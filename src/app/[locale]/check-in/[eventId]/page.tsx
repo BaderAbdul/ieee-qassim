@@ -2,9 +2,8 @@
 
 import React, { useEffect, useState, use, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { doc, getDoc } from 'firebase/firestore';
-import { db, functions } from '@/lib/firebase/client';
-import { httpsCallable } from 'firebase/functions';
+import { doc, getDoc, collection, addDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase/client';
 import { useAuth } from '@/context/AuthContext';
 import { Link } from '@/i18n/routing';
 import { PlatformEvent } from '@/lib/types';
@@ -22,7 +21,7 @@ function CheckInContent({ eventId }: { eventId: string }) {
 
   const { user, loading: authLoading, login } = useAuth();
   
-  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'invalid_token' | 'not_registered' | 'already_checked_in'>('loading');
+  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'invalid_token' | 'not_registered' | 'already_checked_in' | 'server_error'>('loading');
   const [event, setEvent] = useState<PlatformEvent | null>(null);
 
   useEffect(() => {
@@ -32,7 +31,9 @@ function CheckInContent({ eventId }: { eventId: string }) {
       return;
     }
 
-    const checkIn = async () => {
+    let unsubscribe: (() => void) | undefined;
+
+    const initiateCheckIn = async () => {
       try {
         if (!token) {
           setStatus('invalid_token');
@@ -44,30 +45,38 @@ function CheckInContent({ eventId }: { eventId: string }) {
           setEvent({ id: eventSnap.id, ...eventSnap.data() } as PlatformEvent);
         }
 
-        const processCheckIn = httpsCallable(functions, 'processCheckIn');
-        const result = await processCheckIn({ eventId, token });
-        const data = result.data as { status?: string };
+        // Create pending check-in request for the Admin Edge-Server to pick up
+        const requestRef = await addDoc(collection(db, 'pending_checkins'), {
+          eventId,
+          userId: user.uid,
+          token,
+          status: 'pending',
+          timestamp: serverTimestamp()
+        });
 
-        if (data.status === 'already_checked_in') {
-          setStatus('already_checked_in');
-        } else {
-          setStatus('success');
-        }
-      } catch (error: unknown) {
+        // Listen for the Admin Edge-Server to process the request
+        unsubscribe = onSnapshot(requestRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.status === 'approved') {
+              setStatus('success');
+            } else if (data.status === 'rejected') {
+              setStatus(data.error || 'error');
+            }
+          }
+        });
+
+      } catch (error) {
         console.error("Error during check-in", error);
-        
-        const message = error instanceof Error ? error.message : String(error);
-        if (message === 'You are not registered for this event.' || message === 'Your registration is not approved.') {
-          setStatus('not_registered');
-        } else if (message === 'Token is invalid or expired.' || message === 'Token does not match the event.') {
-          setStatus('invalid_token');
-        } else {
-          setStatus('error');
-        }
+        setStatus('error');
       }
     };
 
-    checkIn();
+    initiateCheckIn();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [user, authLoading, eventId, token]);
 
   if (authLoading) {
@@ -192,7 +201,7 @@ function CheckInContent({ eventId }: { eventId: string }) {
           </div>
         )}
 
-        {status === 'error' && (
+        {(status === 'error' || status === 'server_error') && (
           <div className="flex flex-col items-center">
             <div className="h-20 w-20 bg-red-100 rounded-full flex items-center justify-center mb-6 text-red-600 shadow-xs">
               <XCircle className="h-10 w-10" />

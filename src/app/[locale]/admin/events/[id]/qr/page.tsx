@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
-import { doc, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db, functions } from '@/lib/firebase/client';
-import { httpsCallable } from 'firebase/functions';
+import { useEffect, useState, use, useRef } from 'react';
+import { doc, getDoc, collection, query, where, onSnapshot, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase/client';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
 import { ArrowRight, Users } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+
+const TOKEN_ROTATION_MS = 20000; // Rotate token every 20 seconds
 
 export default function AdminQRDisplayPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: eventId } = use(params);
@@ -15,28 +16,28 @@ export default function AdminQRDisplayPage({ params }: { params: Promise<{ id: s
   const [event, setEvent] = useState<PlatformEvent | null>(null);
   const [loading, setLoading] = useState(true);
   const [checkInCount, setCheckInCount] = useState(0);
-  const [token, setToken] = useState<string | null>(null);
+  const [currentToken, setCurrentToken] = useState<string | null>(null);
+  
+  const validTokensRef = useRef<string[]>([]);
+  const processingRef = useRef<Set<string>>(new Set());
 
-  // Rotate token every 45 seconds (token expires in 60s) via Callable Function
+  // Token Generator (Local Edge Server)
   useEffect(() => {
     if (!event || event.state !== 'Ongoing') return;
     
     let isMounted = true;
     
-    const fetchToken = async () => {
-      try {
-        const generateCheckInToken = httpsCallable(functions, 'generateCheckInToken');
-        const result = await generateCheckInToken({ eventId });
-        if (isMounted) {
-          setToken((result.data as { token: string }).token);
-        }
-      } catch (error) {
-        console.error("Error generating token", error);
+    const rotateToken = () => {
+      const newToken = Math.random().toString(36).substring(2, 8).toUpperCase();
+      if (isMounted) {
+        setCurrentToken(newToken);
+        // Keep current and previous token to allow a tiny grace period for network latency
+        validTokensRef.current = [newToken, ...(validTokensRef.current.slice(0, 1))];
       }
     };
 
-    fetchToken();
-    const interval = setInterval(fetchToken, 45000);
+    rotateToken();
+    const interval = setInterval(rotateToken, TOKEN_ROTATION_MS);
     
     return () => {
       isMounted = false;
@@ -60,7 +61,7 @@ export default function AdminQRDisplayPage({ params }: { params: Promise<{ id: s
     fetchEvent();
   }, [eventId]);
 
-  // Real-time listener for check-ins
+  // Real-time listener for check-ins (count)
   useEffect(() => {
     if (!eventId) return;
     const q = query(collection(db, 'attendance_logs'), where('eventId', '==', eventId));
@@ -69,6 +70,74 @@ export default function AdminQRDisplayPage({ params }: { params: Promise<{ id: s
     });
     return () => unsubscribe();
   }, [eventId]);
+
+  // The "Edge Server" listener for pending student check-ins
+  useEffect(() => {
+    if (!eventId || !event || event.state !== 'Ongoing') return;
+    
+    const q = query(
+      collection(db, 'pending_checkins'), 
+      where('eventId', '==', eventId),
+      where('status', '==', 'pending')
+    );
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      snapshot.docChanges().forEach(async (change) => {
+        if (change.type === 'added') {
+          const requestDoc = change.doc;
+          const reqData = requestDoc.data();
+          const { userId, token } = reqData;
+          
+          if (processingRef.current.has(requestDoc.id)) return;
+          processingRef.current.add(requestDoc.id);
+
+          try {
+            // 1. Verify Token
+            if (!validTokensRef.current.includes(token)) {
+              await updateDoc(doc(db, 'pending_checkins', requestDoc.id), { status: 'rejected', error: 'invalid_token' });
+              return;
+            }
+
+            // 2. Verify Registration
+            const regRef = doc(db, 'registrations', `${eventId}_${userId}`);
+            const regSnap = await getDoc(regRef);
+            
+            if (!regSnap.exists() || regSnap.data().status !== 'approved') {
+              await updateDoc(doc(db, 'pending_checkins', requestDoc.id), { status: 'rejected', error: 'not_registered' });
+              return;
+            }
+            
+            if (regSnap.data().attended) {
+              await updateDoc(doc(db, 'pending_checkins', requestDoc.id), { status: 'rejected', error: 'already_checked_in' });
+              return;
+            }
+
+            // 3. Approve and process
+            await addDoc(collection(db, 'attendance_logs'), {
+              eventId,
+              userId,
+              timestamp: serverTimestamp()
+            });
+            
+            await updateDoc(regRef, {
+              attended: true,
+              attendedAt: serverTimestamp()
+            });
+
+            await updateDoc(doc(db, 'pending_checkins', requestDoc.id), { status: 'approved' });
+
+          } catch (error) {
+            console.error("Error processing check-in", error);
+            await updateDoc(doc(db, 'pending_checkins', requestDoc.id), { status: 'rejected', error: 'server_error' });
+          } finally {
+            processingRef.current.delete(requestDoc.id);
+          }
+        }
+      });
+    });
+    
+    return () => unsubscribe();
+  }, [eventId, event]);
 
   if (loading) {
     return <div className="py-20 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div></div>;
@@ -84,9 +153,8 @@ export default function AdminQRDisplayPage({ params }: { params: Promise<{ id: s
     );
   }
 
-  // Generate the check-in URL that students will scan
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-  const checkInUrl = `${baseUrl}/check-in/${eventId}?token=${token}`;
+  const checkInUrl = `${baseUrl}/check-in/${eventId}?token=${currentToken || ''}`;
 
   return (
     <div className="min-h-[80vh] flex flex-col items-center justify-center p-4">
@@ -103,8 +171,8 @@ export default function AdminQRDisplayPage({ params }: { params: Promise<{ id: s
 
         {/* QR Code Area */}
         <div className="p-12 flex flex-col items-center">
-          {token ? (
-            <div className="bg-white p-4 rounded-3xl shadow-md border-4 border-purple-100 mb-8 inline-block">
+          {currentToken ? (
+            <div className="bg-white p-4 rounded-3xl shadow-md border-4 border-purple-100 mb-8 inline-block transition-opacity duration-300">
               <QRCodeSVG 
                 value={checkInUrl} 
                 size={300}
@@ -120,7 +188,7 @@ export default function AdminQRDisplayPage({ params }: { params: Promise<{ id: s
           
           <div className="flex items-center text-gray-500 bg-gray-50 px-6 py-3 rounded-full">
             <div className="animate-pulse h-2 w-2 bg-green-500 rounded-full me-2"></div>
-            يتم تحديث الرمز التلقائياً لمنع التلاعب
+            يتم تحديث الرمز تلقائياً لمنع التلاعب
           </div>
         </div>
 
