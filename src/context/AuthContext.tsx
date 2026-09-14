@@ -57,18 +57,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (userSnap.exists()) {
           setUserData(userSnap.data() as UserData);
         } else {
-          // Check if domain is allowed
-          const allowedDomain = process.env.NEXT_PUBLIC_ALLOWED_DOMAIN;
-          const emailDomain = currentUser.email?.split('@')[1];
-          
-          if (allowedDomain && emailDomain !== allowedDomain) {
-            await signOut(auth);
-            setUser(null);
-            setUserData(null);
-            alert(`Only ${allowedDomain} emails are allowed.`);
-            setLoading(false);
-            return;
-          }
 
           const newUserData: UserData = {
             role: 'student', // Default role
@@ -93,10 +81,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const login = async () => {
-    const allowedDomain = process.env.NEXT_PUBLIC_ALLOWED_DOMAIN;
-    if (allowedDomain) {
-      googleProvider.setCustomParameters({ hd: allowedDomain });
-    }
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
