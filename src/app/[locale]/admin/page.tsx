@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { collection, query, getDocs, where, doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
-import { Users, Calendar, CheckSquare, Award, Save, Settings } from 'lucide-react';
+import { Users, Calendar, CheckSquare, Award, Save, Settings, Star, LayoutTemplate } from 'lucide-react';
+import { PlatformEvent } from '@/lib/types';
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState({
@@ -16,10 +17,12 @@ export default function AdminDashboardPage() {
   const [heroStats, setHeroStats] = useState({
     membersCount: '+500',
     eventsCount: '+25',
-    tracksCount: '4'
+    tracksCount: '4',
+    featuredEventId: '',
+    showStructure: true,
   });
   const [savingHeroStats, setSavingHeroStats] = useState(false);
-  
+  const [allEvents, setAllEvents] = useState<PlatformEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,6 +31,10 @@ export default function AdminDashboardPage() {
         const usersSnap = await getDocs(collection(db, 'users'));
         const eventsQ = query(collection(db, 'events'), where('state', 'in', ['Published', 'Registration Open', 'Ongoing']));
         const eventsSnap = await getDocs(eventsQ);
+        
+        // Fetch all published/open/ongoing events to populate dropdown
+        const evs = eventsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as PlatformEvent));
+        setAllEvents(evs);
         
         const regsSnap = await getDocs(collection(db, 'registrations'));
         const certsSnap = await getDocs(collection(db, 'certificates'));
@@ -42,7 +49,7 @@ export default function AdminDashboardPage() {
         // Fetch Hero Stats Settings
         const heroDoc = await getDoc(doc(db, 'settings', 'homepage'));
         if (heroDoc.exists()) {
-          setHeroStats(heroDoc.data() as any);
+          setHeroStats(prev => ({ ...prev, ...heroDoc.data() }));
         }
 
       } catch (error) {
@@ -157,14 +164,48 @@ export default function AdminDashboardPage() {
           </form>
         </div>
 
-        <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900 font-cairo mb-4">أهلاً بك في لوحة الإدارة</h2>
-          <p className="text-gray-600 mb-4">
-            من هنا يمكنك إدارة الفعاليات، متابعة تسجيلات الطلاب، إصدار الشهادات، وتسجيل الحضور باستخدام رمز (QR Code).
-          </p>
-          <p className="text-gray-600">
-            استخدم القائمة الجانبية للوصول إلى الأقسام المختلفة.
-          </p>
+        <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 flex flex-col justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 font-cairo mb-4 flex items-center gap-2">
+              <Star className="h-5 w-5 text-yellow-500" />
+              الفعالية المميزة في الرئيسية
+            </h2>
+            <p className="text-gray-500 text-sm mb-6">
+              اختر الفعالية التي ستظهر في الكرت الرئيسي في واجهة الموقع. إذا تركت فارغة، سيتم عرض أحدث فعالية تلقائياً.
+            </p>
+            <div className="mb-8">
+              <label className="block text-sm font-medium text-gray-700 mb-2">الفعالية المميزة</label>
+              <select
+                value={heroStats.featuredEventId || ''}
+                onChange={e => setHeroStats({...heroStats, featuredEventId: e.target.value})}
+                className="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 border bg-white"
+              >
+                <option value="">-- تلقائي (أحدث فعالية) --</option>
+                {allEvents.map(ev => (
+                  <option key={ev.id} value={ev.id}>{ev.title}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="pt-6 border-t border-gray-100">
+            <h2 className="text-xl font-bold text-gray-900 font-cairo mb-4 flex items-center gap-2">
+              <LayoutTemplate className="h-5 w-5 text-indigo-500" />
+              هيكلة وإدارات النادي (IEEE Structure)
+            </h2>
+            <p className="text-gray-500 text-sm mb-4">
+              التحكم في ظهور قسم "هيكلة مجتمع IEEE" في الصفحة الرئيسية.
+            </p>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={heroStats.showStructure ?? true}
+                onChange={e => setHeroStats({...heroStats, showStructure: e.target.checked})}
+                className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm font-bold text-gray-700">عرض قسم هيكلة النادي للزوار</span>
+            </label>
+          </div>
         </div>
       </div>
     </div>

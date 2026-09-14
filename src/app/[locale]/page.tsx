@@ -15,19 +15,37 @@ export default function HomePage() {
   const isAr = locale === 'ar';
   const { user, login } = useAuth();
   
-  const [stats, setStats] = useState({ membersCount: '+500', eventsCount: '+25', tracksCount: '4' });
+  const [stats, setStats] = useState({ membersCount: '+500', eventsCount: '+25', tracksCount: '4', featuredEventId: '', showStructure: true });
   const [latestEvent, setLatestEvent] = useState<PlatformEvent | null>(null);
 
   useEffect(() => {
     const fetchHomepageData = async () => {
       try {
-        // Fetch Stats
+        let featuredId = '';
         const statsDoc = await getDoc(doc(db, 'settings', 'homepage'));
         if (statsDoc.exists()) {
-          setStats(statsDoc.data() as any);
+          const data = statsDoc.data() as any;
+          setStats(data);
+          featuredId = data.featuredEventId;
         }
 
-        // Fetch Latest Event
+        if (featuredId) {
+          const evDoc = await getDoc(doc(db, 'events', featuredId));
+          if (evDoc.exists()) {
+            setLatestEvent({ id: evDoc.id, ...evDoc.data() } as PlatformEvent);
+          } else {
+            // Fallback if featured event was deleted
+            fetchLatestEventFallback();
+          }
+        } else {
+          fetchLatestEventFallback();
+        }
+      } catch (error) {
+        console.error("Error fetching homepage data:", error);
+      }
+    };
+    
+    const fetchLatestEventFallback = async () => {
         const eventsQ = query(
           collection(db, 'events'),
           where('state', 'in', ['Published', 'Registration Open', 'Ongoing']),
@@ -39,10 +57,8 @@ export default function HomePage() {
           const evDoc = eventsSnap.docs[0];
           setLatestEvent({ id: evDoc.id, ...evDoc.data() } as PlatformEvent);
         }
-      } catch (error) {
-        console.error("Error fetching homepage data:", error);
-      }
     };
+
     fetchHomepageData();
   }, []);
 
@@ -110,55 +126,81 @@ export default function HomePage() {
             </div>
           </div>
           
-          {/* Right Column: Visual Ecosystem */}
-          <div className="relative hidden lg:block h-full min-h-[450px]">
-            {/* Main Event Card (Float) */}
-            <div className="absolute top-10 rtl:left-8 ltr:right-8 w-72 bg-white rounded-2xl p-5 shadow-2xl shadow-slate-200/50 border border-slate-100 text-slate-900 animate-float z-20">
+          {/* Right Column: Visual Ecosystem (Overlapping Cards) */}
+          <div className="relative hidden lg:block h-full min-h-[500px]">
+            
+            {/* Card 1: Featured Event (Top Right) */}
+            <div className="absolute top-0 rtl:left-0 ltr:right-0 w-80 bg-white rounded-3xl p-5 shadow-2xl shadow-blue-900/10 border border-slate-100 z-30 transform hover:-translate-y-2 transition-transform duration-300">
               <div className="flex items-center justify-between mb-4">
-                <div className="bg-blue-50 text-blue-700 text-xs font-bold px-3 py-1 rounded-full">{t('Hero.cardEvent')}</div>
-                <Calendar className="h-5 w-5 text-slate-400" />
+                <div className="bg-blue-50 text-blue-700 text-[10px] font-black tracking-wider uppercase px-3 py-1.5 rounded-full">{t('Hero.cardEvent')}</div>
+                <div className="bg-slate-50 text-slate-500 text-[10px] font-bold px-2 py-1 rounded-md">24 Oct</div>
               </div>
-              <div className="w-full h-24 bg-gradient-to-br from-[#00629B] to-blue-800 rounded-xl mb-4 flex items-center justify-center overflow-hidden shadow-inner relative">
-                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
-                 <span className="text-white font-bold text-lg font-cairo relative z-10">IEEE QU</span>
+              <div className="w-full h-32 bg-gradient-to-br from-[#00629B] to-indigo-700 rounded-2xl mb-4 relative overflow-hidden group">
+                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+                 <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors duration-300"></div>
+                 <div className="absolute bottom-3 right-3 left-3">
+                   <h4 className="text-white font-bold text-sm leading-tight">معسكر الذكاء الاصطناعي</h4>
+                   <p className="text-blue-100 text-[10px] mt-1">150 مسجل • تبدأ قريباً</p>
+                 </div>
               </div>
-              <div className="h-4 w-3/4 bg-slate-100 rounded-md mb-3"></div>
-              <div className="h-3 w-1/2 bg-slate-50 rounded-md"></div>
+              <div className="flex items-center justify-between">
+                <div className="flex -space-x-2 rtl:space-x-reverse">
+                  <div className="h-6 w-6 rounded-full border-2 border-white bg-blue-100"></div>
+                  <div className="h-6 w-6 rounded-full border-2 border-white bg-indigo-100"></div>
+                  <div className="h-6 w-6 rounded-full border-2 border-white bg-purple-100"></div>
+                </div>
+                <span className="text-[10px] font-bold text-slate-500">+147 انضموا</span>
+              </div>
             </div>
 
-            {/* Points Card (Float Delayed) */}
-            <div className="absolute top-56 rtl:right-0 ltr:left-0 w-64 bg-white rounded-2xl p-5 shadow-2xl shadow-slate-200/60 border border-slate-100 text-slate-800 animate-float-delayed z-10">
-              <div className="flex items-center gap-4">
-                <div className="bg-gradient-to-br from-yellow-100 to-amber-100 p-3 rounded-full text-amber-600 ring-4 ring-white shadow-sm">
+            {/* Card 2: Points / Leaderboard (Middle Left, Overlapping) */}
+            <div className="absolute top-32 rtl:-right-8 ltr:-left-8 w-64 bg-white/95 backdrop-blur-xl rounded-3xl p-5 shadow-xl shadow-slate-200/50 border border-slate-100/50 z-20 transform -rotate-2 hover:rotate-0 hover:-translate-y-1 transition-all duration-300">
+              <div className="flex items-start gap-4">
+                <div className="bg-gradient-to-br from-yellow-100 to-amber-100 p-3.5 rounded-2xl text-amber-600 shadow-sm">
                   <Trophy className="h-6 w-6" />
                 </div>
-                <div>
-                  <div className="text-xl font-black text-slate-800 mb-1 font-cairo">{t('Hero.cardPoints')}</div>
-                  <div className="h-2 w-20 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-yellow-400 to-amber-500 w-3/4 rounded-full"></div>
+                <div className="flex-1">
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">نقاطك</div>
+                  <div className="text-2xl font-black text-slate-800 font-cairo flex items-baseline gap-1">
+                    450 <span className="text-xs font-bold text-emerald-500">+50</span>
                   </div>
+                  <div className="mt-3 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-yellow-400 to-amber-500 w-[85%] rounded-full relative">
+                      <div className="absolute top-0 right-0 bottom-0 w-full bg-white/20 animate-pulse"></div>
+                    </div>
+                  </div>
+                  <div className="text-[10px] font-bold text-slate-400 mt-1.5 text-end">باقي 50 للمستوى القادم</div>
                 </div>
               </div>
             </div>
 
-            {/* Activity Card (Float) */}
-            <div className="absolute bottom-4 rtl:left-24 ltr:right-24 w-72 bg-white rounded-2xl p-5 shadow-2xl shadow-slate-200/60 border border-slate-100 text-slate-800 animate-float z-30">
+            {/* Card 3: Activity/Certificate (Bottom Right, Overlapping) */}
+            <div className="absolute bottom-10 rtl:left-12 ltr:right-12 w-72 bg-[#002855] rounded-3xl p-5 shadow-2xl shadow-blue-900/30 border border-blue-800 z-40 transform rotate-2 hover:rotate-0 hover:-translate-y-1 transition-all duration-300">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="bg-gradient-to-br from-emerald-100 to-green-100 p-2 rounded-full text-emerald-600 ring-4 ring-white shadow-sm">
-                    <UserCircle className="h-6 w-6" />
+                  <div className="bg-blue-500/20 p-2.5 rounded-2xl text-blue-300 ring-1 ring-white/10">
+                    <UserCircle className="h-5 w-5" />
                   </div>
                   <div>
-                    <div className="text-sm font-bold text-slate-800">{t('Hero.cardActivity')}</div>
-                    <div className="text-xs text-slate-500 mt-0.5 font-medium">IEEE Qassim</div>
+                    <div className="text-sm font-bold text-white tracking-wide">{t('Hero.cardActivity')}</div>
+                    <div className="text-[10px] text-blue-300 font-medium">شهادة معتمدة صدرت</div>
                   </div>
                 </div>
-                <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
+                <div className="h-2 w-2 rounded-full bg-emerald-400 animate-ping shadow-[0_0_12px_rgba(52,211,153,0.8)]"></div>
               </div>
-              <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-emerald-400 to-green-500 w-full rounded-full"></div>
+              <div className="bg-white/5 rounded-xl p-3 border border-white/10 flex items-center gap-3">
+                <div className="h-10 w-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-lg flex items-center justify-center shadow-inner">
+                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white">أساسيات إنترنت الأشياء</div>
+                  <div className="text-[10px] text-emerald-400 font-medium mt-0.5">تم توثيق حضورك بنجاح</div>
+                </div>
               </div>
             </div>
+
           </div>
         </div>
       </section>
@@ -287,6 +329,68 @@ export default function HomePage() {
 
         </div>
       </section>
+
+      {/* IEEE QU Structure (Admin Controlled) */}
+      {stats.showStructure !== false && (
+        <section className="py-16 bg-white border-t border-slate-100 mt-8 relative overflow-hidden">
+          <div className="absolute top-0 right-1/4 w-96 h-96 bg-blue-50 rounded-full blur-[100px] pointer-events-none opacity-60"></div>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-black font-cairo text-slate-900 mb-4">هيكلة النادي</h2>
+              <p className="text-slate-500 font-medium max-w-2xl mx-auto">
+                يتكون الفرع الطلابي لجمعية مهندسي الكهرباء والإلكترونيات (IEEE) بجامعة القصيم من عدة لجان ومسارات تعمل بتكامل لتحقيق أهداف النادي.
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              
+              {/* Committee 1 */}
+              <div className="bg-[#F8FAFC] border border-slate-100 rounded-3xl p-6 text-center hover:shadow-xl hover:shadow-blue-900/5 hover:-translate-y-1 transition-all duration-300">
+                <div className="h-16 w-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-inner">
+                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-black font-cairo text-slate-900 mb-2">لجنة العلاقات العامة</h3>
+                <p className="text-sm text-slate-500">حلقة الوصل بين النادي والجهات الخارجية والمجتمع الطلابي.</p>
+              </div>
+
+              {/* Committee 2 */}
+              <div className="bg-[#F8FAFC] border border-slate-100 rounded-3xl p-6 text-center hover:shadow-xl hover:shadow-indigo-900/5 hover:-translate-y-1 transition-all duration-300">
+                <div className="h-16 w-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-inner">
+                  <Calendar className="w-8 h-8" />
+                </div>
+                <h3 className="text-lg font-black font-cairo text-slate-900 mb-2">لجنة التنظيم</h3>
+                <p className="text-sm text-slate-500">الإشراف اللوجستي وتنسيق سير الفعاليات وورش العمل بكفاءة عالية.</p>
+              </div>
+
+              {/* Committee 3 */}
+              <div className="bg-[#F8FAFC] border border-slate-100 rounded-3xl p-6 text-center hover:shadow-xl hover:shadow-emerald-900/5 hover:-translate-y-1 transition-all duration-300">
+                <div className="h-16 w-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-inner">
+                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-black font-cairo text-slate-900 mb-2">المسار التقني</h3>
+                <p className="text-sm text-slate-500">تقديم المحتوى العلمي وتجهيز المعسكرات والمسابقات التقنية.</p>
+              </div>
+
+              {/* Committee 4 */}
+              <div className="bg-[#F8FAFC] border border-slate-100 rounded-3xl p-6 text-center hover:shadow-xl hover:shadow-pink-900/5 hover:-translate-y-1 transition-all duration-300">
+                <div className="h-16 w-16 bg-pink-100 text-pink-600 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-inner">
+                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-black font-cairo text-slate-900 mb-2">المسار الإعلامي</h3>
+                <p className="text-sm text-slate-500">التوثيق المرئي وصناعة المحتوى وإدارة حسابات التواصل الاجتماعي.</p>
+              </div>
+
+            </div>
+          </div>
+        </section>
+      )}
+
     </div>
   );
 }

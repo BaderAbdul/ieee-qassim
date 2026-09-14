@@ -9,7 +9,20 @@ if (process.env.MOCK_FONTS === 'true') {
 const withNextIntl = createNextIntlPlugin();
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  async redirects() {
+    return [
+      {
+        source: '/my-activity',
+        destination: '/profile',
+        permanent: true,
+      },
+      {
+        source: '/:locale/my-activity',
+        destination: '/:locale/profile',
+        permanent: true,
+      }
+    ];
+  },
 };
 
 export default withNextIntl(nextConfig);

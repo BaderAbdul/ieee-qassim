@@ -16,8 +16,8 @@ import {
 } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase/client';
 import { httpsCallable } from 'firebase/functions';
-import { PlatformEvent, Certificate } from '@/lib/types';
-import { formatDateSafe } from '@/lib/dateUtils';
+import { PlatformEvent, Certificate, PointTransaction } from '@/lib/types';
+import { formatDateSafe, toJsDate } from '@/lib/dateUtils';
 import { ar, enUS } from 'date-fns/locale';
 import { 
   Trophy, 
@@ -34,15 +34,21 @@ import {
   ShieldCheck,
   AlertCircle,
   RefreshCw,
-  Clock
+  Clock,
+  ArrowUpRight
 } from 'lucide-react';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
-interface ExtendedRegistration {
+interface CertificateData extends Certificate {
+  eventTitle: string;
+}
+
+interface RegistrationWithEvent {
   id: string;
   status: string;
   timestamp: unknown;
   event: PlatformEvent;
+  certificate?: CertificateData;
 }
 
 interface BadgeDef {
@@ -117,6 +123,7 @@ const ALL_BADGES: BadgeDef[] = [
 
 export default function EngineeringProfilePage() {
   const t = useTranslations('Profile');
+  const tActivity = useTranslations('Activity');
   const tCommon = useTranslations('Common');
   const tOnboard = useTranslations('Onboarding');
   const locale = useLocale();
@@ -128,11 +135,16 @@ export default function EngineeringProfilePage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [registrations, setRegistrations] = useState<ExtendedRegistration[]>([]);
-  const [certificates, setCertificates] = useState<Certificate[]>([]);
+  
+  const [registrations, setRegistrations] = useState<RegistrationWithEvent[]>([]);
+  const [certificates, setCertificates] = useState<CertificateData[]>([]);
+  const [transactions, setTransactions] = useState<PointTransaction[]>([]);
+  
   const [userRank, setUserRank] = useState<number | null>(null);
   const [downloadingCert, setDownloadingCert] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  
+  const [activeTab, setActiveTab] = useState<'events' | 'points' | 'certificates'>('events');
 
   useEffect(() => {
     let active = true;
@@ -144,11 +156,21 @@ export default function EngineeringProfilePage() {
     const loadData = async () => {
       try {
         setError(null);
+        
         // 1. Fetch Registrations
         const regQ = query(collection(db, 'registrations'), where('userId', '==', user.uid));
         const regSnap = await getDocs(regQ);
 
-        const regsWithEvents: ExtendedRegistration[] = [];
+        // 2. Fetch Certificates
+        const certQ = query(collection(db, 'certificates'), where('userId', '==', user.uid));
+        const certSnap = await getDocs(certQ);
+        const certsData = certSnap.docs.map(d => ({ id: d.id, ...d.data() })) as CertificateData[];
+        const certsByEvent = certsData.reduce((acc, cert) => {
+          acc[cert.eventId] = cert;
+          return acc;
+        }, {} as Record<string, CertificateData>);
+
+        const regsWithEvents: RegistrationWithEvent[] = [];
         for (const rDoc of regSnap.docs) {
           const rData = rDoc.data();
           const eventDoc = await getDoc(doc(db, 'events', rData.eventId));
@@ -158,23 +180,28 @@ export default function EngineeringProfilePage() {
               status: rData.status,
               timestamp: rData.timestamp || rData.registeredAt,
               event: { id: eventDoc.id, ...eventDoc.data() } as PlatformEvent,
+              certificate: certsByEvent[eventDoc.id]
             });
           }
         }
 
-        // Sort chronological descending
         regsWithEvents.sort((a, b) => {
-          const timeA = new Date(formatDateSafe(a.timestamp, 'yyyy-MM-dd HH:mm:ss')).getTime() || 0;
-          const timeB = new Date(formatDateSafe(b.timestamp, 'yyyy-MM-dd HH:mm:ss')).getTime() || 0;
+          const timeA = toJsDate(a.timestamp)?.getTime() || 0;
+          const timeB = toJsDate(b.timestamp)?.getTime() || 0;
           return timeB - timeA;
         });
 
-        // 2. Fetch Certificates
-        const certQ = query(collection(db, 'certificates'), where('userId', '==', user.uid));
-        const certSnap = await getDocs(certQ);
-        const certs = certSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Certificate[];
+        // 3. Fetch Point Transactions
+        const ptQ = query(collection(db, 'point_transactions'), where('userId', '==', user.uid));
+        const ptSnap = await getDocs(ptQ);
+        const ptsData = ptSnap.docs.map(d => ({ id: d.id, ...d.data() })) as PointTransaction[];
+        ptsData.sort((a, b) => {
+          const tA = toJsDate(a.createdAt)?.getTime() || 0;
+          const tB = toJsDate(b.createdAt)?.getTime() || 0;
+          return tB - tA;
+        });
 
-        // 3. Compute Community Rank from Leaderboard
+        // 4. Compute Community Rank from Leaderboard
         const rankQ = query(collection(db, 'users'), orderBy('totalPoints', 'desc'), limit(100));
         const rankSnap = await getDocs(rankQ);
         let rankIndex: number | null = null;
@@ -189,11 +216,16 @@ export default function EngineeringProfilePage() {
 
         if (active) {
           setRegistrations(regsWithEvents);
-          setCertificates(certs);
+          setCertificates(certsData.sort((a, b) => {
+            const tA = toJsDate(a.issueDate || a.createdAt)?.getTime() || 0;
+            const tB = toJsDate(b.issueDate || b.createdAt)?.getTime() || 0;
+            return tB - tA;
+          }));
+          setTransactions(ptsData);
           setUserRank(rankIndex || 1);
         }
       } catch (err) {
-        console.error('Error fetching engineering profile data:', err);
+        console.error('Error fetching profile data:', err);
         if (active) {
           setError(isAr ? 'حدث خطأ أثناء تحميل بيانات الملف.' : 'Failed to load profile data.');
         }
@@ -231,7 +263,6 @@ export default function EngineeringProfilePage() {
     }
   };
 
-  // Auth gate
   if (authLoading) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center">
@@ -263,10 +294,15 @@ export default function EngineeringProfilePage() {
     );
   }
 
-  // Profile fields using new onboarding data
-  const displayName = userData?.arabicFullName || user.displayName || user.email?.split('@')[0] || 'Community Member';
+  const getFirstAndLastName = (fullName?: string, fallback?: string | null) => {
+    if (!fullName) return fallback || 'Student';
+    const parts = fullName.split(' ').filter(Boolean);
+    if (parts.length === 1) return parts[0];
+    return `${parts[0]} ${parts[parts.length - 1]}`;
+  };
+
+  const displayName = getFirstAndLastName(userData?.arabicFullName, user?.displayName);
   
-  // Format college and major nice
   const getLabel = (type: 'colleges' | 'majors' | 'levels', val?: string | null) => {
     if (!val) return '';
     try {
@@ -282,16 +318,15 @@ export default function EngineeringProfilePage() {
     
   const academicLevel = userData?.academicLevel ? getLabel('levels', userData.academicLevel) : '';
   const isQassimStudent = userData?.isQassimStudent;
-  const universityId = isQassimStudent && userData?.universityId ? `***${userData.universityId.slice(-4)}` : null; // Partially hidden for privacy
+  const universityId = isQassimStudent && userData?.universityId ? `***${userData.universityId.slice(-4)}` : null;
 
   const totalPoints = userData?.totalPoints ?? 0;
   const attendedCount = registrations.filter(r => r.status === 'attended' || r.status === 'approved').length;
 
   return (
-    <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 lg:px-8 mt-16">
+      <div className="max-w-5xl mx-auto space-y-8">
 
-        {/* Error Notification */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-2xl flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -311,12 +346,11 @@ export default function EngineeringProfilePage() {
           </div>
         )}
 
-        {/* 1. Student Header Card */}
+        {/* 1. Header Card */}
         <section className="relative overflow-hidden bg-white rounded-3xl border border-gray-100 shadow-sm p-6 sm:p-10">
           <div className="absolute -top-24 -end-24 w-72 h-72 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full blur-3xl opacity-60 pointer-events-none" />
           
           <div className="relative z-10 flex flex-col md:flex-row items-center md:items-start gap-6 sm:gap-8">
-            {/* Avatar */}
             <div className="relative">
               <div className="h-28 w-28 sm:h-32 sm:w-32 rounded-3xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black text-4xl flex items-center justify-center overflow-hidden shadow-xl shadow-blue-500/20 border-4 border-white">
                 {user.photoURL ? (
@@ -330,7 +364,6 @@ export default function EngineeringProfilePage() {
               </div>
             </div>
 
-            {/* Profile Info */}
             <div className="flex-1 text-center md:text-start space-y-2.5">
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5">
                 <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100">
@@ -365,7 +398,6 @@ export default function EngineeringProfilePage() {
               </div>
             </div>
 
-            {/* Action link */}
             <div className="flex flex-col sm:flex-row gap-3">
               <Link
                 href="/events"
@@ -380,7 +412,6 @@ export default function EngineeringProfilePage() {
 
         {/* 2. Gamification Summary Cards */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          {/* Points */}
           <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex items-center gap-4">
             <div className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-400 text-white flex items-center justify-center shadow-md shadow-amber-500/20 flex-shrink-0">
               <Trophy className="h-7 w-7" />
@@ -395,7 +426,6 @@ export default function EngineeringProfilePage() {
             </div>
           </div>
 
-          {/* Community Rank */}
           <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex items-center gap-4">
             <div className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center shadow-md shadow-blue-500/20 flex-shrink-0">
               <Sparkles className="h-7 w-7" />
@@ -410,7 +440,6 @@ export default function EngineeringProfilePage() {
             </div>
           </div>
 
-          {/* Events Attended */}
           <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex items-center gap-4">
             <div className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/20 flex-shrink-0">
               <Calendar className="h-7 w-7" />
@@ -425,7 +454,6 @@ export default function EngineeringProfilePage() {
             </div>
           </div>
 
-          {/* Certificates Earned */}
           <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex items-center gap-4">
             <div className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-purple-600 to-pink-500 text-white flex items-center justify-center shadow-md shadow-purple-500/20 flex-shrink-0">
               <Award className="h-7 w-7" />
@@ -523,196 +551,243 @@ export default function EngineeringProfilePage() {
           </div>
         </section>
 
-        {/* 4. Activity Ledger & Verified Certificates Split Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          
-          {/* Activity & Attendance Ledger (7 cols) */}
-          <section className="lg:col-span-7 bg-white rounded-3xl border border-gray-100 shadow-sm p-6 sm:p-8 space-y-6">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
-              <div>
-                <h2 className="text-xl font-bold font-cairo text-slate-900 flex items-center gap-2.5">
-                  <Clock className="h-5 w-5 text-blue-600" />
-                  <span>{t('activityLedger')}</span>
-                </h2>
-                <span className="text-xs text-slate-500">
-                  {registrations.length} {isAr ? 'سجل تفاعلي' : 'recorded items'}
-                </span>
-              </div>
-              <Link
-                href="/events"
-                className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline"
-              >
-                {t('exploreEvents')}
-              </Link>
-            </div>
+        {/* 4. Activity, Points, and Certificates Tabs */}
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="flex border-b border-slate-100">
+            <button 
+              onClick={() => setActiveTab('events')}
+              className={`flex-1 py-4 sm:py-5 font-bold text-center transition-all text-sm sm:text-base font-cairo flex items-center justify-center gap-2 ${
+                activeTab === 'events' 
+                  ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50/50' 
+                  : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              <span>{tActivity('tabs.events')}</span>
+              <span className={`px-2 py-0.5 rounded-full text-xs ${
+                activeTab === 'events' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+              }`}>
+                {registrations.length}
+              </span>
+            </button>
 
+            <button 
+              onClick={() => setActiveTab('points')}
+              className={`flex-1 py-4 sm:py-5 font-bold text-center transition-all text-sm sm:text-base font-cairo flex items-center justify-center gap-2 ${
+                activeTab === 'points' 
+                  ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50/50' 
+                  : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              <span>{tActivity('tabs.points')}</span>
+              <span className={`px-2 py-0.5 rounded-full text-xs ${
+                activeTab === 'points' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+              }`}>
+                {transactions.length}
+              </span>
+            </button>
+
+            <button 
+              onClick={() => setActiveTab('certificates')}
+              className={`flex-1 py-4 sm:py-5 font-bold text-center transition-all text-sm sm:text-base font-cairo flex items-center justify-center gap-2 ${
+                activeTab === 'certificates' 
+                  ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50/50' 
+                  : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              <span>{tActivity('tabs.certificates')}</span>
+              <span className={`px-2 py-0.5 rounded-full text-xs ${
+                activeTab === 'certificates' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+              }`}>
+                {certificates.length}
+              </span>
+            </button>
+          </div>
+
+          <div className="p-6 sm:p-8 min-h-[300px]">
             {loading ? (
-              <div className="space-y-3 py-6">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="h-16 bg-slate-100 rounded-2xl animate-pulse" />
-                ))}
-              </div>
-            ) : registrations.length === 0 ? (
-              <div className="text-center py-12 px-4 space-y-3">
-                <div className="h-16 w-16 bg-blue-50 text-blue-400 rounded-full flex items-center justify-center mx-auto">
-                  <Calendar className="h-8 w-8" />
-                </div>
-                <h3 className="font-bold text-slate-800 text-base font-cairo">
-                  {t('noActivity')}
-                </h3>
-                <p className="text-slate-500 text-xs max-w-sm mx-auto">
-                  {t('noActivityDesc')}
-                </p>
-                <Link
-                  href="/events"
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-xl transition-colors mt-2"
-                >
-                  <span>{t('exploreEvents')}</span>
-                  <ArrowRight className="h-3.5 w-3.5 rtl:-scale-x-100" />
-                </Link>
+              <div className="flex justify-center items-center h-40">
+                <LoadingSpinner size="md" color="border-blue-600" />
               </div>
             ) : (
-              <div className="space-y-3">
-                {registrations.map((reg) => {
-                  const eventDate = reg.event.date;
-                  const isAttended = reg.status === 'attended';
-                  return (
-                    <div
-                      key={reg.id}
-                      className="p-4 rounded-2xl border border-slate-100 hover:border-blue-100 hover:bg-slate-50/50 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                    >
-                      <div className="flex items-start gap-3.5">
-                        <div className={`h-11 w-11 rounded-xl flex items-center justify-center flex-shrink-0 text-white font-bold text-sm ${
-                          isAttended ? 'bg-emerald-500 shadow-sm shadow-emerald-500/20' : 'bg-blue-600 shadow-sm shadow-blue-500/20'
-                        }`}>
-                          {isAttended ? <CheckCircle className="h-5 w-5" /> : <Calendar className="h-5 w-5" />}
+              <>
+                {/* Events Tab */}
+                {activeTab === 'events' && (
+                  <div className="space-y-4">
+                    {registrations.length === 0 ? (
+                      <div className="text-center py-16 flex flex-col items-center">
+                        <Calendar className="h-16 w-16 text-slate-200 mb-4" />
+                        <h3 className="text-xl font-bold text-slate-800 font-cairo mb-2">{tActivity('noEvents')}</h3>
+                        <Link href="/events" className="mt-4 bg-blue-600 text-white font-bold py-2.5 px-6 rounded-xl hover:bg-blue-700 transition-colors shadow-xs">
+                          {isAr ? 'تصفح الفعاليات' : 'Browse Events'}
+                        </Link>
+                      </div>
+                    ) : (
+                      registrations.map((reg, idx) => (
+                        <div 
+                          key={idx} 
+                          className="border border-slate-100 rounded-2xl p-5 hover:bg-slate-50/50 hover:border-blue-100 transition-all shadow-xs flex flex-col gap-4 text-start"
+                        >
+                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div className="flex items-start gap-4">
+                              <div className="h-12 w-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center flex-shrink-0">
+                                <Calendar className="h-6 w-6" />
+                              </div>
+                              <div>
+                                <Link 
+                                  href={`/events/${reg.event.id}`}
+                                  className="font-bold text-slate-900 text-base hover:text-blue-600 transition-colors block"
+                                >
+                                  {isAr ? reg.event.title : (reg.event.titleEn || reg.event.title)}
+                                </Link>
+                                <div className="flex items-center text-xs text-slate-500 mt-1">
+                                  <Clock className="h-3.5 w-3.5 me-1 text-slate-400" />
+                                  <span>{formatDateSafe(reg.timestamp, 'dd MMMM yyyy', { locale: dateLocale })}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 self-start md:self-center">
+                              <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                reg.status === 'approved' || reg.status === 'attended' 
+                                  ? 'bg-emerald-100 text-emerald-800' 
+                                  : reg.status === 'waitlisted' 
+                                    ? 'bg-amber-100 text-amber-800' 
+                                    : reg.status === 'cancelled' 
+                                      ? 'bg-red-100 text-red-800' 
+                                      : 'bg-slate-100 text-slate-700'
+                              }`}>
+                                {reg.status === 'approved' ? tActivity('statusApproved') :
+                                 reg.status === 'waitlisted' ? tActivity('statusWaitlisted') :
+                                 reg.status === 'cancelled' ? tActivity('statusCancelled') :
+                                 reg.status === 'attended' ? (isAr ? 'تم الحضور' : 'Attended') : reg.status}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {reg.certificate && (
+                            <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                              <span className="text-xs font-medium text-emerald-700 flex items-center gap-1.5">
+                                <CheckCircle className="h-3.5 w-3.5" />
+                                <span>{isAr ? 'شهادة الحضور معتمدة' : 'Verified Certificate Available'}</span>
+                              </span>
+                              <button
+                                onClick={() => handleDownloadCertificate(reg.certificate!.id)}
+                                disabled={downloadingCert === reg.certificate!.id}
+                                className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                <span>{isAr ? 'عرض الشهادة' : 'View Certificate'}</span>
+                              </button>
+                            </div>
+                          )}
                         </div>
-                        <div>
-                          <Link 
-                            href={`/events/${reg.event.id}`}
-                            className="font-bold text-slate-900 text-sm hover:text-blue-600 transition-colors block line-clamp-1"
-                          >
-                            {isAr ? reg.event.title : (reg.event.titleEn || reg.event.title)}
-                          </Link>
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-1">
-                            <span>{formatDateSafe(eventDate, 'd MMMM yyyy', { locale: dateLocale })}</span>
-                            <span>•</span>
-                            <span className="bg-slate-100 px-2 py-0.5 rounded text-[11px] font-semibold text-slate-600">
-                              {reg.event.type}
-                            </span>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {/* Points Tab */}
+                {activeTab === 'points' && (
+                  <div className="space-y-3">
+                    {transactions.length === 0 ? (
+                      <div className="text-center py-16 flex flex-col items-center">
+                        <Trophy className="h-16 w-16 text-slate-200 mb-4" />
+                        <h3 className="text-xl font-bold text-slate-800 font-cairo mb-2">{tActivity('noPoints')}</h3>
+                      </div>
+                    ) : (
+                      transactions.map((tx) => (
+                        <div 
+                          key={tx.id} 
+                          className="border border-slate-100 rounded-2xl p-4 flex items-center justify-between hover:bg-slate-50 transition-colors text-start"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className={`mt-0.5 h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                              tx.amount > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                            }`}>
+                              <ArrowUpRight className={`h-5 w-5 ${tx.amount < 0 ? 'rotate-90' : ''}`} />
+                            </div>
+                            <div>
+                              <span className={`inline-block px-2.5 py-0.5 rounded-md text-[11px] font-bold mb-1 ${
+                                tx.source === 'attendance' ? 'bg-blue-100 text-blue-800' : 
+                                tx.source === 'manual_adjustment' ? 'bg-purple-100 text-purple-800' : 
+                                'bg-slate-100 text-slate-700'
+                              }`}>
+                                {tx.source === 'attendance' ? tActivity('sourceAttendance') : 
+                                 tx.source === 'manual_adjustment' ? tActivity('sourceManual') : 
+                                 tx.source === 'attendance_override' ? tActivity('sourceOverride') : 'System'}
+                              </span>
+                              <h4 className="font-bold text-slate-900 text-sm">{tx.reason}</h4>
+                              <p className="text-xs text-slate-400 flex items-center mt-0.5">
+                                <Clock className="h-3 w-3 me-1" />
+                                <span>{formatDateSafe(tx.createdAt, 'dd MMMM yyyy HH:mm', { locale: dateLocale })}</span>
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className={`font-black text-xl font-cairo ${tx.amount > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {tx.amount > 0 ? '+' : ''}{tx.amount}
                           </div>
                         </div>
-                      </div>
-
-                      <div className="flex items-center justify-between sm:justify-end gap-3 self-end sm:self-center">
-                        <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg">
-                          +{reg.event.points || 0} {t('pointsUnit')}
-                        </span>
-                        <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
-                          reg.status === 'attended' || reg.status === 'approved'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : reg.status === 'waitlisted'
-                              ? 'bg-amber-100 text-amber-700'
-                              : reg.status === 'cancelled'
-                                ? 'bg-red-100 text-red-700'
-                                : 'bg-slate-100 text-slate-600'
-                        }`}>
-                          {reg.status === 'attended' ? (isAr ? 'تم الحضور' : 'Attended') :
-                           reg.status === 'approved' ? (isAr ? 'مسجل ومؤكد' : 'Confirmed') :
-                           reg.status === 'waitlisted' ? (isAr ? 'قائمة الانتظار' : 'Waitlisted') :
-                           reg.status === 'cancelled' ? (isAr ? 'ملغى' : 'Cancelled') : reg.status}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          {/* Verified Certificates (5 cols) */}
-          <section className="lg:col-span-5 bg-white rounded-3xl border border-gray-100 shadow-sm p-6 sm:p-8 space-y-6">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
-              <div>
-                <h2 className="text-xl font-bold font-cairo text-slate-900 flex items-center gap-2.5">
-                  <Award className="h-5 w-5 text-emerald-600" />
-                  <span>{t('certificatesTitle')}</span>
-                </h2>
-                <span className="text-xs text-slate-500">
-                  {certificates.length} {isAr ? 'شهادة معتمدة' : 'issued'}
-                </span>
-              </div>
-            </div>
-
-            {loading ? (
-              <div className="space-y-3 py-6">
-                {[1, 2].map(i => (
-                  <div key={i} className="h-24 bg-slate-100 rounded-2xl animate-pulse" />
-                ))}
-              </div>
-            ) : certificates.length === 0 ? (
-              <div className="text-center py-12 px-4 space-y-3">
-                <div className="h-16 w-16 bg-emerald-50 text-emerald-400 rounded-full flex items-center justify-center mx-auto">
-                  <Award className="h-8 w-8" />
-                </div>
-                <h3 className="font-bold text-slate-800 text-base font-cairo">
-                  {t('noCertificates')}
-                </h3>
-                <p className="text-slate-500 text-xs leading-relaxed max-w-xs mx-auto">
-                  {t('noCertificatesDesc')}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {certificates.map((cert) => (
-                  <div
-                    key={cert.id}
-                    className="p-4 rounded-2xl border border-emerald-100 bg-emerald-50/20 hover:bg-emerald-50/50 transition-colors space-y-3"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <div className="h-9 w-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-xs">
-                          <Award className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-slate-900 text-sm line-clamp-1" title={cert.eventTitle}>
-                            {cert.eventTitle}
-                          </h4>
-                          <span className="text-[11px] text-slate-500 block">
-                            {formatDateSafe(cert.issueDate || cert.createdAt, 'dd MMMM yyyy', { locale: dateLocale })}
-                          </span>
-                        </div>
-                      </div>
-
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200">
-                        <CheckCircle className="h-3 w-3" />
-                        <span>{t('verified')}</span>
-                      </span>
-                    </div>
-
-                    <button
-                      onClick={() => handleDownloadCertificate(cert.id)}
-                      disabled={downloadingCert === cert.id}
-                      className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-100/70 hover:bg-emerald-600 hover:text-white transition-colors disabled:opacity-50"
-                    >
-                      {downloadingCert === cert.id ? (
-                        <>
-                          <LoadingSpinner size="sm" color="border-current" />
-                          <span>{isAr ? 'جاري التحميل...' : 'Downloading...'}</span>
-                        </>
-                      ) : (
-                        <>
-                          <ExternalLink className="h-3.5 w-3.5" />
-                          <span>{t('viewCertificate')}</span>
-                        </>
-                      )}
-                    </button>
+                      ))
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
-          </section>
+                )}
 
+                {/* Certificates Tab */}
+                {activeTab === 'certificates' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {certificates.length === 0 ? (
+                      <div className="col-span-1 sm:col-span-2 text-center py-16 flex flex-col items-center">
+                        <Award className="h-16 w-16 text-slate-200 mb-4" />
+                        <h3 className="text-xl font-bold text-slate-800 font-cairo mb-2">{tActivity('noCertificates')}</h3>
+                      </div>
+                    ) : (
+                      certificates.map((cert) => (
+                        <div 
+                          key={cert.id} 
+                          className="border border-emerald-100 bg-emerald-50/20 rounded-2xl p-5 hover:bg-emerald-50/50 transition-colors space-y-4 text-start"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-3">
+                              <div className="h-10 w-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0">
+                                <Award className="h-5 w-5" />
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-slate-900 text-sm line-clamp-1" title={cert.eventTitle}>
+                                  {cert.eventTitle}
+                                </h4>
+                                <span className="text-xs text-slate-500 block mt-0.5">
+                                  {formatDateSafe(cert.issueDate || cert.createdAt, 'dd MMMM yyyy', { locale: dateLocale })}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <button 
+                            onClick={() => handleDownloadCertificate(cert.id)}
+                            disabled={downloadingCert === cert.id}
+                            className="w-full flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-4 rounded-xl text-xs font-bold transition-colors disabled:opacity-50"
+                          >
+                            {downloadingCert === cert.id ? (
+                              <>
+                                <LoadingSpinner size="sm" color="border-white" className="me-1.5" />
+                                <span>{isAr ? 'جاري الفتح...' : 'Opening...'}</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>{isAr ? 'عرض الشهادة المعتمدة' : 'View Accredited Certificate'}</span>
+                                <ExternalLink className="h-3.5 w-3.5 ms-1" />
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
       </div>

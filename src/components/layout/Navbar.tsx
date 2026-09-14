@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Link, usePathname } from '@/i18n/routing';
 import { useAuth } from '@/context/AuthContext';
@@ -14,8 +14,7 @@ import {
   ShieldCheck, 
   LogOut, 
   LogIn, 
-  Sparkles,
-  Award
+  Sparkles
 } from 'lucide-react';
 
 export default function Navbar() {
@@ -25,6 +24,15 @@ export default function Navbar() {
   const pathname = usePathname();
   const { user, userData, login, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 10);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // If in admin dashboard, let admin layout manage its own sidebar & navigation
   if (pathname.startsWith('/admin')) {
@@ -43,7 +51,6 @@ export default function Navbar() {
     { href: '/events', label: t('events'), icon: Calendar },
     { href: '/leaderboard', label: t('leaderboard'), icon: Trophy },
     ...(user ? [
-      { href: '/my-activity', label: t('myActivity'), icon: Award },
       { href: '/profile', label: t('profile'), icon: UserCircle },
     ] : []),
     ...(userData?.role === 'super_admin' || userData?.role === 'event_organizer' ? [
@@ -51,8 +58,17 @@ export default function Navbar() {
     ] : []),
   ];
 
+  const getFirstAndLastName = (fullName?: string, fallback?: string | null) => {
+    if (!fullName) return fallback || 'Student';
+    const parts = fullName.split(' ').filter(Boolean);
+    if (parts.length === 1) return parts[0];
+    return `${parts[0]} ${parts[parts.length - 1]}`;
+  };
+
+  const displayName = getFirstAndLastName(userData?.arabicFullName, user?.displayName);
+
   return (
-    <header className="sticky top-0 z-50 bg-white/85 backdrop-blur-md border-b border-gray-100 shadow-xs transition-all">
+    <header className={`fixed top-0 w-full z-50 transition-all duration-300 ${isScrolled ? 'bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-sm' : 'bg-transparent'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           
@@ -84,7 +100,7 @@ export default function Navbar() {
                       ? 'bg-blue-50 text-blue-700 shadow-xs' 
                       : item.isAdmin
                         ? 'text-purple-600 hover:bg-purple-50 hover:text-purple-700'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100/70'
                   }`}
                 >
                   <Icon className="h-4 w-4" />
@@ -97,15 +113,14 @@ export default function Navbar() {
           {/* Right Controls: Language Switcher & User Auth */}
           <div className="hidden md:flex items-center gap-3">
             
-            {/* Language Switcher Preserving Route */}
+            {/* Language Switcher Preserving Route (Icon Only) */}
             <Link
               href={pathname || '/'}
               locale={isAr ? 'en' : 'ar'}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/80 transition-colors"
-              title={isAr ? 'Switch to English' : 'التحويل إلى العربية'}
+              className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-colors"
+              title={isAr ? 'English' : 'العربية'}
             >
-              <Globe className="h-3.5 w-3.5 text-blue-600" />
-              <span>{isAr ? 'English' : 'العربية'}</span>
+              <Globe className="h-5 w-5" />
             </Link>
 
             {/* Auth Session */}
@@ -113,19 +128,19 @@ export default function Navbar() {
               <div className="flex items-center gap-2 ps-2 border-s border-gray-200">
                 <Link 
                   href="/profile" 
-                  className="flex items-center gap-2.5 p-1 pe-3 rounded-full hover:bg-slate-100 transition-colors"
-                  title={user.displayName || 'Profile'}
+                  className="flex items-center gap-2.5 p-1 pe-3 rounded-full hover:bg-slate-100/70 transition-colors"
+                  title={displayName}
                 >
                   <div className="h-8 w-8 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center overflow-hidden border border-blue-200 shadow-xs">
                     {user.photoURL ? (
-                      <img src={user.photoURL} alt={user.displayName || 'User'} className="h-full w-full object-cover" />
+                      <img src={user.photoURL} alt={displayName} className="h-full w-full object-cover" />
                     ) : (
-                      <span>{(user.displayName || 'U').charAt(0).toUpperCase()}</span>
+                      <span>{displayName.charAt(0).toUpperCase()}</span>
                     )}
                   </div>
                   <div className="flex flex-col text-start">
                     <span className="text-xs font-bold text-slate-900 max-w-[120px] truncate leading-tight">
-                      {user.displayName || 'Student'}
+                      {displayName}
                     </span>
                     <span className="text-[10px] text-blue-600 font-medium">
                       {userData?.totalPoints ?? 0} {isAr ? 'نقطة' : 'pts'}
@@ -157,10 +172,9 @@ export default function Navbar() {
             <Link
               href={pathname || '/'}
               locale={isAr ? 'en' : 'ar'}
-              className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 text-xs font-bold flex items-center gap-1"
+              className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 flex items-center justify-center"
             >
-              <Globe className="h-4 w-4 text-blue-600" />
-              <span>{isAr ? 'EN' : 'عربي'}</span>
+              <Globe className="h-5 w-5" />
             </Link>
 
             <button
@@ -210,13 +224,13 @@ export default function Navbar() {
                 >
                   <div className="h-10 w-10 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center overflow-hidden">
                     {user.photoURL ? (
-                      <img src={user.photoURL} alt="User" className="h-full w-full object-cover" />
+                      <img src={user.photoURL} alt={displayName} className="h-full w-full object-cover" />
                     ) : (
-                      <span>{(user.displayName || 'U').charAt(0).toUpperCase()}</span>
+                      <span>{displayName.charAt(0).toUpperCase()}</span>
                     )}
                   </div>
                   <div className="flex flex-col text-start">
-                    <span className="font-bold text-slate-900 text-sm">{user.displayName || 'Student'}</span>
+                    <span className="font-bold text-slate-900 text-sm">{displayName}</span>
                     <span className="text-xs text-blue-600 font-medium">
                       {userData?.totalPoints ?? 0} {isAr ? 'نقطة' : 'pts'}
                     </span>
