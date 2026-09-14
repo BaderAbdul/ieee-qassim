@@ -2,7 +2,7 @@ import createNextIntlPlugin from 'next-intl/plugin';
 import type { NextConfig } from "next";
 import path from "node:path";
 
-if (!process.env.NEXT_FONT_GOOGLE_MOCKED_RESPONSES) {
+if (process.env.MOCK_FONTS === 'true') {
   process.env.NEXT_FONT_GOOGLE_MOCKED_RESPONSES = path.resolve(process.cwd(), '.next-fonts-mock.json');
 }
 
