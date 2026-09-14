@@ -4,6 +4,7 @@
   --font-sans: var(--font-inter), var(--font-cairo), system-ui, sans-serif;
   --font-cairo: var(--font-cairo), sans-serif;
   --font-inter: var(--font-inter), sans-serif;
+  --font-thmanyah: var(--font-thmanyah), serif;
 }
 
 /* Custom CSS variables and global styles */
@@ -45,8 +46,19 @@ body {
     66% { transform: translate(-20px, 20px) scale(0.9); }
     100% { transform: translate(0px, 0px) scale(1); }
   }
+  @keyframes float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+    100% { transform: translateY(0px); }
+  }
   .animate-blob {
     animation: blob 7s infinite;
+  }
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+  .animate-float-delayed {
+    animation: float 6s ease-in-out 3s infinite;
   }
   .animation-delay-2000 {
     animation-delay: 2s;

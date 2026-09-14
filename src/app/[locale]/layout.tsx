@@ -3,11 +3,24 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { Cairo, Inter } from 'next/font/google';
+import localFont from 'next/font/local';
 import { routing } from '@/i18n/routing';
 import { AuthProvider } from '@/context/AuthContext';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import "../globals.css";
+
+const thmanyah = localFont({
+  src: [
+    { path: '../../fonts/thmanyah-serif-display-light.otf', weight: '300', style: 'normal' },
+    { path: '../../fonts/thmanyah-serif-display-regular.otf', weight: '400', style: 'normal' },
+    { path: '../../fonts/thmanyah-serif-display-medium.otf', weight: '500', style: 'normal' },
+    { path: '../../fonts/thmanyah-serif-display-bold.otf', weight: '700', style: 'normal' },
+    { path: '../../fonts/thmanyah-serif-display-black.otf', weight: '900', style: 'normal' }
+  ],
+  variable: '--font-thmanyah',
+  display: 'swap',
+});
 
 const cairo = Cairo({
   subsets: ['arabic', 'latin'],
@@ -50,7 +63,7 @@ export default async function RootLayout({
   return (
     <html lang={locale} dir={dir}>
       <body
-        className={`${cairo.variable} ${inter.variable} font-sans antialiased bg-gray-50 text-gray-900`}
+        className={`${cairo.variable} ${inter.variable} ${thmanyah.variable} font-sans antialiased bg-gray-50 text-gray-900`}
       >
         <NextIntlClientProvider messages={messages}>
           <AuthProvider>

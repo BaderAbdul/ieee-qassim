@@ -2,7 +2,7 @@
   "Index": {
     "title": "Welcome to the Technology Community",
     "description": "Discover events, record your attendance, and earn points",
-    "badge": "Your gateway to technical excellence at Qassim University",
+    "badge": "Your gateway to technical excellence at Al-Qassim",
     "exploreEvents": "Explore Events",
     "loginNow": "Login Now",
     "upcomingEvents": "Upcoming Events",
@@ -14,6 +14,19 @@
     "activityAndCerts": "Activity & Certificates",
     "activityAndCertsDesc": "Track your attended events, points, and download your certificates.",
     "goToActivity": "Go to My Activity"
+  },
+  "Hero": {
+    "identityLabel": "IEEE Al-Qassim Student Branch",
+    "wordmark": "IEEE QASSIM",
+    "headline": "Build what's next.",
+    "subheadline": "Your engineering and technology community at Al-Qassim.",
+    "description": "Discover events, develop your skills, participate in technical experiences, and build your career with the IEEE Qassim community.",
+    "exploreEvents": "Explore Events",
+    "joinCommunity": "Join the Community",
+    "login": "Sign In",
+    "cardEvent": "Upcoming Event",
+    "cardPoints": "+50 Points",
+    "cardActivity": "Verified Attendance"
   },
   "Navbar": {
     "brand": "TechComm",
@@ -30,8 +43,8 @@
   },
   "Footer": {
     "brand": "TechComm IEEE QU",
-    "description": "The official engineering technology and innovation community platform at College of Engineering - Qassim University.",
-    "college": "College of Engineering - Qassim University",
+    "description": "The official engineering technology and innovation community platform at College of Engineering at Al-Qassim.",
+    "college": "College of Engineering at Al-Qassim",
     "quickLinks": "Quick Links",
     "copyright": "University Technology Community Platform © {year} - All Rights Reserved",
     "home": "Home",
@@ -101,7 +114,7 @@
   "Profile": {
     "title": "Engineering Profile",
     "subtitle": "Your academic record, technical accomplishments, and engagement ledger at College of Engineering.",
-    "college": "College of Engineering - Qassim University",
+    "college": "College of Engineering at Al-Qassim",
     "department": "Engineering Department",
     "academicYear": "Academic Year",
     "activeMember": "Active Member",
