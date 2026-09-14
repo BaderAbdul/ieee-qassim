@@ -1,0 +1,232 @@
+'use client';
+
+import { useEffect, useState, use } from 'react';
+import { collection, query, where, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase/client';
+import { PlatformEvent } from '@/lib/types';
+import { Link } from '@/i18n/routing';
+import { ArrowRight, Download, Users, Check, X, Clock } from 'lucide-react';
+import { format } from 'date-fns';
+import { ar } from 'date-fns/locale';
+
+interface RegistrationData {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  status: string;
+  timestamp: any;
+}
+
+export default function RegistrationDeskPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: eventId } = use(params);
+  
+  const [event, setEvent] = useState<PlatformEvent | null>(null);
+  const [registrations, setRegistrations] = useState<RegistrationData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchRegistrations = async () => {
+    try {
+      const eventSnap = await getDoc(doc(db, 'events', eventId));
+      if (eventSnap.exists()) {
+        setEvent({ id: eventSnap.id, ...eventSnap.data() } as PlatformEvent);
+      }
+
+      const q = query(collection(db, 'registrations'), where('eventId', '==', eventId));
+      const snap = await getDocs(q);
+      
+      const regs: RegistrationData[] = [];
+      
+      for (const regDoc of snap.docs) {
+        const regData = regDoc.data();
+        
+        // Fetch user data
+        const userSnap = await getDoc(doc(db, 'users', regData.userId));
+        const userData = userSnap.exists() ? userSnap.data() : { displayName: 'Unknown', email: 'Unknown' };
+        
+        regs.push({
+          id: regDoc.id,
+          userId: regData.userId,
+          userName: userData.displayName || 'Unknown',
+          userEmail: userData.email || 'Unknown',
+          status: regData.status,
+          timestamp: regData.timestamp
+        });
+      }
+      
+      regs.sort((a, b) => {
+        const tA = a.timestamp?.toDate()?.getTime() || 0;
+        const tB = b.timestamp?.toDate()?.getTime() || 0;
+        return tA - tB; // Earliest first
+      });
+      
+      setRegistrations(regs);
+    } catch (error) {
+      console.error("Error fetching registrations", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRegistrations();
+  }, [eventId]);
+
+  const handleUpdateStatus = async (regId: string, newStatus: string) => {
+    try {
+      await updateDoc(doc(db, 'registrations', regId), {
+        status: newStatus
+      });
+      setRegistrations(prev => prev.map(r => r.id === regId ? { ...r, status: newStatus } : r));
+    } catch (error) {
+      console.error("Error updating status", error);
+      alert("حدث خطأ أثناء تحديث حالة التسجيل");
+    }
+  };
+
+  const exportCSV = () => {
+    if (!event) return;
+    
+    const headers = ['Name', 'Email', 'Status', 'Date'];
+    const rows = registrations.map(r => [
+      `"${r.userName}"`,
+      `"${r.userEmail}"`,
+      r.status,
+      r.timestamp?.toDate() ? format(r.timestamp.toDate(), 'yyyy-MM-dd HH:mm:ss') : ''
+    ]);
+    
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" 
+      + headers.join(',') + '\n' 
+      + rows.map(e => e.join(',')).join('\n');
+      
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `registrations_${event.title.replace(/\s+/g, '_')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  if (loading) {
+    return <div className="py-20 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div></div>;
+  }
+
+  if (!event) {
+    return <div className="text-center py-20 text-gray-500">الفعالية غير موجودة.</div>;
+  }
+
+  const approvedCount = registrations.filter(r => r.status === 'approved').length;
+
+  return (
+    <div>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <div>
+          <div className="flex items-center mb-2">
+            <Link href="/admin/events" className="text-gray-500 hover:text-gray-900 me-2">
+              <ArrowRight className="h-5 w-5 rtl:-scale-x-100" />
+            </Link>
+            <h1 className="text-3xl font-bold text-gray-900 font-cairo">مكتب التسجيل</h1>
+          </div>
+          <p className="text-gray-600 text-lg">{event.title}</p>
+        </div>
+        
+        <button onClick={exportCSV} className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center shadow-sm">
+          <Download size={18} className="me-2" />
+          تصدير (CSV)
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex items-center">
+          <div className="h-12 w-12 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center me-4">
+            <Users size={24} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-500 mb-1">إجمالي المسجلين</p>
+            <h3 className="text-2xl font-bold text-gray-900">{registrations.length}</h3>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex items-center">
+          <div className="h-12 w-12 rounded-lg bg-green-100 text-green-600 flex items-center justify-center me-4">
+            <Check size={24} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-500 mb-1">المقبولين (سعة {event.capacity})</p>
+            <h3 className="text-2xl font-bold text-gray-900">{approvedCount}</h3>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex items-center">
+          <div className="h-12 w-12 rounded-lg bg-yellow-100 text-yellow-600 flex items-center justify-center me-4">
+            <Clock size={24} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-500 mb-1">قائمة الانتظار / معلق</p>
+            <h3 className="text-2xl font-bold text-gray-900">{registrations.filter(r => r.status === 'waitlisted' || r.status === 'pending').length}</h3>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        {registrations.length === 0 ? (
+          <div className="p-12 text-center text-gray-500">لا يوجد مسجلين حتى الآن.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-start">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th className="px-6 py-4 text-start text-xs font-semibold text-gray-500 uppercase tracking-wider">الطالب</th>
+                  <th className="px-6 py-4 text-start text-xs font-semibold text-gray-500 uppercase tracking-wider">تاريخ التسجيل</th>
+                  <th className="px-6 py-4 text-start text-xs font-semibold text-gray-500 uppercase tracking-wider">الحالة</th>
+                  <th className="px-6 py-4 text-start text-xs font-semibold text-gray-500 uppercase tracking-wider">إجراءات</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {registrations.map((reg) => (
+                  <tr key={reg.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4">
+                      <div className="font-bold text-gray-900">{reg.userName}</div>
+                      <div className="text-sm text-gray-500">{reg.userEmail}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      {reg.timestamp?.toDate ? format(reg.timestamp.toDate(), 'dd MMM yyyy HH:mm', { locale: ar }) : ''}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        reg.status === 'approved' ? 'bg-green-100 text-green-700' :
+                        reg.status === 'waitlisted' ? 'bg-yellow-100 text-yellow-700' :
+                        reg.status === 'rejected' || reg.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                        'bg-blue-100 text-blue-700'
+                      }`}>
+                        {reg.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-start text-sm font-medium">
+                      <div className="flex items-center gap-2">
+                        {reg.status !== 'approved' && (
+                          <button onClick={() => handleUpdateStatus(reg.id, 'approved')} className="text-green-600 hover:bg-green-50 p-1.5 rounded" title="قبول">
+                            <Check size={18} />
+                          </button>
+                        )}
+                        {reg.status !== 'waitlisted' && (
+                          <button onClick={() => handleUpdateStatus(reg.id, 'waitlisted')} className="text-yellow-600 hover:bg-yellow-50 p-1.5 rounded" title="وضع في قائمة الانتظار">
+                            <Clock size={18} />
+                          </button>
+                        )}
+                        {reg.status !== 'rejected' && reg.status !== 'cancelled' && (
+                          <button onClick={() => handleUpdateStatus(reg.id, 'rejected')} className="text-red-600 hover:bg-red-50 p-1.5 rounded" title="رفض">
+                            <X size={18} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
