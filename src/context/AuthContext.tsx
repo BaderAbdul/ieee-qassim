@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '@/lib/firebase/client';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 
 export interface UserData {
@@ -46,38 +46,48 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    let unsubscribeSnapshot: () => void;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       
       if (currentUser) {
-        // Fetch or create user data in Firestore
         const userRef = doc(db, 'users', currentUser.uid);
-        const userSnap = await getDoc(userRef);
         
-        if (userSnap.exists()) {
-          setUserData(userSnap.data() as UserData);
-        } else {
-
-          const newUserData: UserData = {
-            role: 'student', // Default role
-            totalPoints: 0,
-            email: currentUser.email,
-            displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Student',
-            photoURL: currentUser.photoURL || null,
-            createdAt: new Date().toISOString(),
-            profileCompleted: false, // Onboarding required
-          };
-          await setDoc(userRef, newUserData);
-          setUserData(newUserData);
-        }
+        // Listen to the document in real-time to sync profileCompleted, points, etc.
+        unsubscribeSnapshot = onSnapshot(userRef, async (userSnap) => {
+          if (userSnap.exists()) {
+            setUserData(userSnap.data() as UserData);
+          } else {
+            const newUserData: UserData = {
+              role: 'student', // Default role
+              totalPoints: 0,
+              email: currentUser.email,
+              displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Student',
+              photoURL: currentUser.photoURL || null,
+              createdAt: new Date().toISOString(),
+              profileCompleted: false, // Onboarding required
+            };
+            await setDoc(userRef, newUserData);
+            // onSnapshot will automatically fire again after setDoc creates the doc
+          }
+          setLoading(false);
+        });
       } else {
         setUserData(null);
+        setLoading(false);
+        if (unsubscribeSnapshot) {
+          unsubscribeSnapshot();
+        }
       }
-      
-      setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+      }
+    };
   }, []);
 
   const login = async () => {
