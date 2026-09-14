@@ -58,7 +58,10 @@ exports.generateCheckInToken = functions.https.onCall(async (data, context) => {
     }
     // Get the secret from environment config (firebase functions:config:set or dotenv)
     // For V1, we'll use a strong fallback if env var is missing, but in production, this should be set in Secrets Manager.
-    const JWT_SECRET = process.env.JWT_SECRET || ((_a = functions.config().jwt) === null || _a === void 0 ? void 0 : _a.secret) || 'fallback_secret_do_not_use_in_prod_123!';
+    const JWT_SECRET = process.env.JWT_SECRET || ((_a = functions.config().jwt) === null || _a === void 0 ? void 0 : _a.secret);
+    if (!JWT_SECRET) {
+        throw new functions.https.HttpsError('internal', 'JWT_SECRET is not configured. Please set it in Firebase Secret Manager.');
+    }
     // Create a payload with a nonce to prevent replay attacks and limit lifespan to 60 seconds
     const payload = {
         eventId,

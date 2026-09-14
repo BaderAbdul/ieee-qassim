@@ -1,3 +1,4 @@
+import { FieldValue } from 'firebase-admin/firestore';
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { verifyAuth, verifyAdmin } from './utils/auth';
@@ -57,11 +58,11 @@ export const manualAttendanceOverride = functions.https.onCall(async (data, cont
     transaction.set(logRef, {
       userId: studentUid,
       eventId: eventId,
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      timestamp: FieldValue.serverTimestamp(),
       verifiedByQR: false,
       manualOverride: true,
       overriddenBy: adminUid,
-      overrideTimestamp: admin.firestore.FieldValue.serverTimestamp(),
+      overrideTimestamp: FieldValue.serverTimestamp(),
     });
 
     // 5. Award Points Atomically
@@ -79,7 +80,7 @@ export const manualAttendanceOverride = functions.https.onCall(async (data, cont
         reason: `Manual attendance for event: ${eventData?.title || 'Unknown'}`,
         sourceEventId: eventId,
         createdBy: adminUid,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
       });
     }
 

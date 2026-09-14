@@ -47,4 +47,16 @@ __exportStar(require("./manualAttendanceOverride"), exports);
 __exportStar(require("./addManualPoints"), exports);
 __exportStar(require("./onPointTransactionCreated"), exports);
 __exportStar(require("./authBlocking"), exports);
+__exportStar(require("./issueCertificates"), exports);
+__exportStar(require("./generateCertificate"), exports);
+__exportStar(require("./getCertificateDownloadUrl"), exports);
+__exportStar(require("./retryCertificate"), exports);
+__exportStar(require("./revokeCertificate"), exports);
+// Transactional Email System
+__exportStar(require("./workers/processMailQueue"), exports);
+__exportStar(require("./cron/retryMailQueue"), exports);
+__exportStar(require("./triggers/emailRegistrations"), exports);
+__exportStar(require("./triggers/emailAttendance"), exports);
+__exportStar(require("./triggers/emailCertificates"), exports);
+__exportStar(require("./cron/sendEventReminders"), exports);
 //# sourceMappingURL=index.js.map

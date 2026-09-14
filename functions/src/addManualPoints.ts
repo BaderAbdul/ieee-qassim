@@ -1,3 +1,4 @@
+import { FieldValue } from 'firebase-admin/firestore';
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { verifyAuth, verifyAdmin } from './utils/auth';
@@ -33,7 +34,7 @@ export const addManualPoints = functions.https.onCall(async (data, context) => {
     source: 'manual_adjustment',
     reason: reason.trim(),
     createdBy: adminUid,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdAt: FieldValue.serverTimestamp(),
   });
 
   return { status: 'success', transactionId: pointTxRef.id };

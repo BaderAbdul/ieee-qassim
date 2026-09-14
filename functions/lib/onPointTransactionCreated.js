@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.onPointTransactionCreated = void 0;
+const firestore_1 = require("firebase-admin/firestore");
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 exports.onPointTransactionCreated = functions.firestore
@@ -50,7 +51,7 @@ exports.onPointTransactionCreated = functions.firestore
     // Atomically increment the user's totalPoints cache
     try {
         await userRef.update({
-            totalPoints: admin.firestore.FieldValue.increment(amount)
+            totalPoints: firestore_1.FieldValue.increment(amount)
         });
         console.log(`Successfully updated totalPoints for user ${userId} by ${amount}`);
     }

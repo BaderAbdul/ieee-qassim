@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.processCheckIn = void 0;
+const firestore_1 = require("firebase-admin/firestore");
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const jwt = __importStar(require("jsonwebtoken"));
@@ -49,7 +50,10 @@ exports.processCheckIn = functions.https.onCall(async (data, context) => {
     if (!eventId || typeof eventId !== 'string') {
         (0, errors_1.throwFailedPrecondition)('Invalid or missing eventId.');
     }
-    const JWT_SECRET = process.env.JWT_SECRET || ((_a = functions.config().jwt) === null || _a === void 0 ? void 0 : _a.secret) || 'fallback_secret_do_not_use_in_prod_123!';
+    const JWT_SECRET = process.env.JWT_SECRET || ((_a = functions.config().jwt) === null || _a === void 0 ? void 0 : _a.secret);
+    if (!JWT_SECRET) {
+        (0, errors_1.throwFailedPrecondition)('JWT_SECRET is not configured. Please set it in Firebase Secret Manager.');
+    }
     let decodedToken;
     try {
         decodedToken = jwt.verify(token, JWT_SECRET);
@@ -96,7 +100,7 @@ exports.processCheckIn = functions.https.onCall(async (data, context) => {
         transaction.set(logRef, {
             userId: uid,
             eventId: eventId,
-            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            timestamp: firestore_1.FieldValue.serverTimestamp(),
             verifiedByQR: true,
             tokenNonce: decodedToken.nonce,
         });
@@ -113,7 +117,7 @@ exports.processCheckIn = functions.https.onCall(async (data, context) => {
                 reason: `Attended event: ${(eventData === null || eventData === void 0 ? void 0 : eventData.title) || 'Unknown'}`,
                 sourceEventId: eventId,
                 createdBy: 'system',
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                createdAt: firestore_1.FieldValue.serverTimestamp(),
             });
         }
         return { status: 'success' };

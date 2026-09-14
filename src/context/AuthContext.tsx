@@ -58,9 +58,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             return;
           }
 
-          const newUserData: UserData = {
-            role: 'student', // Default role
+          const newUserData = {
+            role: 'student' as const, // Default role
             totalPoints: 0,
+            email: currentUser.email,
+            displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Student',
+            photoURL: currentUser.photoURL || null,
+            createdAt: new Date().toISOString(),
           };
           await setDoc(userRef, newUserData);
           setUserData(newUserData);

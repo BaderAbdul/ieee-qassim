@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -39,3 +39,20 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Firebase service account keys (NEVER commit these)
+*-adminsdk-*.json
+service-account*.json
+
+# Firebase debug logs
+firebase-debug.log
+firestore-debug.log
+storage-debug.log
+ui-debug.log
+emulator.log
+
+# Temporary/development files
+firestore.rules.orig
+firestore_temp_nevermind.txt
+fix-imports.js
+fix_rules.patch

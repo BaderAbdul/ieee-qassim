@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerForEvent = void 0;
+const firestore_1 = require("firebase-admin/firestore");
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const auth_1 = require("./utils/auth");
@@ -82,7 +83,7 @@ exports.registerForEvent = functions.https.onCall(async (data, context) => {
             userId: uid,
             eventId: eventId,
             status: status,
-            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            timestamp: firestore_1.FieldValue.serverTimestamp(),
         };
         transaction.set(regRef, regData);
         // 5. Update the event document's registeredCount to ensure strict serialization

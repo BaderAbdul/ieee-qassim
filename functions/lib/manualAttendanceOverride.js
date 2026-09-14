@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.manualAttendanceOverride = void 0;
+const firestore_1 = require("firebase-admin/firestore");
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const auth_1 = require("./utils/auth");
@@ -80,11 +81,11 @@ exports.manualAttendanceOverride = functions.https.onCall(async (data, context) 
         transaction.set(logRef, {
             userId: studentUid,
             eventId: eventId,
-            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            timestamp: firestore_1.FieldValue.serverTimestamp(),
             verifiedByQR: false,
             manualOverride: true,
             overriddenBy: adminUid,
-            overrideTimestamp: admin.firestore.FieldValue.serverTimestamp(),
+            overrideTimestamp: firestore_1.FieldValue.serverTimestamp(),
         });
         // 5. Award Points Atomically
         const eventData = eventSnap.data();
@@ -99,7 +100,7 @@ exports.manualAttendanceOverride = functions.https.onCall(async (data, context) 
                 reason: `Manual attendance for event: ${(eventData === null || eventData === void 0 ? void 0 : eventData.title) || 'Unknown'}`,
                 sourceEventId: eventId,
                 createdBy: adminUid,
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                createdAt: firestore_1.FieldValue.serverTimestamp(),
             });
         }
         return { status: 'success' };

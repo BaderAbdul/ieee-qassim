@@ -40,3 +40,25 @@ export interface PointTransaction {
   createdBy: string;
   createdAt: Timestamp | Date;
 }
+
+export type CertificateState = 'Not Issued' | 'Generating' | 'Available' | 'Failed' | 'Revoked';
+
+export interface Certificate {
+  id: string; // The deterministic certificateId (certificate_{eventId}_{userId})
+  eventId: string;
+  userId: string;
+  status: CertificateState;
+  storagePath: string; // e.g. certificates/{eventId}/{id}.pdf
+  studentName: string;
+  eventTitle: string;
+  eventType: EventType;
+  attendanceDate: Timestamp | Date;
+  issueDate: Timestamp | Date;
+  createdAt: Timestamp | Date;
+  updatedAt: Timestamp | Date;
+  attemptCount: number;
+  lastError?: string;
+  issuedBy: string;
+  revokedBy?: string;
+  revokedAt?: Timestamp | Date;
+}

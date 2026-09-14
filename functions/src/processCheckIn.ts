@@ -1,3 +1,4 @@
+import { FieldValue } from 'firebase-admin/firestore';
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import * as jwt from 'jsonwebtoken';
@@ -16,7 +17,10 @@ export const processCheckIn = functions.https.onCall(async (data, context) => {
     throwFailedPrecondition('Invalid or missing eventId.');
   }
 
-  const JWT_SECRET = process.env.JWT_SECRET || functions.config().jwt?.secret || 'fallback_secret_do_not_use_in_prod_123!';
+  const JWT_SECRET = process.env.JWT_SECRET || functions.config().jwt?.secret;
+  if (!JWT_SECRET) {
+    throwFailedPrecondition('JWT_SECRET is not configured. Please set it in Firebase Secret Manager.');
+  }
 
   let decodedToken: any;
   try {
@@ -73,7 +77,7 @@ export const processCheckIn = functions.https.onCall(async (data, context) => {
     transaction.set(logRef, {
       userId: uid,
       eventId: eventId,
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      timestamp: FieldValue.serverTimestamp(),
       verifiedByQR: true,
       tokenNonce: decodedToken.nonce,
     });
@@ -93,7 +97,7 @@ export const processCheckIn = functions.https.onCall(async (data, context) => {
         reason: `Attended event: ${eventData?.title || 'Unknown'}`,
         sourceEventId: eventId,
         createdBy: 'system',
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
       });
     }
 

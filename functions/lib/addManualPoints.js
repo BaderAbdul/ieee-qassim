@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.addManualPoints = void 0;
+const firestore_1 = require("firebase-admin/firestore");
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const auth_1 = require("./utils/auth");
@@ -61,7 +62,7 @@ exports.addManualPoints = functions.https.onCall(async (data, context) => {
         source: 'manual_adjustment',
         reason: reason.trim(),
         createdBy: adminUid,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: firestore_1.FieldValue.serverTimestamp(),
     });
     return { status: 'success', transactionId: pointTxRef.id };
 });

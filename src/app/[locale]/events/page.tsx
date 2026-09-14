@@ -1,20 +1,19 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { PlatformEvent } from '@/lib/types';
-import { Link } from '@/i18n/routing';
-import { format } from 'date-fns';
-import { ar, enUS } from 'date-fns/locale';
-import { Calendar, MapPin, Clock, Users } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 import { useLocale } from 'next-intl';
+import EventCard from '@/components/ui/EventCard';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 export default function EventsPage() {
   const [events, setEvents] = useState<PlatformEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const locale = useLocale();
-  const dateLocale = locale === 'ar' ? ar : enUS;
+  const isAr = locale === 'ar';
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -29,10 +28,10 @@ export default function EventsPage() {
           ...doc.data()
         })) as PlatformEvent[];
         
-        // Sort by date client-side to avoid needing composite index immediately
+        // Sort by date client-side
         fetchedEvents.sort((a, b) => {
-          const dateA = a.date instanceof Date ? a.date : a.date.toDate();
-          const dateB = b.date instanceof Date ? b.date : b.date.toDate();
+          const dateA = a.date instanceof Date ? a.date : a.date?.toDate?.() || new Date();
+          const dateB = b.date instanceof Date ? b.date : b.date?.toDate?.() || new Date();
           return dateB.getTime() - dateA.getTime();
         });
 
@@ -48,92 +47,44 @@ export default function EventsPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-slate-50 py-16 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-center mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-end mb-12 border-b border-gray-200 pb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 font-cairo mb-2">الفعاليات</h1>
-            <p className="text-gray-600">اكتشف أحدث الفعاليات والورش وانضم لمجتمع التكنولوجيا.</p>
+            <h1 className="text-4xl font-extrabold text-slate-900 font-cairo mb-3">{isAr ? 'الفعاليات' : 'Events'}</h1>
+            <p className="text-lg text-slate-600">{isAr ? 'اكتشف أحدث الفعاليات والورش وانضم لمجتمع التكنولوجيا.' : 'Discover the latest events and workshops and join the tech community.'}</p>
           </div>
           
           {/* Simple Filters Placeholder */}
-          <div className="mt-4 md:mt-0 flex gap-2">
-            <select className="bg-white border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm">
-              <option>جميع الأنواع</option>
-              <option>ورشة عمل</option>
-              <option>معسكر</option>
+          <div className="mt-6 md:mt-0 flex gap-2">
+            <select className="bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm font-medium focus:ring-blue-500 focus:border-blue-500 shadow-sm transition-shadow hover:shadow-md cursor-pointer outline-none">
+              <option>{isAr ? 'جميع الأنواع' : 'All Types'}</option>
+              <option>{isAr ? 'ورشة عمل' : 'Workshop'}</option>
+              <option>{isAr ? 'معسكر' : 'Bootcamp'}</option>
             </select>
           </div>
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <div className="flex flex-col items-center justify-center py-32 opacity-70">
+            <LoadingSpinner size="lg" color="border-blue-600" />
+            <span className="mt-4 text-blue-600 font-medium">{isAr ? 'جاري تحميل الفعاليات...' : 'Loading events...'}</span>
           </div>
         ) : events.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-16 text-center">
-            <Calendar className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-gray-900 mb-2">لا توجد فعاليات حالياً</h3>
-            <p className="text-gray-500">عد لاحقاً لاكتشاف الفعاليات القادمة.</p>
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-20 text-center flex flex-col items-center">
+            <div className="h-24 w-24 bg-blue-50 text-blue-300 rounded-full flex items-center justify-center mb-6">
+              <Calendar className="h-12 w-12" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-3 font-cairo">{isAr ? 'لا توجد فعاليات حالياً' : 'No events currently'}</h3>
+            <p className="text-gray-500 text-lg">{isAr ? 'نعمل على تجهيز فعاليات رائعة قريباً. عد لاحقاً!' : 'We are preparing great events soon. Check back later!'}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {events.map((event) => {
-              const eventDate = event.date instanceof Date ? event.date : (event.date as any).toDate();
-              
-              return (
-                <Link key={event.id} href={`/events/${event.id}`} className="block group">
-                  <div className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow border border-gray-100 flex flex-col h-full">
-                    {/* Cover Image Placeholder */}
-                    <div className="h-48 bg-blue-100 relative overflow-hidden">
-                      {event.coverUrl ? (
-                        <img src={event.coverUrl} alt={locale === 'en' ? event.titleEn : event.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-600">
-                          <span className="text-white font-bold text-xl opacity-50">{event.type}</span>
-                        </div>
-                      )}
-                      
-                      <div className="absolute top-4 end-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold shadow-sm ${
-                          event.state === 'Registration Open' ? 'bg-green-100 text-green-700' :
-                          event.state === 'Ongoing' ? 'bg-blue-100 text-blue-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {event.state}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="p-6 flex-grow flex flex-col">
-                      <div className="text-sm font-semibold text-blue-600 mb-2">{event.type}</div>
-                      <h3 className="text-xl font-bold text-gray-900 mb-4 line-clamp-2">
-                        {locale === 'en' ? event.titleEn : event.title}
-                      </h3>
-                      
-                      <div className="space-y-2 mt-auto">
-                        <div className="flex items-center text-sm text-gray-600">
-                          <Calendar className="h-4 w-4 me-2 text-gray-400" />
-                          <span>{format(eventDate, 'dd MMMM yyyy', { locale: dateLocale })}</span>
-                        </div>
-                        <div className="flex items-center text-sm text-gray-600">
-                          <Clock className="h-4 w-4 me-2 text-gray-400" />
-                          <span>{format(eventDate, 'HH:mm', { locale: dateLocale })} ({event.durationHours}h)</span>
-                        </div>
-                        <div className="flex items-center text-sm text-gray-600">
-                          <MapPin className="h-4 w-4 me-2 text-gray-400" />
-                          <span className="truncate">{locale === 'en' ? event.locationEn : event.location}</span>
-                        </div>
-                        <div className="flex items-center text-sm text-gray-600 mt-2 pt-4 border-t border-gray-100">
-                          <Users className="h-4 w-4 me-2 text-gray-400" />
-                          <span>السعة: {event.capacity} مقعد</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              )
-            })}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {events.map((event) => (
+              <div key={event.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationFillMode: 'both' }}>
+                <EventCard event={event} />
+              </div>
+            ))}
           </div>
         )}
       </div>

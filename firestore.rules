@@ -66,6 +66,11 @@ service cloud.firestore {
       allow read: if isOwner(resource.data.userId) || isEventOrganizer();
       allow create, update, delete: if isEventOrganizer(); // Managed by admins/functions
     }
+
+    // Mail Queue (Outbox)
+    match /mail/{mailId} {
+      allow read, write: if false; // Only accessed via Cloud Functions
+    }
     
     // Audit Logs
     match /audit_logs/{logId} {

@@ -1,3 +1,4 @@
+import { FieldValue } from 'firebase-admin/firestore';
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { verifyAuth } from './utils/auth';
@@ -53,7 +54,7 @@ export const registerForEvent = functions.https.onCall(async (data, context) => 
       userId: uid,
       eventId: eventId,
       status: status,
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      timestamp: FieldValue.serverTimestamp(),
     };
 
     transaction.set(regRef, regData);

@@ -1,3 +1,4 @@
+import { FieldValue } from 'firebase-admin/firestore';
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 
@@ -18,7 +19,7 @@ export const onPointTransactionCreated = functions.firestore
     // Atomically increment the user's totalPoints cache
     try {
       await userRef.update({
-        totalPoints: admin.firestore.FieldValue.increment(amount)
+        totalPoints: FieldValue.increment(amount)
       });
       console.log(`Successfully updated totalPoints for user ${userId} by ${amount}`);
     } catch (error: any) {

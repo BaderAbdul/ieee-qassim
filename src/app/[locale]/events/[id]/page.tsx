@@ -11,6 +11,8 @@ import { format } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
 import { Calendar, MapPin, Clock, Users, Trophy, Award, CheckCircle, AlertCircle } from 'lucide-react';
 
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
+
 export default function EventDetailsPage({ params }: { params: Promise<{ id: string, locale: string }> }) {
   const unwrappedParams = use(params);
   const eventId = unwrappedParams.id;
@@ -38,7 +40,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
           // Fetch current registration count
           const regQuery = query(collection(db, 'registrations'), where('eventId', '==', eventId));
           const regSnap = await getDocs(regQuery);
-          // Count only active registrations (Approved or Pending or Waitlisted) - simplifying for V1
+          // Count only active registrations (Approved or Pending or Waitlisted)
           const activeRegs = regSnap.docs.filter(d => d.data().status !== 'cancelled').length;
           setAttendeeCount(activeRegs);
         }
@@ -121,11 +123,21 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
   };
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
+        <LoadingSpinner size="lg" color="border-blue-600" />
+        <p className="mt-4 text-blue-600 font-medium">جاري تحميل التفاصيل...</p>
+      </div>
+    );
   }
 
   if (!event) {
-    return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-xl font-bold">الفعالية غير موجودة</div>;
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
+        <AlertCircle className="h-16 w-16 text-red-400 mb-4" />
+        <h2 className="text-2xl font-bold text-slate-800 font-cairo">الفعالية غير موجودة</h2>
+      </div>
+    );
   }
 
   const isFull = attendeeCount >= event.capacity;
@@ -138,41 +150,49 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
   const gains = locale === 'en' ? event.gainsEn : event.gains;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50">
       {/* Cover Image */}
-      <div className="w-full h-64 md:h-96 bg-blue-900 relative">
+      <div className="w-full h-72 md:h-96 bg-blue-900 relative">
         {event.coverUrl ? (
-          <img src={event.coverUrl} alt={title} className="w-full h-full object-cover opacity-80" />
+          <img src={event.coverUrl} alt={title} className="w-full h-full object-cover opacity-70 mix-blend-overlay" />
         ) : (
-          <div className="w-full h-full bg-gradient-to-r from-blue-700 to-indigo-800" />
+          <div className="w-full h-full bg-gradient-to-br from-blue-800 to-indigo-900" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-        <div className="absolute bottom-0 left-0 right-0 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
-          <span className="inline-block bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-bold mb-4">
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/40 to-transparent" />
+        <div className="absolute bottom-0 left-0 right-0 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-10">
+          <span className="inline-block bg-blue-500/20 text-blue-100 backdrop-blur-md border border-blue-400/30 px-4 py-1.5 rounded-full text-sm font-bold mb-5">
             {event.type}
           </span>
-          <h1 className="text-3xl md:text-5xl font-bold text-white font-cairo shadow-sm">{title}</h1>
+          <h1 className="text-4xl md:text-6xl font-extrabold text-white font-cairo shadow-sm leading-tight max-w-4xl">{title}</h1>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
           
           {/* Main Details */}
           <div className="lg:col-span-2 space-y-8">
-            <section className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
-              <h2 className="text-2xl font-bold mb-4 font-cairo">عن الفعالية</h2>
-              <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{description}</p>
+            <section className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+              <h2 className="text-2xl font-bold mb-6 font-cairo text-slate-800 flex items-center">
+                <div className="w-1.5 h-6 bg-blue-600 rounded-full rtl:ml-3 ltr:mr-3"></div>
+                عن الفعالية
+              </h2>
+              <p className="text-slate-600 text-lg leading-relaxed whitespace-pre-wrap">{description}</p>
             </section>
             
             {gains && gains.length > 0 && (
-              <section className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
-                <h2 className="text-2xl font-bold mb-4 font-cairo">ماذا ستتعلم؟</h2>
-                <ul className="space-y-2">
+              <section className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+                <h2 className="text-2xl font-bold mb-6 font-cairo text-slate-800 flex items-center">
+                  <div className="w-1.5 h-6 bg-green-500 rounded-full rtl:ml-3 ltr:mr-3"></div>
+                  ماذا ستتعلم؟
+                </h2>
+                <ul className="space-y-4">
                   {gains.map((gain, idx) => (
                     <li key={idx} className="flex items-start">
-                      <CheckCircle className="h-5 w-5 text-green-500 me-2 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-700">{gain}</span>
+                      <div className="bg-green-50 p-1 rounded-full rtl:ml-3 ltr:mr-3 mt-0.5 flex-shrink-0">
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                      </div>
+                      <span className="text-slate-700 text-lg">{gain}</span>
                     </li>
                   ))}
                 </ul>
@@ -180,11 +200,14 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
             )}
 
             {event.speakers && event.speakers.length > 0 && (
-              <section className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
-                <h2 className="text-2xl font-bold mb-4 font-cairo">المتحدثون</h2>
-                <div className="flex flex-wrap gap-2">
+              <section className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+                <h2 className="text-2xl font-bold mb-6 font-cairo text-slate-800 flex items-center">
+                  <div className="w-1.5 h-6 bg-purple-500 rounded-full rtl:ml-3 ltr:mr-3"></div>
+                  المتحدثون
+                </h2>
+                <div className="flex flex-wrap gap-3">
                   {event.speakers.map((speaker, idx) => (
-                    <span key={idx} className="bg-gray-100 text-gray-800 px-4 py-2 rounded-lg font-medium">{speaker}</span>
+                    <span key={idx} className="bg-slate-100 text-slate-700 px-5 py-2.5 rounded-xl font-semibold border border-slate-200 shadow-sm">{speaker}</span>
                   ))}
                 </div>
               </section>
@@ -194,39 +217,56 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
           {/* Sidebar CTA & Info */}
           <div className="space-y-6">
             {/* Registration Card */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 sticky top-24">
-              <div className="space-y-4 mb-6">
-                <div className="flex items-center text-gray-700">
-                  <Calendar className="h-5 w-5 text-blue-600 me-3" />
+            <div className="bg-white rounded-3xl p-8 shadow-md border border-blue-50 sticky top-24">
+              <div className="space-y-6 mb-8">
+                <div className="flex items-start text-slate-700">
+                  <div className="bg-blue-50 p-2.5 rounded-xl rtl:ml-4 ltr:mr-4">
+                    <Calendar className="h-6 w-6 text-blue-600" />
+                  </div>
                   <div>
-                    <div className="font-semibold">{format(eventDate, 'dd MMMM yyyy', { locale: dateLocale })}</div>
-                    <div className="text-sm text-gray-500">{format(eventDate, 'HH:mm', { locale: dateLocale })} ({event.durationHours} ساعات)</div>
+                    <div className="font-bold text-lg">{format(eventDate, 'dd MMMM yyyy', { locale: dateLocale })}</div>
+                    <div className="text-slate-500">{format(eventDate, 'HH:mm', { locale: dateLocale })} ({event.durationHours} ساعات)</div>
                   </div>
                 </div>
-                <div className="flex items-center text-gray-700">
-                  <MapPin className="h-5 w-5 text-blue-600 me-3" />
-                  <span className="font-semibold">{location}</span>
+                
+                <div className="flex items-center text-slate-700">
+                  <div className="bg-blue-50 p-2.5 rounded-xl rtl:ml-4 ltr:mr-4">
+                    <MapPin className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <span className="font-bold text-lg">{location}</span>
                 </div>
-                <div className="flex items-center text-gray-700">
-                  <Users className="h-5 w-5 text-blue-600 me-3" />
-                  <span>{attendeeCount} / {event.capacity} مسجل</span>
+                
+                <div className="flex items-center text-slate-700">
+                  <div className="bg-blue-50 p-2.5 rounded-xl rtl:ml-4 ltr:mr-4">
+                    <Users className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-bold text-lg">{attendeeCount} / {event.capacity} مسجل</span>
+                    {isFull && <span className="text-sm text-orange-500 font-medium">الفعالية ممتلئة (متاح قائمة انتظار)</span>}
+                  </div>
                 </div>
-                <div className="flex items-center text-gray-700">
-                  <Trophy className="h-5 w-5 text-yellow-500 me-3" />
-                  <span>{event.points} نقطة</span>
+                
+                <div className="flex items-center text-slate-700">
+                  <div className="bg-yellow-50 p-2.5 rounded-xl rtl:ml-4 ltr:mr-4">
+                    <Trophy className="h-6 w-6 text-yellow-600" />
+                  </div>
+                  <span className="font-bold text-lg">{event.points} نقطة</span>
                 </div>
+                
                 {event.hasCertificate && (
-                  <div className="flex items-center text-gray-700">
-                    <Award className="h-5 w-5 text-green-500 me-3" />
-                    <span>شهادة حضور معتمدة</span>
+                  <div className="flex items-center text-slate-700">
+                    <div className="bg-green-50 p-2.5 rounded-xl rtl:ml-4 ltr:mr-4">
+                      <Award className="h-6 w-6 text-green-600" />
+                    </div>
+                    <span className="font-bold text-lg">شهادة حضور معتمدة</span>
                   </div>
                 )}
               </div>
 
               {/* Registration CTA Logic */}
-              <div className="mt-8 pt-6 border-t border-gray-100">
+              <div className="mt-8 pt-8 border-t border-slate-100">
                 {!user ? (
-                  <button onClick={login} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition-colors">
+                  <button onClick={login} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5 text-lg">
                     تسجيل الدخول للحضور
                   </button>
                 ) : (
@@ -235,35 +275,46 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                       <button 
                         onClick={handleRegister} 
                         disabled={!isRegistrationOpen || isRegistering}
-                        className={`w-full py-3 rounded-xl font-bold transition-colors ${
-                          !isRegistrationOpen ? 'bg-gray-200 text-gray-500 cursor-not-allowed' :
-                          isFull ? 'bg-yellow-500 text-white hover:bg-yellow-600' :
-                          'bg-blue-600 text-white hover:bg-blue-700'
+                        className={`w-full py-4 rounded-2xl font-bold text-lg transition-all flex items-center justify-center ${
+                          !isRegistrationOpen ? 'bg-slate-100 text-slate-400 cursor-not-allowed' :
+                          isFull ? 'bg-yellow-500 text-white hover:bg-yellow-600 shadow-md' :
+                          'bg-blue-600 text-white hover:bg-blue-700 shadow-md hover:shadow-lg transform hover:-translate-y-0.5'
                         }`}
                       >
-                        {isRegistering ? 'جاري التسجيل...' : 
-                         !isRegistrationOpen ? 'التسجيل مغلق' : 
-                         isFull ? 'الانضمام لقائمة الانتظار' : 'سجل الآن'}
+                        {isRegistering ? (
+                          <>
+                            <LoadingSpinner size="sm" color="border-white" className="rtl:ml-3 ltr:mr-3" />
+                            <span>جاري التسجيل...</span>
+                          </>
+                        ) : !isRegistrationOpen ? 'التسجيل مغلق' : 
+                         isFull ? 'الانضمام لقائمة الانتظار' : 'سجل الآن في الفعالية'}
                       </button>
                     ) : (
-                      <div className="space-y-3">
-                        <div className={`flex items-center justify-center p-3 rounded-xl font-bold ${
-                          registrationStatus === 'approved' ? 'bg-green-100 text-green-700' :
-                          registrationStatus === 'waitlisted' ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-blue-100 text-blue-700'
+                      <div className="space-y-4">
+                        <div className={`flex flex-col items-center justify-center p-5 rounded-2xl text-center border ${
+                          registrationStatus === 'approved' ? 'bg-green-50 text-green-800 border-green-200' :
+                          registrationStatus === 'waitlisted' ? 'bg-yellow-50 text-yellow-800 border-yellow-200' :
+                          'bg-blue-50 text-blue-800 border-blue-200'
                         }`}>
-                          {registrationStatus === 'approved' ? 'تم تأكيد تسجيلك!' :
-                           registrationStatus === 'waitlisted' ? 'أنت في قائمة الانتظار' :
-                           'طلبك قيد المراجعة'}
+                          <span className="font-bold text-lg mb-1">
+                            {registrationStatus === 'approved' ? 'تم تأكيد تسجيلك!' :
+                             registrationStatus === 'waitlisted' ? 'أنت في قائمة الانتظار' :
+                             'طلبك قيد المراجعة'}
+                          </span>
+                          <span className="text-sm opacity-80">
+                            {registrationStatus === 'approved' ? 'ننتظر رؤيتك في الفعالية' :
+                             registrationStatus === 'waitlisted' ? 'سنعلمك في حال توفر مقعد' :
+                             'سيتم مراجعة طلبك من قبل المنظمين'}
+                          </span>
                         </div>
                         
                         {(event.state === 'Registration Open' || event.state === 'Published') && (
                           <button 
                             onClick={handleCancelRegistration}
                             disabled={isRegistering}
-                            className="w-full text-red-500 text-sm font-medium hover:underline p-2"
+                            className="w-full text-red-500 font-bold hover:bg-red-50 py-3 rounded-xl transition-colors flex items-center justify-center"
                           >
-                            إلغاء التسجيل
+                            {isRegistering ? <LoadingSpinner size="sm" color="border-red-500" /> : 'إلغاء التسجيل'}
                           </button>
                         )}
                       </div>
