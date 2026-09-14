@@ -13,20 +13,20 @@
     "discoverLeaders": "Discover Leaders",
     "activityAndCerts": "Activity & Certificates",
     "activityAndCertsDesc": "Track your attended events, points, and download your certificates.",
-    "goToActivity": "Go to My Activity"
-  },
-  "Hero": {
-    "identityLabel": "IEEE Al-Qassim Student Branch",
-    "wordmark": "IEEE QASSIM",
-    "headline": "Build what's next.",
-    "subheadline": "Your engineering and technology community at Al-Qassim.",
-    "description": "Discover events, develop your skills, participate in technical experiences, and build your career with the IEEE Qassim community.",
-    "exploreEvents": "Explore Events",
-    "joinCommunity": "Join the Community",
-    "login": "Sign In",
-    "cardEvent": "Upcoming Event",
-    "cardPoints": "+50 Points",
-    "cardActivity": "Verified Attendance"
+    "goToActivity": "Go to My Activity",
+    "Hero": {
+      "identityLabel": "IEEE Al-Qassim Student Branch",
+      "wordmark": "IEEE QASSIM",
+      "headline": "Build what's next.",
+      "subheadline": "Your engineering and technology community at Al-Qassim.",
+      "description": "Discover events, develop your skills, participate in technical experiences, and build your career with the IEEE Qassim community.",
+      "exploreEvents": "Explore Events",
+      "joinCommunity": "Join the Community",
+      "login": "Sign In",
+      "cardEvent": "Upcoming Event",
+      "cardPoints": "+50 Points",
+      "cardActivity": "Verified Attendance"
+    }
   },
   "Navbar": {
     "brand": "TechComm",

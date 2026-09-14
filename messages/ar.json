@@ -13,20 +13,20 @@
     "discoverLeaders": "اكتشف المتصدرين",
     "activityAndCerts": "نشاطك وشهاداتك",
     "activityAndCertsDesc": "تتبع الفعاليات التي حضرتها، نقاطك، واطبع شهاداتك بكل سهولة.",
-    "goToActivity": "انتقل إلى نشاطي"
-  },
-  "Hero": {
-    "identityLabel": "الفرع الطلابي IEEE بالقصيم",
-    "wordmark": "IEEE QASSIM",
-    "headline": "اصنع المستقبل.",
-    "subheadline": "مجتمعك الهندسي والتقني بالقصيم.",
-    "description": "اكتشف الفعاليات، طوّر مهاراتك، شارك في التجارب التقنية، وابنِ مسيرتك مع مجتمع IEEE Qassim.",
-    "exploreEvents": "استكشف الفعاليات",
-    "joinCommunity": "انضم للمجتمع",
-    "login": "تسجيل الدخول",
-    "cardEvent": "فعالية قادمة",
-    "cardPoints": "+50 نقطة",
-    "cardActivity": "حضور موثق"
+    "goToActivity": "انتقل إلى نشاطي",
+    "Hero": {
+      "identityLabel": "الفرع الطلابي IEEE بالقصيم",
+      "wordmark": "IEEE QASSIM",
+      "headline": "اصنع المستقبل.",
+      "subheadline": "مجتمعك الهندسي والتقني بالقصيم.",
+      "description": "اكتشف الفعاليات، طوّر مهاراتك، شارك في التجارب التقنية، وابنِ مسيرتك مع مجتمع IEEE Qassim.",
+      "exploreEvents": "استكشف الفعاليات",
+      "joinCommunity": "انضم للمجتمع",
+      "login": "تسجيل الدخول",
+      "cardEvent": "فعالية قادمة",
+      "cardPoints": "+50 نقطة",
+      "cardActivity": "حضور موثق"
+    }
   },
   "Navbar": {
     "brand": "TechComm",
