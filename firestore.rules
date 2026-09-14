@@ -62,8 +62,11 @@ service cloud.firestore {
       allow read: if isEventOrganizer()
         || (resource != null && isOwner(resource.data.userId))
         || true;
-      // Client cannot create registrations directly; must use backend Callable Function
-      allow create: if false; 
+      // Client CAN create registrations directly now (Spark Plan friendly)
+      allow create: if isAuthenticated() 
+        && request.resource.data.userId == request.auth.uid
+        && registrationId == (request.resource.data.eventId + '_' + request.auth.uid)
+        && request.resource.data.status in ['approved', 'waitlisted', 'pending']; 
       // Users can only cancel their own registrations, admins can approve/reject
       allow update: if isEventOrganizer() || (
         isOwner(resource.data.userId)

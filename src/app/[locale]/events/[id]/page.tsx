@@ -122,12 +122,55 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
     
     setIsRegistering(true);
     try {
-      const registerForEvent = httpsCallable(functions, 'registerForEvent');
-      const result = await registerForEvent({ eventId: event.id });
+      const regId = `${eventId}_${user.uid}`;
+      const regRef = doc(db, 'registrations', regId);
+      const eventRef = doc(db, 'events', eventId);
+
+      const result = await runTransaction(db, async (transaction) => {
+        const eventSnap = await transaction.get(eventRef);
+        if (!eventSnap.exists()) {
+          throw new Error(isAr ? 'الفعالية غير موجودة' : 'Event not found.');
+        }
+
+        const eventData = eventSnap.data() as PlatformEvent;
+        if (eventData.state !== 'Registration Open' && eventData.state !== 'Published') {
+          throw new Error(isAr ? 'التسجيل مغلق لهذه الفعالية' : 'Registration is not open for this event.');
+        }
+
+        const regSnap = await transaction.get(regRef);
+        if (regSnap.exists()) {
+          const currentStatus = regSnap.data().status;
+          if (currentStatus !== 'cancelled') {
+            throw new Error(isAr ? 'أنت مسجل بالفعل في هذه الفعالية' : 'You are already registered or pending for this event.');
+          }
+        }
+
+        let currentAttendeeCount = eventData.registeredCount || 0;
+        let newStatus = 'approved';
+        if (eventData.registrationMode === 'Manual') {
+          newStatus = 'pending';
+        } else if (currentAttendeeCount >= (eventData.capacity || 0)) {
+          newStatus = 'waitlisted';
+        }
+
+        const regData = {
+          userId: user.uid,
+          eventId: eventId,
+          status: newStatus,
+          timestamp: serverTimestamp(),
+        };
+
+        transaction.set(regRef, regData);
+        
+        transaction.update(eventRef, {
+          registeredCount: increment(1)
+        });
+
+        return { status: newStatus, attendeeCount: currentAttendeeCount + 1 };
+      });
       
-      const data = result.data as { status: string; attendeeCount: number };
-      setRegistrationStatus(data.status);
-      setAttendeeCount(data.attendeeCount);
+      setRegistrationStatus(result.status);
+      setAttendeeCount(result.attendeeCount);
     } catch (error: unknown) {
       console.error("Error registering", error);
       const msg = error instanceof Error ? error.message : (isAr ? "حدث خطأ أثناء التسجيل. حاول مرة أخرى." : "Registration failed. Try again.");
