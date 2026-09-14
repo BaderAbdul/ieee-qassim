@@ -43,8 +43,8 @@
   },
   "Footer": {
     "brand": "TechComm IEEE QU",
-    "description": "The official engineering technology and innovation community platform at College of Engineering at Al-Qassim.",
-    "college": "College of Engineering at Al-Qassim",
+    "description": "The official engineering technology and innovation community platform for IEEE QU.",
+    "college": "IEEE QU",
     "quickLinks": "Quick Links",
     "copyright": "University Technology Community Platform © {year} - All Rights Reserved",
     "home": "Home",
@@ -113,8 +113,8 @@
   },
   "Profile": {
     "title": "Engineering Profile",
-    "subtitle": "Your academic record, technical accomplishments, and engagement ledger at College of Engineering.",
-    "college": "College of Engineering at Al-Qassim",
+    "subtitle": "Your academic record, technical accomplishments, and engagement ledger at IEEE QU.",
+    "college": "IEEE QU",
     "department": "Engineering Department",
     "academicYear": "Academic Year",
     "activeMember": "Active Member",
@@ -200,8 +200,8 @@
   "Onboarding": {
     "title": "Let's get to know you 👋",
     "subtitle": "Complete your profile to personalize your experience in the IEEE Qassim community.",
-    "isStudent": "Are you a student at Qassim University?",
-    "yes": "Yes, I am a student at Qassim University",
+    "isStudent": "Are you a student in Qassim?",
+    "yes": "Yes, I am a student in Qassim",
     "no": "No",
     "universityData": "University Details",
     "universityId": "University ID",
