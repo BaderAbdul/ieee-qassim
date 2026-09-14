@@ -27,3 +27,16 @@ export interface PlatformEvent {
   createdAt: Timestamp | Date;
   updatedAt: Timestamp | Date;
 }
+
+export type PointTransactionSource = 'attendance' | 'attendance_override' | 'manual_adjustment';
+
+export interface PointTransaction {
+  id: string;
+  userId: string;
+  amount: number;
+  source: PointTransactionSource;
+  reason: string;
+  sourceEventId?: string;
+  createdBy: string;
+  createdAt: Timestamp | Date;
+}

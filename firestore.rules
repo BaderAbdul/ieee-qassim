@@ -55,11 +55,10 @@ service cloud.firestore {
       allow update, delete: if isSuperAdmin();
     }
     
-    // Point Transactions
+    // Point Transactions (Immutable Ledger)
     match /point_transactions/{transactionId} {
       allow read: if isOwner(resource.data.userId) || isEventOrganizer();
-      allow create: if isSuperAdmin(); // Usually created by Cloud Functions
-      allow update, delete: if isSuperAdmin();
+      allow create, update, delete: if false; // Only written by Cloud Functions
     }
     
     // Certificates

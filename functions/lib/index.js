@@ -44,5 +44,7 @@ __exportStar(require("./registerForEvent"), exports);
 __exportStar(require("./generateCheckInToken"), exports);
 __exportStar(require("./processCheckIn"), exports);
 __exportStar(require("./manualAttendanceOverride"), exports);
+__exportStar(require("./addManualPoints"), exports);
+__exportStar(require("./onPointTransactionCreated"), exports);
 __exportStar(require("./authBlocking"), exports);
 //# sourceMappingURL=index.js.map

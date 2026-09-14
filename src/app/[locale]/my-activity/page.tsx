@@ -17,12 +17,7 @@ interface RegistrationWithEvent {
   event: PlatformEvent;
 }
 
-interface PointTransaction {
-  id: string;
-  points: number;
-  reason: string;
-  timestamp: any;
-}
+import { PointTransaction } from '@/lib/types';
 
 interface Certificate {
   id: string;
@@ -81,8 +76,8 @@ export default function MyActivityPage() {
         const ptSnap = await getDocs(ptQ);
         const ptsData = ptSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as PointTransaction[];
         ptsData.sort((a, b) => {
-          const tA = a.timestamp?.toDate()?.getTime() || 0;
-          const tB = b.timestamp?.toDate()?.getTime() || 0;
+          const tA = (a.createdAt as any)?.toDate()?.getTime() || 0;
+          const tB = (b.createdAt as any)?.toDate()?.getTime() || 0;
           return tB - tA;
         });
         setTransactions(ptsData);
@@ -205,11 +200,16 @@ export default function MyActivityPage() {
                   transactions.map((tx) => (
                     <div key={tx.id} className="border border-gray-100 rounded-xl p-4 flex items-center justify-between">
                       <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`px-2 py-0.5 rounded text-xs font-bold ${tx.source === 'attendance' ? 'bg-blue-100 text-blue-700' : tx.source === 'manual_adjustment' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'}`}>
+                            {tx.source === 'attendance' ? 'حضور' : tx.source === 'manual_adjustment' ? 'تعديل يدوي' : 'إدارة'}
+                          </span>
+                        </div>
                         <h4 className="font-bold text-gray-900">{tx.reason}</h4>
-                        <p className="text-sm text-gray-500">{tx.timestamp?.toDate ? format(tx.timestamp.toDate(), 'dd MMMM yyyy', { locale: dateLocale }) : ''}</p>
+                        <p className="text-sm text-gray-500">{(tx.createdAt as any)?.toDate ? format((tx.createdAt as any).toDate(), 'dd MMMM yyyy', { locale: dateLocale }) : ''}</p>
                       </div>
-                      <div className="font-bold text-lg text-green-600">
-                        +{tx.points}
+                      <div className={`font-bold text-lg ${tx.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {tx.amount > 0 ? '+' : ''}{tx.amount}
                       </div>
                     </div>
                   ))

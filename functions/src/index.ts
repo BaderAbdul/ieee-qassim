@@ -8,4 +8,6 @@ export * from './registerForEvent';
 export * from './generateCheckInToken';
 export * from './processCheckIn';
 export * from './manualAttendanceOverride';
+export * from './addManualPoints';
+export * from './onPointTransactionCreated';
 export * from './authBlocking';

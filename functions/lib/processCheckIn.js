@@ -100,6 +100,22 @@ exports.processCheckIn = functions.https.onCall(async (data, context) => {
             verifiedByQR: true,
             tokenNonce: decodedToken.nonce,
         });
+        // 5. Award Points Atomically
+        const eventData = eventSnap.data();
+        const pointsToAward = typeof (eventData === null || eventData === void 0 ? void 0 : eventData.points) === 'number' ? eventData.points : 0;
+        if (pointsToAward > 0) {
+            const pointTxId = `attendance_${eventId}_${uid}`;
+            const pointTxRef = db.collection('point_transactions').doc(pointTxId);
+            transaction.set(pointTxRef, {
+                userId: uid,
+                amount: pointsToAward,
+                source: 'attendance',
+                reason: `Attended event: ${(eventData === null || eventData === void 0 ? void 0 : eventData.title) || 'Unknown'}`,
+                sourceEventId: eventId,
+                createdBy: 'system',
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+        }
         return { status: 'success' };
     });
 });
