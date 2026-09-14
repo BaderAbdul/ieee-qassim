@@ -118,21 +118,13 @@ const ALL_BADGES: BadgeDef[] = [
 export default function EngineeringProfilePage() {
   const t = useTranslations('Profile');
   const tCommon = useTranslations('Common');
+  const tOnboard = useTranslations('Onboarding');
   const locale = useLocale();
   const isAr = locale === 'ar';
   const dateLocale = isAr ? ar : enUS;
 
-  interface StudentUserData {
-    department?: string;
-    academicYear?: string;
-    universityId?: string;
-    badges?: string[];
-    totalPoints?: number;
-    role?: string;
-  }
-
   const { user, userData, loading: authLoading, login } = useAuth();
-  const studentData = userData as (StudentUserData & typeof userData) | null;
+  const userBadges = userData?.badges || [];
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -203,7 +195,7 @@ export default function EngineeringProfilePage() {
       } catch (err) {
         console.error('Error fetching engineering profile data:', err);
         if (active) {
-          setError(isAr ? 'حدث خطأ أثناء تحميل بيانات الملف الهندسي.' : 'Failed to load profile data.');
+          setError(isAr ? 'حدث خطأ أثناء تحميل بيانات الملف.' : 'Failed to load profile data.');
         }
       } finally {
         if (active) {
@@ -271,14 +263,29 @@ export default function EngineeringProfilePage() {
     );
   }
 
-  // Profile fields
-  const displayName = user.displayName || user.email?.split('@')[0] || 'Eng. Student';
-  const department = studentData?.department || (isAr ? 'الهندسة الكهربائية والحاسب' : 'Electrical & Computer Engineering');
-  const academicYear = studentData?.academicYear || (isAr ? 'المستوى الثامن - بكالوريوس' : '4th Year - Bachelor of Science');
-  const universityId = studentData?.universityId || (user.email?.includes('@') ? user.email.split('@')[0] : '441029384');
+  // Profile fields using new onboarding data
+  const displayName = userData?.arabicFullName || user.displayName || user.email?.split('@')[0] || 'Community Member';
+  
+  // Format college and major nice
+  const getLabel = (type: 'colleges' | 'majors' | 'levels', val?: string | null) => {
+    if (!val) return '';
+    try {
+      return tOnboard(`${type}.${val}`);
+    } catch {
+      return val;
+    }
+  };
+
+  const departmentStr = userData?.isQassimStudent 
+    ? [getLabel('colleges', userData.college), getLabel('majors', userData.major)].filter(Boolean).join(' - ')
+    : (isAr ? 'عضو مجتمع التقنية' : 'Tech Community Member');
+    
+  const academicLevel = userData?.academicLevel ? getLabel('levels', userData.academicLevel) : '';
+  const isQassimStudent = userData?.isQassimStudent;
+  const universityId = isQassimStudent && userData?.universityId ? `***${userData.universityId.slice(-4)}` : null; // Partially hidden for privacy
+
   const totalPoints = userData?.totalPoints ?? 0;
   const attendedCount = registrations.filter(r => r.status === 'attended' || r.status === 'approved').length;
-  const userBadges = studentData?.badges || [];
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 lg:px-8">
@@ -342,15 +349,19 @@ export default function EngineeringProfilePage() {
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-y-2 gap-x-6 text-sm text-slate-600 pt-1">
                 <div className="flex items-center gap-1.5">
                   <Building2 className="h-4 w-4 text-blue-600" />
-                  <span className="font-semibold">{department}</span>
+                  <span className="font-semibold">{departmentStr}</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <GraduationCap className="h-4 w-4 text-indigo-600" />
-                  <span>{academicYear}</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-xs bg-slate-100 px-2.5 py-1 rounded-md font-mono text-slate-500">
-                  <span>ID: {universityId}</span>
-                </div>
+                {academicLevel && (
+                  <div className="flex items-center gap-1.5">
+                    <GraduationCap className="h-4 w-4 text-indigo-600" />
+                    <span>{academicLevel}</span>
+                  </div>
+                )}
+                {universityId && (
+                  <div className="flex items-center gap-1.5 text-xs bg-slate-100 px-2.5 py-1 rounded-md font-mono text-slate-500">
+                    <span>ID: {universityId}</span>
+                  </div>
+                )}
               </div>
             </div>
 

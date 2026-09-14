@@ -6,9 +6,22 @@ import { auth, googleProvider } from '@/lib/firebase/client';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 
-interface UserData {
+export interface UserData {
   role: 'student' | 'event_organizer' | 'super_admin';
   totalPoints: number;
+  email?: string | null;
+  displayName?: string | null;
+  photoURL?: string | null;
+  createdAt?: string;
+  isQassimStudent?: boolean;
+  universityId?: string | null;
+  arabicFullName?: string;
+  college?: string | null;
+  major?: string | null;
+  academicLevel?: string | null;
+  profileCompleted?: boolean;
+  profileCompletedAt?: string | null;
+  badges?: string[];
 }
 
 interface AuthContextType {
@@ -44,8 +57,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (userSnap.exists()) {
           setUserData(userSnap.data() as UserData);
         } else {
-          // Check if domain is allowed (for V1, we'll allow any for now if env is not set, 
-          // or strictly enforce if process.env.NEXT_PUBLIC_ALLOWED_DOMAIN is set)
+          // Check if domain is allowed
           const allowedDomain = process.env.NEXT_PUBLIC_ALLOWED_DOMAIN;
           const emailDomain = currentUser.email?.split('@')[1];
           
@@ -58,13 +70,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             return;
           }
 
-          const newUserData = {
-            role: 'student' as const, // Default role
+          const newUserData: UserData = {
+            role: 'student', // Default role
             totalPoints: 0,
             email: currentUser.email,
             displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Student',
             photoURL: currentUser.photoURL || null,
             createdAt: new Date().toISOString(),
+            profileCompleted: false, // Onboarding required
           };
           await setDoc(userRef, newUserData);
           setUserData(newUserData);

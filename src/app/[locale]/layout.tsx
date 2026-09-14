@@ -6,6 +6,7 @@ import { Cairo, Inter } from 'next/font/google';
 import localFont from 'next/font/local';
 import { routing } from '@/i18n/routing';
 import { AuthProvider } from '@/context/AuthContext';
+import ProfileGuard from '@/components/auth/ProfileGuard';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import "../globals.css";
@@ -67,13 +68,15 @@ export default async function RootLayout({
       >
         <NextIntlClientProvider messages={messages}>
           <AuthProvider>
-            <div className="flex flex-col min-h-screen">
-              <Navbar />
-              <main className="flex-grow">
-                {children}
-              </main>
-              <Footer />
-            </div>
+            <ProfileGuard>
+              <div className="flex flex-col min-h-screen">
+                <Navbar />
+                <main className="flex-grow">
+                  {children}
+                </main>
+                <Footer />
+              </div>
+            </ProfileGuard>
           </AuthProvider>
         </NextIntlClientProvider>
       </body>
