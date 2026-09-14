@@ -59,7 +59,8 @@ export const processCheckIn = functions.https.onCall(async (data, context) => {
       throwFailedPrecondition('You are not registered for this event.');
     }
     
-    if (regSnap.data()?.status !== 'approved') {
+    const currentRegStatus = regSnap.data()?.status;
+    if (currentRegStatus !== 'approved' && currentRegStatus !== 'attended') {
       throwFailedPrecondition('Your registration is not approved.');
     }
 
@@ -80,6 +81,12 @@ export const processCheckIn = functions.https.onCall(async (data, context) => {
       timestamp: FieldValue.serverTimestamp(),
       verifiedByQR: true,
       tokenNonce: decodedToken.nonce,
+    });
+
+    // 4b. Update registration status to attended
+    transaction.update(regRef, {
+      status: 'attended',
+      attendedAt: FieldValue.serverTimestamp(),
     });
 
     // 5. Award Points Atomically

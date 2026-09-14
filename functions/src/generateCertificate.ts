@@ -29,12 +29,52 @@ export const generateCertificate = onDocumentWritten(
     const db = admin.firestore();
     const certRef = db.collection('certificates').doc(event.params.certificateId);
 
+    // Safe helper to resolve font path across both development and compiled runtime environments
+    const resolveFontBase64 = (fontFileName: string): string | null => {
+      const candidatePaths = [
+        path.join(__dirname, '../src/assets/fonts', fontFileName), // Relative to functions/lib/
+        path.join(__dirname, 'assets/fonts', fontFileName),        // If co-located with script
+        path.join(__dirname, './src/assets/fonts', fontFileName),  // Relative to functions/ root
+        path.join(process.cwd(), 'functions/src/assets/fonts', fontFileName),
+        path.join(process.cwd(), 'src/assets/fonts', fontFileName),
+      ];
+
+      for (const candidate of candidatePaths) {
+        try {
+          if (fs.existsSync(candidate)) {
+            return fs.readFileSync(candidate).toString('base64');
+          }
+        } catch {
+          // Ignore and check next candidate
+        }
+      }
+      console.warn(`[generateCertificate] Font file ${fontFileName} not found at any candidate path. Using fallback typography.`);
+      return null;
+    };
+
     try {
-      // Load fonts as base64
-      const fontRegularPath = path.join(__dirname, '../../src/assets/fonts/Cairo-Regular.ttf');
-      const fontBoldPath = path.join(__dirname, '../../src/assets/fonts/Cairo-Bold.ttf');
-      const cairoRegularBase64 = fs.readFileSync(fontRegularPath).toString('base64');
-      const cairoBoldBase64 = fs.readFileSync(fontBoldPath).toString('base64');
+      // Load fonts as base64 if available
+      const cairoRegularBase64 = resolveFontBase64('Cairo-Regular.ttf');
+      const cairoBoldBase64 = resolveFontBase64('Cairo-Bold.ttf');
+
+      const fontFaceStyles = [
+        cairoRegularBase64
+          ? `@font-face {
+              font-family: 'Cairo';
+              src: url(data:font/truetype;charset=utf-8;base64,${cairoRegularBase64}) format('truetype');
+              font-weight: 400;
+              font-style: normal;
+            }`
+          : '',
+        cairoBoldBase64
+          ? `@font-face {
+              font-family: 'Cairo';
+              src: url(data:font/truetype;charset=utf-8;base64,${cairoBoldBase64}) format('truetype');
+              font-weight: 700;
+              font-style: normal;
+            }`
+          : '',
+      ].filter(Boolean).join('\n');
 
       // 1. Generate HTML for the certificate
       const htmlContent = `
@@ -43,20 +83,9 @@ export const generateCertificate = onDocumentWritten(
         <head>
           <meta charset="UTF-8">
           <style>
-            @font-face {
-              font-family: 'Cairo';
-              src: url(data:font/truetype;charset=utf-8;base64,${cairoRegularBase64}) format('truetype');
-              font-weight: 400;
-              font-style: normal;
-            }
-            @font-face {
-              font-family: 'Cairo';
-              src: url(data:font/truetype;charset=utf-8;base64,${cairoBoldBase64}) format('truetype');
-              font-weight: 700;
-              font-style: normal;
-            }
+            ${fontFaceStyles}
             body {
-              font-family: 'Cairo', sans-serif;
+              font-family: 'Cairo', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
               margin: 0;
               padding: 0;
               width: 297mm;

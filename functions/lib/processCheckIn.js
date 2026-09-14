@@ -85,7 +85,8 @@ exports.processCheckIn = functions.https.onCall(async (data, context) => {
         if (!regSnap.exists) {
             (0, errors_1.throwFailedPrecondition)('You are not registered for this event.');
         }
-        if (((_b = regSnap.data()) === null || _b === void 0 ? void 0 : _b.status) !== 'approved') {
+        const currentRegStatus = (_b = regSnap.data()) === null || _b === void 0 ? void 0 : _b.status;
+        if (currentRegStatus !== 'approved' && currentRegStatus !== 'attended') {
             (0, errors_1.throwFailedPrecondition)('Your registration is not approved.');
         }
         // 3. Check for existing attendance (Idempotency)
@@ -103,6 +104,11 @@ exports.processCheckIn = functions.https.onCall(async (data, context) => {
             timestamp: firestore_1.FieldValue.serverTimestamp(),
             verifiedByQR: true,
             tokenNonce: decodedToken.nonce,
+        });
+        // 4b. Update registration status to attended
+        transaction.update(regRef, {
+            status: 'attended',
+            attendedAt: firestore_1.FieldValue.serverTimestamp(),
         });
         // 5. Award Points Atomically
         const eventData = eventSnap.data();

@@ -15,8 +15,15 @@ interface RegistrationData {
   userName: string;
   userEmail: string;
   status: string;
-  timestamp: any;
+  timestamp: { toDate?: () => Date } | Date | null;
 }
+
+const toDate = (val: { toDate?: () => Date } | Date | null | undefined): Date | null => {
+  if (!val) return null;
+  if (val instanceof Date) return val;
+  if (typeof val.toDate === 'function') return val.toDate();
+  return null;
+};
 
 export default function RegistrationDeskPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: eventId } = use(params);
@@ -25,51 +32,59 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
   const [registrations, setRegistrations] = useState<RegistrationData[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchRegistrations = async () => {
-    try {
-      const eventSnap = await getDoc(doc(db, 'events', eventId));
-      if (eventSnap.exists()) {
-        setEvent({ id: eventSnap.id, ...eventSnap.data() } as PlatformEvent);
-      }
-
-      const q = query(collection(db, 'registrations'), where('eventId', '==', eventId));
-      const snap = await getDocs(q);
-      
-      const regs: RegistrationData[] = [];
-      
-      for (const regDoc of snap.docs) {
-        const regData = regDoc.data();
-        
-        // Fetch user data
-        const userSnap = await getDoc(doc(db, 'users', regData.userId));
-        const userData = userSnap.exists() ? userSnap.data() : { displayName: 'Unknown', email: 'Unknown' };
-        
-        regs.push({
-          id: regDoc.id,
-          userId: regData.userId,
-          userName: userData.displayName || 'Unknown',
-          userEmail: userData.email || 'Unknown',
-          status: regData.status,
-          timestamp: regData.timestamp
-        });
-      }
-      
-      regs.sort((a, b) => {
-        const tA = a.timestamp?.toDate()?.getTime() || 0;
-        const tB = b.timestamp?.toDate()?.getTime() || 0;
-        return tA - tB; // Earliest first
-      });
-      
-      setRegistrations(regs);
-    } catch (error) {
-      console.error("Error fetching registrations", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    let active = true;
+
+    const fetchRegistrations = async () => {
+      try {
+        const eventSnap = await getDoc(doc(db, 'events', eventId));
+        if (eventSnap.exists() && active) {
+          setEvent({ id: eventSnap.id, ...eventSnap.data() } as PlatformEvent);
+        }
+
+        const q = query(collection(db, 'registrations'), where('eventId', '==', eventId));
+        const snap = await getDocs(q);
+        
+        const regs: RegistrationData[] = [];
+        
+        for (const regDoc of snap.docs) {
+          const regData = regDoc.data();
+          
+          // Fetch user data
+          const userSnap = await getDoc(doc(db, 'users', regData.userId));
+          const userData = userSnap.exists() ? userSnap.data() : { displayName: 'Unknown', email: 'Unknown' };
+          
+          regs.push({
+            id: regDoc.id,
+            userId: regData.userId,
+            userName: userData.displayName || 'Unknown',
+            userEmail: userData.email || 'Unknown',
+            status: regData.status,
+            timestamp: regData.timestamp
+          });
+        }
+        
+        regs.sort((a, b) => {
+          const tA = (a.timestamp as { toDate?: () => Date })?.toDate?.()?.getTime() || 0;
+          const tB = (b.timestamp as { toDate?: () => Date })?.toDate?.()?.getTime() || 0;
+          return tA - tB; // Earliest first
+        });
+        
+        if (active) setRegistrations(regs);
+      } catch (error) {
+        console.error("Error fetching registrations", error);
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
     fetchRegistrations();
+
+    return () => {
+      active = false;
+    };
   }, [eventId]);
 
   const handleUpdateStatus = async (regId: string, newStatus: string) => {
@@ -88,12 +103,15 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
     if (!event) return;
     
     const headers = ['Name', 'Email', 'Status', 'Date'];
-    const rows = registrations.map(r => [
-      `"${r.userName}"`,
-      `"${r.userEmail}"`,
-      r.status,
-      r.timestamp?.toDate() ? format(r.timestamp.toDate(), 'yyyy-MM-dd HH:mm:ss') : ''
-    ]);
+    const rows = registrations.map(r => {
+      const d = toDate(r.timestamp);
+      return [
+        `"${r.userName}"`,
+        `"${r.userEmail}"`,
+        r.status,
+        d ? format(d, 'yyyy-MM-dd HH:mm:ss') : ''
+      ];
+    });
     
     const csvContent = "data:text/csv;charset=utf-8,\uFEFF" 
       + headers.join(',') + '\n' 
@@ -189,7 +207,7 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
                       <div className="text-sm text-gray-500">{reg.userEmail}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {reg.timestamp?.toDate ? format(reg.timestamp.toDate(), 'dd MMM yyyy HH:mm', { locale: ar }) : ''}
+                      {toDate(reg.timestamp) ? format(toDate(reg.timestamp)!, 'dd MMM yyyy HH:mm', { locale: ar }) : ''}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-3 py-1 rounded-full text-xs font-bold ${

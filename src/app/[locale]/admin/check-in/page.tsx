@@ -5,7 +5,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
-import { QrCode, ArrowRight } from 'lucide-react';
+import { QrCode } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -46,7 +46,7 @@ export default function AdminCheckInDashboard() {
         {events.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
             <QrCode className="h-16 w-16 mx-auto text-gray-300 mb-4" />
-            <p className="text-lg">لا توجد فعاليات في حالة "Ongoing" حالياً.</p>
+            <p className="text-lg">لا توجد فعاليات في حالة &quot;Ongoing&quot; حالياً.</p>
             <p className="text-sm mt-2">لتسجيل الحضور، قم بتغيير حالة الفعالية إلى Ongoing من لوحة إدارة الفعاليات.</p>
             <Link href="/admin/events" className="inline-block mt-4 text-purple-600 font-medium hover:underline">
               الذهاب لإدارة الفعاليات
@@ -55,7 +55,7 @@ export default function AdminCheckInDashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {events.map(event => {
-              const eventDate = event.date instanceof Date ? event.date : (event.date as any)?.toDate?.() || new Date();
+              const eventDate = event.date instanceof Date ? event.date : (event.date as { toDate?: () => Date })?.toDate?.() || new Date();
               return (
                 <div key={event.id} className="border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
                   <div className="flex justify-between items-start mb-4">

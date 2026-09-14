@@ -6,7 +6,7 @@ import { db, functions } from '@/lib/firebase/client';
 import { httpsCallable } from 'firebase/functions';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
-import { ArrowRight, Users, QrCode } from 'lucide-react';
+import { ArrowRight, Users } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
 export default function AdminQRDisplayPage({ params }: { params: Promise<{ id: string }> }) {
@@ -28,7 +28,7 @@ export default function AdminQRDisplayPage({ params }: { params: Promise<{ id: s
         const generateCheckInToken = httpsCallable(functions, 'generateCheckInToken');
         const result = await generateCheckInToken({ eventId });
         if (isMounted) {
-          setToken((result.data as any).token);
+          setToken((result.data as { token: string }).token);
         }
       } catch (error) {
         console.error("Error generating token", error);
@@ -78,7 +78,7 @@ export default function AdminQRDisplayPage({ params }: { params: Promise<{ id: s
     return (
       <div className="text-center py-20">
         <h2 className="text-xl font-bold text-gray-900 mb-2">الفعالية غير متاحة لتسجيل الحضور</h2>
-        <p className="text-gray-500 mb-4">يجب أن تكون حالة الفعالية "Ongoing" لعرض رمز QR.</p>
+        <p className="text-gray-500 mb-4">يجب أن تكون حالة الفعالية &quot;Ongoing&quot; لعرض رمز QR.</p>
         <Link href="/admin/check-in" className="text-purple-600 hover:underline">العودة لقائمة تسجيل الحضور</Link>
       </div>
     );

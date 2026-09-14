@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from '@/i18n/routing';
 import { useEffect } from 'react';
 import { Link } from '@/i18n/routing';
-import { LayoutDashboard, Calendar, Users, QrCode, Settings, LogOut, FileText } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, QrCode, LogOut } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

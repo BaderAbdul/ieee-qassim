@@ -2,13 +2,28 @@ import type { Metadata } from "next";
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { notFound } from 'next/navigation';
+import { Cairo, Inter } from 'next/font/google';
 import { routing } from '@/i18n/routing';
 import { AuthProvider } from '@/context/AuthContext';
+import Navbar from '@/components/layout/Navbar';
+import Footer from '@/components/layout/Footer';
 import "../globals.css";
 
+const cairo = Cairo({
+  subsets: ['arabic', 'latin'],
+  variable: '--font-cairo',
+  display: 'swap',
+});
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+});
+
 export const metadata: Metadata = {
-  title: "Tech Community Platform",
-  description: "University Student Technology Community",
+  title: "Tech Community Platform | IEEE Qassim University",
+  description: "University Student Technology Community - College of Engineering",
 };
 
 export default async function RootLayout({
@@ -22,12 +37,11 @@ export default async function RootLayout({
   const { locale } = await params;
 
   // Ensure that the incoming `locale` is valid
-  if (!routing.locales.includes(locale as any)) {
+  if (!routing.locales.includes(locale as (typeof routing.locales)[number])) {
     notFound();
   }
  
-  // Providing all messages to the client
-  // side is the easiest way to get started
+  // Providing all messages to the client side
   const messages = await getMessages();
 
   // Determine direction based on locale
@@ -36,11 +50,17 @@ export default async function RootLayout({
   return (
     <html lang={locale} dir={dir}>
       <body
-        className={`font-sans antialiased bg-gray-50 text-gray-900`}
+        className={`${cairo.variable} ${inter.variable} font-sans antialiased bg-gray-50 text-gray-900`}
       >
         <NextIntlClientProvider messages={messages}>
           <AuthProvider>
-            {children}
+            <div className="flex flex-col min-h-screen">
+              <Navbar />
+              <main className="flex-grow">
+                {children}
+              </main>
+              <Footer />
+            </div>
           </AuthProvider>
         </NextIntlClientProvider>
       </body>

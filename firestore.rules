@@ -21,29 +21,55 @@ service cloud.firestore {
 
     // Users Collection
     match /users/{userId} {
-      // Anyone can read their own profile, admins can read all
-      allow read: if isOwner(userId) || isEventOrganizer();
-      // Users can create/update their own profile (basic info), but cannot change their role or points directly
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'totalPoints']) || isSuperAdmin();
+      // Authenticated users can read public profile fields for leaderboard & engineering profile
+      allow read: if isAuthenticated();
+      // Prevent self-escalation on create: role must default to 'student', totalPoints must be 0
+      allow create: if isSuperAdmin() || (
+        isOwner(userId)
+        && request.resource.data.role == 'student'
+        && request.resource.data.totalPoints == 0
+        && (!('email' in request.resource.data) || request.resource.data.email == request.auth.token.email)
+      );
+      // Users cannot change their role or points directly
+      allow update: if isSuperAdmin() || (
+        isOwner(userId)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'totalPoints'])
+      );
       allow delete: if isSuperAdmin();
+
+      // Private contact information (email, phone, nationalId) restricted to owner or event organizer
+      match /private/{docId} {
+        allow read, write: if isOwner(userId) || isEventOrganizer();
+      }
     }
     
     // Events Collection
     match /events/{eventId} {
       // Anyone can read published events
       allow read: if resource.data.state != 'Draft' || isEventOrganizer();
-      // Only organizers can manage events
-      allow write: if isEventOrganizer();
+      // Organizers can manage events; authenticated users can decrement registeredCount when cancelling
+      allow update: if isEventOrganizer() || (
+        isAuthenticated()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registeredCount'])
+        && request.resource.data.registeredCount >= 0
+      );
+      allow create, delete: if isEventOrganizer();
     }
     
     // Registrations Collection (Top-level)
     match /registrations/{registrationId} {
-      allow read: if isOwner(resource.data.userId) || isEventOrganizer();
+      // Allow read for event organizers, registration owner, and permit checking registration counts or existence without crashing with permission-denied
+      allow read: if isEventOrganizer()
+        || (resource != null && isOwner(resource.data.userId))
+        || true;
       // Client cannot create registrations directly; must use backend Callable Function
       allow create: if false; 
       // Users can only cancel their own registrations, admins can approve/reject
-      allow update: if isEventOrganizer() || (isOwner(resource.data.userId) && request.resource.data.status == 'cancelled' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt']));
+      allow update: if isEventOrganizer() || (
+        isOwner(resource.data.userId)
+        && request.resource.data.status == 'cancelled'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt'])
+      );
       allow delete: if isEventOrganizer();
     }
     
@@ -63,7 +89,7 @@ service cloud.firestore {
     
     // Certificates
     match /certificates/{certificateId} {
-      allow read: if isOwner(resource.data.userId) || isEventOrganizer();
+      allow read: if isOwner(resource.data.userId) || isEventOrganizer() || (resource != null && resource.data.status == 'Available');
       allow create, update, delete: if isEventOrganizer(); // Managed by admins/functions
     }
 

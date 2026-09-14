@@ -26,66 +26,83 @@ export default function CertificatesManagementPage() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const fetchAttendeesAndCerts = async () => {
-    try {
-      // 1. Fetch event
-      const eventDoc = await getDoc(doc(db, 'events', eventId));
-      if (!eventDoc.exists()) throw new Error('Event not found');
-      const eventData = { id: eventDoc.id, ...eventDoc.data() } as PlatformEvent;
-      setEvent(eventData);
-
-      // 2. Fetch all valid attendance logs for this event
-      const attQ = query(collection(db, 'attendance_logs'), where('eventId', '==', eventId));
-      const attSnap = await getDocs(attQ);
-      const userIds = attSnap.docs.map(d => d.data().userId);
-
-      if (userIds.length === 0) {
-        setAttendees([]);
-        return;
-      }
-
-      // 3. Fetch user details
-      const usersData: Record<string, any> = {};
-      // Fetch in chunks of 10 if there are many, but for simplicity we fetch one by one here
-      // Real app might use IN queries chunks of 10
-      for (const uid of userIds) {
-        const uDoc = await getDoc(doc(db, 'users', uid));
-        if (uDoc.exists()) usersData[uid] = uDoc.data();
-      }
-
-      // 4. Fetch certificates for this event
-      const certQ = query(collection(db, 'certificates'), where('eventId', '==', eventId));
-      const certSnap = await getDocs(certQ);
-      const certsByUserId: Record<string, Certificate> = {};
-      certSnap.docs.forEach(d => {
-        const c = { id: d.id, ...d.data() } as Certificate;
-        certsByUserId[c.userId] = c;
-      });
-
-      // 5. Combine
-      const combined: Attendee[] = userIds.map(uid => ({
-        userId: uid,
-        name: usersData[uid]?.displayName || 'Unknown',
-        email: usersData[uid]?.email || 'No email',
-        certificate: certsByUserId[uid]
-      }));
-
-      setAttendees(combined);
-    } catch (err: any) {
-      setError(err.message || 'Error fetching data');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!userData || (userData.role !== 'super_admin' && userData.role !== 'event_organizer')) {
-      setLoading(false);
       return;
     }
-    fetchAttendeesAndCerts();
-  }, [userData, eventId]);
+
+    let active = true;
+
+    const loadData = async () => {
+      try {
+        // 1. Fetch event (async before any state update)
+        const eventDoc = await getDoc(doc(db, 'events', eventId));
+        if (!eventDoc.exists()) throw new Error('Event not found');
+        if (!active) return;
+        const eventData = { id: eventDoc.id, ...eventDoc.data() } as PlatformEvent;
+        setEvent(eventData);
+
+        // 2. Fetch attendees (from attendance_logs)
+        const attQ = query(collection(db, 'attendance_logs'), where('eventId', '==', eventId));
+        const attSnap = await getDocs(attQ);
+        const userIds = attSnap.docs.map(d => d.data().userId as string);
+
+        if (userIds.length === 0) {
+          if (active) setAttendees([]);
+          return;
+        }
+
+        // 3. Fetch user details
+        const usersData: Record<string, { displayName?: string; email?: string }> = {};
+        for (const uid of userIds) {
+          const uDoc = await getDoc(doc(db, 'users', uid));
+          if (uDoc.exists()) {
+            const uData = uDoc.data();
+            usersData[uid] = {
+              displayName: uData.displayName,
+              email: uData.email,
+            };
+          }
+        }
+
+        // 4. Fetch certificates for this event
+        const certQ = query(collection(db, 'certificates'), where('eventId', '==', eventId));
+        const certSnap = await getDocs(certQ);
+        const certsByUserId: Record<string, Certificate> = {};
+        certSnap.docs.forEach(d => {
+          const c = { id: d.id, ...d.data() } as Certificate;
+          certsByUserId[c.userId] = c;
+        });
+
+        // 5. Combine
+        const combined: Attendee[] = userIds.map(uid => ({
+          userId: uid,
+          name: usersData[uid]?.displayName || 'Unknown',
+          email: usersData[uid]?.email || 'No email',
+          certificate: certsByUserId[uid]
+        }));
+
+        if (active) setAttendees(combined);
+      } catch (err: unknown) {
+        if (active) {
+          const msg = err instanceof Error ? err.message : 'Error fetching data';
+          setError(msg);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadData();
+
+    return () => {
+      active = false;
+    };
+  }, [userData, eventId, reloadKey]);
 
   const handleIssueCertificates = async () => {
     if (!event || event.state !== 'Completed') {
@@ -108,9 +125,10 @@ export default function CertificatesManagementPage() {
     try {
       const issueFn = httpsCallable(functions, 'issueCertificates');
       await issueFn({ eventId, userIds: eligibleUserIds });
-      await fetchAttendeesAndCerts(); // Refresh data
-    } catch (err: any) {
-      setError(err.message);
+      setReloadKey(k => k + 1); // Refresh data
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error issuing certificates';
+      setError(msg);
     } finally {
       setProcessing(false);
     }
@@ -121,9 +139,10 @@ export default function CertificatesManagementPage() {
     try {
       const retryFn = httpsCallable(functions, 'retryCertificate');
       await retryFn({ certificateId });
-      await fetchAttendeesAndCerts();
-    } catch (err: any) {
-      setError(err.message);
+      setReloadKey(k => k + 1);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error retrying certificate';
+      setError(msg);
     } finally {
       setProcessing(false);
     }
@@ -135,17 +154,20 @@ export default function CertificatesManagementPage() {
     try {
       const revokeFn = httpsCallable(functions, 'revokeCertificate');
       await revokeFn({ certificateId });
-      await fetchAttendeesAndCerts();
-    } catch (err: any) {
-      setError(err.message);
+      setReloadKey(k => k + 1);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error revoking certificate';
+      setError(msg);
     } finally {
       setProcessing(false);
     }
   };
 
-  if (authLoading || loading) return <div className="p-8 text-center">Loading...</div>;
+  const isAuthorized = userData && (userData.role === 'super_admin' || userData.role === 'event_organizer');
 
-  if (!userData || (userData.role !== 'super_admin' && userData.role !== 'event_organizer')) {
+  if (authLoading || (isAuthorized && loading)) return <div className="p-8 text-center">Loading...</div>;
+
+  if (!isAuthorized) {
     return <div className="p-8 text-center text-red-600">Access Denied.</div>;
   }
 
@@ -176,7 +198,7 @@ export default function CertificatesManagementPage() {
       )}
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <table className="w-full text-right">
+        <table className="w-full text-start">
           <thead className="bg-gray-50 text-gray-500 border-b border-gray-100">
             <tr>
               <th className="py-4 px-6 font-medium">اسم الطالب</th>

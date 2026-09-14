@@ -20,6 +20,7 @@ export interface PlatformEvent {
   gainsEn: string[];
   speakers: string[];
   capacity: number;
+  registeredCount?: number;
   points: number;
   hasCertificate: boolean;
   state: EventState;

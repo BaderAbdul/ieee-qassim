@@ -1,20 +1,19 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, query, getDocs, orderBy, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { PlatformEvent, EventState } from '@/lib/types';
 import { Link } from '@/i18n/routing';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { Plus, Edit, MoreVertical, Calendar, Users } from 'lucide-react';
+import { Plus, Users, QrCode, Award, Eye } from 'lucide-react';
 
 export default function AdminEventsPage() {
   const [events, setEvents] = useState<PlatformEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchEvents = async () => {
-    setLoading(true);
     try {
       // In production, we'd paginate. For now, fetch all events sorted by date.
       const q = query(collection(db, 'events'));
@@ -23,8 +22,8 @@ export default function AdminEventsPage() {
       
       // Sort client-side
       fetchedEvents.sort((a, b) => {
-        const dateA = a.createdAt instanceof Date ? a.createdAt : (a.createdAt as any)?.toDate?.() || new Date();
-        const dateB = b.createdAt instanceof Date ? b.createdAt : (b.createdAt as any)?.toDate?.() || new Date();
+        const dateA = a.createdAt instanceof Date ? a.createdAt : (a.createdAt as { toDate?: () => Date })?.toDate?.() || new Date();
+        const dateB = b.createdAt instanceof Date ? b.createdAt : (b.createdAt as { toDate?: () => Date })?.toDate?.() || new Date();
         return dateB.getTime() - dateA.getTime();
       });
       
@@ -37,7 +36,36 @@ export default function AdminEventsPage() {
   };
 
   useEffect(() => {
-    fetchEvents();
+    let active = true;
+
+    const loadEvents = async () => {
+      try {
+        const q = query(collection(db, 'events'));
+        const snap = await getDocs(q);
+        if (!active) return;
+        const fetchedEvents = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as PlatformEvent[];
+        
+        fetchedEvents.sort((a, b) => {
+          const dateA = a.createdAt instanceof Date ? a.createdAt : (a.createdAt as { toDate?: () => Date })?.toDate?.() || new Date();
+          const dateB = b.createdAt instanceof Date ? b.createdAt : (b.createdAt as { toDate?: () => Date })?.toDate?.() || new Date();
+          return dateB.getTime() - dateA.getTime();
+        });
+        
+        setEvents(fetchedEvents);
+      } catch (error) {
+        console.error("Error fetching events", error);
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadEvents();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const handleStateChange = async (eventId: string, newState: EventState) => {
@@ -102,7 +130,7 @@ export default function AdminEventsPage() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {events.map((event) => {
-                  const eventDate = event.date instanceof Date ? event.date : (event.date as any)?.toDate?.() || new Date();
+                  const eventDate = event.date instanceof Date ? event.date : (event.date as { toDate?: () => Date })?.toDate?.() || new Date();
                   
                   return (
                     <tr key={event.id} className="hover:bg-gray-50">
@@ -128,8 +156,16 @@ export default function AdminEventsPage() {
                             <Users size={16} />
                           </Link>
                           
-                          <Link href={`/admin/events/${event.id}/edit`} className="text-blue-600 hover:text-blue-900 bg-blue-50 p-2 rounded-lg" title="تعديل">
-                            <Edit size={16} />
+                          <Link href={`/admin/events/${event.id}/qr`} className="text-indigo-600 hover:text-indigo-900 bg-indigo-50 p-2 rounded-lg" title="رمز التحقق (QR)">
+                            <QrCode size={16} />
+                          </Link>
+
+                          <Link href={`/admin/events/${event.id}/certificates`} className="text-emerald-600 hover:text-emerald-900 bg-emerald-50 p-2 rounded-lg" title="الشهادات">
+                            <Award size={16} />
+                          </Link>
+
+                          <Link href={`/events/${event.id}`} className="text-blue-600 hover:text-blue-900 bg-blue-50 p-2 rounded-lg" title="عرض الفعالية">
+                            <Eye size={16} />
                           </Link>
                           
                           <select 

@@ -1,0 +1,4 @@
+{
+  "https://fonts.googleapis.com/css2?family=Cairo:wght@200..1000&display=swap": "/* arabic */\n@font-face {\n  font-family: 'Cairo';\n  font-style: normal;\n  font-weight: 200 1000;\n  font-display: swap;\n  src: url(/home/bader/Documents/IEEE QU SITE/node_modules/next/dist/next-devtools/server/font/geist-latin.woff2) format('woff2');\n}\n/* latin */\n@font-face {\n  font-family: 'Cairo';\n  font-style: normal;\n  font-weight: 200 1000;\n  font-display: swap;\n  src: url(/home/bader/Documents/IEEE QU SITE/node_modules/next/dist/next-devtools/server/font/geist-latin.woff2) format('woff2');\n}",
+  "https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap": "/* latin */\n@font-face {\n  font-family: 'Inter';\n  font-style: normal;\n  font-weight: 100 900;\n  font-display: swap;\n  src: url(/home/bader/Documents/IEEE QU SITE/node_modules/next/dist/next-devtools/server/font/geist-latin.woff2) format('woff2');\n}"
+}

@@ -75,7 +75,7 @@ export default function AdminDashboardPage() {
       <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
         <h2 className="text-xl font-bold text-gray-900 font-cairo mb-4">أهلاً بك في لوحة الإدارة</h2>
         <p className="text-gray-600 mb-4">
-          من هنا يمكنك إدارة الفعاليات، متابعة تسجيلات الطلاب، إصدار الشهادات، وتسجيل الحضور באמצעות (QR Code).
+          من هنا يمكنك إدارة الفعاليات، متابعة تسجيلات الطلاب، إصدار الشهادات، وتسجيل الحضور باستخدام رمز (QR Code).
         </p>
         <p className="text-gray-600">
           استخدم القائمة الجانبية للوصول إلى الأقسام المختلفة.

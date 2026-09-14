@@ -7,15 +7,23 @@ import { httpsCallable } from 'firebase/functions';
 import { useAuth } from '@/context/AuthContext';
 import { Search, Trophy, Shield, ShieldAlert } from 'lucide-react';
 
+interface AdminUserItem {
+  id: string;
+  displayName?: string;
+  email?: string;
+  role?: string;
+  totalPoints?: number;
+}
+
 export default function AdminUsersPage() {
   const { userData, loading: authLoading } = useAuth();
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<AdminUserItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
   // Adjust Points Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [selectedUser, setSelectedUser] = useState<AdminUserItem | null>(null);
   const [amount, setAmount] = useState<number | ''>('');
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -23,21 +31,31 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     if (!userData || (userData.role !== 'super_admin' && userData.role !== 'event_organizer')) {
-      setLoading(false);
       return;
     }
+
+    let active = true;
 
     const fetchUsers = async () => {
       try {
         const snap = await getDocs(collection(db, 'users'));
-        setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        if (active) {
+          setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() } as AdminUserItem)));
+        }
       } catch (err) {
         console.error('Error fetching users', err);
       } finally {
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     };
+
     fetchUsers();
+
+    return () => {
+      active = false;
+    };
   }, [userData]);
 
   const handleAdjustPoints = async (e: React.FormEvent) => {
@@ -68,9 +86,9 @@ export default function AdminUsersPage() {
       setIsModalOpen(false);
       setAmount('');
       setReason('');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setError(err.message || 'An error occurred.');
+      setError(err instanceof Error ? err.message : 'An error occurred.');
     } finally {
       setSubmitting(false);
     }
@@ -81,11 +99,13 @@ export default function AdminUsersPage() {
     (u.email || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (authLoading || loading) {
+  const isAuthorized = userData && (userData.role === 'super_admin' || userData.role === 'event_organizer');
+
+  if (authLoading || (isAuthorized && loading)) {
     return <div className="py-20 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div></div>;
   }
 
-  if (!userData || (userData.role !== 'super_admin' && userData.role !== 'event_organizer')) {
+  if (!isAuthorized) {
     return <div className="text-center py-20 text-red-600">Access Denied. Event Organizers or Super Admins only.</div>;
   }
 
@@ -101,19 +121,19 @@ export default function AdminUsersPage() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-4 border-b border-gray-100">
           <div className="relative">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 rtl:-scale-x-100" />
+            <Search className="absolute end-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input 
               type="text" 
               placeholder="ابحث بالاسم أو البريد الإلكتروني..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-4 pr-10 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-600 focus:border-transparent outline-none"
+              className="w-full ps-4 pe-10 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-600 focus:border-transparent outline-none"
             />
           </div>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-right">
+          <table className="w-full text-start">
             <thead className="bg-gray-50 border-b border-gray-100 text-gray-500 text-sm">
               <tr>
                 <th className="py-4 px-6 font-medium">المستخدم</th>
