@@ -45,6 +45,7 @@ service cloud.firestore {
       // Users can only cancel their own registrations, admins can approve/reject
       allow update: if isEventOrganizer() || (isOwner(resource.data.userId) && request.resource.data.status == 'cancelled' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt']));
       allow delete: if isEventOrganizer();
+    }
     
     // Attendance Logs
     match /attendance_logs/{logId} {

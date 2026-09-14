@@ -36,17 +36,9 @@ export const registerForEvent = functions.https.onCall(async (data, context) => 
       }
     }
 
-    // 2. Count active attendees (approved + pending + waitlisted) - simplified for V1
-    // Note: Transactional count queries aren't natively supported like this in firestore transactions without aggregates,
-    // but we can query them if we must, or better, use an aggregate query if it's outside the transaction, or keep a counter on the event doc!
-    // Since we don't have a counter on the event doc yet, we'll query registrations inside the transaction.
-    const activeRegsQuery = db.collection('registrations')
-      .where('eventId', '==', eventId)
-      .where('status', 'in', ['approved', 'pending', 'waitlisted']);
-    
-    // In Firebase Admin SDK, we can get the query in a transaction
-    const activeRegsSnap = await transaction.get(activeRegsQuery);
-    const attendeeCount = activeRegsSnap.size;
+    // 2. Count active attendees securely to avoid phantom reads (Race Condition)
+    // We rely on a counter stored directly on the event document to ensure the transaction locks correctly.
+    let attendeeCount = eventData.registeredCount || 0;
 
     // 3. Determine status
     let status = 'approved';
@@ -65,6 +57,11 @@ export const registerForEvent = functions.https.onCall(async (data, context) => 
     };
 
     transaction.set(regRef, regData);
+    
+    // 5. Update the event document's registeredCount to ensure strict serialization
+    transaction.update(eventRef, {
+      registeredCount: attendeeCount + 1
+    });
 
     return { status, attendeeCount: attendeeCount + 1 };
   });
