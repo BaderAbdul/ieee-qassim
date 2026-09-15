@@ -31,7 +31,7 @@ service cloud.firestore {
         && (!('email' in request.resource.data) || request.resource.data.email == request.auth.token.email)
       );
       // Users cannot change their role or points directly
-      allow update: if isSuperAdmin() || (
+      allow update: if isSuperAdmin() || isEventOrganizer() || (
         isOwner(userId)
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'totalPoints'])
       );
@@ -47,10 +47,14 @@ service cloud.firestore {
     match /events/{eventId} {
       // Anyone can read published events
       allow read: if resource.data.state != 'Draft' || isEventOrganizer();
-      // Organizers can manage events; authenticated users can decrement registeredCount when cancelling
+      // Organizers can manage events; authenticated users can increment/decrement registeredCount by 1
       allow update: if isEventOrganizer() || (
         isAuthenticated()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registeredCount'])
+        && (
+           request.resource.data.registeredCount == resource.data.registeredCount + 1 ||
+           request.resource.data.registeredCount == resource.data.registeredCount - 1
+        )
         && request.resource.data.registeredCount >= 0
       );
       allow create, delete: if isEventOrganizer();
@@ -94,13 +98,20 @@ service cloud.firestore {
     // Point Transactions (Immutable Ledger)
     match /point_transactions/{transactionId} {
       allow read: if isOwner(resource.data.userId) || isEventOrganizer();
-      allow create, update, delete: if false; // Only written by Cloud Functions
+      allow create: if isEventOrganizer();
+      allow update, delete: if false; // Immutable
     }
     
     // Certificates
     match /certificates/{certificateId} {
       allow read: if isOwner(resource.data.userId) || isEventOrganizer() || (resource != null && resource.data.status == 'Available');
       allow create, update, delete: if isEventOrganizer(); // Managed by admins/functions
+    }
+
+    // Settings
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
     }
 
     // Mail Queue (Outbox)

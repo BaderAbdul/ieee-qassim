@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, use, useRef } from 'react';
-import { doc, getDoc, collection, query, where, onSnapshot, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, onSnapshot, updateDoc, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
@@ -31,7 +31,6 @@ export default function AdminQRDisplayPage({ params }: { params: Promise<{ id: s
       const newToken = Math.random().toString(36).substring(2, 8).toUpperCase();
       if (isMounted) {
         setCurrentToken(newToken);
-        // Keep current and previous token to allow a tiny grace period for network latency
         validTokensRef.current = [newToken, ...(validTokensRef.current.slice(0, 1))];
       }
     };
@@ -112,19 +111,58 @@ export default function AdminQRDisplayPage({ params }: { params: Promise<{ id: s
               return;
             }
 
-            // 3. Approve and process
-            await addDoc(collection(db, 'attendance_logs'), {
-              eventId,
-              userId,
-              timestamp: serverTimestamp()
-            });
-            
-            await updateDoc(regRef, {
+            // 3. Approve and process using Batched Writes
+            const batch = writeBatch(db);
+
+            // a. Approve pending check-in
+            batch.update(doc(db, 'pending_checkins', requestDoc.id), { status: 'approved' });
+
+            // b. Mark registration as attended
+            batch.update(regRef, {
               attended: true,
               attendedAt: serverTimestamp()
             });
 
-            await updateDoc(doc(db, 'pending_checkins', requestDoc.id), { status: 'approved' });
+            // c. Add attendance log
+            const logRef = doc(collection(db, 'attendance_logs'));
+            batch.set(logRef, {
+              eventId,
+              userId,
+              timestamp: serverTimestamp()
+            });
+
+            // d. Distribute Points
+            if (event.points && event.points > 0) {
+              const txRef = doc(collection(db, 'point_transactions'));
+              batch.set(txRef, {
+                userId,
+                eventId,
+                points: event.points,
+                type: 'earned',
+                description: `حضور فعالية: ${event.title}`,
+                timestamp: serverTimestamp()
+              });
+
+              const userRef = doc(db, 'users', userId);
+              batch.update(userRef, {
+                totalPoints: increment(event.points)
+              });
+            }
+
+            // e. Issue Certificate
+            if (event.hasCertificate) {
+              const certRef = doc(collection(db, 'certificates'));
+              batch.set(certRef, {
+                userId,
+                eventId,
+                eventTitle: event.title,
+                eventDate: event.date,
+                issuedAt: serverTimestamp(),
+                status: 'Available'
+              });
+            }
+
+            await batch.commit();
 
           } catch (error) {
             console.error("Error processing check-in", error);

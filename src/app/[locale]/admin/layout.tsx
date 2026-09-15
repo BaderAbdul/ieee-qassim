@@ -40,6 +40,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'إدارة الفعاليات', href: '/admin/events', icon: <Calendar size={20} /> },
     { name: 'المسجلون والطلاب', href: '/admin/users', icon: <Users size={20} /> },
     { name: 'تسجيل الحضور (QR)', href: '/admin/check-in', icon: <QrCode size={20} /> },
+    { name: 'الهيكلة والتنظيم', href: '/admin/structure', icon: <Users size={20} /> },
   ];
 
   return (

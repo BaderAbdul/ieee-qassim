@@ -13,10 +13,11 @@ export default function HomePage() {
   const t = useTranslations('Index');
   const locale = useLocale();
   const isAr = locale === 'ar';
-  const { user, login } = useAuth();
+  const { user, userData, login } = useAuth();
   
-  const [stats, setStats] = useState({ membersCount: '+500', eventsCount: '+25', tracksCount: '4', featuredEventId: '', showStructure: true });
+  const [stats, setStats] = useState({ membersCount: '+500', eventsCount: '+25', tracksCount: '4', featuredEventId: '', showStructure: true, committees: [] as any[] });
   const [latestEvent, setLatestEvent] = useState<PlatformEvent | null>(null);
+  const [latestCert, setLatestCert] = useState<{title: string, date: string} | null>(null);
 
   useEffect(() => {
     const fetchHomepageData = async () => {
@@ -34,7 +35,6 @@ export default function HomePage() {
           if (evDoc.exists()) {
             setLatestEvent({ id: evDoc.id, ...evDoc.data() } as PlatformEvent);
           } else {
-            // Fallback if featured event was deleted
             fetchLatestEventFallback();
           }
         } else {
@@ -62,17 +62,40 @@ export default function HomePage() {
     fetchHomepageData();
   }, []);
 
+  useEffect(() => {
+    if (user) {
+      const fetchCerts = async () => {
+        try {
+          const certQ = query(
+            collection(db, 'certificates'),
+            where('userId', '==', user.uid),
+            orderBy('issuedAt', 'desc'),
+            limit(1)
+          );
+          const certSnap = await getDocs(certQ);
+          if (!certSnap.empty) {
+            const data = certSnap.docs[0].data();
+            setLatestCert({ title: data.eventTitle, date: 'تم توثيق حضورك بنجاح' });
+          }
+        } catch (e) {
+          console.error('Error fetching cert', e);
+        }
+      };
+      fetchCerts();
+    }
+  }, [user]);
+
   return (
     <div className="flex flex-col bg-[#F8FAFC] min-h-screen">
       {/* Light Mode Premium Hero Section */}
-      <section className="relative overflow-hidden pt-24 pb-20 px-4 sm:px-6 lg:px-8">
+      <section className="relative overflow-hidden pt-24 pb-12 lg:pb-20 px-4 sm:px-6 lg:px-8">
         {/* Subtle Background Elements */}
         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] pointer-events-none" />
         <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none" />
         
-        <div className="relative max-w-7xl mx-auto z-10 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+        <div className="relative max-w-7xl mx-auto z-10 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
           
-          {/* Left Column: Typography & Action */}
+          {/* Left Column: Wordmark & Buttons */}
           <div className="flex flex-col space-y-6 text-center lg:text-start lg:rtl:text-right lg:ltr:text-left">
             <div>
               <div className="inline-flex items-center gap-2.5 bg-blue-50 border border-blue-100 px-4 py-2 rounded-full mb-6 shadow-sm">
@@ -82,21 +105,9 @@ export default function HomePage() {
                 </span>
               </div>
               
-              <h1 className="text-5xl sm:text-7xl font-black mb-4 font-thmanyah text-slate-900 drop-shadow-sm uppercase tracking-tight">
+              <h1 className="text-5xl sm:text-7xl lg:text-8xl font-black mb-4 font-thmanyah text-slate-900 drop-shadow-sm uppercase tracking-tight">
                 {t('Hero.wordmark')}
               </h1>
-              
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black font-cairo mb-4 text-[#002855] leading-tight">
-                {t('Hero.headline')}
-              </h2>
-              
-              <p className="text-xl sm:text-2xl font-cairo text-slate-700 font-bold mb-4">
-                {t('Hero.subheadline')}
-              </p>
-              
-              <p className="text-base sm:text-lg text-slate-500 max-w-xl mx-auto lg:mx-0 font-sans leading-relaxed font-medium">
-                {t('Hero.description')}
-              </p>
             </div>
             
             <div className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start pt-2">
@@ -117,7 +128,7 @@ export default function HomePage() {
                 </button>
               ) : (
                 <Link 
-                  href="/my-activity" 
+                  href="/profile" 
                   className="inline-flex items-center justify-center w-full sm:w-auto bg-white hover:bg-slate-50 border-2 border-slate-200 text-slate-700 px-8 py-4 rounded-xl font-bold transition-all shadow-sm hover:border-slate-300"
                 >
                   {t('Hero.joinCommunity')}
@@ -127,76 +138,78 @@ export default function HomePage() {
           </div>
           
           {/* Right Column: Visual Ecosystem (Overlapping Cards) */}
-          <div className="relative hidden lg:block h-full min-h-[500px]">
+          <div className="relative block w-full h-[450px] lg:h-full lg:min-h-[500px] mt-8 lg:mt-0 flex items-center justify-center lg:block">
             
-            {/* Card 1: Featured Event (Top Right) */}
-            <div className="absolute top-0 rtl:left-0 ltr:right-0 w-80 bg-white rounded-3xl p-5 shadow-2xl shadow-blue-900/10 border border-slate-100 z-30 transform hover:-translate-y-2 transition-transform duration-300">
-              <div className="flex items-center justify-between mb-4">
-                <div className="bg-blue-50 text-blue-700 text-[10px] font-black tracking-wider uppercase px-3 py-1.5 rounded-full">{t('Hero.cardEvent')}</div>
-                <div className="bg-slate-50 text-slate-500 text-[10px] font-bold px-2 py-1 rounded-md">24 Oct</div>
-              </div>
-              <div className="w-full h-32 bg-gradient-to-br from-[#00629B] to-indigo-700 rounded-2xl mb-4 relative overflow-hidden group">
-                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-                 <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors duration-300"></div>
-                 <div className="absolute bottom-3 right-3 left-3">
-                   <h4 className="text-white font-bold text-sm leading-tight">معسكر الذكاء الاصطناعي</h4>
-                   <p className="text-blue-100 text-[10px] mt-1">150 مسجل • تبدأ قريباً</p>
-                 </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex -space-x-2 rtl:space-x-reverse">
-                  <div className="h-6 w-6 rounded-full border-2 border-white bg-blue-100"></div>
-                  <div className="h-6 w-6 rounded-full border-2 border-white bg-indigo-100"></div>
-                  <div className="h-6 w-6 rounded-full border-2 border-white bg-purple-100"></div>
+            <div className="relative w-full max-w-sm lg:max-w-none h-full">
+              {/* Card 1: Featured Event (Top Right) */}
+              <div className="absolute top-0 rtl:left-0 lg:rtl:left-0 lg:ltr:right-0 ltr:-right-4 w-72 lg:w-80 bg-white rounded-3xl p-4 lg:p-5 shadow-2xl shadow-blue-900/10 border border-slate-100 z-30 transform hover:-translate-y-2 hover:z-50 transition-all duration-300 group cursor-pointer" onClick={() => { if(latestEvent) window.location.href = `/events/${latestEvent.id}` }}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="bg-blue-50 text-blue-700 text-[10px] font-black tracking-wider uppercase px-3 py-1.5 rounded-full">{latestEvent?.state === 'Ongoing' ? (isAr ? 'جاري الآن' : 'Ongoing') : (latestEvent?.state === 'Registration Open' ? (isAr ? 'التسجيل مفتوح' : 'Open') : (isAr ? 'قريباً' : 'Soon'))}</div>
+                  <div className="bg-slate-50 text-slate-500 text-[10px] font-bold px-2 py-1 rounded-md">{latestEvent ? latestEvent.date : '---'}</div>
                 </div>
-                <span className="text-[10px] font-bold text-slate-500">+147 انضموا</span>
-              </div>
-            </div>
-
-            {/* Card 2: Points / Leaderboard (Middle Left, Overlapping) */}
-            <div className="absolute top-32 rtl:-right-8 ltr:-left-8 w-64 bg-white/95 backdrop-blur-xl rounded-3xl p-5 shadow-xl shadow-slate-200/50 border border-slate-100/50 z-20 transform -rotate-2 hover:rotate-0 hover:-translate-y-1 transition-all duration-300">
-              <div className="flex items-start gap-4">
-                <div className="bg-gradient-to-br from-yellow-100 to-amber-100 p-3.5 rounded-2xl text-amber-600 shadow-sm">
-                  <Trophy className="h-6 w-6" />
+                <div className="w-full h-28 lg:h-32 bg-gradient-to-br from-[#00629B] to-indigo-700 rounded-2xl mb-4 relative overflow-hidden">
+                   <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+                   <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors duration-300"></div>
+                   <div className="absolute bottom-3 right-3 left-3">
+                     <h4 className="text-white font-bold text-sm lg:text-base leading-tight truncate">{latestEvent ? (isAr ? latestEvent.title : (latestEvent.titleEn || latestEvent.title)) : (isAr ? 'لا توجد فعاليات' : 'No Events')}</h4>
+                     <p className="text-blue-100 text-[10px] lg:text-xs mt-1">{latestEvent ? `${latestEvent.registeredCount || 0} ${isAr ? 'مسجل' : 'Registered'}` : ''}</p>
+                   </div>
                 </div>
-                <div className="flex-1">
-                  <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">نقاطك</div>
-                  <div className="text-2xl font-black text-slate-800 font-cairo flex items-baseline gap-1">
-                    450 <span className="text-xs font-bold text-emerald-500">+50</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex -space-x-2 rtl:space-x-reverse">
+                    <div className="h-6 w-6 rounded-full border-2 border-white bg-blue-100"></div>
+                    <div className="h-6 w-6 rounded-full border-2 border-white bg-indigo-100"></div>
+                    <div className="h-6 w-6 rounded-full border-2 border-white bg-purple-100"></div>
                   </div>
-                  <div className="mt-3 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-yellow-400 to-amber-500 w-[85%] rounded-full relative">
-                      <div className="absolute top-0 right-0 bottom-0 w-full bg-white/20 animate-pulse"></div>
+                  <span className="text-[10px] lg:text-xs font-bold text-slate-500">{latestEvent ? `+${latestEvent.registeredCount || 0} ${isAr ? 'انضموا' : 'Joined'}` : ''}</span>
+                </div>
+              </div>
+
+              {/* Card 2: Points / Leaderboard (Middle Left, Overlapping) */}
+              <div className="absolute top-28 lg:top-32 rtl:-right-2 lg:rtl:-right-8 ltr:-left-2 lg:ltr:-left-8 w-60 lg:w-64 bg-white/95 backdrop-blur-xl rounded-3xl p-4 lg:p-5 shadow-xl shadow-slate-200/50 border border-slate-100/50 z-20 transform -rotate-2 hover:rotate-0 hover:-translate-y-1 hover:z-50 transition-all duration-300 cursor-pointer" onClick={() => window.location.href='/leaderboard'}>
+                <div className="flex items-start gap-4">
+                  <div className="bg-gradient-to-br from-yellow-100 to-amber-100 p-3 lg:p-3.5 rounded-2xl text-amber-600 shadow-sm">
+                    <Trophy className="h-5 w-5 lg:h-6 lg:w-6" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-[10px] lg:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{isAr ? 'نقاطك' : 'Your Points'}</div>
+                    <div className="text-xl lg:text-2xl font-black text-slate-800 font-cairo flex items-baseline gap-1">
+                      {user && userData ? userData.totalPoints : 0} <span className="text-[10px] font-bold text-emerald-500">Pts</span>
+                    </div>
+                    <div className="mt-2 lg:mt-3 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-yellow-400 to-amber-500 w-[75%] rounded-full relative">
+                        <div className="absolute top-0 right-0 bottom-0 w-full bg-white/20 animate-pulse"></div>
+                      </div>
+                    </div>
+                    <div className="text-[9px] lg:text-[10px] font-bold text-slate-400 mt-1.5 text-end">{user ? (isAr ? 'استمر بجمع النقاط!' : 'Keep earning points!') : (isAr ? 'سجل دخولك الآن' : 'Login to earn points')}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 3: Activity/Certificate (Bottom Right, Overlapping) */}
+              <div className="absolute bottom-6 lg:bottom-10 rtl:left-4 lg:rtl:left-12 ltr:right-4 lg:ltr:right-12 w-64 lg:w-72 bg-[#002855] rounded-3xl p-4 lg:p-5 shadow-2xl shadow-blue-900/30 border border-blue-800 z-40 transform rotate-2 hover:rotate-0 hover:-translate-y-1 hover:z-50 transition-all duration-300 cursor-pointer" onClick={() => window.location.href='/profile'}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-blue-500/20 p-2 lg:p-2.5 rounded-2xl text-blue-300 ring-1 ring-white/10">
+                      <UserCircle className="h-4 w-4 lg:h-5 lg:w-5" />
+                    </div>
+                    <div>
+                      <div className="text-xs lg:text-sm font-bold text-white tracking-wide">{isAr ? 'نشاطك' : 'Activity'}</div>
+                      <div className="text-[9px] lg:text-[10px] text-blue-300 font-medium">{latestCert ? (isAr ? 'شهادة معتمدة صدرت' : 'Certificate Issued') : (user ? (isAr ? 'لا يوجد نشاط حديث' : 'No recent activity') : (isAr ? 'مجتمع تقني تفاعلي' : 'Interactive Community'))}</div>
                     </div>
                   </div>
-                  <div className="text-[10px] font-bold text-slate-400 mt-1.5 text-end">باقي 50 للمستوى القادم</div>
+                  <div className="h-2 w-2 rounded-full bg-emerald-400 animate-ping shadow-[0_0_12px_rgba(52,211,153,0.8)]"></div>
                 </div>
-              </div>
-            </div>
-
-            {/* Card 3: Activity/Certificate (Bottom Right, Overlapping) */}
-            <div className="absolute bottom-10 rtl:left-12 ltr:right-12 w-72 bg-[#002855] rounded-3xl p-5 shadow-2xl shadow-blue-900/30 border border-blue-800 z-40 transform rotate-2 hover:rotate-0 hover:-translate-y-1 transition-all duration-300">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="bg-blue-500/20 p-2.5 rounded-2xl text-blue-300 ring-1 ring-white/10">
-                    <UserCircle className="h-5 w-5" />
+                <div className="bg-white/5 rounded-xl p-3 border border-white/10 flex items-center gap-3">
+                  <div className="h-8 w-8 lg:h-10 lg:w-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-lg flex items-center justify-center shadow-inner flex-shrink-0">
+                    <svg className="w-4 h-4 lg:w-5 lg:h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
                   </div>
-                  <div>
-                    <div className="text-sm font-bold text-white tracking-wide">{t('Hero.cardActivity')}</div>
-                    <div className="text-[10px] text-blue-300 font-medium">شهادة معتمدة صدرت</div>
+                  <div className="truncate">
+                    <div className="text-[10px] lg:text-xs font-bold text-white truncate">{latestCert ? latestCert.title : (user ? (isAr ? 'حضور الفعاليات يمنحك شهادات' : 'Attend events to earn certificates') : (isAr ? 'اكتشف فعالياتنا وانضم إلينا' : 'Discover and join our events'))}</div>
+                    <div className="text-[9px] lg:text-[10px] text-emerald-400 font-medium mt-0.5 truncate">{latestCert ? latestCert.date : ''}</div>
                   </div>
-                </div>
-                <div className="h-2 w-2 rounded-full bg-emerald-400 animate-ping shadow-[0_0_12px_rgba(52,211,153,0.8)]"></div>
-              </div>
-              <div className="bg-white/5 rounded-xl p-3 border border-white/10 flex items-center gap-3">
-                <div className="h-10 w-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-lg flex items-center justify-center shadow-inner">
-                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-white">أساسيات إنترنت الأشياء</div>
-                  <div className="text-[10px] text-emerald-400 font-medium mt-0.5">تم توثيق حضورك بنجاح</div>
                 </div>
               </div>
             </div>
@@ -344,47 +357,48 @@ export default function HomePage() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               
-              {/* Committee 1 */}
-              <div className="bg-[#F8FAFC] border border-slate-100 rounded-3xl p-6 text-center hover:shadow-xl hover:shadow-blue-900/5 hover:-translate-y-1 transition-all duration-300">
-                <div className="h-16 w-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-inner">
-                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
+              {stats.committees && stats.committees.length > 0 ? (
+                stats.committees.map((committee: any, index: number) => {
+                  const colors = ['blue', 'indigo', 'emerald', 'pink', 'amber', 'purple'];
+                  const color = colors[index % colors.length];
+                  
+                  return (
+                    <div key={committee.id || index} className="bg-[#F8FAFC] border border-slate-100 rounded-3xl p-6 text-center hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                      <div className={`h-16 w-16 bg-${color}-100 text-${color}-600 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-inner`}>
+                        <Users className="w-8 h-8" />
+                      </div>
+                      <h3 className="text-lg font-black font-cairo text-slate-900 mb-2">{committee.name}</h3>
+                      <p className="text-sm text-slate-500 mb-4">{committee.description}</p>
+                      
+                      {committee.members && committee.members.length > 0 && (
+                        <div className="flex -space-x-2 rtl:space-x-reverse justify-center mt-2">
+                          {committee.members.slice(0, 4).map((member: any) => (
+                            <div key={member.userId} className={`h-8 w-8 rounded-full border-2 border-white bg-${color}-200 flex items-center justify-center text-xs font-bold text-${color}-700 overflow-hidden relative group`} title={member.name}>
+                              {member.avatar ? (
+                                <img src={member.avatar} alt={member.name} className="h-full w-full object-cover" />
+                              ) : (
+                                <span>{member.name.charAt(0)}</span>
+                              )}
+                              <div className="absolute hidden group-hover:block bottom-full mb-1 w-max px-2 py-1 bg-gray-900 text-white text-[10px] rounded z-50">
+                                {member.name} - {member.role}
+                              </div>
+                            </div>
+                          ))}
+                          {committee.members.length > 4 && (
+                            <div className="h-8 w-8 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-600">
+                              +{committee.members.length - 4}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="col-span-full text-center text-slate-500 py-12 bg-slate-50 rounded-2xl border border-slate-100">
+                  {isAr ? 'لم يتم إضافة لجان بعد.' : 'No committees added yet.'}
                 </div>
-                <h3 className="text-lg font-black font-cairo text-slate-900 mb-2">لجنة العلاقات العامة</h3>
-                <p className="text-sm text-slate-500">حلقة الوصل بين النادي والجهات الخارجية والمجتمع الطلابي.</p>
-              </div>
-
-              {/* Committee 2 */}
-              <div className="bg-[#F8FAFC] border border-slate-100 rounded-3xl p-6 text-center hover:shadow-xl hover:shadow-indigo-900/5 hover:-translate-y-1 transition-all duration-300">
-                <div className="h-16 w-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-inner">
-                  <Calendar className="w-8 h-8" />
-                </div>
-                <h3 className="text-lg font-black font-cairo text-slate-900 mb-2">لجنة التنظيم</h3>
-                <p className="text-sm text-slate-500">الإشراف اللوجستي وتنسيق سير الفعاليات وورش العمل بكفاءة عالية.</p>
-              </div>
-
-              {/* Committee 3 */}
-              <div className="bg-[#F8FAFC] border border-slate-100 rounded-3xl p-6 text-center hover:shadow-xl hover:shadow-emerald-900/5 hover:-translate-y-1 transition-all duration-300">
-                <div className="h-16 w-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-inner">
-                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-black font-cairo text-slate-900 mb-2">المسار التقني</h3>
-                <p className="text-sm text-slate-500">تقديم المحتوى العلمي وتجهيز المعسكرات والمسابقات التقنية.</p>
-              </div>
-
-              {/* Committee 4 */}
-              <div className="bg-[#F8FAFC] border border-slate-100 rounded-3xl p-6 text-center hover:shadow-xl hover:shadow-pink-900/5 hover:-translate-y-1 transition-all duration-300">
-                <div className="h-16 w-16 bg-pink-100 text-pink-600 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-inner">
-                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-black font-cairo text-slate-900 mb-2">المسار الإعلامي</h3>
-                <p className="text-sm text-slate-500">التوثيق المرئي وصناعة المحتوى وإدارة حسابات التواصل الاجتماعي.</p>
-              </div>
+              )}
 
             </div>
           </div>
