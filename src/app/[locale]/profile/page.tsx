@@ -39,7 +39,8 @@ import {
   ArrowUpRight,
   Edit2,
   X,
-  Save
+  Save,
+  LogOut
 } from 'lucide-react';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
@@ -134,7 +135,7 @@ export default function EngineeringProfilePage() {
   const isAr = locale === 'ar';
   const dateLocale = isAr ? ar : enUS;
 
-  const { user, userData, loading: authLoading, login } = useAuth();
+  const { user, userData, loading: authLoading, login, logout } = useAuth();
   const userBadges = userData?.badges || [];
 
   const [loading, setLoading] = useState(true);
@@ -441,6 +442,13 @@ export default function EngineeringProfilePage() {
                 <span>{t('exploreEvents')}</span>
                 <ArrowRight className="h-4 w-4 rtl:-scale-x-100" />
               </Link>
+              <button
+                onClick={logout}
+                className="inline-flex items-center justify-center gap-2 bg-slate-100 hover:bg-red-50 text-slate-700 hover:text-red-600 px-5 py-2.5 rounded-xl text-sm font-bold transition-all"
+              >
+                <LogOut className="h-4 w-4 rtl:rotate-180" />
+                <span>{isAr ? 'تسجيل الخروج' : 'Log Out'}</span>
+              </button>
             </div>
           </div>
         </section>

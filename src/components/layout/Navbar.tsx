@@ -100,8 +100,8 @@ export default function Navbar() {
                         : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100/70'
                   }`}
                 >
-                  <Icon className="h-4 w-4" />
-                  <span>{item.label}</span>
+                  <Icon className="h-4 w-4 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="hidden sm:inline">{item.label}</span>
                 </Link>
               );
             })}
@@ -144,14 +144,6 @@ export default function Navbar() {
                     </span>
                   </div>
                 </Link>
-
-                <button
-                  onClick={logout}
-                  className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  title={t('logout')}
-                >
-                  <LogOut className="h-4 w-4 rtl:rotate-180" />
-                </button>
               </div>
             ) : (
               <button
