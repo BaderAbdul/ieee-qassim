@@ -108,28 +108,31 @@ export default function HomePage() {
               <h1 className="text-5xl sm:text-7xl lg:text-8xl font-black mb-4 font-thmanyah text-slate-900 drop-shadow-sm uppercase tracking-tight">
                 {t('Hero.wordmark')}
               </h1>
+              <p className="text-slate-600 font-medium text-sm sm:text-base max-w-lg mx-auto lg:mx-0 mb-6 leading-relaxed">
+                {isAr ? 'المنصة الرسمية للمجتمع الطلابي التقني والهندسي في جامعة القصيم.' : 'The official platform for the engineering and tech student community at Qassim University.'}
+              </p>
             </div>
             
-            <div className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start pt-2">
+            <div className="flex flex-row flex-wrap items-center gap-3 justify-center lg:justify-start pt-2">
               <Link 
                 href="/events" 
-                className="group inline-flex items-center justify-center w-full sm:w-auto bg-[#00629B] text-white px-8 py-4 rounded-xl font-bold hover:bg-[#004b78] transition-all shadow-md shadow-blue-900/20 hover:shadow-lg hover:shadow-blue-900/30 hover:-translate-y-0.5"
+                className="group inline-flex items-center justify-center bg-[#00629B] text-white px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold hover:bg-[#004b78] transition-all shadow-md shadow-blue-900/20 hover:shadow-lg hover:shadow-blue-900/30 hover:-translate-y-0.5 text-sm sm:text-base"
               >
                 <span>{t('Hero.exploreEvents')}</span>
-                <ArrowRight className="ms-2 h-5 w-5 rtl:-scale-x-100 transition-transform group-hover:translate-x-1 rtl:group-hover:-translate-x-1" />
+                <ArrowRight className="ms-2 h-4 w-4 sm:h-5 sm:w-5 rtl:-scale-x-100 transition-transform group-hover:translate-x-1 rtl:group-hover:-translate-x-1" />
               </Link>
               
               {!user ? (
                 <button 
                   onClick={login} 
-                  className="inline-flex items-center justify-center w-full sm:w-auto bg-white hover:bg-slate-50 border-2 border-slate-200 text-slate-700 px-8 py-4 rounded-xl font-bold transition-all shadow-sm hover:border-slate-300"
+                  className="inline-flex items-center justify-center bg-white hover:bg-slate-50 border-2 border-slate-200 text-slate-700 px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold transition-all shadow-sm hover:border-slate-300 text-sm sm:text-base"
                 >
                   {t('Hero.login')}
                 </button>
               ) : (
                 <Link 
                   href="/profile" 
-                  className="inline-flex items-center justify-center w-full sm:w-auto bg-white hover:bg-slate-50 border-2 border-slate-200 text-slate-700 px-8 py-4 rounded-xl font-bold transition-all shadow-sm hover:border-slate-300"
+                  className="inline-flex items-center justify-center bg-white hover:bg-slate-50 border-2 border-slate-200 text-slate-700 px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold transition-all shadow-sm hover:border-slate-300 text-sm sm:text-base"
                 >
                   {t('Hero.joinCommunity')}
                 </Link>

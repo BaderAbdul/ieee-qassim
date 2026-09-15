@@ -75,19 +75,16 @@ export default function Navbar() {
           {/* Brand Logo */}
           <div className="flex items-center lg:px-2">
             <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-blue-700 to-blue-600 flex items-center justify-center text-white font-black text-xl shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
-                IEEE
-              </div>
               <div className="flex flex-col">
-                <span className="text-xl font-black font-cairo text-slate-900 leading-none group-hover:text-blue-600 transition-colors uppercase tracking-tight">
+                <span className="text-xl sm:text-2xl font-black font-cairo text-slate-900 leading-none group-hover:text-blue-600 transition-colors uppercase tracking-tight">
                   IEEE QU
                 </span>
               </div>
             </Link>
           </div>
 
-          {/* Desktop Navigation Links */}
-          <nav className="hidden md:flex items-center gap-1 lg:gap-2">
+          {/* Navigation Links */}
+          <nav className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar mx-2 flex-1 justify-center sm:justify-start px-2">
             {navLinks.map((item) => {
               const active = isActive(item.href);
               const Icon = item.icon;
@@ -111,7 +108,7 @@ export default function Navbar() {
           </nav>
 
           {/* Right Controls: Language Switcher & User Auth */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             
             {/* Language Switcher Preserving Route (Icon Only) */}
             <Link
@@ -159,110 +156,16 @@ export default function Navbar() {
             ) : (
               <button
                 onClick={login}
-                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm shadow-blue-500/20 hover:shadow-md transition-all transform hover:-translate-y-0.5"
+                className="inline-flex items-center gap-1.5 sm:gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold shadow-sm shadow-blue-500/20 hover:shadow-md transition-all transform hover:-translate-y-0.5"
               >
                 <LogIn className="h-4 w-4" />
                 <span>{t('login')}</span>
               </button>
             )}
-          </div>
-
-          {/* Mobile Menu Button */}
-          <div className="flex md:hidden items-center gap-2">
-            <Link
-              href={pathname || '/'}
-              locale={isAr ? 'en' : 'ar'}
-              className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 flex items-center justify-center"
-            >
-              <Globe className="h-5 w-5" />
-            </Link>
-
-            <button
-              onClick={() => setIsOpen(!isOpen)}
-              className="p-2 rounded-lg text-slate-700 hover:bg-slate-100 focus:outline-none"
-              aria-label={t('menu')}
-            >
-              {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </button>
           </div>
 
         </div>
       </div>
-
-      {/* Mobile Drawer */}
-      {isOpen && (
-        <div className="md:hidden border-t border-gray-100 bg-white px-4 pt-3 pb-6 space-y-2 shadow-lg animate-in slide-in-from-top-2">
-          {navLinks.map((item) => {
-            const active = isActive(item.href);
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setIsOpen(false)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-base font-semibold transition-colors ${
-                  active
-                    ? 'bg-blue-50 text-blue-700'
-                    : item.isAdmin
-                      ? 'text-purple-600 hover:bg-purple-50'
-                      : 'text-slate-700 hover:bg-slate-50'
-                }`}
-              >
-                <Icon className="h-5 w-5" />
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
-
-          <div className="pt-4 mt-2 border-t border-gray-100">
-            {user ? (
-              <div className="space-y-3">
-                <Link
-                  href="/profile"
-                  onClick={() => setIsOpen(false)}
-                  className="flex items-center gap-3 px-4 py-2 rounded-xl bg-slate-50"
-                >
-                  <div className="h-10 w-10 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center overflow-hidden">
-                    {user.photoURL ? (
-                      <img src={user.photoURL} alt={displayName} className="h-full w-full object-cover" />
-                    ) : (
-                      <span>{displayName.charAt(0).toUpperCase()}</span>
-                    )}
-                  </div>
-                  <div className="flex flex-col text-start">
-                    <span className="font-bold text-slate-900 text-sm">{displayName}</span>
-                    <span className="text-xs text-blue-600 font-medium">
-                      {userData?.totalPoints ?? 0} {isAr ? 'نقطة' : 'pts'}
-                    </span>
-                  </div>
-                </Link>
-
-                <button
-                  onClick={() => {
-                    setIsOpen(false);
-                    logout();
-                  }}
-                  className="w-full flex items-center justify-center gap-2 text-red-600 hover:bg-red-50 py-3 rounded-xl text-sm font-bold transition-colors"
-                >
-                  <LogOut className="h-4 w-4 rtl:rotate-180" />
-                  <span>{t('logout')}</span>
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => {
-                  setIsOpen(false);
-                  login();
-                }}
-                className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold shadow-md shadow-blue-500/20"
-              >
-                <LogIn className="h-4 w-4" />
-                <span>{t('login')}</span>
-              </button>
-            )}
-          </div>
-        </div>
-      )}
     </header>
   );
 }

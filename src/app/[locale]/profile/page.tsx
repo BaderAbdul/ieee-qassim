@@ -12,7 +12,8 @@ import {
   doc, 
   getDoc,
   orderBy,
-  limit 
+  limit,
+  updateDoc
 } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase/client';
 import { httpsCallable } from 'firebase/functions';
@@ -35,7 +36,10 @@ import {
   AlertCircle,
   RefreshCw,
   Clock,
-  ArrowUpRight
+  ArrowUpRight,
+  Edit2,
+  X,
+  Save
 } from 'lucide-react';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
@@ -145,6 +149,11 @@ export default function EngineeringProfilePage() {
   const [reloadKey, setReloadKey] = useState(0);
   
   const [activeTab, setActiveTab] = useState<'events' | 'points' | 'certificates'>('events');
+
+  // Edit Name State
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingName, setEditingName] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -263,6 +272,23 @@ export default function EngineeringProfilePage() {
     }
   };
 
+  const handleSaveName = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingName.trim() || !user) return;
+    setIsSaving(true);
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        arabicFullName: editingName.trim()
+      });
+      setShowEditModal(false);
+    } catch(err) {
+      console.error(err);
+      alert(isAr ? 'حدث خطأ أثناء التحديث.' : 'Error updating name');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center">
@@ -375,9 +401,18 @@ export default function EngineeringProfilePage() {
                 </span>
               </div>
 
-              <h1 className="text-2xl sm:text-4xl font-extrabold font-cairo text-slate-900 leading-tight">
-                {displayName}
-              </h1>
+              <div className="flex items-center justify-center md:justify-start gap-3">
+                <h1 className="text-2xl sm:text-4xl font-extrabold font-cairo text-slate-900 leading-tight">
+                  {displayName}
+                </h1>
+                <button 
+                  onClick={() => { setEditingName(userData?.arabicFullName || ''); setShowEditModal(true); }}
+                  className="p-2 text-slate-400 hover:text-blue-600 bg-slate-50 hover:bg-blue-50 rounded-lg transition-colors"
+                  title={isAr ? 'تعديل الاسم' : 'Edit Name'}
+                >
+                  <Edit2 className="h-4 w-4" />
+                </button>
+              </div>
 
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-y-2 gap-x-6 text-sm text-slate-600 pt-1">
                 <div className="flex items-center gap-1.5">
@@ -791,6 +826,63 @@ export default function EngineeringProfilePage() {
         </div>
 
       </div>
+
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl relative">
+            <button 
+              onClick={() => setShowEditModal(false)}
+              className="absolute top-4 rtl:left-4 ltr:right-4 text-slate-400 hover:text-slate-600"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <h3 className="text-xl font-bold font-cairo text-slate-900 mb-2">
+              {isAr ? 'تعديل الاسم الشخصي' : 'Edit Full Name'}
+            </h3>
+            
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-xl flex gap-3 text-sm mb-5">
+              <AlertCircle className="h-5 w-5 flex-shrink-0 text-amber-600" />
+              <p className="font-medium">
+                {isAr ? 'تنبيه: هذا هو الاسم الذي سيظهر في الشهادات المعتمدة الخاصة بك. تأكد من كتابته بشكل صحيح (الاسم الأول والأب والعائلة).' : 'Note: This name will appear on your accredited certificates. Ensure it is written correctly.'}
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveName} className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">
+                  {isAr ? 'الاسم الثلاثي (عربي)' : 'Full Name (Arabic)'}
+                </label>
+                <input 
+                  type="text" 
+                  required
+                  value={editingName}
+                  onChange={(e) => setEditingName(e.target.value)}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder={isAr ? 'مثال: محمد علي الخالد' : 'e.g. Mohammed Ali Al-Khaled'}
+                />
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button 
+                  type="button" 
+                  onClick={() => setShowEditModal(false)}
+                  className="flex-1 py-2.5 px-4 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-colors"
+                >
+                  {isAr ? 'إلغاء' : 'Cancel'}
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={isSaving}
+                  className="flex-1 py-2.5 px-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isSaving && <LoadingSpinner size="sm" color="border-white" />}
+                  <Save className="h-4 w-4" />
+                  <span>{isAr ? 'حفظ' : 'Save'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
