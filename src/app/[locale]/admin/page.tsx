@@ -16,6 +16,7 @@ export default function AdminDashboardPage() {
   
   const [heroStats, setHeroStats] = useState({
     membersCount: '+500',
+    eventsCount: '+25',
     tracksCount: '4',
     featuredEventId: '',
     showStructure: true,
