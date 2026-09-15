@@ -53,34 +53,43 @@ export default function AdminStructurePage() {
     fetchData();
   }, []);
 
-  const handleSave = async () => {
+  const updateCommitteesInDB = async (newCommittees: Committee[]) => {
     setSaving(true);
     try {
-      await setDoc(doc(db, 'settings', 'homepage'), { committees }, { merge: true });
-      alert('تم حفظ الهيكلة بنجاح');
+      await setDoc(doc(db, 'settings', 'homepage'), { committees: newCommittees }, { merge: true });
     } catch (e) {
       console.error(e);
-      alert('حدث خطأ أثناء الحفظ');
+      alert('حدث خطأ أثناء حفظ الهيكلة في قاعدة البيانات');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSave = async () => {
+    await updateCommitteesInDB(committees);
+    alert('تم الحفظ بنجاح');
   };
 
   const handleAddCommittee = (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentCommittee) return;
     
+    let updated;
     if (currentCommittee.id) {
-      setCommittees(committees.map(c => c.id === currentCommittee.id ? currentCommittee : c));
+      updated = committees.map(c => c.id === currentCommittee.id ? currentCommittee : c);
     } else {
-      setCommittees([...committees, { ...currentCommittee, id: Date.now().toString(), members: [] }]);
+      updated = [...committees, { ...currentCommittee, id: Date.now().toString(), members: [] }];
     }
+    setCommittees(updated);
+    updateCommitteesInDB(updated);
     setShowCommitteeModal(false);
   };
 
   const handleDeleteCommittee = (id: string) => {
     if(confirm('هل أنت متأكد من حذف هذه اللجنة؟')) {
-      setCommittees(committees.filter(c => c.id !== id));
+      const updated = committees.filter(c => c.id !== id);
+      setCommittees(updated);
+      updateCommitteesInDB(updated);
     }
   };
 
@@ -109,7 +118,7 @@ export default function AdminStructurePage() {
     if (!showMemberModal) return;
     const { committeeId } = showMemberModal;
     
-    setCommittees(committees.map(c => {
+    const updated = committees.map(c => {
       if (c.id === committeeId) {
         const memberExists = c.members.some(m => m.userId === user.id);
         if (memberExists) return c;
@@ -124,7 +133,10 @@ export default function AdminStructurePage() {
         };
       }
       return c;
-    }));
+    });
+    
+    setCommittees(updated);
+    updateCommitteesInDB(updated);
     
     setShowMemberModal(null);
     setSearchQuery('');
@@ -132,12 +144,16 @@ export default function AdminStructurePage() {
   };
 
   const handleRemoveMember = (committeeId: string, userId: string) => {
-    setCommittees(committees.map(c => {
-      if (c.id === committeeId) {
-        return { ...c, members: c.members.filter(m => m.userId !== userId) };
-      }
-      return c;
-    }));
+    if(confirm('هل أنت متأكد من إزالة هذا العضو؟')) {
+      const updated = committees.map(c => {
+        if (c.id === committeeId) {
+          return { ...c, members: c.members.filter(m => m.userId !== userId) };
+        }
+        return c;
+      });
+      setCommittees(updated);
+      updateCommitteesInDB(updated);
+    }
   };
 
   if (loading) {

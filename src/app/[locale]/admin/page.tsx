@@ -16,10 +16,12 @@ export default function AdminDashboardPage() {
   
   const [heroStats, setHeroStats] = useState({
     membersCount: '+500',
-    eventsCount: '+25',
     tracksCount: '4',
     featuredEventId: '',
     showStructure: true,
+    heroTitle: '',
+    heroSubtitleAr: '',
+    heroSubtitleEn: '',
   });
   const [savingHeroStats, setSavingHeroStats] = useState(false);
   const [allEvents, setAllEvents] = useState<PlatformEvent[]>([]);
@@ -66,7 +68,7 @@ export default function AdminDashboardPage() {
     e.preventDefault();
     setSavingHeroStats(true);
     try {
-      await setDoc(doc(db, 'settings', 'homepage'), heroStats);
+      await setDoc(doc(db, 'settings', 'homepage'), heroStats, { merge: true });
       alert('تم تحديث إحصائيات الرئيسية بنجاح');
     } catch (error) {
       console.error('Error saving hero stats:', error);
@@ -105,64 +107,87 @@ export default function AdminDashboardPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900 font-cairo mb-4 flex items-center gap-2">
-            <Settings className="h-5 w-5 text-blue-600" />
-            إعدادات الصفحة الرئيسية (شريط الإحصائيات)
-          </h2>
-          <p className="text-gray-500 text-sm mb-6">
-            قم بتحديث الأرقام المعروضة في شريط الإحصائيات في الصفحة الرئيسية للمنصة.
-          </p>
-          
-          <form onSubmit={handleSaveHeroStats} className="space-y-4">
+      <form onSubmit={handleSaveHeroStats} className="space-y-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Column 1: Stats */}
+          <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">عدد الأعضاء</label>
-              <input 
-                type="text" 
-                value={heroStats.membersCount}
-                onChange={e => setHeroStats({...heroStats, membersCount: e.target.value})}
-                placeholder="+500"
-                className="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 border text-left rtl:text-right"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">الفعاليات وورش العمل</label>
-              <input 
-                type="text" 
-                value={heroStats.eventsCount}
-                onChange={e => setHeroStats({...heroStats, eventsCount: e.target.value})}
-                placeholder="+25"
-                className="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 border text-left rtl:text-right"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">المسارات واللجان</label>
-              <input 
-                type="text" 
-                value={heroStats.tracksCount}
-                onChange={e => setHeroStats({...heroStats, tracksCount: e.target.value})}
-                placeholder="4"
-                className="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 border text-left rtl:text-right"
-              />
+              <h2 className="text-xl font-bold text-gray-900 font-cairo mb-2 flex items-center gap-2">
+                <Settings className="h-5 w-5 text-blue-600" />
+                إعدادات الصفحة الرئيسية
+              </h2>
+              <p className="text-gray-500 text-sm">
+                قم بتحديث الأرقام المعروضة في شريط الإحصائيات.
+              </p>
             </div>
             
-            <button 
-              type="submit" 
-              disabled={savingHeroStats}
-              className="mt-4 flex items-center justify-center gap-2 w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-bold transition-colors disabled:opacity-50"
-            >
-              {savingHeroStats ? (
-                <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
-              ) : (
-                <>
-                  <Save className="h-5 w-5" />
-                  حفظ الإعدادات
-                </>
-              )}
-            </button>
-          </form>
-        </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">عدد الأعضاء</label>
+                <input 
+                  type="text" 
+                  value={heroStats.membersCount}
+                  onChange={e => setHeroStats({...heroStats, membersCount: e.target.value})}
+                  placeholder="+500"
+                  className="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 border text-left rtl:text-right"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">الفعاليات وورش العمل</label>
+                <input 
+                  type="text" 
+                  value={heroStats.eventsCount}
+                  onChange={e => setHeroStats({...heroStats, eventsCount: e.target.value})}
+                  placeholder="+25"
+                  className="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 border text-left rtl:text-right"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">المسارات واللجان</label>
+                <input 
+                  type="text" 
+                  value={heroStats.tracksCount}
+                  onChange={e => setHeroStats({...heroStats, tracksCount: e.target.value})}
+                  placeholder="4"
+                  className="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 border text-left rtl:text-right"
+                />
+              </div>
+            </div>
+
+            <div className="pt-6 border-t border-gray-100 space-y-4">
+              <h3 className="text-lg font-bold text-gray-900 font-cairo">نصوص الواجهة (Hero Texts)</h3>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">العنوان الرئيسي</label>
+                <input 
+                  type="text" 
+                  value={heroStats.heroTitle || ''}
+                  onChange={e => setHeroStats({...heroStats, heroTitle: e.target.value})}
+                  placeholder="مثال: IEEE QASSIM"
+                  className="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 border"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">الوصف الفرعي (عربي)</label>
+                <textarea 
+                  value={heroStats.heroSubtitleAr || ''}
+                  onChange={e => setHeroStats({...heroStats, heroSubtitleAr: e.target.value})}
+                  placeholder="المنصة الرسمية للمجتمع الطلابي التقني والهندسي في جامعة القصيم."
+                  className="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 border text-right resize-none h-20"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">الوصف الفرعي (إنجليزي)</label>
+                <textarea 
+                  value={heroStats.heroSubtitleEn || ''}
+                  onChange={e => setHeroStats({...heroStats, heroSubtitleEn: e.target.value})}
+                  placeholder="The official platform for the engineering and tech student community at Qassim University."
+                  className="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 border text-left resize-none h-20"
+                  dir="ltr"
+                />
+              </div>
+            </div>
+          </div>
 
         <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 flex flex-col justify-between">
           <div>
@@ -207,7 +232,25 @@ export default function AdminDashboardPage() {
             </label>
           </div>
         </div>
-      </div>
+        </div>
+
+        <div className="flex justify-end">
+          <button 
+            type="submit" 
+            disabled={savingHeroStats}
+            className="flex items-center justify-center gap-2 w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-sm shadow-blue-500/20 hover:-translate-y-0.5 disabled:opacity-50"
+          >
+            {savingHeroStats ? (
+              <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
+            ) : (
+              <>
+                <Save className="h-5 w-5" />
+                حفظ الإعدادات
+              </>
+            )}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

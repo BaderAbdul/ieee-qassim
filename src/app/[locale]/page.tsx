@@ -15,7 +15,7 @@ export default function HomePage() {
   const isAr = locale === 'ar';
   const { user, userData, login } = useAuth();
   
-  const [stats, setStats] = useState({ membersCount: '+500', eventsCount: '+25', tracksCount: '4', featuredEventId: '', showStructure: true, committees: [] as any[] });
+  const [stats, setStats] = useState({ membersCount: '+500', eventsCount: '+25', tracksCount: '4', featuredEventId: '', showStructure: true, heroTitle: '', heroSubtitleAr: '', heroSubtitleEn: '', committees: [] as any[] });
   const [latestEvent, setLatestEvent] = useState<PlatformEvent | null>(null);
   const [latestCert, setLatestCert] = useState<{title: string, date: string} | null>(null);
 
@@ -106,10 +106,10 @@ export default function HomePage() {
               </div>
               
               <h1 className="text-5xl sm:text-7xl lg:text-8xl font-black mb-4 font-thmanyah text-slate-900 drop-shadow-sm uppercase tracking-tight">
-                {t('Hero.wordmark')}
+                {stats.heroTitle || t('Hero.wordmark')}
               </h1>
               <p className="text-slate-600 font-medium text-sm sm:text-base max-w-lg mx-auto lg:mx-0 mb-6 leading-relaxed">
-                {isAr ? 'المنصة الرسمية للمجتمع الطلابي التقني والهندسي في جامعة القصيم.' : 'The official platform for the engineering and tech student community at Qassim University.'}
+                {isAr ? (stats.heroSubtitleAr || 'المنصة الرسمية للمجتمع الطلابي التقني والهندسي في جامعة القصيم.') : (stats.heroSubtitleEn || 'The official platform for the engineering and tech student community at Qassim University.')}
               </p>
             </div>
             

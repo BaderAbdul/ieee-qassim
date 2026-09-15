@@ -153,7 +153,7 @@ export default function EngineeringProfilePage() {
 
   // Edit Name State
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingName, setEditingName] = useState('');
+  const [editingName, setEditingName] = useState({ first: '', middle: '', last: '' });
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -275,11 +275,12 @@ export default function EngineeringProfilePage() {
 
   const handleSaveName = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingName.trim() || !user) return;
+    const fullName = `${editingName.first} ${editingName.middle} ${editingName.last}`.trim().replace(/\s+/g, ' ');
+    if (!fullName || !user) return;
     setIsSaving(true);
     try {
       await updateDoc(doc(db, 'users', user.uid), {
-        arabicFullName: editingName.trim()
+        arabicFullName: fullName
       });
       setShowEditModal(false);
     } catch(err) {
@@ -407,7 +408,15 @@ export default function EngineeringProfilePage() {
                   {displayName}
                 </h1>
                 <button 
-                  onClick={() => { setEditingName(userData?.arabicFullName || ''); setShowEditModal(true); }}
+                  onClick={() => { 
+                    const parts = (userData?.arabicFullName || '').split(' ').filter(Boolean);
+                    setEditingName({
+                      first: parts[0] || '',
+                      middle: parts.length > 2 ? parts.slice(1, -1).join(' ') : (parts.length === 2 ? parts[1] : ''),
+                      last: parts.length > 2 ? parts[parts.length - 1] : ''
+                    }); 
+                    setShowEditModal(true); 
+                  }}
                   className="p-2 text-slate-400 hover:text-blue-600 bg-slate-50 hover:bg-blue-50 rounded-lg transition-colors"
                   title={isAr ? 'تعديل الاسم' : 'Edit Name'}
                 >
@@ -856,18 +865,19 @@ export default function EngineeringProfilePage() {
             </div>
 
             <form onSubmit={handleSaveName} className="space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">
-                  {isAr ? 'الاسم الثلاثي (عربي)' : 'Full Name (Arabic)'}
-                </label>
-                <input 
-                  type="text" 
-                  required
-                  value={editingName}
-                  onChange={(e) => setEditingName(e.target.value)}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder={isAr ? 'مثال: محمد علي الخالد' : 'e.g. Mohammed Ali Al-Khaled'}
-                />
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">{isAr ? 'الاسم الأول' : 'First Name'}</label>
+                  <input type="text" required value={editingName.first} onChange={e => setEditingName({...editingName, first: e.target.value})} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder={isAr ? 'مثال: بدر' : 'e.g. Bader'} />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">{isAr ? 'اسم الأب' : 'Father Name'}</label>
+                  <input type="text" required value={editingName.middle} onChange={e => setEditingName({...editingName, middle: e.target.value})} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder={isAr ? 'مثال: عبدالله' : 'e.g. Abdullah'} />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">{isAr ? 'اسم العائلة' : 'Family Name'}</label>
+                  <input type="text" required value={editingName.last} onChange={e => setEditingName({...editingName, last: e.target.value})} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder={isAr ? 'مثال: الدخيل الله' : 'e.g. Aldakhilallah'} />
+                </div>
               </div>
               <div className="flex gap-3 mt-6">
                 <button 
