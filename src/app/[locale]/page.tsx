@@ -127,7 +127,8 @@ export default function HomePage() {
               </p>
             </div>
             
-            <div className="flex flex-r              <Link 
+            <div className="flex flex-row flex-wrap items-center gap-3 justify-center lg:justify-start pt-2">
+              <Link 
                 href="/events"
                 className="group inline-flex items-center justify-center bg-[#00629B]/90 backdrop-blur-md border border-white/10 text-white px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold hover:bg-[#004b78] transition-all shadow-md shadow-blue-900/20 hover:shadow-lg hover:shadow-blue-900/30 hover:-translate-y-0.5 text-sm sm:text-base"
               >
@@ -148,9 +149,6 @@ export default function HomePage() {
                   className="inline-flex items-center justify-center bg-white/70 backdrop-blur-md border border-slate-200/50 text-slate-700 px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold transition-all shadow-sm hover:bg-white hover:border-slate-300 hover:-translate-y-0.5 text-sm sm:text-base"
                 >
                   {t('Hero.joinCommunity')}
-                </Link>
-              )}
-            </div>ommunity')}
                 </Link>
               )}
             </div>
