@@ -111,7 +111,7 @@ service cloud.firestore {
     // Settings
     match /settings/{docId} {
       allow read: if true;
-      allow write: if isSuperAdmin();
+      allow write: if isEventOrganizer();
     }
 
     // Mail Queue (Outbox)

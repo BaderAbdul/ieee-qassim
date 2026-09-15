@@ -156,6 +156,16 @@ export default function EngineeringProfilePage() {
   const [editingName, setEditingName] = useState({ first: '', middle: '', last: '' });
   const [isSaving, setIsSaving] = useState(false);
 
+  // Edit Profile State
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [editingProfile, setEditingProfile] = useState({
+    college: '',
+    major: '',
+    academicLevel: '',
+    universityId: ''
+  });
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
   useEffect(() => {
     let active = true;
 
@@ -283,11 +293,33 @@ export default function EngineeringProfilePage() {
         arabicFullName: fullName
       });
       setShowEditModal(false);
+      alert(isAr ? 'تم حفظ الاسم بنجاح' : 'Name saved successfully');
     } catch(err) {
       console.error(err);
       alert(isAr ? 'حدث خطأ أثناء التحديث.' : 'Error updating name');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    setIsSavingProfile(true);
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        college: editingProfile.college,
+        major: editingProfile.major,
+        academicLevel: editingProfile.academicLevel,
+        universityId: editingProfile.universityId
+      });
+      setShowProfileModal(false);
+      alert(isAr ? 'تم تحديث الملف الشخصي بنجاح' : 'Profile updated successfully');
+    } catch(err) {
+      console.error(err);
+      alert(isAr ? 'حدث خطأ أثناء التحديث.' : 'Error updating profile');
+    } finally {
+      setIsSavingProfile(false);
     }
   };
 
@@ -440,6 +472,21 @@ export default function EngineeringProfilePage() {
                     <span>ID: {universityId}</span>
                   </div>
                 )}
+                <button 
+                  onClick={() => {
+                    setEditingProfile({
+                      college: userData?.college || '',
+                      major: userData?.major || '',
+                      academicLevel: userData?.academicLevel || '',
+                      universityId: userData?.universityId || ''
+                    });
+                    setShowProfileModal(true);
+                  }}
+                  className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
+                  title={isAr ? 'تعديل البيانات الأكاديمية' : 'Edit Academic Details'}
+                >
+                  <Edit2 className="h-3.5 w-3.5" />
+                </button>
               </div>
             </div>
 
@@ -888,12 +935,69 @@ export default function EngineeringProfilePage() {
                   {isAr ? 'إلغاء' : 'Cancel'}
                 </button>
                 <button 
-                  type="submit" 
+                  type="submit"
                   disabled={isSaving}
-                  className="flex-1 py-2.5 px-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50"
                 >
-                  {isSaving && <LoadingSpinner size="sm" color="border-white" />}
-                  <Save className="h-4 w-4" />
+                  {isSaving ? <LoadingSpinner size="sm" color="border-white" /> : <Save className="h-4 w-4" />}
+                  <span>{isAr ? 'حفظ' : 'Save'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showProfileModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl relative">
+            <button 
+              onClick={() => setShowProfileModal(false)}
+              className="absolute top-4 rtl:left-4 ltr:right-4 text-slate-400 hover:text-slate-600"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <h3 className="text-xl font-bold font-cairo text-slate-900 mb-6">
+              {isAr ? 'تعديل البيانات الأكاديمية' : 'Edit Academic Details'}
+            </h3>
+            
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">{isAr ? 'الكلية' : 'College'}</label>
+                <select required value={editingProfile.college} onChange={e => setEditingProfile({...editingProfile, college: e.target.value})} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                  <option value="">{isAr ? 'اختر الكلية' : 'Select College'}</option>
+                  <option value="engineering">{isAr ? 'كلية الهندسة' : 'Engineering'}</option>
+                  <option value="computer_science">{isAr ? 'كلية الحاسب' : 'Computer Science'}</option>
+                  <option value="other">{isAr ? 'كلية أخرى' : 'Other'}</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">{isAr ? 'التخصص' : 'Major'}</label>
+                <input type="text" required value={editingProfile.major} onChange={e => setEditingProfile({...editingProfile, major: e.target.value})} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder={isAr ? 'مثال: هندسة كهربائية' : 'e.g. Electrical Engineering'} />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">{isAr ? 'المستوى الأكاديمي' : 'Academic Level'}</label>
+                <input type="text" required value={editingProfile.academicLevel} onChange={e => setEditingProfile({...editingProfile, academicLevel: e.target.value})} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder={isAr ? 'مثال: المستوى الخامس' : 'e.g. Level 5'} />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">{isAr ? 'الرقم الجامعي' : 'University ID'}</label>
+                <input type="text" required value={editingProfile.universityId} onChange={e => setEditingProfile({...editingProfile, universityId: e.target.value})} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="4xxxxxxxxx" />
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button 
+                  type="button" 
+                  onClick={() => setShowProfileModal(false)}
+                  className="flex-1 py-2.5 px-4 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-colors"
+                >
+                  {isAr ? 'إلغاء' : 'Cancel'}
+                </button>
+                <button 
+                  type="submit"
+                  disabled={isSavingProfile}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  {isSavingProfile ? <LoadingSpinner size="sm" color="border-white" /> : <Save className="h-4 w-4" />}
                   <span>{isAr ? 'حفظ' : 'Save'}</span>
                 </button>
               </div>
