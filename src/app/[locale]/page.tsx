@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Link, useRouter } from '@/i18n/routing';
 import { useAuth } from '@/context/AuthContext';
-import { Calendar, Trophy, ArrowRight, UserCircle, Users, LayoutList } from 'lucide-react';
+import { Calendar, Trophy, ArrowRight, UserCircle, Users, LayoutList, Sparkles } from 'lucide-react';
 import { collection, query, getDocs, where, limit, doc, getDoc, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { PlatformEvent } from '@/lib/types';
@@ -398,52 +398,74 @@ export default function HomePage() {
       </section>
 
       {/* Gamification Loop Section */}
-      <section className="py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full relative z-20">
-        <div className="bg-gradient-to-br from-blue-900 to-slate-900 rounded-[2.5rem] p-8 sm:p-12 shadow-2xl overflow-hidden relative">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/20 rounded-full blur-[100px] pointer-events-none"></div>
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-[100px] pointer-events-none"></div>
+      <section className="py-6 sm:py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full relative z-20">
+        <div className="bg-gradient-to-br from-[#001f3f] to-slate-900 rounded-[2rem] p-6 sm:p-10 shadow-2xl overflow-hidden relative border border-white/5">
+          {/* Subtle glowing orbs */}
+          <div className="absolute -top-24 -right-24 w-64 h-64 bg-blue-500/20 rounded-full blur-[80px] pointer-events-none"></div>
+          <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-emerald-500/10 rounded-full blur-[80px] pointer-events-none"></div>
           
-          <div className="relative z-10">
-            <div className="text-center mb-10 sm:mb-14">
-              <h2 className="text-3xl sm:text-4xl font-black text-white mb-4 font-cairo">{t('Gamification.title')}</h2>
+          <div className="relative z-10 flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
+            
+            <div className="text-center lg:text-start flex-shrink-0 lg:max-w-xs">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/10 text-blue-200 text-xs font-bold mb-4">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>كيف يعمل النظام؟</span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-black text-white mb-3 font-cairo">{t('Gamification.title')}</h2>
+              <p className="text-slate-400 text-sm leading-relaxed hidden sm:block">
+                شارك بفعالية في النادي، اجمع النقاط، وتصدر قائمة الشرف لتحصل على التكريم والشهادات المعتمدة.
+              </p>
             </div>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 text-center relative">
-              {/* Connection lines (desktop only) */}
-              <div className="hidden lg:block absolute top-12 rtl:right-1/6 ltr:left-1/6 rtl:left-1/6 ltr:right-1/6 h-0.5 bg-gradient-to-r rtl:from-blue-500 rtl:via-emerald-500 rtl:to-amber-500 ltr:from-blue-500 ltr:via-emerald-500 ltr:to-amber-500 opacity-30 z-0"></div>
+            <div className="flex-1 w-full">
+              <div className="flex overflow-x-auto pb-6 sm:pb-0 -mx-6 px-6 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 snap-x hide-scrollbar">
+                
+                {/* Step 1 */}
+                <div className="min-w-[140px] flex-1 snap-center group relative">
+                  <div className="hidden lg:block absolute top-6 rtl:-left-4 ltr:-right-4 w-8 h-[1px] bg-gradient-to-r rtl:from-blue-500/50 ltr:from-blue-500/50 to-transparent"></div>
+                  <div className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-4 transition-all h-full flex flex-col items-center sm:items-start text-center sm:text-start">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-blue-600/20 text-blue-300 rounded-xl flex items-center justify-center text-xl mb-3 shadow-inner ring-1 ring-blue-400/20 group-hover:scale-110 transition-transform">
+                      🎯
+                    </div>
+                    <h3 className="text-white font-bold text-sm leading-snug">{t('Gamification.step1')}</h3>
+                  </div>
+                </div>
+                
+                {/* Step 2 */}
+                <div className="min-w-[140px] flex-1 snap-center group relative">
+                  <div className="hidden lg:block absolute top-6 rtl:-left-4 ltr:-right-4 w-8 h-[1px] bg-gradient-to-r rtl:from-amber-500/50 ltr:from-amber-500/50 to-transparent"></div>
+                  <div className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-4 transition-all h-full flex flex-col items-center sm:items-start text-center sm:text-start">
+                    <div className="w-12 h-12 bg-gradient-to-br from-amber-500/20 to-amber-600/20 text-amber-300 rounded-xl flex items-center justify-center text-xl mb-3 shadow-inner ring-1 ring-amber-400/20 group-hover:scale-110 transition-transform">
+                      ⭐
+                    </div>
+                    <h3 className="text-white font-bold text-sm leading-snug">{t('Gamification.step2')}</h3>
+                  </div>
+                </div>
+                
+                {/* Step 3 */}
+                <div className="min-w-[140px] flex-1 snap-center group relative">
+                  <div className="hidden lg:block absolute top-6 rtl:-left-4 ltr:-right-4 w-8 h-[1px] bg-gradient-to-r rtl:from-purple-500/50 ltr:from-purple-500/50 to-transparent"></div>
+                  <div className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-4 transition-all h-full flex flex-col items-center sm:items-start text-center sm:text-start">
+                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500/20 to-purple-600/20 text-purple-300 rounded-xl flex items-center justify-center text-xl mb-3 shadow-inner ring-1 ring-purple-400/20 group-hover:scale-110 transition-transform">
+                      🏆
+                    </div>
+                    <h3 className="text-white font-bold text-sm leading-snug">{t('Gamification.step3')}</h3>
+                  </div>
+                </div>
 
-              {/* Step 1 */}
-              <div className="relative z-10 flex flex-col items-center">
-                <div className="w-20 h-20 sm:w-24 sm:h-24 bg-blue-500/20 border border-blue-400/30 rounded-3xl flex items-center justify-center text-4xl mb-5 shadow-[0_0_30px_rgba(59,130,246,0.15)] backdrop-blur-sm">
-                  🎯
+                {/* Step 4 */}
+                <div className="min-w-[140px] flex-1 snap-center group">
+                  <div className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-4 transition-all h-full flex flex-col items-center sm:items-start text-center sm:text-start">
+                    <div className="w-12 h-12 bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 text-emerald-300 rounded-xl flex items-center justify-center text-xl mb-3 shadow-inner ring-1 ring-emerald-400/20 group-hover:scale-110 transition-transform">
+                      🎓
+                    </div>
+                    <h3 className="text-white font-bold text-sm leading-snug">{t('Gamification.step4')}</h3>
+                  </div>
                 </div>
-                <h3 className="text-white font-bold text-lg max-w-[200px]">{t('Gamification.step1')}</h3>
-              </div>
-              
-              {/* Step 2 */}
-              <div className="relative z-10 flex flex-col items-center">
-                <div className="w-20 h-20 sm:w-24 sm:h-24 bg-amber-500/20 border border-amber-400/30 rounded-3xl flex items-center justify-center text-4xl mb-5 shadow-[0_0_30px_rgba(245,158,11,0.15)] backdrop-blur-sm">
-                  ⭐
-                </div>
-                <h3 className="text-white font-bold text-lg max-w-[200px]">{t('Gamification.step2')}</h3>
-              </div>
-              
-              {/* Step 3 */}
-              <div className="relative z-10 flex flex-col items-center">
-                <div className="w-20 h-20 sm:w-24 sm:h-24 bg-purple-500/20 border border-purple-400/30 rounded-3xl flex items-center justify-center text-4xl mb-5 shadow-[0_0_30px_rgba(168,85,247,0.15)] backdrop-blur-sm">
-                  🏆
-                </div>
-                <h3 className="text-white font-bold text-lg max-w-[200px]">{t('Gamification.step3')}</h3>
-              </div>
-
-              {/* Step 4 */}
-              <div className="relative z-10 flex flex-col items-center">
-                <div className="w-20 h-20 sm:w-24 sm:h-24 bg-emerald-500/20 border border-emerald-400/30 rounded-3xl flex items-center justify-center text-4xl mb-5 shadow-[0_0_30px_rgba(16,185,129,0.15)] backdrop-blur-sm">
-                  🎓
-                </div>
-                <h3 className="text-white font-bold text-lg max-w-[200px]">{t('Gamification.step4')}</h3>
+                
               </div>
             </div>
+            
           </div>
         </div>
       </section>
