@@ -15,6 +15,9 @@ export interface UserData {
   createdAt?: string;
   isQassimStudent?: boolean;
   universityId?: string | null;
+  firstName?: string | null;
+  fatherName?: string | null;
+  familyName?: string | null;
   arabicFullName?: string;
   college?: string | null;
   major?: string | null;
