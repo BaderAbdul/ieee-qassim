@@ -362,10 +362,7 @@ export default function EngineeringProfilePage() {
   }
 
   const getFirstAndLastName = (fullName?: string, fallback?: string | null) => {
-    if (!fullName) return fallback || 'Student';
-    const parts = fullName.split(' ').filter(Boolean);
-    if (parts.length === 1) return parts[0];
-    return `${parts[0]} ${parts[parts.length - 1]}`;
+    return fullName || fallback || 'Student';
   };
 
   const displayName = getFirstAndLastName(userData?.arabicFullName, user?.displayName);

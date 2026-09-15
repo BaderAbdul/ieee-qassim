@@ -133,14 +133,14 @@ export default function HomePage() {
               </div>
               
               <h1 className="text-5xl sm:text-7xl lg:text-8xl font-black mb-4 font-thmanyah text-slate-900 drop-shadow-sm uppercase tracking-tight">
-                {stats.heroTitle || t('Hero.wordmark')}
+                {t('Hero.headline')}
               </h1>
-              <p className="text-slate-600 font-medium text-sm sm:text-base max-w-lg mx-auto lg:mx-0 mb-6 leading-relaxed">
-                {isAr ? (stats.heroSubtitleAr || 'المنصة الرسمية للمجتمع الطلابي التقني والهندسي في جامعة القصيم.') : (stats.heroSubtitleEn || 'The official platform for the engineering and tech student community at Qassim University.')}
+              <p className="text-slate-600 font-medium text-sm sm:text-base max-w-lg mx-auto lg:mx-0 mb-10 leading-relaxed">
+                {t('Hero.description')}
               </p>
             </div>
             
-            <div className="flex flex-row flex-wrap items-center gap-3 justify-center lg:justify-start pt-2">
+            <div className="flex flex-row flex-wrap items-center gap-4 justify-center lg:justify-start pt-6">
               <Link 
                 href="/events"
                 className="group inline-flex items-center justify-center bg-[#00629B]/80 backdrop-blur-xl border border-white/20 text-white px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold hover:bg-[#004b78]/90 transition-all shadow-md shadow-blue-900/20 hover:shadow-lg hover:shadow-blue-900/30 hover:-translate-y-0.5 text-sm sm:text-base"
@@ -340,7 +340,7 @@ export default function HomePage() {
                 >
                   <div className="relative h-48 w-full bg-slate-100 overflow-hidden">
                     {event.coverUrl ? (
-                      <img src={event.coverUrl} alt={isAr ? event.title : (event.titleEn || event.title)} className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${isCompleted ? 'blur-sm brightness-90' : ''}`} />
+                      <img src={event.coverUrl} alt={isAr ? event.title : (event.titleEn || event.title)} loading="lazy" className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${isCompleted ? 'blur-sm brightness-90' : ''}`} />
                     ) : (
                       <div className={`w-full h-full bg-gradient-to-br from-[#00629B] to-blue-800 flex items-center justify-center group-hover:scale-105 transition-transform duration-500 ${isCompleted ? 'blur-sm brightness-90' : ''}`}>
                         <span className="text-white/30 font-black text-4xl uppercase tracking-widest">IEEE QU</span>
@@ -397,6 +397,57 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Gamification Loop Section */}
+      <section className="py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full relative z-20">
+        <div className="bg-gradient-to-br from-blue-900 to-slate-900 rounded-[2.5rem] p-8 sm:p-12 shadow-2xl overflow-hidden relative">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/20 rounded-full blur-[100px] pointer-events-none"></div>
+          <div className="absolute bottom-0 left-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-[100px] pointer-events-none"></div>
+          
+          <div className="relative z-10">
+            <div className="text-center mb-10 sm:mb-14">
+              <h2 className="text-3xl sm:text-4xl font-black text-white mb-4 font-cairo">{t('Gamification.title')}</h2>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 text-center relative">
+              {/* Connection lines (desktop only) */}
+              <div className="hidden lg:block absolute top-12 rtl:right-1/6 ltr:left-1/6 rtl:left-1/6 ltr:right-1/6 h-0.5 bg-gradient-to-r rtl:from-blue-500 rtl:via-emerald-500 rtl:to-amber-500 ltr:from-blue-500 ltr:via-emerald-500 ltr:to-amber-500 opacity-30 z-0"></div>
+
+              {/* Step 1 */}
+              <div className="relative z-10 flex flex-col items-center">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 bg-blue-500/20 border border-blue-400/30 rounded-3xl flex items-center justify-center text-4xl mb-5 shadow-[0_0_30px_rgba(59,130,246,0.15)] backdrop-blur-sm">
+                  🎯
+                </div>
+                <h3 className="text-white font-bold text-lg max-w-[200px]">{t('Gamification.step1')}</h3>
+              </div>
+              
+              {/* Step 2 */}
+              <div className="relative z-10 flex flex-col items-center">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 bg-amber-500/20 border border-amber-400/30 rounded-3xl flex items-center justify-center text-4xl mb-5 shadow-[0_0_30px_rgba(245,158,11,0.15)] backdrop-blur-sm">
+                  ⭐
+                </div>
+                <h3 className="text-white font-bold text-lg max-w-[200px]">{t('Gamification.step2')}</h3>
+              </div>
+              
+              {/* Step 3 */}
+              <div className="relative z-10 flex flex-col items-center">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 bg-purple-500/20 border border-purple-400/30 rounded-3xl flex items-center justify-center text-4xl mb-5 shadow-[0_0_30px_rgba(168,85,247,0.15)] backdrop-blur-sm">
+                  🏆
+                </div>
+                <h3 className="text-white font-bold text-lg max-w-[200px]">{t('Gamification.step3')}</h3>
+              </div>
+
+              {/* Step 4 */}
+              <div className="relative z-10 flex flex-col items-center">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 bg-emerald-500/20 border border-emerald-400/30 rounded-3xl flex items-center justify-center text-4xl mb-5 shadow-[0_0_30px_rgba(16,185,129,0.15)] backdrop-blur-sm">
+                  🎓
+                </div>
+                <h3 className="text-white font-bold text-lg max-w-[200px]">{t('Gamification.step4')}</h3>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Quick Links / Feature Highlights */}
       <section className="py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full mb-12">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -406,7 +457,7 @@ export default function HomePage() {
             {latestEvent ? (
               <div className="relative h-48 w-full bg-slate-100 overflow-hidden">
                 {latestEvent.coverUrl ? (
-                  <img src={latestEvent.coverUrl} alt={isAr ? latestEvent.title : (latestEvent.titleEn || latestEvent.title)} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <img src={latestEvent.coverUrl} alt={isAr ? latestEvent.title : (latestEvent.titleEn || latestEvent.title)} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-[#00629B] to-blue-800 flex items-center justify-center group-hover:scale-105 transition-transform duration-500">
                     <span className="text-white/30 font-black text-4xl uppercase tracking-widest">IEEE QU</span>
@@ -517,7 +568,7 @@ export default function HomePage() {
                           {committee.members.slice(0, 4).map((member: any) => (
                             <div key={member.userId} className={`h-8 w-8 rounded-full border-2 border-white bg-${color}-200 flex items-center justify-center text-xs font-bold text-${color}-700 overflow-hidden relative group`} title={member.name}>
                               {member.avatar ? (
-                                <img src={member.avatar} alt={member.name} className="h-full w-full object-cover" />
+                                <img src={member.avatar} alt={member.name} loading="lazy" className="h-full w-full object-cover" />
                               ) : (
                                 <span>{member.name.charAt(0)}</span>
                               )}

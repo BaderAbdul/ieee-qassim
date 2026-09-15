@@ -61,16 +61,18 @@ export default function Navbar() {
   ];
 
   const getFirstAndLastName = (fullName?: string, fallback?: string | null) => {
-    if (!fullName) return fallback || 'Student';
-    const parts = fullName.split(' ').filter(Boolean);
-    if (parts.length === 1) return parts[0];
-    return `${parts[0]} ${parts[parts.length - 1]}`;
+    return fullName || fallback || 'Student';
   };
 
   const displayName = getFirstAndLastName(userData?.arabicFullName, user?.displayName);
 
+  const isHomePage = pathname === '/' || pathname === '/ar' || pathname === '/en' || pathname === '';
+  const navbarBg = (isScrolled || !isHomePage)
+    ? 'bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-sm' 
+    : 'bg-transparent';
+
   return (
-    <header className={`fixed top-0 w-full z-50 transition-all duration-300 ${isScrolled ? 'bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-sm' : 'bg-transparent'}`}>
+    <header className={`fixed top-0 w-full z-50 transition-all duration-300 ${navbarBg}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           
@@ -153,7 +155,8 @@ export default function Navbar() {
                 className="inline-flex items-center gap-1.5 sm:gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold shadow-sm shadow-blue-500/20 hover:shadow-md transition-all transform hover:-translate-y-0.5"
               >
                 <LogIn className="h-4 w-4" />
-                <span>{t('login')}</span>
+                <span className="hidden sm:inline">{t('login')}</span>
+                <span className="sm:hidden">تسجيل</span>
               </button>
             )}
           </div>
