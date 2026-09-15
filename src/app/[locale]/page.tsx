@@ -398,161 +398,70 @@ export default function HomePage() {
       </section>
 
       {/* Gamification Loop Section */}
-      <section className="py-6 sm:py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full relative z-20">
-        <div className="bg-gradient-to-br from-[#001f3f] to-slate-900 rounded-[2rem] p-6 sm:p-10 shadow-2xl overflow-hidden relative border border-white/5">
-          {/* Subtle glowing orbs */}
-          <div className="absolute -top-24 -right-24 w-64 h-64 bg-blue-500/20 rounded-full blur-[80px] pointer-events-none"></div>
-          <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-emerald-500/10 rounded-full blur-[80px] pointer-events-none"></div>
+      <section className="py-6 sm:py-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full relative z-20">
+        <div className="text-center mb-6">
+          <h2 className="text-xl sm:text-3xl font-black text-slate-900 mb-2 font-cairo">{t('Gamification.title')}</h2>
+          <p className="text-slate-500 font-medium text-xs sm:text-sm max-w-lg mx-auto">
+            {isAr ? 'شارك بفعالية في النادي، اجمع النقاط، وتصدر قائمة الشرف لتحصل على التكريم والشهادات.' : 'Participate in club events, earn points, top the leaderboard, and get recognized.'}
+          </p>
+        </div>
+        
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6">
+          {/* Step 1 */}
+          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 flex flex-col items-center text-center hover:shadow-md transition-shadow">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-50 text-blue-600 rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-3xl mb-3">🎯</div>
+            <h3 className="text-slate-900 font-bold text-[11px] sm:text-sm leading-tight">{t('Gamification.step1')}</h3>
+          </div>
           
-          <div className="relative z-10 flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
-            
-            <div className="text-center lg:text-start flex-shrink-0 lg:max-w-xs">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/10 text-blue-200 text-xs font-bold mb-4">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>كيف يعمل النظام؟</span>
-              </div>
-              <h2 className="text-2xl sm:text-3xl font-black text-white mb-3 font-cairo">{t('Gamification.title')}</h2>
-              <p className="text-slate-400 text-sm leading-relaxed hidden sm:block">
-                شارك بفعالية في النادي، اجمع النقاط، وتصدر قائمة الشرف لتحصل على التكريم والشهادات المعتمدة.
-              </p>
-            </div>
-            
-            <div className="flex-1 w-full">
-              <div className="flex overflow-x-auto pb-6 sm:pb-0 -mx-6 px-6 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 snap-x hide-scrollbar">
-                
-                {/* Step 1 */}
-                <div className="min-w-[140px] flex-1 snap-center group relative">
-                  <div className="hidden lg:block absolute top-6 rtl:-left-4 ltr:-right-4 w-8 h-[1px] bg-gradient-to-r rtl:from-blue-500/50 ltr:from-blue-500/50 to-transparent"></div>
-                  <div className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-4 transition-all h-full flex flex-col items-center sm:items-start text-center sm:text-start">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-blue-600/20 text-blue-300 rounded-xl flex items-center justify-center text-xl mb-3 shadow-inner ring-1 ring-blue-400/20 group-hover:scale-110 transition-transform">
-                      🎯
-                    </div>
-                    <h3 className="text-white font-bold text-sm leading-snug">{t('Gamification.step1')}</h3>
-                  </div>
-                </div>
-                
-                {/* Step 2 */}
-                <div className="min-w-[140px] flex-1 snap-center group relative">
-                  <div className="hidden lg:block absolute top-6 rtl:-left-4 ltr:-right-4 w-8 h-[1px] bg-gradient-to-r rtl:from-amber-500/50 ltr:from-amber-500/50 to-transparent"></div>
-                  <div className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-4 transition-all h-full flex flex-col items-center sm:items-start text-center sm:text-start">
-                    <div className="w-12 h-12 bg-gradient-to-br from-amber-500/20 to-amber-600/20 text-amber-300 rounded-xl flex items-center justify-center text-xl mb-3 shadow-inner ring-1 ring-amber-400/20 group-hover:scale-110 transition-transform">
-                      ⭐
-                    </div>
-                    <h3 className="text-white font-bold text-sm leading-snug">{t('Gamification.step2')}</h3>
-                  </div>
-                </div>
-                
-                {/* Step 3 */}
-                <div className="min-w-[140px] flex-1 snap-center group relative">
-                  <div className="hidden lg:block absolute top-6 rtl:-left-4 ltr:-right-4 w-8 h-[1px] bg-gradient-to-r rtl:from-purple-500/50 ltr:from-purple-500/50 to-transparent"></div>
-                  <div className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-4 transition-all h-full flex flex-col items-center sm:items-start text-center sm:text-start">
-                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500/20 to-purple-600/20 text-purple-300 rounded-xl flex items-center justify-center text-xl mb-3 shadow-inner ring-1 ring-purple-400/20 group-hover:scale-110 transition-transform">
-                      🏆
-                    </div>
-                    <h3 className="text-white font-bold text-sm leading-snug">{t('Gamification.step3')}</h3>
-                  </div>
-                </div>
+          {/* Step 2 */}
+          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 flex flex-col items-center text-center hover:shadow-md transition-shadow">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-amber-50 text-amber-600 rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-3xl mb-3">⭐</div>
+            <h3 className="text-slate-900 font-bold text-[11px] sm:text-sm leading-tight">{t('Gamification.step2')}</h3>
+          </div>
+          
+          {/* Step 3 */}
+          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 flex flex-col items-center text-center hover:shadow-md transition-shadow">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-purple-50 text-purple-600 rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-3xl mb-3">🏆</div>
+            <h3 className="text-slate-900 font-bold text-[11px] sm:text-sm leading-tight">{t('Gamification.step3')}</h3>
+          </div>
 
-                {/* Step 4 */}
-                <div className="min-w-[140px] flex-1 snap-center group">
-                  <div className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-4 transition-all h-full flex flex-col items-center sm:items-start text-center sm:text-start">
-                    <div className="w-12 h-12 bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 text-emerald-300 rounded-xl flex items-center justify-center text-xl mb-3 shadow-inner ring-1 ring-emerald-400/20 group-hover:scale-110 transition-transform">
-                      🎓
-                    </div>
-                    <h3 className="text-white font-bold text-sm leading-snug">{t('Gamification.step4')}</h3>
-                  </div>
-                </div>
-                
-              </div>
-            </div>
-            
+          {/* Step 4 */}
+          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 flex flex-col items-center text-center hover:shadow-md transition-shadow">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-emerald-50 text-emerald-600 rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-3xl mb-3">🎓</div>
+            <h3 className="text-slate-900 font-bold text-[11px] sm:text-sm leading-tight">{t('Gamification.step4')}</h3>
           </div>
         </div>
       </section>
 
       {/* Quick Links / Feature Highlights */}
-      <section className="py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full mb-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <section className="py-6 sm:py-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full mb-8 sm:mb-12">
+        <div className="grid grid-cols-3 gap-2 sm:gap-6">
           
-          {/* Card 1: Events (Dynamic) */}
-          <Link href={latestEvent ? `/events/${latestEvent.id}` : "/events"} className="bg-white rounded-3xl shadow-md shadow-slate-200/50 border border-slate-100 hover:shadow-lg transition-all flex flex-col overflow-hidden group">
-            {latestEvent ? (
-              <div className="relative h-48 w-full bg-slate-100 overflow-hidden">
-                {latestEvent.coverUrl ? (
-                  <img src={latestEvent.coverUrl} alt={isAr ? latestEvent.title : (latestEvent.titleEn || latestEvent.title)} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-[#00629B] to-blue-800 flex items-center justify-center group-hover:scale-105 transition-transform duration-500">
-                    <span className="text-white/30 font-black text-4xl uppercase tracking-widest">IEEE QU</span>
-                  </div>
-                )}
-                <div className="absolute top-4 rtl:right-4 ltr:left-4">
-                  <span className="bg-white/95 backdrop-blur-sm text-slate-900 text-xs font-black px-3 py-1.5 rounded-full shadow-sm">
-                    {latestEvent.state === 'Registration Open' ? (isAr ? 'التسجيل مفتوح' : 'Registration Open') : (isAr ? 'قريباً' : 'Coming Soon')}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="p-8 pb-4">
-                <div className="h-14 w-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-6">
-                  <Calendar className="h-7 w-7" />
-                </div>
-              </div>
-            )}
-            
-            <div className="p-8 pt-6 flex-1 flex flex-col justify-between">
-              <div>
-                <h3 className="text-2xl font-black mb-3 font-cairo text-slate-900">{latestEvent ? (isAr ? latestEvent.title : (latestEvent.titleEn || latestEvent.title)) : t('upcomingEvents')}</h3>
-                <p className="text-slate-500 text-sm leading-relaxed mb-6 font-medium">
-                  {t('upcomingEventsDesc')}
-                </p>
-              </div>
-              <div className="flex items-center">
-                <div className="inline-flex items-center gap-2 bg-slate-50 text-blue-700 px-5 py-2.5 rounded-full font-bold text-sm transition-colors group-hover:bg-slate-100">
-                  <span>{t('viewAll')}</span>
-                  <ArrowRight className="h-4 w-4 rtl:-scale-x-100 transition-transform group-hover:translate-x-1 rtl:group-hover:-translate-x-1" />
-                </div>
-              </div>
+          {/* Card 1: Events */}
+          <Link href={latestEvent ? `/events/${latestEvent.id}` : "/events"} className="bg-white rounded-2xl p-3 sm:p-8 shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center hover:-translate-y-1 transition-transform group">
+            <div className="w-10 h-10 sm:w-16 sm:h-16 bg-blue-50 text-blue-600 rounded-xl sm:rounded-2xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-blue-100 transition-colors">
+              <Calendar className="w-5 h-5 sm:w-8 sm:h-8" />
             </div>
+            <h3 className="text-slate-900 font-black text-[10px] sm:text-xl leading-tight">{latestEvent ? (isAr ? 'الفعالية القادمة' : 'Next Event') : t('upcomingEvents')}</h3>
+            <p className="hidden sm:block text-slate-500 text-sm mt-2">{t('upcomingEventsDesc')}</p>
           </Link>
           
           {/* Card 2: Leaderboard */}
-          <Link href="/leaderboard" className="bg-white rounded-3xl shadow-md shadow-slate-200/50 border border-slate-100 hover:shadow-lg transition-all flex flex-col justify-between p-8 relative overflow-hidden group">
-            <div className="absolute -right-8 -top-8 h-40 w-40 bg-amber-50 rounded-full blur-3xl group-hover:bg-amber-100 transition-colors pointer-events-none"></div>
-            <div className="relative z-10">
-              <div className="h-14 w-14 bg-gradient-to-br from-yellow-100 to-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mb-6 shadow-inner ring-1 ring-amber-200/50">
-                <Trophy className="h-7 w-7" />
-              </div>
-              <h3 className="text-2xl font-black mb-3 font-cairo text-slate-900">{t('leaderboard')}</h3>
-              <p className="text-slate-500 text-sm leading-relaxed mb-8 font-medium">
-                {t('leaderboardDesc')}
-              </p>
+          <Link href="/leaderboard" className="bg-white rounded-2xl p-3 sm:p-8 shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center hover:-translate-y-1 transition-transform group">
+            <div className="w-10 h-10 sm:w-16 sm:h-16 bg-amber-50 text-amber-600 rounded-xl sm:rounded-2xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-amber-100 transition-colors">
+              <Trophy className="w-5 h-5 sm:w-8 sm:h-8" />
             </div>
-            <div className="relative z-10 flex items-center">
-              <div className="inline-flex items-center gap-2 bg-amber-50 text-amber-700 px-5 py-2.5 rounded-full font-bold text-sm transition-colors group-hover:bg-amber-100">
-                <span>{t('discoverLeaders')}</span>
-                <ArrowRight className="h-4 w-4 rtl:-scale-x-100 transition-transform group-hover:translate-x-1 rtl:group-hover:-translate-x-1" />
-              </div>
-            </div>
+            <h3 className="text-slate-900 font-black text-[10px] sm:text-xl leading-tight">{t('leaderboard')}</h3>
+            <p className="hidden sm:block text-slate-500 text-sm mt-2">{t('leaderboardDesc')}</p>
           </Link>
 
           {/* Card 3: Activity & Certificates */}
-          <Link href="/my-activity" className="bg-white rounded-3xl shadow-md shadow-slate-200/50 border border-slate-100 hover:shadow-lg transition-all flex flex-col justify-between p-8 relative overflow-hidden group">
-            <div className="absolute -left-8 -bottom-8 h-40 w-40 bg-emerald-50 rounded-full blur-3xl group-hover:bg-emerald-100 transition-colors pointer-events-none"></div>
-            <div className="relative z-10">
-              <div className="h-14 w-14 bg-gradient-to-br from-emerald-100 to-green-100 text-emerald-600 rounded-2xl flex items-center justify-center mb-6 shadow-inner ring-1 ring-emerald-200/50">
-                <UserCircle className="h-7 w-7" />
-              </div>
-              <h3 className="text-2xl font-black mb-3 font-cairo text-slate-900">{t('activityAndCerts')}</h3>
-              <p className="text-slate-500 text-sm leading-relaxed mb-8 font-medium">
-                {t('activityAndCertsDesc')}
-              </p>
+          <Link href="/my-activity" className="bg-white rounded-2xl p-3 sm:p-8 shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center hover:-translate-y-1 transition-transform group">
+            <div className="w-10 h-10 sm:w-16 sm:h-16 bg-emerald-50 text-emerald-600 rounded-xl sm:rounded-2xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-emerald-100 transition-colors">
+              <UserCircle className="w-5 h-5 sm:w-8 sm:h-8" />
             </div>
-            <div className="relative z-10 flex items-center">
-              <div className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-700 px-5 py-2.5 rounded-full font-bold text-sm transition-colors group-hover:bg-emerald-100">
-                <span>{t('goToActivity')}</span>
-                <ArrowRight className="h-4 w-4 rtl:-scale-x-100 transition-transform group-hover:translate-x-1 rtl:group-hover:-translate-x-1" />
-              </div>
-            </div>
+            <h3 className="text-slate-900 font-black text-[10px] sm:text-xl leading-tight">{t('activityAndCerts')}</h3>
+            <p className="hidden sm:block text-slate-500 text-sm mt-2">{t('activityAndCertsDesc')}</p>
           </Link>
 
         </div>
