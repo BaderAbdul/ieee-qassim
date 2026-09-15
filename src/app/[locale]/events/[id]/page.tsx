@@ -133,7 +133,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
         }
 
         const eventData = eventSnap.data() as PlatformEvent;
-        if (eventData.state !== 'Registration Open' && eventData.state !== 'Published') {
+        if (eventData.state !== 'Registration Open') {
           throw new Error(isAr ? 'التسجيل مغلق لهذه الفعالية' : 'Registration is not open for this event.');
         }
 
@@ -214,8 +214,10 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
       
       setRegistrationStatus('cancelled');
       setAttendeeCount(prev => Math.max(0, prev - 1));
+      alert(isAr ? 'تم إلغاء التسجيل بنجاح.' : 'Registration cancelled successfully.');
     } catch (error: unknown) {
       console.error("Error cancelling registration", error);
+      alert(isAr ? 'حدث خطأ أثناء إلغاء التسجيل.' : 'Error cancelling registration.');
     } finally {
       setIsRegistering(false);
     }
@@ -249,7 +251,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
   }
 
   const isFull = attendeeCount >= event.capacity;
-  const isRegistrationOpen = event.state === 'Registration Open' || event.state === 'Published';
+  const isRegistrationOpen = event.state === 'Registration Open';
   const eventDate = event.date;
   
   const title = isAr ? event.title : event.titleEn || event.title;
@@ -466,6 +468,8 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                             <LoadingSpinner size="sm" color="border-white" className="me-2" />
                             <span>{t('registering')}</span>
                           </>
+                        ) : event.state === 'Published' ? (
+                          isAr ? 'التسجيل قريباً' : 'Registration Soon'
                         ) : !isRegistrationOpen ? (
                           t('registrationClosed')
                         ) : isFull ? (
@@ -504,7 +508,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                           <span>{t('checkInCTA')}</span>
                         </Link>
                         
-                        {(event.state === 'Registration Open' || event.state === 'Published') && (
+                        {event.state === 'Registration Open' && (
                           <button 
                             onClick={handleCancelRegistration}
                             disabled={isRegistering}

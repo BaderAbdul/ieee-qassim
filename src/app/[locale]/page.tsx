@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
-import { Link } from '@/i18n/routing';
+import { Link, useRouter } from '@/i18n/routing';
 import { useAuth } from '@/context/AuthContext';
 import { Calendar, Trophy, ArrowRight, UserCircle, Users, LayoutList } from 'lucide-react';
 import { collection, query, getDocs, where, limit, doc, getDoc, orderBy } from 'firebase/firestore';
@@ -13,11 +13,25 @@ export default function HomePage() {
   const t = useTranslations('Index');
   const locale = useLocale();
   const isAr = locale === 'ar';
+  const router = useRouter();
   const { user, userData, login } = useAuth();
   
   const [stats, setStats] = useState({ membersCount: '+500', eventsCount: '+25', tracksCount: '4', featuredEventId: '', showStructure: true, heroTitle: '', heroSubtitleAr: '', heroSubtitleEn: '', committees: [] as any[] });
   const [latestEvent, setLatestEvent] = useState<PlatformEvent | null>(null);
   const [latestCert, setLatestCert] = useState<{title: string, date: string} | null>(null);
+  const [activeCard, setActiveCard] = useState<number | null>(null);
+
+  const handleCardClick = (cardId: number, path: string) => {
+    if (activeCard === cardId || window.innerWidth >= 1024) {
+      if (path.startsWith('http')) {
+        window.location.href = path;
+      } else {
+        router.push(path);
+      }
+    } else {
+      setActiveCard(cardId);
+    }
+  };
 
   useEffect(() => {
     const fetchHomepageData = async () => {
@@ -113,10 +127,9 @@ export default function HomePage() {
               </p>
             </div>
             
-            <div className="flex flex-row flex-wrap items-center gap-3 justify-center lg:justify-start pt-2">
-              <Link 
-                href="/events" 
-                className="group inline-flex items-center justify-center bg-[#00629B] text-white px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold hover:bg-[#004b78] transition-all shadow-md shadow-blue-900/20 hover:shadow-lg hover:shadow-blue-900/30 hover:-translate-y-0.5 text-sm sm:text-base"
+            <div className="flex flex-r              <Link 
+                href="/events"
+                className="group inline-flex items-center justify-center bg-[#00629B]/90 backdrop-blur-md border border-white/10 text-white px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold hover:bg-[#004b78] transition-all shadow-md shadow-blue-900/20 hover:shadow-lg hover:shadow-blue-900/30 hover:-translate-y-0.5 text-sm sm:text-base"
               >
                 <span>{t('Hero.exploreEvents')}</span>
                 <ArrowRight className="ms-2 h-4 w-4 sm:h-5 sm:w-5 rtl:-scale-x-100 transition-transform group-hover:translate-x-1 rtl:group-hover:-translate-x-1" />
@@ -125,32 +138,38 @@ export default function HomePage() {
               {!user ? (
                 <button 
                   onClick={login} 
-                  className="inline-flex items-center justify-center bg-white hover:bg-slate-50 border-2 border-slate-200 text-slate-700 px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold transition-all shadow-sm hover:border-slate-300 text-sm sm:text-base"
+                  className="inline-flex items-center justify-center bg-white/70 backdrop-blur-md border border-slate-200/50 text-slate-700 px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold transition-all shadow-sm hover:bg-white hover:border-slate-300 hover:-translate-y-0.5 text-sm sm:text-base"
                 >
                   {t('Hero.login')}
                 </button>
               ) : (
                 <Link 
                   href="/profile" 
-                  className="inline-flex items-center justify-center bg-white hover:bg-slate-50 border-2 border-slate-200 text-slate-700 px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold transition-all shadow-sm hover:border-slate-300 text-sm sm:text-base"
+                  className="inline-flex items-center justify-center bg-white/70 backdrop-blur-md border border-slate-200/50 text-slate-700 px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold transition-all shadow-sm hover:bg-white hover:border-slate-300 hover:-translate-y-0.5 text-sm sm:text-base"
                 >
                   {t('Hero.joinCommunity')}
+                </Link>
+              )}
+            </div>ommunity')}
                 </Link>
               )}
             </div>
           </div>
           
           {/* Right Column: Visual Ecosystem (Overlapping Cards) */}
-          <div className="relative block w-full h-[450px] lg:h-full lg:min-h-[500px] mt-8 lg:mt-0 flex items-center justify-center lg:block">
+          <div className="relative block w-full h-[320px] lg:h-full lg:min-h-[500px] mt-4 lg:mt-0 flex items-center justify-center lg:block">
             
             <div className="relative w-full max-w-sm lg:max-w-none h-full">
               {/* Card 1: Featured Event (Top Right) */}
-              <div className="absolute top-0 rtl:left-0 lg:rtl:left-0 lg:ltr:right-0 ltr:-right-4 w-72 lg:w-80 bg-white rounded-3xl p-4 lg:p-5 shadow-2xl shadow-blue-900/10 border border-slate-100 z-30 transform hover:-translate-y-2 hover:z-50 transition-all duration-300 group cursor-pointer" onClick={() => { if(latestEvent) window.location.href = `/events/${latestEvent.id}` }}>
+              <div 
+                className={`absolute top-0 lg:top-4 rtl:left-2 lg:rtl:left-0 lg:ltr:right-0 ltr:-right-2 w-72 lg:w-80 bg-white/95 backdrop-blur-xl rounded-3xl p-4 lg:p-5 shadow-2xl shadow-blue-900/10 border border-slate-100 transform hover:-translate-y-2 lg:hover:z-50 transition-all duration-300 group cursor-pointer ${activeCard === 1 ? 'z-50 scale-105' : 'z-30'}`}
+                onClick={() => { if(latestEvent) handleCardClick(1, `/events/${latestEvent.id}`) }}
+              >
                 <div className="flex items-center justify-between mb-4">
                   <div className="bg-blue-50 text-blue-700 text-[10px] font-black tracking-wider uppercase px-3 py-1.5 rounded-full">{latestEvent?.state === 'Ongoing' ? (isAr ? 'جاري الآن' : 'Ongoing') : (latestEvent?.state === 'Registration Open' ? (isAr ? 'التسجيل مفتوح' : 'Open') : (isAr ? 'قريباً' : 'Soon'))}</div>
                   <div className="bg-slate-50 text-slate-500 text-[10px] font-bold px-2 py-1 rounded-md">{latestEvent ? (latestEvent.date as any)?.toDate?.()?.toLocaleDateString(isAr ? 'ar-SA' : 'en-US') || new Date(latestEvent.date as any).toLocaleDateString(isAr ? 'ar-SA' : 'en-US') : '---'}</div>
                 </div>
-                <div className="w-full h-28 lg:h-32 bg-gradient-to-br from-[#00629B] to-indigo-700 rounded-2xl mb-4 relative overflow-hidden">
+                <div className="w-full h-24 lg:h-32 bg-gradient-to-br from-[#00629B] to-indigo-700 rounded-2xl mb-4 relative overflow-hidden">
                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
                    <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors duration-300"></div>
                    <div className="absolute bottom-3 right-3 left-3">
@@ -169,49 +188,55 @@ export default function HomePage() {
               </div>
 
               {/* Card 2: Points / Leaderboard (Middle Left, Overlapping) */}
-              <div className="absolute top-28 lg:top-32 rtl:-right-2 lg:rtl:-right-8 ltr:-left-2 lg:ltr:-left-8 w-60 lg:w-64 bg-white/95 backdrop-blur-xl rounded-3xl p-4 lg:p-5 shadow-xl shadow-slate-200/50 border border-slate-100/50 z-20 transform -rotate-2 hover:rotate-0 hover:-translate-y-1 hover:z-50 transition-all duration-300 cursor-pointer" onClick={() => window.location.href='/leaderboard'}>
-                <div className="flex items-start gap-4">
-                  <div className="bg-gradient-to-br from-yellow-100 to-amber-100 p-3 lg:p-3.5 rounded-2xl text-amber-600 shadow-sm">
+              <div 
+                className={`absolute top-20 lg:top-32 rtl:-right-2 lg:rtl:-right-8 ltr:-left-2 lg:ltr:-left-8 w-56 lg:w-64 bg-white/95 backdrop-blur-xl rounded-3xl p-4 lg:p-5 shadow-xl shadow-slate-200/50 border border-slate-100/50 transform -rotate-2 hover:rotate-0 hover:-translate-y-1 lg:hover:z-50 transition-all duration-300 cursor-pointer ${activeCard === 2 ? 'z-50 scale-105 rotate-0' : 'z-20'}`}
+                onClick={() => handleCardClick(2, '/leaderboard')}
+              >
+                <div className="flex items-start gap-3 lg:gap-4">
+                  <div className="bg-gradient-to-br from-yellow-100 to-amber-100 p-2.5 lg:p-3.5 rounded-2xl text-amber-600 shadow-sm">
                     <Trophy className="h-5 w-5 lg:h-6 lg:w-6" />
                   </div>
                   <div className="flex-1">
-                    <div className="text-[10px] lg:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{isAr ? 'نقاطك' : 'Your Points'}</div>
-                    <div className="text-xl lg:text-2xl font-black text-slate-800 font-cairo flex items-baseline gap-1">
+                    <div className="text-[9px] lg:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{isAr ? 'نقاطك' : 'Your Points'}</div>
+                    <div className="text-lg lg:text-2xl font-black text-slate-800 font-cairo flex items-baseline gap-1">
                       {user && userData ? userData.totalPoints : 0} <span className="text-[10px] font-bold text-emerald-500">Pts</span>
                     </div>
-                    <div className="mt-2 lg:mt-3 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div className="mt-2 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                       <div className="h-full bg-gradient-to-r from-yellow-400 to-amber-500 w-[75%] rounded-full relative">
                         <div className="absolute top-0 right-0 bottom-0 w-full bg-white/20 animate-pulse"></div>
                       </div>
                     </div>
-                    <div className="text-[9px] lg:text-[10px] font-bold text-slate-400 mt-1.5 text-end">{user ? (isAr ? 'استمر بجمع النقاط!' : 'Keep earning points!') : (isAr ? 'سجل دخولك الآن' : 'Login to earn points')}</div>
+                    <div className="text-[8px] lg:text-[9px] font-bold text-slate-400 mt-1.5 text-end">{user ? (isAr ? 'استمر بجمع النقاط!' : 'Keep earning points!') : (isAr ? 'سجل دخولك الآن' : 'Login to earn points')}</div>
                   </div>
                 </div>
               </div>
 
               {/* Card 3: Activity/Certificate (Bottom Right, Overlapping) */}
-              <div className="absolute bottom-6 lg:bottom-10 rtl:left-4 lg:rtl:left-12 ltr:right-4 lg:ltr:right-12 w-64 lg:w-72 bg-[#002855] rounded-3xl p-4 lg:p-5 shadow-2xl shadow-blue-900/30 border border-blue-800 z-40 transform rotate-2 hover:rotate-0 hover:-translate-y-1 hover:z-50 transition-all duration-300 cursor-pointer" onClick={() => window.location.href='/profile'}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
+              <div 
+                className={`absolute top-40 lg:top-auto lg:bottom-10 rtl:left-6 lg:rtl:left-12 ltr:right-6 lg:ltr:right-12 w-60 lg:w-72 bg-[#002855]/95 backdrop-blur-xl rounded-3xl p-4 lg:p-5 shadow-2xl shadow-blue-900/30 border border-blue-800/50 transform rotate-2 hover:rotate-0 hover:-translate-y-1 lg:hover:z-50 transition-all duration-300 cursor-pointer ${activeCard === 3 ? 'z-50 scale-105 rotate-0' : 'z-40'}`}
+                onClick={() => handleCardClick(3, '/profile')}
+              >
+                <div className="flex items-center justify-between mb-3 lg:mb-4">
+                  <div className="flex items-center gap-2 lg:gap-3">
                     <div className="bg-blue-500/20 p-2 lg:p-2.5 rounded-2xl text-blue-300 ring-1 ring-white/10">
                       <UserCircle className="h-4 w-4 lg:h-5 lg:w-5" />
                     </div>
                     <div>
                       <div className="text-xs lg:text-sm font-bold text-white tracking-wide">{isAr ? 'نشاطك' : 'Activity'}</div>
-                      <div className="text-[9px] lg:text-[10px] text-blue-300 font-medium">{latestCert ? (isAr ? 'شهادة معتمدة صدرت' : 'Certificate Issued') : (user ? (isAr ? 'لا يوجد نشاط حديث' : 'No recent activity') : (isAr ? 'مجتمع تقني تفاعلي' : 'Interactive Community'))}</div>
+                      <div className="text-[8px] lg:text-[9px] text-blue-300 font-medium">{latestCert ? (isAr ? 'شهادة معتمدة صدرت' : 'Certificate Issued') : (user ? (isAr ? 'لا يوجد نشاط حديث' : 'No recent activity') : (isAr ? 'مجتمع تقني تفاعلي' : 'Interactive Community'))}</div>
                     </div>
                   </div>
                   <div className="h-2 w-2 rounded-full bg-emerald-400 animate-ping shadow-[0_0_12px_rgba(52,211,153,0.8)]"></div>
                 </div>
-                <div className="bg-white/5 rounded-xl p-3 border border-white/10 flex items-center gap-3">
+                <div className="bg-white/5 rounded-xl p-2.5 lg:p-3 border border-white/10 flex items-center gap-2.5 lg:gap-3">
                   <div className="h-8 w-8 lg:h-10 lg:w-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-lg flex items-center justify-center shadow-inner flex-shrink-0">
                     <svg className="w-4 h-4 lg:w-5 lg:h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
                   <div className="truncate">
-                    <div className="text-[10px] lg:text-xs font-bold text-white truncate">{latestCert ? latestCert.title : (user ? (isAr ? 'حضور الفعاليات يمنحك شهادات' : 'Attend events to earn certificates') : (isAr ? 'اكتشف فعالياتنا وانضم إلينا' : 'Discover and join our events'))}</div>
-                    <div className="text-[9px] lg:text-[10px] text-emerald-400 font-medium mt-0.5 truncate">{latestCert ? latestCert.date : ''}</div>
+                    <div className="text-[9px] lg:text-[10px] font-bold text-white truncate">{latestCert ? latestCert.title : (user ? (isAr ? 'حضور الفعاليات يمنحك شهادات' : 'Attend events to earn certificates') : (isAr ? 'اكتشف فعالياتنا وانضم إلينا' : 'Discover and join our events'))}</div>
+                    <div className="text-[8px] lg:text-[9px] text-emerald-400 font-medium mt-0.5 truncate">{latestCert ? latestCert.date : ''}</div>
                   </div>
                 </div>
               </div>

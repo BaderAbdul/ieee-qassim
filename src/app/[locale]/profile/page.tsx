@@ -290,7 +290,10 @@ export default function EngineeringProfilePage() {
     setIsSaving(true);
     try {
       await updateDoc(doc(db, 'users', user.uid), {
-        arabicFullName: fullName
+        arabicFullName: fullName,
+        firstName: editingName.first.trim(),
+        fatherName: editingName.middle.trim(),
+        familyName: editingName.last.trim()
       });
       setShowEditModal(false);
       alert(isAr ? 'تم حفظ الاسم بنجاح' : 'Name saved successfully');
@@ -443,9 +446,9 @@ export default function EngineeringProfilePage() {
                   onClick={() => { 
                     const parts = (userData?.arabicFullName || '').split(' ').filter(Boolean);
                     setEditingName({
-                      first: parts[0] || '',
-                      middle: parts.length > 2 ? parts.slice(1, -1).join(' ') : (parts.length === 2 ? parts[1] : ''),
-                      last: parts.length > 2 ? parts[parts.length - 1] : ''
+                      first: userData?.firstName || parts[0] || '',
+                      middle: userData?.fatherName || (parts.length > 2 ? parts.slice(1, -1).join(' ') : (parts.length === 2 ? parts[1] : '')),
+                      last: userData?.familyName || (parts.length > 2 ? parts[parts.length - 1] : '')
                     }); 
                     setShowEditModal(true); 
                   }}

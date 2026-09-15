@@ -7,11 +7,13 @@ import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
 import { ArrowRight, Users } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { useLocale } from 'next-intl';
 
 const TOKEN_ROTATION_MS = 20000; // Rotate token every 20 seconds
 
 export default function AdminQRDisplayPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: eventId } = use(params);
+  const locale = useLocale();
   
   const [event, setEvent] = useState<PlatformEvent | null>(null);
   const [loading, setLoading] = useState(true);
@@ -192,7 +194,7 @@ export default function AdminQRDisplayPage({ params }: { params: Promise<{ id: s
   }
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-  const checkInUrl = `${baseUrl}/check-in/${eventId}?token=${currentToken || ''}`;
+  const checkInUrl = `${baseUrl}/${locale}/check-in/${eventId}?token=${currentToken || ''}`;
 
   return (
     <div className="min-h-[80vh] flex flex-col items-center justify-center p-4">
