@@ -31,6 +31,7 @@
   "Navbar": {
     "brand": "TechComm",
     "home": "Home",
+    "structure": "Structure",
     "events": "Events",
     "leaderboard": "Leaderboard",
     "myActivity": "My Activity",
@@ -48,6 +49,7 @@
     "quickLinks": "Quick Links",
     "copyright": "University Technology Community Platform © {year} - All Rights Reserved",
     "home": "Home",
+    "structure": "Structure",
     "events": "Events",
     "leaderboard": "Leaderboard",
     "profile": "Engineering Profile"

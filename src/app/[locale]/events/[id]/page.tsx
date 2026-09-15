@@ -488,12 +488,14 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                               : 'bg-blue-50 text-blue-900 border-blue-200'
                         }`}>
                           <span className="font-bold text-base mb-1">
-                            {registrationStatus === 'approved' ? t('registeredSuccess') :
+                            {registrationStatus === 'approved' 
+                              ? ((event.state === 'Completed' || event.state === 'Archived') ? (isAr ? 'انتهت الفعالية' : 'Event Ended') : t('registeredSuccess')) :
                              registrationStatus === 'waitlisted' ? t('waitlistedTitle') :
                              t('pendingTitle')}
                           </span>
                           <span className="text-xs opacity-80">
-                            {registrationStatus === 'approved' ? t('registeredNotice') :
+                            {registrationStatus === 'approved' 
+                              ? ((event.state === 'Completed' || event.state === 'Archived') ? (isAr ? 'شكراً لاهتمامك بهذه الفعالية' : 'Thank you for your interest in this event') : t('registeredNotice')) :
                              registrationStatus === 'waitlisted' ? t('waitlistedNotice') :
                              t('pendingNotice')}
                           </span>

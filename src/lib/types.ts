@@ -49,7 +49,8 @@ export interface Certificate {
   eventId: string;
   userId: string;
   status: CertificateState;
-  storagePath: string; // e.g. certificates/{eventId}/{id}.pdf
+  storagePath?: string; // e.g. certificates/{eventId}/{id}.pdf
+  externalUrl?: string; // e.g. Google Drive link
   studentName: string;
   eventTitle: string;
   eventType: EventType;

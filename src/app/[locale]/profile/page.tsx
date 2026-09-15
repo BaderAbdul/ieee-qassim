@@ -263,7 +263,11 @@ export default function EngineeringProfilePage() {
     };
   }, [user, authLoading, isAr, reloadKey]);
 
-  const handleDownloadCertificate = async (certificateId: string) => {
+  const handleDownloadCertificate = async (certificateId: string, externalUrl?: string) => {
+    if (externalUrl) {
+      window.open(externalUrl, '_blank');
+      return;
+    }
     setDownloadingCert(certificateId);
     try {
       const getCertUrl = httpsCallable(functions, 'getCertificateDownloadUrl');
@@ -773,7 +777,7 @@ export default function EngineeringProfilePage() {
                                 <span>{isAr ? 'شهادة الحضور معتمدة' : 'Verified Certificate Available'}</span>
                               </span>
                               <button
-                                onClick={() => handleDownloadCertificate(reg.certificate!.id)}
+                                onClick={() => handleDownloadCertificate(reg.certificate!.id, reg.certificate!.externalUrl)}
                                 disabled={downloadingCert === reg.certificate!.id}
                                 className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800"
                               >
@@ -865,10 +869,10 @@ export default function EngineeringProfilePage() {
                             </div>
                           </div>
 
-                          <button 
-                            onClick={() => handleDownloadCertificate(cert.id)}
+                          <button
+                            onClick={() => handleDownloadCertificate(cert.id, cert.externalUrl)}
                             disabled={downloadingCert === cert.id}
-                            className="w-full flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-4 rounded-xl text-xs font-bold transition-colors disabled:opacity-50"
+                            className="bg-emerald-500 hover:bg-emerald-600 text-white p-2.5 sm:p-3 rounded-xl sm:rounded-2xl shadow-md transition-colors disabled:opacity-70 disabled:cursor-not-allowed group"
                           >
                             {downloadingCert === cert.id ? (
                               <>

@@ -14,7 +14,8 @@ import {
   ShieldCheck, 
   LogOut, 
   LogIn, 
-  Sparkles
+  Sparkles,
+  Users
 } from 'lucide-react';
 
 export default function Navbar() {
@@ -50,6 +51,7 @@ export default function Navbar() {
     { href: '/', label: t('home'), icon: Sparkles },
     { href: '/events', label: t('events'), icon: Calendar },
     { href: '/leaderboard', label: t('leaderboard'), icon: Trophy },
+    { href: '/structure', label: t('structure'), icon: Users },
     ...(user ? [
       { href: '/profile', label: t('profile'), icon: UserCircle },
     ] : []),

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase/client';
@@ -9,6 +9,8 @@ import { doc, updateDoc, collection, query, where, getDocs } from 'firebase/fire
 
 export default function CompleteProfilePage() {
   const t = useTranslations('Onboarding');
+  const locale = useLocale();
+  const isAr = locale === 'ar';
   const router = useRouter();
   const { user, userData } = useAuth();
   
@@ -16,7 +18,9 @@ export default function CompleteProfilePage() {
   
   // Form State
   const [universityId, setUniversityId] = useState('');
-  const [arabicFullName, setArabicFullName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [fatherName, setFatherName] = useState('');
+  const [familyName, setFamilyName] = useState('');
   const [college, setCollege] = useState('');
   const [major, setMajor] = useState('');
   const [academicLevel, setAcademicLevel] = useState('');
@@ -34,11 +38,16 @@ export default function CompleteProfilePage() {
   const validateForm = async () => {
     const newErrors: { [key: string]: string } = {};
 
-    // Validate Arabic Full Name (Must have at least 3 parts, arabic characters preferred but we just check length of parts here for simplicity, plus basic arabic regex)
-    const nameParts = arabicFullName.trim().split(/\s+/);
+    // Validate Name parts (Arabic letters and spaces only)
     const arabicRegex = /^[\u0600-\u06FF\s]+$/;
-    if (nameParts.length < 3 || !arabicRegex.test(arabicFullName)) {
-      newErrors.arabicFullName = t('errors.fullNameFormat');
+    if (!firstName.trim() || !arabicRegex.test(firstName)) {
+      newErrors.firstName = isAr ? 'يجب إدخال الاسم الأول بالعربية' : 'First name required in Arabic';
+    }
+    if (!fatherName.trim() || !arabicRegex.test(fatherName)) {
+      newErrors.fatherName = isAr ? 'يجب إدخال اسم الأب بالعربية' : 'Father name required in Arabic';
+    }
+    if (!familyName.trim() || !arabicRegex.test(familyName)) {
+      newErrors.familyName = isAr ? 'يجب إدخال اسم العائلة بالعربية' : 'Family name required in Arabic';
     }
 
     if (isStudent) {
@@ -84,7 +93,10 @@ export default function CompleteProfilePage() {
     try {
       const userRef = doc(db, 'users', user.uid);
       const updateData: Record<string, string | boolean | null> = {
-        arabicFullName: arabicFullName.trim(),
+        firstName: firstName.trim(),
+        fatherName: fatherName.trim(),
+        familyName: familyName.trim(),
+        arabicFullName: `${firstName.trim()} ${fatherName.trim()} ${familyName.trim()}`,
         isQassimStudent: isStudent,
         profileCompleted: true,
         profileCompletedAt: new Date().toISOString(),
@@ -180,16 +192,40 @@ export default function CompleteProfilePage() {
               )}
 
               {/* Arabic Full Name - Required for both */}
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">{t('fullName')}</label>
-                <input
-                  type="text"
-                  value={arabicFullName}
-                  onChange={(e) => setArabicFullName(e.target.value)}
-                  placeholder={t('fullNamePlaceholder')}
-                  className={`w-full p-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all ${errors.arabicFullName ? 'border-red-400 focus:ring-red-500' : 'border-slate-200'}`}
-                />
-                {errors.arabicFullName && <p className="text-red-500 text-xs mt-1 font-medium">{errors.arabicFullName}</p>}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">{isAr ? 'الاسم الأول' : 'First Name'}</label>
+                  <input
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    placeholder={isAr ? 'الاسم الأول' : 'First'}
+                    className={`w-full p-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all ${errors.firstName ? 'border-red-400 focus:ring-red-500' : 'border-slate-200'}`}
+                  />
+                  {errors.firstName && <p className="text-red-500 text-xs mt-1 font-medium">{errors.firstName}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">{isAr ? 'اسم الأب' : 'Father Name'}</label>
+                  <input
+                    type="text"
+                    value={fatherName}
+                    onChange={(e) => setFatherName(e.target.value)}
+                    placeholder={isAr ? 'اسم الأب' : 'Father'}
+                    className={`w-full p-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all ${errors.fatherName ? 'border-red-400 focus:ring-red-500' : 'border-slate-200'}`}
+                  />
+                  {errors.fatherName && <p className="text-red-500 text-xs mt-1 font-medium">{errors.fatherName}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">{isAr ? 'العائلة' : 'Family Name'}</label>
+                  <input
+                    type="text"
+                    value={familyName}
+                    onChange={(e) => setFamilyName(e.target.value)}
+                    placeholder={isAr ? 'العائلة' : 'Family'}
+                    className={`w-full p-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all ${errors.familyName ? 'border-red-400 focus:ring-red-500' : 'border-slate-200'}`}
+                  />
+                  {errors.familyName && <p className="text-red-500 text-xs mt-1 font-medium">{errors.familyName}</p>}
+                </div>
               </div>
 
               {isStudent && (

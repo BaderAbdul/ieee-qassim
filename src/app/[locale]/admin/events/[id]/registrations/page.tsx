@@ -52,12 +52,12 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
           
           // Fetch user data
           const userSnap = await getDoc(doc(db, 'users', regData.userId));
-          const userData = userSnap.exists() ? userSnap.data() : { displayName: 'Unknown', email: 'Unknown' };
+          const userData = userSnap.exists() ? userSnap.data() : { displayName: 'Unknown', email: 'Unknown', arabicFullName: '' };
           
           regs.push({
             id: regDoc.id,
             userId: regData.userId,
-            userName: userData.displayName || 'Unknown',
+            userName: userData.arabicFullName || userData.displayName || 'Unknown',
             userEmail: userData.email || 'Unknown',
             status: regData.status,
             timestamp: regData.timestamp

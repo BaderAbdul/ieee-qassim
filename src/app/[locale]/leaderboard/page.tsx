@@ -34,7 +34,7 @@ export default function LeaderboardPage() {
           const data = d.data();
           return {
             id: d.id,
-            name: data.displayName || (isAr ? 'طالب هندسي' : 'Engineering Student'),
+            name: data.arabicFullName || data.displayName || (isAr ? 'طالب هندسي' : 'Engineering Student'),
             points: data.totalPoints || 0,
             photoUrl: data.photoURL || data.photoUrl,
             department: data.department

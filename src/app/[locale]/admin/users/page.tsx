@@ -10,6 +10,7 @@ import { Search, Trophy, Shield, ShieldAlert } from 'lucide-react';
 interface AdminUserItem {
   id: string;
   displayName?: string;
+  arabicFullName?: string;
   email?: string;
   role?: string;
   totalPoints?: number;
@@ -95,7 +96,7 @@ export default function AdminUsersPage() {
   };
 
   const filteredUsers = users.filter(u => 
-    (u.displayName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (u.arabicFullName || u.displayName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (u.email || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -147,7 +148,7 @@ export default function AdminUsersPage() {
               {filteredUsers.map(u => (
                 <tr key={u.id} className="hover:bg-gray-50 transition-colors">
                   <td className="py-4 px-6">
-                    <div className="font-bold text-gray-900">{u.displayName}</div>
+                    <div className="font-bold text-gray-900">{u.arabicFullName || u.displayName}</div>
                   </td>
                   <td className="py-4 px-6 text-gray-500">{u.email}</td>
                   <td className="py-4 px-6">
@@ -190,7 +191,7 @@ export default function AdminUsersPage() {
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden">
             <div className="p-6 border-b border-gray-100">
               <h3 className="text-xl font-bold font-cairo">تعديل نقاط الطالب</h3>
-              <p className="text-gray-500 text-sm mt-1">{selectedUser.displayName} ({selectedUser.email})</p>
+              <p className="text-gray-500 text-sm mt-1">{selectedUser.arabicFullName || selectedUser.displayName} ({selectedUser.email})</p>
             </div>
             
             <form onSubmit={handleAdjustPoints} className="p-6 space-y-4">

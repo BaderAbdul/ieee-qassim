@@ -31,6 +31,7 @@
   "Navbar": {
     "brand": "TechComm",
     "home": "الرئيسية",
+    "structure": "الهيكلة الإدارية",
     "events": "الفعاليات",
     "leaderboard": "لوحة الشرف",
     "myActivity": "نشاطي",
@@ -48,6 +49,7 @@
     "quickLinks": "روابط سريعة",
     "copyright": "منصة مجتمع التكنولوجيا الجامعي © {year} - جميع الحقوق محفوظة",
     "home": "الرئيسية",
+    "structure": "الهيكلة الإدارية",
     "events": "الفعاليات",
     "leaderboard": "لوحة الشرف",
     "profile": "الملف الهندسي"
