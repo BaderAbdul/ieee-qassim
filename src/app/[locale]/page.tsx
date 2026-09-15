@@ -145,7 +145,7 @@ export default function HomePage() {
               <div className="absolute top-0 rtl:left-0 lg:rtl:left-0 lg:ltr:right-0 ltr:-right-4 w-72 lg:w-80 bg-white rounded-3xl p-4 lg:p-5 shadow-2xl shadow-blue-900/10 border border-slate-100 z-30 transform hover:-translate-y-2 hover:z-50 transition-all duration-300 group cursor-pointer" onClick={() => { if(latestEvent) window.location.href = `/events/${latestEvent.id}` }}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="bg-blue-50 text-blue-700 text-[10px] font-black tracking-wider uppercase px-3 py-1.5 rounded-full">{latestEvent?.state === 'Ongoing' ? (isAr ? 'جاري الآن' : 'Ongoing') : (latestEvent?.state === 'Registration Open' ? (isAr ? 'التسجيل مفتوح' : 'Open') : (isAr ? 'قريباً' : 'Soon'))}</div>
-                  <div className="bg-slate-50 text-slate-500 text-[10px] font-bold px-2 py-1 rounded-md">{latestEvent ? latestEvent.date : '---'}</div>
+                  <div className="bg-slate-50 text-slate-500 text-[10px] font-bold px-2 py-1 rounded-md">{latestEvent ? (latestEvent.date as any)?.toDate?.()?.toLocaleDateString(isAr ? 'ar-SA' : 'en-US') || new Date(latestEvent.date as any).toLocaleDateString(isAr ? 'ar-SA' : 'en-US') : '---'}</div>
                 </div>
                 <div className="w-full h-28 lg:h-32 bg-gradient-to-br from-[#00629B] to-indigo-700 rounded-2xl mb-4 relative overflow-hidden">
                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
