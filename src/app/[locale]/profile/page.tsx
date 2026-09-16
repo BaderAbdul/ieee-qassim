@@ -410,31 +410,51 @@ export default function EngineeringProfilePage() {
         )}
 
         {/* 1. Digital Member Card */}
-        <DigitalMemberCard 
-          user={user}
-          userData={userData}
-          rank={userRank}
-          totalPoints={totalPoints}
-          onEditName={() => {
-            const parts = (userData?.arabicFullName || '').split(' ').filter(Boolean);
-            setEditingName({
-              first: userData?.firstName || parts[0] || '',
-              middle: userData?.fatherName || (parts.length > 2 ? parts.slice(1, -1).join(' ') : (parts.length === 2 ? parts[1] : '')),
-              last: userData?.familyName || (parts.length > 2 ? parts[parts.length - 1] : '')
-            });
-            setShowEditModal(true);
-          }}
-          onEditProfile={() => {
-            setEditingProfile({
-              college: userData?.college || '',
-              major: userData?.major || '',
-              academicLevel: userData?.academicLevel || '',
-              universityId: userData?.universityId || ''
-            });
-            setShowProfileModal(true);
-          }}
-          onLogout={logout}
-        />
+        <div className="relative">
+          <DigitalMemberCard 
+            user={user}
+            userData={userData}
+            rank={userRank}
+            totalPoints={totalPoints}
+            onEditName={() => {
+              const parts = (userData?.arabicFullName || '').split(' ').filter(Boolean);
+              setEditingName({
+                first: userData?.firstName || parts[0] || '',
+                middle: userData?.fatherName || (parts.length > 2 ? parts.slice(1, -1).join(' ') : (parts.length === 2 ? parts[1] : '')),
+                last: userData?.familyName || (parts.length > 2 ? parts[parts.length - 1] : '')
+              });
+              setShowEditModal(true);
+            }}
+            onEditProfile={() => {
+              setEditingProfile({
+                college: userData?.college || '',
+                major: userData?.major || '',
+                academicLevel: userData?.academicLevel || '',
+                universityId: userData?.universityId || ''
+              });
+              setShowProfileModal(true);
+            }}
+            onLogout={logout}
+          />
+          <div className="absolute top-4 rtl:left-4 ltr:right-4 z-20 md:hidden">
+             <Link 
+                href="/profile/pass" 
+                className="bg-white/20 hover:bg-white/30 backdrop-blur-md border border-white/20 text-white p-2 rounded-xl flex items-center justify-center transition-colors shadow-lg"
+                title={isAr ? 'عرض البطاقة بملء الشاشة' : 'View Full Screen Pass'}
+             >
+                <ExternalLink className="w-5 h-5" />
+             </Link>
+          </div>
+          <div className="hidden md:flex justify-end -mt-4 mb-4">
+             <Link 
+                href="/profile/pass" 
+                className="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-sm"
+             >
+                <ExternalLink className="w-4 h-4" />
+                <span>{isAr ? 'عرض البطاقة الرقمية' : 'View Digital Pass'}</span>
+             </Link>
+          </div>
+        </div>
 
         {/* 2. Gamification Summary Cards */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
