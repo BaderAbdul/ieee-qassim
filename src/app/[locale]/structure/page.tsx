@@ -1,5 +1,6 @@
 import React from 'react';
-import { adminDb } from '@/lib/firebase/admin';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase/client';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import StructureAccordion, { Committee } from './StructureAccordion';
@@ -13,8 +14,8 @@ export default async function StructurePage({ params }: { params: Promise<{ loca
   
   let committees: Committee[] = [];
   try {
-    const docSnap = await adminDb.collection('settings').doc('homepage').get();
-    if (docSnap.exists) {
+    const docSnap = await getDoc(doc(db, 'settings', 'homepage'));
+    if (docSnap.exists()) {
       const data = docSnap.data();
       if (data && data.committees) {
         committees = data.committees;

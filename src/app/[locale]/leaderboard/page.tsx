@@ -1,6 +1,7 @@
 import React from 'react';
 import { Trophy } from 'lucide-react';
-import { adminDb } from '@/lib/firebase/admin';
+import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase/client';
 import LeaderboardList, { LeaderboardUser } from './LeaderboardList';
 
 export const dynamic = 'force-dynamic';
@@ -12,10 +13,8 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ lo
 
   let topUsers: LeaderboardUser[] = [];
   try {
-    const snap = await adminDb.collection('users')
-      .orderBy('totalPoints', 'desc')
-      .limit(50)
-      .get();
+    const q = query(collection(db, 'users'), orderBy('totalPoints', 'desc'), limit(50));
+    const snap = await getDocs(q);
       
     topUsers = snap.docs.map(d => {
       const data = d.data();

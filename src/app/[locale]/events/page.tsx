@@ -1,5 +1,6 @@
 import React from 'react';
-import { adminDb } from '@/lib/firebase/admin';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase/client';
 import { PlatformEvent } from '@/lib/types';
 import EventsList from './EventsList';
 
@@ -10,9 +11,12 @@ export default async function EventsPage() {
   let events: PlatformEvent[] = [];
   
   try {
-    const snapshot = await adminDb.collection('events')
-      .where('state', 'in', ['Published', 'Registration Open', 'Registration Closed', 'Ongoing', 'Completed'])
-      .get();
+    const eventsRef = collection(db, 'events');
+    const q = query(
+      eventsRef, 
+      where('state', 'in', ['Published', 'Registration Open', 'Registration Closed', 'Ongoing', 'Completed'])
+    );
+    const snapshot = await getDocs(q);
       
     const fetchedEvents = snapshot.docs.map(doc => {
       const data = doc.data();
@@ -20,7 +24,9 @@ export default async function EventsPage() {
         id: doc.id,
         ...data,
         // Convert Firebase Timestamp to ISO string to pass safely to Client Component
-        date: data.date?.toDate ? data.date.toDate().toISOString() : data.date
+        date: data.date?.toDate ? data.date.toDate().toISOString() : data.date,
+        createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
+        updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt
       };
     }) as PlatformEvent[];
     
