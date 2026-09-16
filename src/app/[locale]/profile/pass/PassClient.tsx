@@ -9,12 +9,12 @@ import { useLocale } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
 
 export default function PassClient() {
-  const { user, userData, authLoading } = useAuth();
+  const { user, userData, loading } = useAuth();
   const locale = useLocale();
   const isAr = locale === 'ar';
   const router = useRouter();
 
-  if (authLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#002f56]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
@@ -27,7 +27,7 @@ export default function PassClient() {
     return null;
   }
 
-  const displayName = userData?.arabicFullName || userData?.name || user.displayName || 'Member';
+  const displayName = userData?.arabicFullName || user.displayName || 'Member';
   const major = userData?.major || 'General Member';
   const joinDate = user.metadata?.creationTime 
     ? new Date(user.metadata.creationTime).getFullYear() 
