@@ -507,7 +507,7 @@ export default function EngineeringProfilePage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+          <div className="flex overflow-x-auto pb-4 snap-x sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 hide-scrollbar">
             {ALL_BADGES.map((badge) => {
               const isEarned = userBadges.includes(badge.id) || 
                 (badge.targetType === 'attendance' && attendedCount >= badge.threshold) ||
@@ -519,7 +519,7 @@ export default function EngineeringProfilePage() {
               return (
                 <div
                   key={badge.id}
-                  className={`relative rounded-2xl p-5 border transition-all duration-300 flex flex-col justify-between ${
+                  className={`relative rounded-2xl p-5 border transition-all duration-300 flex flex-col justify-between shrink-0 w-72 sm:w-auto snap-center ${
                     isEarned
                       ? 'bg-gradient-to-b from-white to-slate-50/60 border-blue-200 shadow-sm hover:shadow-md hover:-translate-y-1'
                       : 'bg-slate-50/70 border-slate-100 opacity-60'

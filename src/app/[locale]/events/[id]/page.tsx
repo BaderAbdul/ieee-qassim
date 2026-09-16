@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, use } from 'react';
+import Image from 'next/image';
 import { 
   doc, 
   getDoc, 
@@ -265,10 +266,13 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
       {/* Hero Banner with Cover */}
       <div className="w-full h-72 sm:h-96 bg-slate-900 relative overflow-hidden">
         {event.coverUrl ? (
-          <img 
+          <Image 
             src={event.coverUrl} 
             alt={title} 
-            className="w-full h-full object-cover opacity-60 mix-blend-overlay" 
+            fill
+            priority
+            sizes="(max-width: 1200px) 100vw, 1200px"
+            className="object-cover opacity-60 mix-blend-overlay" 
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-blue-900 via-indigo-900 to-slate-900" />

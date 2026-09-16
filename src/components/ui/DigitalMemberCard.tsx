@@ -3,6 +3,7 @@
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { ShieldCheck, Calendar, Trophy, Zap, Edit2, LogOut } from 'lucide-react';
+import Image from 'next/image';
 import { useLocale } from 'next-intl';
 
 interface DigitalMemberCardProps {
@@ -47,9 +48,9 @@ export default function DigitalMemberCard({ user, userData, rank, totalPoints, o
         <div className="flex flex-col md:flex-row items-center md:items-start gap-6 text-center md:text-start flex-1">
           <div className="relative shrink-0">
             <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl bg-gradient-to-tr from-blue-500 to-indigo-500 p-1 shadow-xl shadow-blue-900/50">
-              <div className="w-full h-full bg-slate-900 rounded-[1.35rem] overflow-hidden flex items-center justify-center text-4xl font-black text-white">
+              <div className="w-full h-full relative bg-slate-900 rounded-[1.35rem] overflow-hidden flex items-center justify-center text-4xl font-black text-white">
                 {user.photoURL ? (
-                  <img src={user.photoURL} alt={displayName} className="w-full h-full object-cover" />
+                  <Image src={user.photoURL} alt={displayName} fill sizes="128px" className="object-cover" />
                 ) : (
                   displayName.charAt(0).toUpperCase()
                 )}

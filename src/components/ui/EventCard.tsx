@@ -1,6 +1,5 @@
-'use client';
-
 import React from 'react';
+import Image from 'next/image';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
 import { ar, enUS } from 'date-fns/locale';
@@ -53,10 +52,12 @@ export default function EventCard({ event }: EventCardProps) {
         {/* Banner Image / Abstract Pattern */}
         <div className="h-48 w-full bg-gradient-to-r from-blue-700 to-indigo-700 relative overflow-hidden flex-shrink-0">
           {event.coverUrl && (
-            <img 
-              src={event.coverUrl} 
-              alt={title} 
-              className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-overlay group-hover:scale-105 transition-transform duration-500" 
+            <Image
+              src={event.coverUrl}
+              alt={title}
+              fill
+              className="object-cover opacity-60 mix-blend-overlay group-hover:scale-105 transition-transform duration-500"
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
           )}
           <div className="absolute inset-0 opacity-20 pointer-events-none">

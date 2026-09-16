@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
-import { Link, usePathname } from '@/i18n/routing';
+import { Link, usePathname, useRouter } from '@/i18n/routing';
 import { useAuth } from '@/context/AuthContext';
+import Image from 'next/image';
 import { 
   Calendar, 
   Trophy, 
@@ -132,9 +133,9 @@ export default function Navbar() {
                   className="hidden sm:flex items-center gap-2.5 p-1 pe-3 rounded-full hover:bg-slate-100/70 transition-colors"
                   title={displayName}
                 >
-                  <div className="h-8 w-8 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center overflow-hidden border border-blue-200 shadow-xs">
+                  <div className="h-8 w-8 relative rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center overflow-hidden border border-blue-200 shadow-xs">
                     {user.photoURL ? (
-                      <img src={user.photoURL} alt={displayName} className="h-full w-full object-cover" />
+                      <Image src={user.photoURL} alt={displayName} fill sizes="32px" className="object-cover" />
                     ) : (
                       <span>{displayName.charAt(0).toUpperCase()}</span>
                     )}

@@ -11,11 +11,11 @@ import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import IdeaFloatingButton from '@/components/ui/IdeaFloatingButton';
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/next";
 import "../globals.css";
 
 const thmanyah = localFont({
   src: [
-    { path: '../../fonts/thmanyah-serif-display-light.otf', weight: '300', style: 'normal' },
     { path: '../../fonts/thmanyah-serif-display-regular.otf', weight: '400', style: 'normal' },
     { path: '../../fonts/thmanyah-serif-display-medium.otf', weight: '500', style: 'normal' },
     { path: '../../fonts/thmanyah-serif-display-bold.otf', weight: '700', style: 'normal' },
@@ -83,6 +83,7 @@ export default async function RootLayout({
           </AuthProvider>
         </NextIntlClientProvider>
         <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );
