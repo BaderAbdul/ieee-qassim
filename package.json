@@ -11,6 +11,7 @@
     "test:raw": "node --test --experimental-strip-types \"tests/**/*.test.ts\""
   },
   "dependencies": {
+    "@vercel/speed-insights": "^2.0.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "firebase": "^12.19.0",
