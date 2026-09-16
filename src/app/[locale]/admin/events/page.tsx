@@ -151,7 +151,7 @@ export default function AdminEventsPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-start text-sm font-medium">
-                        <div className="flex items-center space-x-3 space-x-reverse">
+                        <div className="flex items-center gap-3">
                           <Link href={`/admin/events/${event.id}/registrations`} className="text-purple-600 hover:text-purple-900 bg-purple-50 p-2 rounded-lg" title="التسجيلات">
                             <Users size={16} />
                           </Link>

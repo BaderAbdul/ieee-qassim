@@ -13,7 +13,8 @@ import {
   getDoc,
   orderBy,
   limit,
-  updateDoc
+  updateDoc,
+  getCountFromServer
 } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase/client';
 import { httpsCallable } from 'firebase/functions';
@@ -222,18 +223,14 @@ export default function EngineeringProfilePage() {
           return tB - tA;
         });
 
-        // 4. Compute Community Rank from Leaderboard
-        const rankQ = query(collection(db, 'users'), orderBy('totalPoints', 'desc'), limit(100));
-        const rankSnap = await getDocs(rankQ);
-        let rankIndex: number | null = null;
-        let count = 1;
-        for (const uDoc of rankSnap.docs) {
-          if (uDoc.id === user.uid) {
-            rankIndex = count;
-            break;
-          }
-          count++;
-        }
+        // 4. Compute Community Rank accurately via O(1) aggregation
+        const myPoints = userData?.totalPoints || 0;
+        const higherPointsQuery = query(
+          collection(db, 'users'),
+          where('totalPoints', '>', myPoints)
+        );
+        const rankCountSnap = await getCountFromServer(higherPointsQuery);
+        const userCalculatedRank = rankCountSnap.data().count + 1;
 
         if (active) {
           setRegistrations(regsWithEvents);
@@ -243,7 +240,7 @@ export default function EngineeringProfilePage() {
             return tB - tA;
           }));
           setTransactions(ptsData);
-          setUserRank(rankIndex || 1);
+          setUserRank(userCalculatedRank);
         }
       } catch (err) {
         console.error('Error fetching profile data:', err);

@@ -12,10 +12,9 @@ import {
   getDocs, 
   runTransaction, 
   increment,
-  getCountFromServer
+  DocumentReference
 } from 'firebase/firestore';
-import { db, functions } from '@/lib/firebase/client';
-import { httpsCallable } from 'firebase/functions';
+import { db } from '@/lib/firebase/client';
 import { PlatformEvent } from '@/lib/types';
 import { useAuth } from '@/context/AuthContext';
 import { useLocale, useTranslations } from 'next-intl';
@@ -44,7 +43,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
   const isAr = locale === 'ar';
   const dateLocale = isAr ? ar : enUS;
   
-  const { user, login } = useAuth();
+  const { user, userData, login } = useAuth();
   
   const [event, setEvent] = useState<PlatformEvent | null>(null);
   const [loading, setLoading] = useState(true);
@@ -146,7 +145,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
           }
         }
 
-        let currentAttendeeCount = eventData.registeredCount || 0;
+        const currentAttendeeCount = eventData.registeredCount || 0;
         let newStatus = 'approved';
         if (eventData.registrationMode === 'Manual') {
           newStatus = 'pending';
@@ -154,20 +153,30 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
           newStatus = 'waitlisted';
         }
 
-        const regData = {
+        const regData: Record<string, unknown> = {
           userId: user.uid,
           eventId: eventId,
           status: newStatus,
           timestamp: serverTimestamp(),
+          userName: userData?.arabicFullName || userData?.displayName || user.displayName || 'Student',
+          userEmail: userData?.email || user.email || '',
         };
+        if (userData?.universityId) {
+          regData.universityId = userData.universityId;
+        }
 
         transaction.set(regRef, regData);
         
-        transaction.update(eventRef, {
-          registeredCount: increment(1)
-        });
+        if (newStatus !== 'waitlisted') {
+          transaction.update(eventRef, {
+            registeredCount: increment(1)
+          });
+        }
 
-        return { status: newStatus, attendeeCount: currentAttendeeCount + 1 };
+        return { 
+          status: newStatus, 
+          attendeeCount: newStatus !== 'waitlisted' ? currentAttendeeCount + 1 : currentAttendeeCount 
+        };
       });
       
       setRegistrationStatus(result.status);
@@ -191,23 +200,60 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
       const regRef = doc(db, 'registrations', regId);
       const eventRef = doc(db, 'events', eventId);
 
+      // Query waitlisted candidates to auto-promote FIFO
+      const waitlistQ = query(
+        collection(db, 'registrations'),
+        where('eventId', '==', eventId),
+        where('status', '==', 'waitlisted')
+      );
+      const waitlistSnap = await getDocs(waitlistQ);
+      let candidateToPromote: DocumentReference | null = null;
+      if (!waitlistSnap.empty) {
+        const sortedWaitlist = [...waitlistSnap.docs].sort((a, b) => {
+          const getTs = (d: typeof a): number => {
+            const data = d.data();
+            const ts = data.timestamp as { toMillis?: () => number; seconds?: number } | undefined;
+            if (ts && typeof ts.toMillis === 'function') return ts.toMillis();
+            if (ts && typeof ts.seconds === 'number') return ts.seconds * 1000;
+            return 0;
+          };
+          return getTs(a) - getTs(b);
+        });
+        candidateToPromote = sortedWaitlist[0].ref;
+      }
+
       await runTransaction(db, async (transaction) => {
         const regDoc = await transaction.get(regRef);
-        const isCurrentlyActive = regDoc.exists() && regDoc.data().status !== 'cancelled';
+        const prevStatus = regDoc.exists() ? regDoc.data().status : null;
+        const wasApproved = prevStatus === 'approved' || prevStatus === 'pending';
 
         transaction.set(regRef, {
           status: 'cancelled',
           cancelledAt: serverTimestamp()
         }, { merge: true });
 
-        if (isCurrentlyActive) {
-          const eventDoc = await transaction.get(eventRef);
-          if (eventDoc.exists()) {
-            const currentCount = (eventDoc.data() as PlatformEvent).registeredCount || 0;
-            if (currentCount > 0) {
-              transaction.update(eventRef, {
-                registeredCount: increment(-1)
+        if (wasApproved) {
+          let promoted = false;
+          if (candidateToPromote) {
+            const promDoc = await transaction.get(candidateToPromote);
+            if (promDoc.exists() && promDoc.data().status === 'waitlisted') {
+              transaction.update(candidateToPromote, {
+                status: 'approved',
+                promotedAt: serverTimestamp()
               });
+              promoted = true;
+            }
+          }
+
+          if (!promoted) {
+            const eventDoc = await transaction.get(eventRef);
+            if (eventDoc.exists()) {
+              const currentCount = (eventDoc.data() as PlatformEvent).registeredCount || 0;
+              if (currentCount > 0) {
+                transaction.update(eventRef, {
+                  registeredCount: increment(-1)
+                });
+              }
             }
           }
         }

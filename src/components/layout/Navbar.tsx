@@ -157,7 +157,7 @@ export default function Navbar() {
               >
                 <LogIn className="h-4 w-4" />
                 <span className="hidden sm:inline">{t('login')}</span>
-                <span className="sm:hidden">تسجيل</span>
+                <span className="sm:hidden">{t('login')}</span>
               </button>
             )}
           </div>

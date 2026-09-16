@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, use, useRef } from 'react';
-import { doc, getDoc, collection, query, where, onSnapshot, updateDoc, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, onSnapshot, updateDoc, runTransaction, increment, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
@@ -99,72 +99,69 @@ export default function AdminQRDisplayPage({ params }: { params: Promise<{ id: s
               return;
             }
 
-            // 2. Verify Registration
+            // 2. Process check-in atomically using runTransaction
+            const pendingRef = doc(db, 'pending_checkins', requestDoc.id);
             const regRef = doc(db, 'registrations', `${eventId}_${userId}`);
-            const regSnap = await getDoc(regRef);
-            
-            if (!regSnap.exists() || regSnap.data().status !== 'approved') {
-              await updateDoc(doc(db, 'pending_checkins', requestDoc.id), { status: 'rejected', error: 'not_registered' });
-              return;
-            }
-            
-            if (regSnap.data().attended) {
-              await updateDoc(doc(db, 'pending_checkins', requestDoc.id), { status: 'rejected', error: 'already_checked_in' });
-              return;
-            }
+            const logRef = doc(db, 'attendance_logs', `${eventId}_${userId}`);
+            const userRef = doc(db, 'users', userId);
+            const txRef = doc(collection(db, 'point_transactions'));
 
-            // 3. Approve and process using Batched Writes
-            const batch = writeBatch(db);
+            await runTransaction(db, async (transaction) => {
+              // Reads Phase
+              const pendingSnap = await transaction.get(pendingRef);
+              if (!pendingSnap.exists() || pendingSnap.data().status !== 'pending') {
+                return;
+              }
 
-            // a. Approve pending check-in
-            batch.update(doc(db, 'pending_checkins', requestDoc.id), { status: 'approved' });
+              const regSnap = await transaction.get(regRef);
+              if (!regSnap.exists() || regSnap.data().status !== 'approved') {
+                transaction.update(pendingRef, { status: 'rejected', error: 'not_registered' });
+                return;
+              }
 
-            // b. Mark registration as attended
-            batch.update(regRef, {
-              attended: true,
-              attendedAt: serverTimestamp()
-            });
+              if (regSnap.data().attended) {
+                transaction.update(pendingRef, { status: 'rejected', error: 'already_checked_in' });
+                return;
+              }
 
-            // c. Add attendance log
-            const logRef = doc(collection(db, 'attendance_logs'));
-            batch.set(logRef, {
-              eventId,
-              userId,
-              timestamp: serverTimestamp()
-            });
+              if (event.points && event.points > 0) {
+                await transaction.get(userRef);
+              }
 
-            // d. Distribute Points
-            if (event.points && event.points > 0) {
-              const txRef = doc(collection(db, 'point_transactions'));
-              batch.set(txRef, {
-                userId,
+              // Writes Phase
+              transaction.update(pendingRef, { status: 'approved' });
+
+              transaction.update(regRef, {
+                status: 'attended',
+                attended: true,
+                attendedAt: serverTimestamp()
+              });
+
+              transaction.set(logRef, {
                 eventId,
-                points: event.points,
-                type: 'earned',
-                description: `حضور فعالية: ${event.title}`,
+                userId,
                 timestamp: serverTimestamp()
               });
 
-              const userRef = doc(db, 'users', userId);
-              batch.update(userRef, {
-                totalPoints: increment(event.points)
-              });
-            }
+              if (event.points && event.points > 0) {
+                transaction.set(txRef, {
+                  amount: event.points,
+                  source: 'attendance',
+                  reason: `حضور فعالية: ${event.title}`,
+                  createdAt: serverTimestamp(),
+                  userId,
+                  eventId,
+                  type: 'earned',
+                  points: event.points,
+                  description: `حضور فعالية: ${event.title}`,
+                  timestamp: serverTimestamp()
+                });
 
-            // e. Issue Certificate
-            if (event.hasCertificate) {
-              const certRef = doc(collection(db, 'certificates'));
-              batch.set(certRef, {
-                userId,
-                eventId,
-                eventTitle: event.title,
-                eventDate: event.date,
-                issuedAt: serverTimestamp(),
-                status: 'Available'
-              });
-            }
-
-            await batch.commit();
+                transaction.update(userRef, {
+                  totalPoints: increment(event.points)
+                });
+              }
+            });
 
           } catch (error) {
             console.error("Error processing check-in", error);

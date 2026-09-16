@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, query, getDocs, where, doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, query, getDocs, where, doc, getDoc, setDoc, getCountFromServer } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { Users, Calendar, CheckSquare, Award, Save, Settings, Star, LayoutTemplate } from 'lucide-react';
 import { PlatformEvent } from '@/lib/types';
@@ -31,26 +31,27 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const usersSnap = await getDocs(collection(db, 'users'));
         const eventsQ = query(collection(db, 'events'), where('state', 'in', ['Published', 'Registration Open', 'Ongoing']));
-        const eventsSnap = await getDocs(eventsQ);
         
-        // Fetch all published/open/ongoing events to populate dropdown
+        const [usersCountSnap, eventsSnap, regsCountSnap, certsCountSnap, heroDoc] = await Promise.all([
+          getCountFromServer(collection(db, 'users')),
+          getDocs(eventsQ),
+          getCountFromServer(collection(db, 'registrations')),
+          getCountFromServer(collection(db, 'certificates')),
+          getDoc(doc(db, 'settings', 'homepage')),
+        ]);
+        
+        // Populate dropdown with active events
         const evs = eventsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as PlatformEvent));
         setAllEvents(evs);
-        
-        const regsSnap = await getDocs(collection(db, 'registrations'));
-        const certsSnap = await getDocs(collection(db, 'certificates'));
 
         setStats({
-          totalUsers: usersSnap.size,
+          totalUsers: usersCountSnap.data().count,
           activeEvents: eventsSnap.size,
-          totalRegistrations: regsSnap.size,
-          certificatesIssued: certsSnap.size,
+          totalRegistrations: regsCountSnap.data().count,
+          certificatesIssued: certsCountSnap.data().count,
         });
 
-        // Fetch Hero Stats Settings
-        const heroDoc = await getDoc(doc(db, 'settings', 'homepage'));
         if (heroDoc.exists()) {
           setHeroStats(prev => ({ ...prev, ...heroDoc.data() }));
         }

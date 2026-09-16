@@ -44,6 +44,12 @@ const TIERS: TierConfig[] = [
     pattern: 'tests/tier4-real-world-scenarios/*.test.ts',
     threshold: 5,
   },
+  {
+    tierId: 'Tier 5',
+    name: 'Production Readiness (Security, Bounds, E2E)',
+    pattern: 'tests/verify_*.test.ts',
+    threshold: 15,
+  },
 ];
 
 interface TierResult {

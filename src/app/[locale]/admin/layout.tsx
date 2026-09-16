@@ -14,21 +14,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (!loading) {
-      if (!user) {
-        router.push('/');
-      } else if (userData?.role !== 'super_admin' && userData?.role !== 'event_organizer') {
-        router.push('/');
+      if (!user || (userData?.role !== 'super_admin' && userData?.role !== 'event_organizer')) {
+        router.replace('/');
       }
     }
   }, [user, userData, loading, router]);
 
-  if (loading || !user || (userData?.role !== 'super_admin' && userData?.role !== 'event_organizer')) {
-    return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div></div>;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+      </div>
+    );
+  }
+
+  if (!user || (userData?.role !== 'super_admin' && userData?.role !== 'event_organizer')) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-4">
+        <h2 className="text-xl font-bold text-gray-800 mb-2 font-cairo">غير مصرح بالدخول</h2>
+        <p className="text-gray-500 text-sm mb-4">هذه الصفحة مخصصة لمديري ومنظمي الفعاليات فقط.</p>
+      </div>
+    );
   }
 
   const isCurrentPath = (path: string) => {
     // pathname might look like /ar/admin/events, we check if it includes the path
-    // simple check for now
     if (path === '/admin') {
       return pathname.endsWith('/admin');
     }
@@ -60,7 +70,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Link 
                 key={item.href} 
                 href={item.href}
-                className={`flex items-center space-x-3 space-x-reverse px-4 py-3 rounded-lg transition-colors ${
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                   active ? 'bg-purple-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                 }`}
               >
@@ -72,7 +82,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </nav>
 
         <div className="p-4 border-t border-slate-800">
-          <Link href="/" className="flex items-center space-x-3 space-x-reverse px-4 py-3 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">
+          <Link href="/" className="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">
             <LogOut size={20} className="rtl:rotate-180" />
             <span className="font-medium text-sm">العودة للمنصة</span>
           </Link>

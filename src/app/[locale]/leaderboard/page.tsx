@@ -5,11 +5,12 @@ import { Trophy } from 'lucide-react';
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import LeaderboardList, { LeaderboardUser } from './LeaderboardList';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 
 export default function LeaderboardPage() {
-  const t = useTranslations('leaderboard' as any); // Using as any since we might not have it in messages
-  const isAr = true; // Temporary, should use locale hook if needed
+  const t = useTranslations('leaderboard' as any);
+  const locale = useLocale();
+  const isAr = locale === 'ar';
   
   const [topUsers, setTopUsers] = useState<LeaderboardUser[]>([]);
   const [loading, setLoading] = useState(true);

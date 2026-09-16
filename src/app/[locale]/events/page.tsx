@@ -1,5 +1,5 @@
 import React from 'react';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { PlatformEvent } from '@/lib/types';
 import EventsList from './EventsList';
@@ -14,7 +14,8 @@ export default async function EventsPage() {
     const eventsRef = collection(db, 'events');
     const q = query(
       eventsRef, 
-      where('state', 'in', ['Published', 'Registration Open', 'Registration Closed', 'Ongoing', 'Completed'])
+      where('state', 'in', ['Published', 'Registration Open', 'Registration Closed', 'Ongoing', 'Completed']),
+      limit(50)
     );
     const snapshot = await getDocs(q);
       

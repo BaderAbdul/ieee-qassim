@@ -32,7 +32,11 @@ export default async function HomePage({ params }: PageProps) {
     }
 
     const validStates = ['Published', 'Registration Open', 'Ongoing', 'Completed', 'Registration Closed'];
-    const eventsSnap = await getDocs(query(collection(db, 'events'), where('state', 'in', validStates)));
+    const eventsSnap = await getDocs(query(
+      collection(db, 'events'),
+      where('state', 'in', validStates),
+      limit(20)
+    ));
 
     const evs = eventsSnap.docs.map(doc => {
       const data = doc.data();
@@ -256,7 +260,7 @@ export default async function HomePage({ params }: PageProps) {
             <p className="hidden sm:block text-slate-500 text-sm mt-2">{t('leaderboardDesc')}</p>
           </Link>
 
-          <Link href="/my-activity" className="bg-white rounded-2xl p-3 sm:p-8 shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center hover:-translate-y-1 transition-transform group">
+          <Link href="/profile" className="bg-white rounded-2xl p-3 sm:p-8 shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center hover:-translate-y-1 transition-transform group">
             <div className="w-10 h-10 sm:w-16 sm:h-16 bg-emerald-50 text-emerald-600 rounded-xl sm:rounded-2xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-emerald-100 transition-colors">
               <UserCircle className="w-5 h-5 sm:w-8 sm:h-8" />
             </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, use } from 'react';
-import { collection, query, where, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
@@ -47,24 +47,41 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
         const q = query(collection(db, 'registrations'), where('eventId', '==', eventId));
         const snap = await getDocs(q);
         
-        const regs: RegistrationData[] = [];
-        
-        for (const regDoc of snap.docs) {
-          const regData = regDoc.data();
-          
-          // Fetch user data
-          const userSnap = await getDoc(doc(db, 'users', regData.userId));
-          const userData = userSnap.exists() ? userSnap.data() : { displayName: 'Unknown', email: 'Unknown', arabicFullName: '' };
-          
-          regs.push({
-            id: regDoc.id,
-            userId: regData.userId,
-            userName: userData.arabicFullName || userData.displayName || 'Unknown',
-            userEmail: userData.email || 'Unknown',
-            status: regData.status,
-            timestamp: regData.timestamp
+        // Parallelize user fetching using Promise.all & cache to eliminate N+1 sequential waterfall
+        const userIdsToFetch = new Set<string>();
+        snap.docs.forEach(d => {
+          const data = d.data();
+          if (!data.userName && data.userId) {
+            userIdsToFetch.add(data.userId);
+          }
+        });
+
+        const userCache = new Map<string, Record<string, unknown>>();
+        if (userIdsToFetch.size > 0) {
+          const userSnaps = await Promise.all(
+            Array.from(userIdsToFetch).map(uid => getDoc(doc(db, 'users', uid)))
+          );
+          userSnaps.forEach(uSnap => {
+            if (uSnap.exists()) {
+              userCache.set(uSnap.id, uSnap.data() as Record<string, unknown>);
+            }
           });
         }
+
+        const regs: RegistrationData[] = snap.docs.map(regDoc => {
+          const regData = regDoc.data();
+          const cachedUser = userCache.get(regData.userId);
+          const cachedName = (cachedUser?.arabicFullName as string | undefined) || (cachedUser?.displayName as string | undefined);
+          const cachedEmail = cachedUser?.email as string | undefined;
+          return {
+            id: regDoc.id,
+            userId: regData.userId,
+            userName: regData.userName || cachedName || 'Unknown',
+            userEmail: regData.userEmail || cachedEmail || 'Unknown',
+            status: regData.status,
+            timestamp: regData.timestamp
+          };
+        });
         
         regs.sort((a, b) => {
           const tA = (a.timestamp as { toDate?: () => Date })?.toDate?.()?.getTime() || 0;
@@ -91,9 +108,26 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
 
   const handleUpdateStatus = async (regId: string, newStatus: string) => {
     try {
-      await updateDoc(doc(db, 'registrations', regId), {
-        status: newStatus
-      });
+      const reg = registrations.find(r => r.id === regId);
+      const userId = reg?.userId || (regId.includes('_') ? regId.slice(eventId.length + 1) : null);
+
+      const promises: Promise<unknown>[] = [
+        updateDoc(doc(db, 'registrations', regId), {
+          status: newStatus
+        })
+      ];
+
+      if (newStatus === 'attended' && userId) {
+        promises.push(
+          setDoc(doc(db, 'attendance_logs', `${eventId}_${userId}`), {
+            eventId,
+            userId,
+            timestamp: serverTimestamp()
+          }, { merge: true })
+        );
+      }
+
+      await Promise.all(promises);
       setRegistrations(prev => prev.map(r => r.id === regId ? { ...r, status: newStatus } : r));
     } catch (error) {
       console.error("Error updating status", error);
@@ -107,9 +141,22 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
     
     setIsUpdatingBulk(true);
     try {
-      const promises = selectedIds.map(id => 
-        updateDoc(doc(db, 'registrations', id), { status: newStatus })
-      );
+      const promises = selectedIds.flatMap(id => {
+        const updatePromise = updateDoc(doc(db, 'registrations', id), { status: newStatus });
+        if (newStatus === 'attended') {
+          const reg = registrations.find(r => r.id === id);
+          const userId = reg?.userId || (id.includes('_') ? id.slice(eventId.length + 1) : null);
+          if (userId) {
+            const logPromise = setDoc(doc(db, 'attendance_logs', `${eventId}_${userId}`), {
+              eventId,
+              userId,
+              timestamp: serverTimestamp()
+            }, { merge: true });
+            return [updatePromise, logPromise];
+          }
+        }
+        return [updatePromise];
+      });
       await Promise.all(promises);
       setRegistrations(prev => prev.map(r => selectedIds.includes(r.id) ? { ...r, status: newStatus } : r));
       setSelectedIds([]);

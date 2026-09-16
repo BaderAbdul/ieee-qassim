@@ -133,7 +133,7 @@ function CheckInContent({ eventId }: { eventId: string }) {
               {t('successDesc')} <span className="font-bold text-slate-900">{eventTitle}</span>.
             </p>
             <Link 
-              href="/my-activity" 
+              href="/profile" 
               className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3.5 rounded-xl font-bold transition-colors w-full inline-block shadow-md shadow-emerald-600/20 text-sm"
             >
               {t('viewActivity')}
@@ -153,7 +153,7 @@ function CheckInContent({ eventId }: { eventId: string }) {
               {t('alreadyCheckedInDesc')}
             </p>
             <Link 
-              href="/my-activity" 
+              href="/profile" 
               className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3.5 rounded-xl font-bold transition-colors w-full inline-block shadow-md shadow-blue-500/20 text-sm mb-3"
             >
               {t('viewActivity')}

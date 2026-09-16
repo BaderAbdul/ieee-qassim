@@ -42,70 +42,79 @@ export const issueCertificates = functions.https.onCall(async (data, context) =>
   // Since we are creating a generic firebase background function using onDocumentCreated or onCall,
   // we will trigger the generation automatically when the certificate document is created with status = 'Generating'.
   
-  const queuedCount = await db.runTransaction(async (transaction) => {
-    let count = 0;
-    
-    // Phase 1: All Reads
-    const readResults = [];
-    for (const userId of userIds) {
-      const logRef = db.collection('attendance_logs').doc(`${eventId}_${userId}`);
-      const certificateId = `certificate_${eventId}_${userId}`;
-      const certRef = db.collection('certificates').doc(certificateId);
-      const userRef = db.collection('users').doc(userId);
-      
-      const [logSnap, certSnap, userSnap] = await Promise.all([
-        transaction.get(logRef),
-        transaction.get(certRef),
-        transaction.get(userRef)
-      ]);
-      
-      readResults.push({
-        userId,
-        certificateId,
-        certRef,
-        logSnap,
-        certSnap,
-        userSnap
-      });
-    }
-    
-    // Phase 2: All Writes
-    for (const data of readResults) {
-      if (!data.logSnap.exists) {
-        continue; // Skip, no attendance found
-      }
-      
-      if (data.certSnap.exists) {
-        const currentStatus = data.certSnap.data()?.status;
-        if (currentStatus === 'Available' || currentStatus === 'Generating') {
-          continue; // Already processed
-        }
-      }
-      
-      const studentName = data.userSnap.data()?.displayName || 'Student';
+  const BATCH_SIZE = 50;
+  let queuedCount = 0;
 
-      // Create or overwrite as Generating
-      transaction.set(data.certRef, {
-        id: data.certificateId,
-        eventId,
-        userId: data.userId,
-        status: 'Generating',
-        storagePath: `certificates/${eventId}/${data.certificateId}.pdf`,
-        studentName,
-        eventTitle: eventData!.title,
-        eventType: eventData!.type,
-        attendanceDate: data.logSnap.data()?.timestamp || eventData!.date,
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-        attemptCount: 0,
-        issuedBy: adminUid,
-      }, { merge: true });
+  for (let i = 0; i < userIds.length; i += BATCH_SIZE) {
+    const chunk = userIds.slice(i, i + BATCH_SIZE);
+
+    const chunkCount = await db.runTransaction(async (transaction) => {
+      let count = 0;
       
-      count++;
-    }
-    
-    return count;
-  });
+      // Phase 1: All Reads
+      const readResults = [];
+      for (const userId of chunk) {
+        const logRef = db.collection('attendance_logs').doc(`${eventId}_${userId}`);
+        const certificateId = `certificate_${eventId}_${userId}`;
+        const certRef = db.collection('certificates').doc(certificateId);
+        const userRef = db.collection('users').doc(userId);
+        
+        const [logSnap, certSnap, userSnap] = await Promise.all([
+          transaction.get(logRef),
+          transaction.get(certRef),
+          transaction.get(userRef)
+        ]);
+        
+        readResults.push({
+          userId,
+          certificateId,
+          certRef,
+          logSnap,
+          certSnap,
+          userSnap
+        });
+      }
+      
+      // Phase 2: All Writes
+      for (const data of readResults) {
+        if (!data.logSnap.exists) {
+          continue; // Skip, no attendance found
+        }
+        
+        if (data.certSnap.exists) {
+          const currentStatus = data.certSnap.data()?.status;
+          if (currentStatus === 'Available' || currentStatus === 'Generating') {
+            continue; // Already processed
+          }
+        }
+        
+        const studentName = data.userSnap.data()?.displayName || 'Student';
+
+        // Create or overwrite as Generating
+        transaction.set(data.certRef, {
+          id: data.certificateId,
+          eventId,
+          userId: data.userId,
+          status: 'Generating',
+          storagePath: `certificates/${eventId}/${data.certificateId}.pdf`,
+          studentName,
+          eventTitle: eventData!.title,
+          eventType: eventData!.type,
+          attendanceDate: data.logSnap.data()?.timestamp || eventData!.date,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+          attemptCount: 0,
+          issuedBy: adminUid,
+        }, { merge: true });
+        
+        count++;
+      }
+      
+      return count;
+    });
+
+    queuedCount += chunkCount;
+  }
 
   return { status: 'success', queuedCount };
 });

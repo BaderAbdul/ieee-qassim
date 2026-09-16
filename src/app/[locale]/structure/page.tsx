@@ -1,8 +1,6 @@
 import React from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
-import Navbar from '@/components/layout/Navbar';
-import Footer from '@/components/layout/Footer';
 import StructureAccordion, { Committee } from './StructureAccordion';
 
 export const dynamic = 'force-dynamic';
@@ -26,29 +24,23 @@ export default async function StructurePage({ params }: { params: Promise<{ loca
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50">
-      <Navbar />
-      
-      <main className="flex-grow pt-28 pb-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-5xl mx-auto">
-          
-          <div className="text-center mb-16">
-            <h1 className="text-4xl md:text-5xl font-black text-slate-900 mb-6 font-thmanyah uppercase tracking-tight">
-              {isAr ? 'الهيكلة الإدارية' : 'Organizational Structure'}
-            </h1>
-            <p className="text-lg text-slate-600 max-w-2xl mx-auto font-medium">
-              {isAr 
-                ? 'تعرف على اللجان وفرق العمل التي تقود مبادرات وفعاليات النادي.' 
-                : 'Meet the committees and teams driving the club initiatives and events.'}
-            </p>
-          </div>
-
-          <StructureAccordion committees={committees} isAr={isAr} />
-
+    <div className="min-h-screen bg-slate-50 pt-28 pb-20 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-5xl mx-auto">
+        
+        <div className="text-center mb-16">
+          <h1 className="text-4xl md:text-5xl font-black text-slate-900 mb-6 font-thmanyah uppercase tracking-tight">
+            {isAr ? 'الهيكلة الإدارية' : 'Organizational Structure'}
+          </h1>
+          <p className="text-lg text-slate-600 max-w-2xl mx-auto font-medium">
+            {isAr 
+              ? 'تعرف على اللجان وفرق العمل التي تقود مبادرات وفعاليات النادي.' 
+              : 'Meet the committees and teams driving the club initiatives and events.'}
+          </p>
         </div>
-      </main>
 
-      <Footer />
+        <StructureAccordion committees={committees} isAr={isAr} />
+
+      </div>
     </div>
   );
 }

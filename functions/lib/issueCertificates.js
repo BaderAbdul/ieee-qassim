@@ -67,62 +67,68 @@ exports.issueCertificates = functions.https.onCall(async (data, context) => {
     // In a real Gen2 environment, we would use Cloud Tasks or Google Cloud Pub/Sub.
     // Since we are creating a generic firebase background function using onDocumentCreated or onCall,
     // we will trigger the generation automatically when the certificate document is created with status = 'Generating'.
-    const queuedCount = await db.runTransaction(async (transaction) => {
-        var _a, _b, _c;
-        let count = 0;
-        // Phase 1: All Reads
-        const readResults = [];
-        for (const userId of userIds) {
-            const logRef = db.collection('attendance_logs').doc(`${eventId}_${userId}`);
-            const certificateId = `certificate_${eventId}_${userId}`;
-            const certRef = db.collection('certificates').doc(certificateId);
-            const userRef = db.collection('users').doc(userId);
-            const [logSnap, certSnap, userSnap] = await Promise.all([
-                transaction.get(logRef),
-                transaction.get(certRef),
-                transaction.get(userRef)
-            ]);
-            readResults.push({
-                userId,
-                certificateId,
-                certRef,
-                logSnap,
-                certSnap,
-                userSnap
-            });
-        }
-        // Phase 2: All Writes
-        for (const data of readResults) {
-            if (!data.logSnap.exists) {
-                continue; // Skip, no attendance found
+    const BATCH_SIZE = 50;
+    let queuedCount = 0;
+    for (let i = 0; i < userIds.length; i += BATCH_SIZE) {
+        const chunk = userIds.slice(i, i + BATCH_SIZE);
+        const chunkCount = await db.runTransaction(async (transaction) => {
+            var _a, _b, _c;
+            let count = 0;
+            // Phase 1: All Reads
+            const readResults = [];
+            for (const userId of chunk) {
+                const logRef = db.collection('attendance_logs').doc(`${eventId}_${userId}`);
+                const certificateId = `certificate_${eventId}_${userId}`;
+                const certRef = db.collection('certificates').doc(certificateId);
+                const userRef = db.collection('users').doc(userId);
+                const [logSnap, certSnap, userSnap] = await Promise.all([
+                    transaction.get(logRef),
+                    transaction.get(certRef),
+                    transaction.get(userRef)
+                ]);
+                readResults.push({
+                    userId,
+                    certificateId,
+                    certRef,
+                    logSnap,
+                    certSnap,
+                    userSnap
+                });
             }
-            if (data.certSnap.exists) {
-                const currentStatus = (_a = data.certSnap.data()) === null || _a === void 0 ? void 0 : _a.status;
-                if (currentStatus === 'Available' || currentStatus === 'Generating') {
-                    continue; // Already processed
+            // Phase 2: All Writes
+            for (const data of readResults) {
+                if (!data.logSnap.exists) {
+                    continue; // Skip, no attendance found
                 }
+                if (data.certSnap.exists) {
+                    const currentStatus = (_a = data.certSnap.data()) === null || _a === void 0 ? void 0 : _a.status;
+                    if (currentStatus === 'Available' || currentStatus === 'Generating') {
+                        continue; // Already processed
+                    }
+                }
+                const studentName = ((_b = data.userSnap.data()) === null || _b === void 0 ? void 0 : _b.displayName) || 'Student';
+                // Create or overwrite as Generating
+                transaction.set(data.certRef, {
+                    id: data.certificateId,
+                    eventId,
+                    userId: data.userId,
+                    status: 'Generating',
+                    storagePath: `certificates/${eventId}/${data.certificateId}.pdf`,
+                    studentName,
+                    eventTitle: eventData.title,
+                    eventType: eventData.type,
+                    attendanceDate: ((_c = data.logSnap.data()) === null || _c === void 0 ? void 0 : _c.timestamp) || eventData.date,
+                    createdAt: firestore_1.FieldValue.serverTimestamp(),
+                    updatedAt: firestore_1.FieldValue.serverTimestamp(),
+                    attemptCount: 0,
+                    issuedBy: adminUid,
+                }, { merge: true });
+                count++;
             }
-            const studentName = ((_b = data.userSnap.data()) === null || _b === void 0 ? void 0 : _b.displayName) || 'Student';
-            // Create or overwrite as Generating
-            transaction.set(data.certRef, {
-                id: data.certificateId,
-                eventId,
-                userId: data.userId,
-                status: 'Generating',
-                storagePath: `certificates/${eventId}/${data.certificateId}.pdf`,
-                studentName,
-                eventTitle: eventData.title,
-                eventType: eventData.type,
-                attendanceDate: ((_c = data.logSnap.data()) === null || _c === void 0 ? void 0 : _c.timestamp) || eventData.date,
-                createdAt: firestore_1.FieldValue.serverTimestamp(),
-                updatedAt: firestore_1.FieldValue.serverTimestamp(),
-                attemptCount: 0,
-                issuedBy: adminUid,
-            }, { merge: true });
-            count++;
-        }
-        return count;
-    });
+            return count;
+        });
+        queuedCount += chunkCount;
+    }
     return { status: 'success', queuedCount };
 });
 //# sourceMappingURL=issueCertificates.js.map

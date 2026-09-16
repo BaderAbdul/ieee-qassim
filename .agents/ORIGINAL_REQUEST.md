@@ -43,3 +43,39 @@ The server was restarted, so your background tasks and workers may have been int
 ## Follow-up — 2026-09-14T09:01:36Z
 
 The server was restarted again, which paused your background processes. Please revive the Orchestrator, resume Milestone 7 (Final Verification, Challenger Hardening & Forensic Audit), and proceed to trigger the independent Victory Auditor once you claim victory.
+
+## 2026-09-16T21:16:07Z
+
+Prepare the IEEE Qassim platform (Next.js/Firebase) for a production launch to handle 300+ students. The team will secure Firestore rules, optimize SSR and query performance, test the complete user journey, and polish the UX.
+
+Working directory: `/home/bader/Documents/IEEE QU SITE`
+Integrity mode: benchmark
+
+## Requirements
+
+### R1. Security & Data Integrity
+Audit and rewrite `firestore.rules` to explicitly deny unauthorized writes and secure admin routes. Enforce strict type checking and ownership rules for user data and events.
+
+### R2. Performance & Scalability
+Review all Server Components and database queries. Ensure that queries for events and users (especially in the admin dashboard and home page) do not trigger full collection scans (O(N) reads) and can handle 300+ concurrent users efficiently.
+
+### R3. End-to-End User Journey QA
+Validate the entire lifecycle: Event Creation -> Student Registration -> Admin Bulk Approval -> QR Check-in -> Certificate Generation. Identify and fix any bugs that prevent this flow from completing.
+
+### R4. UX and Vibe Polish
+Add robust fallback loading states (e.g., skeletons) and Error Boundaries for all major data-fetching components to ensure a premium mobile experience.
+
+## Acceptance Criteria
+
+### Security
+- [ ] A script or agent-as-judge confirms that `firestore.rules` blocks writes to the `users` collection by anyone other than the owner or an admin.
+- [ ] Admin routes (`/admin/*`) are verified to redirect or block non-admin users effectively.
+
+### Performance
+- [ ] A verification script or QA agent verifies that fetching the homepage and the registrations dashboard uses `limit()` or pagination, confirming O(1) or bounded reads.
+
+### QA Journey
+- [ ] An automated script successfully simulates creating an event, registering a mock user, updating status to `attended`, and generating a certificate record in Firestore without runtime errors.
+
+### UX
+- [ ] A QA agent confirms the presence of React `<Suspense>` boundaries or `loading.tsx` files for dynamic routes.

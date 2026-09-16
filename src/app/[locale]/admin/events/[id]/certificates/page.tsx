@@ -55,17 +55,21 @@ export default function CertificatesManagementPage() {
           return;
         }
 
+        // Parallelize attendee user fetches using Promise.all
+        const uniqueUids = Array.from(new Set(userIds));
+        const userDocs = await Promise.all(
+          uniqueUids.map(uid => getDoc(doc(db, 'users', uid)))
+        );
         const usersData: Record<string, { displayName?: string; email?: string }> = {};
-        for (const uid of userIds) {
-          const uDoc = await getDoc(doc(db, 'users', uid));
+        userDocs.forEach(uDoc => {
           if (uDoc.exists()) {
             const uData = uDoc.data();
-            usersData[uid] = {
+            usersData[uDoc.id] = {
               displayName: uData.arabicFullName || uData.displayName,
               email: uData.email,
             };
           }
-        }
+        });
 
         const certQ = query(collection(db, 'certificates'), where('eventId', '==', eventId));
         const certSnap = await getDocs(certQ);
