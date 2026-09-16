@@ -7,7 +7,7 @@ import { PlatformEvent, EventState } from '@/lib/types';
 import { Link } from '@/i18n/routing';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { Plus, Users, QrCode, Award, Eye } from 'lucide-react';
+import { Plus, Users, QrCode, Award, Eye, Edit2 } from 'lucide-react';
 
 export default function AdminEventsPage() {
   const [events, setEvents] = useState<PlatformEvent[]>([]);
@@ -166,6 +166,10 @@ export default function AdminEventsPage() {
 
                           <Link href={`/events/${event.id}`} className="text-blue-600 hover:text-blue-900 bg-blue-50 p-2 rounded-lg" title="عرض الفعالية">
                             <Eye size={16} />
+                          </Link>
+                          
+                          <Link href={`/admin/events/${event.id}/edit`} className="text-amber-600 hover:text-amber-900 bg-amber-50 p-2 rounded-lg" title="تعديل الفعالية">
+                            <Edit2 size={16} />
                           </Link>
                           
                           <select 

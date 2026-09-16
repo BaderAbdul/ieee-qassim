@@ -58,7 +58,9 @@ export default function AdminStructurePage() {
   const updateCommitteesInDB = async (newCommittees: Committee[]) => {
     setSaving(true);
     try {
-      await setDoc(doc(db, 'settings', 'homepage'), { committees: newCommittees }, { merge: true });
+      // Firestore does not accept 'undefined' values. We must deep clone and remove undefined keys.
+      const cleanCommittees = JSON.parse(JSON.stringify(newCommittees));
+      await setDoc(doc(db, 'settings', 'homepage'), { committees: cleanCommittees }, { merge: true });
     } catch (e) {
       console.error(e);
       alert('حدث خطأ أثناء حفظ الهيكلة في قاعدة البيانات');

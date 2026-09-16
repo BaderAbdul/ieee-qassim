@@ -114,6 +114,36 @@ service cloud.firestore {
       allow write: if isEventOrganizer();
     }
 
+    // Ideas (Shared ideas and proposals)
+    match /ideas/{ideaId} {
+      allow create: if isAuthenticated() 
+        && request.resource.data.userId == request.auth.uid;
+      
+      allow read: if isAuthenticated() && (isOwner(resource.data.userId) || isEventOrganizer() || resource.data.isPublic == true);
+      
+      allow update: if isEventOrganizer() || (
+        isAuthenticated()
+        && resource.data.isPublic == true
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votesCount', 'voters'])
+        // Ensure the only change in voters array is the user's own uid
+        && (
+          // Voting:
+          (request.resource.data.voters.hasAll(resource.data.get('voters', [])) 
+           && request.resource.data.voters.size() == resource.data.get('voters', []).size() + 1 
+           && request.resource.data.voters.hasAll([request.auth.uid]) 
+           && request.resource.data.votesCount == resource.data.get('votesCount', 0) + 1)
+          ||
+          // Unvoting:
+          (resource.data.get('voters', []).hasAll(request.resource.data.voters) 
+           && request.resource.data.voters.size() == resource.data.get('voters', []).size() - 1 
+           && !request.resource.data.voters.hasAny([request.auth.uid]) 
+           && request.resource.data.votesCount == resource.data.get('votesCount', 0) - 1)
+        )
+      );
+      
+      allow delete: if isEventOrganizer();
+    }
+
     // Mail Queue (Outbox)
     match /mail/{mailId} {
       allow read, write: if false; // Only accessed via Cloud Functions

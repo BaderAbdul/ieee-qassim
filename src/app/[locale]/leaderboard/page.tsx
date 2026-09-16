@@ -1,34 +1,46 @@
-import React from 'react';
+'use client';
+
+import React, { useEffect, useState } from 'react';
 import { Trophy } from 'lucide-react';
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import LeaderboardList, { LeaderboardUser } from './LeaderboardList';
+import { useTranslations } from 'next-intl';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+export default function LeaderboardPage() {
+  const t = useTranslations('leaderboard' as any); // Using as any since we might not have it in messages
+  const isAr = true; // Temporary, should use locale hook if needed
+  
+  const [topUsers, setTopUsers] = useState<LeaderboardUser[]>([]);
+  const [loading, setLoading] = useState(true);
 
-export default async function LeaderboardPage({ params }: { params: Promise<{ locale: string }> }) {
-  const resolvedParams = await params;
-  const isAr = resolvedParams.locale === 'ar';
-
-  let topUsers: LeaderboardUser[] = [];
-  try {
-    const q = query(collection(db, 'users'), orderBy('totalPoints', 'desc'), limit(50));
-    const snap = await getDocs(q);
-      
-    topUsers = snap.docs.map(d => {
-      const data = d.data();
-      return {
-        id: d.id,
-        name: data.arabicFullName || data.displayName || (isAr ? 'عضو' : 'Member'),
-        points: data.totalPoints || 0,
-        photoUrl: data.photoURL || data.photoUrl,
-        department: data.department
-      };
-    }).filter(u => u.points > 0);
-  } catch (error) {
-    console.error("Error fetching leaderboard", error);
-  }
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      try {
+        const q = query(collection(db, 'users'), orderBy('totalPoints', 'desc'), limit(50));
+        const snap = await getDocs(q);
+          
+        const users = snap.docs.map(d => {
+          const data = d.data();
+          return {
+            id: d.id,
+            name: data.arabicFullName || data.displayName || (isAr ? 'عضو' : 'Member'),
+            points: data.totalPoints || 0,
+            photoUrl: data.photoURL || data.photoUrl,
+            department: data.department
+          };
+        }).filter(u => u.points > 0);
+        
+        setTopUsers(users);
+      } catch (error) {
+        console.error("Error fetching leaderboard", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchLeaderboard();
+  }, [isAr]);
 
   return (
     <div className="min-h-screen bg-slate-50 pt-24 pb-12 px-4 sm:px-6 lg:px-8">
@@ -50,7 +62,13 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ lo
         </div>
 
         {/* Board Container */}
-        <LeaderboardList users={topUsers} />
+        {loading ? (
+          <div className="py-20 flex justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div>
+          </div>
+        ) : (
+          <LeaderboardList users={topUsers} />
+        )}
 
       </div>
     </div>

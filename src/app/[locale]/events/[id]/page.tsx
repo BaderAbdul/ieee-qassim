@@ -11,7 +11,8 @@ import {
   where, 
   getDocs, 
   runTransaction, 
-  increment 
+  increment,
+  getCountFromServer
 } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase/client';
 import { httpsCallable } from 'firebase/functions';
@@ -65,10 +66,9 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
           setEvent(evData);
           
           // Fetch current active registrations
-          const regQuery = query(collection(db, 'registrations'), where('eventId', '==', eventId));
-          const regSnap = await getDocs(regQuery);
-          const activeRegs = regSnap.docs.filter(d => d.data().status !== 'cancelled').length;
-          setAttendeeCount(activeRegs);
+          // NOTE: We do not use '!=' 'cancelled' in a query because it requires an index. 
+          // Instead we can just read the registeredCount field from the event itself which is updated via transactions.
+          setAttendeeCount(evData.registeredCount || 0);
         }
       } catch (error) {
         console.error("Error fetching event details", error);
@@ -271,12 +271,15 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
             alt={title} 
             fill
             priority
+            unoptimized
+            quality={95}
             sizes="(max-width: 1200px) 100vw, 1200px"
-            className="object-cover opacity-60 mix-blend-overlay" 
+            className="object-cover" 
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-blue-900 via-indigo-900 to-slate-900" />
+          <div className="w-full h-full bg-gradient-to-r from-blue-700 to-indigo-800" />
         )}
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/60 to-transparent pointer-events-none" />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/40 to-transparent" />
         
         <div className="absolute bottom-0 inset-x-0 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-10">

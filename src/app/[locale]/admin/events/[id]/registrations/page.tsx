@@ -5,7 +5,7 @@ import { collection, query, where, getDocs, doc, getDoc, updateDoc } from 'fireb
 import { db } from '@/lib/firebase/client';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
-import { ArrowRight, Download, Users, Check, X, Clock } from 'lucide-react';
+import { ArrowRight, Download, Users, Check, X, Clock, UserCheck, CheckSquare, Square } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -31,6 +31,8 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
   const [event, setEvent] = useState<PlatformEvent | null>(null);
   const [registrations, setRegistrations] = useState<RegistrationData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isUpdatingBulk, setIsUpdatingBulk] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -99,6 +101,38 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
     }
   };
 
+  const handleBulkUpdateStatus = async (newStatus: string) => {
+    if (selectedIds.length === 0) return;
+    if (!confirm(`هل أنت متأكد من تغيير حالة ${selectedIds.length} مسجل إلى "${newStatus}"؟`)) return;
+    
+    setIsUpdatingBulk(true);
+    try {
+      const promises = selectedIds.map(id => 
+        updateDoc(doc(db, 'registrations', id), { status: newStatus })
+      );
+      await Promise.all(promises);
+      setRegistrations(prev => prev.map(r => selectedIds.includes(r.id) ? { ...r, status: newStatus } : r));
+      setSelectedIds([]);
+    } catch (error) {
+      console.error("Error updating bulk status", error);
+      alert("حدث خطأ أثناء تحديث الحالات");
+    } finally {
+      setIsUpdatingBulk(false);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === registrations.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(registrations.map(r => r.id));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
   const exportCSV = () => {
     if (!event) return;
     
@@ -155,6 +189,44 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
         </button>
       </div>
 
+      {selectedIds.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-blue-800 font-bold">
+            تم تحديد {selectedIds.length} مسجل
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button 
+              disabled={isUpdatingBulk}
+              onClick={() => handleBulkUpdateStatus('approved')}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition-colors disabled:opacity-50"
+            >
+              <Check size={16} /> قبول
+            </button>
+            <button 
+              disabled={isUpdatingBulk}
+              onClick={() => handleBulkUpdateStatus('waitlisted')}
+              className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition-colors disabled:opacity-50"
+            >
+              <Clock size={16} /> انتظار
+            </button>
+            <button 
+              disabled={isUpdatingBulk}
+              onClick={() => handleBulkUpdateStatus('rejected')}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition-colors disabled:opacity-50"
+            >
+              <X size={16} /> رفض
+            </button>
+            <button 
+              disabled={isUpdatingBulk}
+              onClick={() => handleBulkUpdateStatus('attended')}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition-colors disabled:opacity-50"
+            >
+              <UserCheck size={16} /> تحضير (حضور)
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex items-center">
           <div className="h-12 w-12 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center me-4">
@@ -193,6 +265,11 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
             <table className="w-full text-start">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
+                  <th className="px-6 py-4 text-start">
+                    <button onClick={toggleSelectAll} className="text-gray-400 hover:text-blue-600 transition-colors">
+                      {selectedIds.length === registrations.length && registrations.length > 0 ? <CheckSquare size={20} className="text-blue-600" /> : <Square size={20} />}
+                    </button>
+                  </th>
                   <th className="px-6 py-4 text-start text-xs font-semibold text-gray-500 uppercase tracking-wider">الطالب</th>
                   <th className="px-6 py-4 text-start text-xs font-semibold text-gray-500 uppercase tracking-wider">تاريخ التسجيل</th>
                   <th className="px-6 py-4 text-start text-xs font-semibold text-gray-500 uppercase tracking-wider">الحالة</th>
@@ -201,7 +278,12 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {registrations.map((reg) => (
-                  <tr key={reg.id} className="hover:bg-gray-50">
+                  <tr key={reg.id} className={`hover:bg-gray-50 ${selectedIds.includes(reg.id) ? 'bg-blue-50/50' : ''}`}>
+                    <td className="px-6 py-4">
+                      <button onClick={() => toggleSelect(reg.id)} className="text-gray-400 hover:text-blue-600 transition-colors">
+                        {selectedIds.includes(reg.id) ? <CheckSquare size={20} className="text-blue-600" /> : <Square size={20} />}
+                      </button>
+                    </td>
                     <td className="px-6 py-4">
                       <div className="font-bold text-gray-900">{reg.userName}</div>
                       <div className="text-sm text-gray-500">{reg.userEmail}</div>
@@ -212,18 +294,24 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                         reg.status === 'approved' ? 'bg-green-100 text-green-700' :
+                        reg.status === 'attended' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
                         reg.status === 'waitlisted' ? 'bg-yellow-100 text-yellow-700' :
                         reg.status === 'rejected' || reg.status === 'cancelled' ? 'bg-red-100 text-red-700' :
                         'bg-blue-100 text-blue-700'
                       }`}>
-                        {reg.status}
+                        {reg.status === 'attended' ? 'attended (حاضر)' : reg.status}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-start text-sm font-medium">
                       <div className="flex items-center gap-2">
-                        {reg.status !== 'approved' && (
+                        {reg.status !== 'approved' && reg.status !== 'attended' && (
                           <button onClick={() => handleUpdateStatus(reg.id, 'approved')} className="text-green-600 hover:bg-green-50 p-1.5 rounded" title="قبول">
                             <Check size={18} />
+                          </button>
+                        )}
+                        {reg.status !== 'attended' && (
+                          <button onClick={() => handleUpdateStatus(reg.id, 'attended')} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded" title="تحضير (حضر الفعالية)">
+                            <UserCheck size={18} />
                           </button>
                         )}
                         {reg.status !== 'waitlisted' && (

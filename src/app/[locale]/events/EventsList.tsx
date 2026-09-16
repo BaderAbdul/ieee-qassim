@@ -2,8 +2,9 @@
 
 import React, { useState, useMemo } from 'react';
 import { PlatformEvent } from '@/lib/types';
-import { Calendar, Search, Filter } from 'lucide-react';
+import { Calendar, Search, Filter, Lightbulb } from 'lucide-react';
 import { useTranslations, useLocale } from 'next-intl';
+import { Link } from '@/i18n/routing';
 import EventCard from '@/components/ui/EventCard';
 
 interface EventsListProps {
@@ -83,6 +84,15 @@ export default function EventsList({ events }: EventsListProps) {
               <option value="Other">{t('filterOther')}</option>
             </select>
           </div>
+          
+          {/* Ideas Arena Button */}
+          <Link 
+            href="/events/ideas"
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white rounded-2xl text-sm font-bold shadow-sm shadow-amber-500/20 hover:shadow-md transition-all transform hover:-translate-y-0.5"
+          >
+            <Lightbulb className="w-4 h-4" />
+            {isAr ? 'ساحة الأفكار' : 'Ideas Arena'}
+          </Link>
         </div>
       </div>
 

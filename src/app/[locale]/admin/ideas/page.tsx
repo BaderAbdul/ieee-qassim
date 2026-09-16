@@ -14,6 +14,8 @@ type Idea = {
   title: string;
   description: string;
   status: string;
+  isPublic?: boolean;
+  votesCount?: number;
   createdAt: any;
 };
 
@@ -50,6 +52,23 @@ export default function AdminIdeasPage() {
     } catch (error) {
       console.error('Error updating status:', error);
       alert('حدث خطأ أثناء تحديث الحالة');
+    }
+  };
+
+  const togglePublic = async (id: string, currentIsPublic: boolean | undefined) => {
+    try {
+      const newIsPublic = !currentIsPublic;
+      const updates: any = { isPublic: newIsPublic };
+      if (newIsPublic && currentIsPublic === undefined) {
+        updates.votesCount = 0;
+        updates.voters = [];
+      }
+      await updateDoc(doc(db, 'ideas', id), updates);
+      
+      setIdeas(ideas.map(idea => idea.id === id ? { ...idea, isPublic: newIsPublic } : idea));
+    } catch (error) {
+      console.error('Error toggling public status:', error);
+      alert('حدث خطأ أثناء تحديث النشر');
     }
   };
 
@@ -144,6 +163,19 @@ export default function AdminIdeasPage() {
                     }`}
                   >
                     رفض
+                  </button>
+                </div>
+                
+                <div className="flex items-center gap-2 border-t md:border-t-0 md:border-r border-slate-100 pt-4 md:pt-0 md:pr-4 rtl:md:pr-0 rtl:md:border-r-0 rtl:md:border-l rtl:md:pl-4 mt-4 md:mt-0">
+                  <button 
+                    onClick={() => togglePublic(idea.id, idea.isPublic)}
+                    className={`flex-1 md:flex-none px-4 py-2 rounded-xl text-sm font-bold transition-colors border ${
+                      idea.isPublic 
+                        ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' 
+                        : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    {idea.isPublic ? 'معروض للجمهور للتصويت' : 'عرض للجمهور'}
                   </button>
                 </div>
               </div>

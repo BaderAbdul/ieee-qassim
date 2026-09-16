@@ -50,16 +50,20 @@ export default function EventCard({ event }: EventCardProps) {
       <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden h-full flex flex-col transition-all duration-300 transform group-hover:-translate-y-1 group-hover:shadow-xl group-hover:border-blue-100">
         
         {/* Banner Image / Abstract Pattern */}
-        <div className="h-48 w-full bg-gradient-to-r from-blue-700 to-indigo-700 relative overflow-hidden flex-shrink-0">
+        <div className="h-48 w-full bg-slate-900 relative overflow-hidden flex-shrink-0">
           {event.coverUrl && (
             <Image
               src={event.coverUrl}
               alt={title}
               fill
-              className="object-cover opacity-60 mix-blend-overlay group-hover:scale-105 transition-transform duration-500"
+              unoptimized
+              quality={95}
+              className="object-cover group-hover:scale-105 transition-transform duration-500"
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
           )}
+          {/* Simple overlay instead of mix-blend-overlay for better mobile GPU performance */}
+          <div className="absolute inset-0 bg-gradient-to-t from-blue-900/60 to-transparent pointer-events-none" />
           <div className="absolute inset-0 opacity-20 pointer-events-none">
             <svg className="h-full w-full" xmlns="http://www.w3.org/2000/svg">
               <defs>
