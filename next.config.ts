@@ -9,6 +9,18 @@ if (process.env.MOCK_FONTS === 'true') {
 const withNextIntl = createNextIntlPlugin();
 
 const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+      {
+        protocol: 'http',
+        hostname: '**',
+      }
+    ]
+  },
   async redirects() {
     return [
       {
