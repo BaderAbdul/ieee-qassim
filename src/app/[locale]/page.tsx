@@ -397,41 +397,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Gamification Loop Section */}
-      <section className="py-6 sm:py-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full relative z-20">
-        <div className="text-center mb-6">
-          <h2 className="text-xl sm:text-3xl font-black text-slate-900 mb-2 font-cairo">{t('Gamification.title')}</h2>
-          <p className="text-slate-500 font-medium text-xs sm:text-sm max-w-lg mx-auto">
-            {isAr ? 'شارك بفعالية في النادي، اجمع النقاط، وتصدر قائمة الشرف لتحصل على التكريم والشهادات.' : 'Participate in club events, earn points, top the leaderboard, and get recognized.'}
-          </p>
-        </div>
-        
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6">
-          {/* Step 1 */}
-          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 flex flex-col items-center text-center hover:shadow-md transition-shadow">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-50 text-blue-600 rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-3xl mb-3">🎯</div>
-            <h3 className="text-slate-900 font-bold text-[11px] sm:text-sm leading-tight">{t('Gamification.step1')}</h3>
-          </div>
-          
-          {/* Step 2 */}
-          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 flex flex-col items-center text-center hover:shadow-md transition-shadow">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-amber-50 text-amber-600 rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-3xl mb-3">⭐</div>
-            <h3 className="text-slate-900 font-bold text-[11px] sm:text-sm leading-tight">{t('Gamification.step2')}</h3>
-          </div>
-          
-          {/* Step 3 */}
-          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 flex flex-col items-center text-center hover:shadow-md transition-shadow">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-purple-50 text-purple-600 rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-3xl mb-3">🏆</div>
-            <h3 className="text-slate-900 font-bold text-[11px] sm:text-sm leading-tight">{t('Gamification.step3')}</h3>
-          </div>
-
-          {/* Step 4 */}
-          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100 flex flex-col items-center text-center hover:shadow-md transition-shadow">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-emerald-50 text-emerald-600 rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-3xl mb-3">🎓</div>
-            <h3 className="text-slate-900 font-bold text-[11px] sm:text-sm leading-tight">{t('Gamification.step4')}</h3>
-          </div>
-        </div>
-      </section>
 
       {/* Quick Links / Feature Highlights */}
       <section className="py-6 sm:py-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full mb-8 sm:mb-12">

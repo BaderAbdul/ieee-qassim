@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from '@/i18n/routing';
 import { useEffect } from 'react';
 import { Link } from '@/i18n/routing';
-import { LayoutDashboard, Calendar, Users, QrCode, LogOut } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, QrCode, LogOut, Lightbulb } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -40,6 +40,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'إدارة الفعاليات', href: '/admin/events', icon: <Calendar size={20} /> },
     { name: 'المسجلون والطلاب', href: '/admin/users', icon: <Users size={20} /> },
     { name: 'تسجيل الحضور (QR)', href: '/admin/check-in', icon: <QrCode size={20} /> },
+    { name: 'الأفكار والمبادرات', href: '/admin/ideas', icon: <Lightbulb size={20} /> },
     { name: 'الهيكلة والتنظيم', href: '/admin/structure', icon: <Users size={20} /> },
   ];
 

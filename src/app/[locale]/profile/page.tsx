@@ -43,6 +43,7 @@ import {
   LogOut
 } from 'lucide-react';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import DigitalMemberCard from '@/components/ui/DigitalMemberCard';
 
 interface CertificateData extends Certificate {
   eventTitle: string;
@@ -410,108 +411,32 @@ export default function EngineeringProfilePage() {
           </div>
         )}
 
-        {/* 1. Header Card */}
-        <section className="relative overflow-hidden bg-white rounded-3xl border border-gray-100 shadow-sm p-6 sm:p-10">
-          <div className="absolute -top-24 -end-24 w-72 h-72 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full blur-3xl opacity-60 pointer-events-none" />
-          
-          <div className="relative z-10 flex flex-col md:flex-row items-center md:items-start gap-6 sm:gap-8">
-            <div className="relative">
-              <div className="h-28 w-28 sm:h-32 sm:w-32 rounded-3xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black text-4xl flex items-center justify-center overflow-hidden shadow-xl shadow-blue-500/20 border-4 border-white">
-                {user.photoURL ? (
-                  <img src={user.photoURL} alt={displayName} className="h-full w-full object-cover" />
-                ) : (
-                  <span>{displayName.charAt(0).toUpperCase()}</span>
-                )}
-              </div>
-              <div className="absolute -bottom-2 -end-2 bg-emerald-500 text-white p-1.5 rounded-full border-2 border-white shadow-sm" title={t('activeMember')}>
-                <ShieldCheck className="h-4 w-4" />
-              </div>
-            </div>
-
-            <div className="flex-1 text-center md:text-start space-y-2.5">
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5">
-                <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100">
-                  {t('college')}
-                </span>
-                <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-1">
-                  <UserCheck className="h-3.5 w-3.5" />
-                  <span>{t('activeMember')}</span>
-                </span>
-              </div>
-
-              <div className="flex items-center justify-center md:justify-start gap-3">
-                <h1 className="text-2xl sm:text-4xl font-extrabold font-cairo text-slate-900 leading-tight">
-                  {displayName}
-                </h1>
-                <button 
-                  onClick={() => { 
-                    const parts = (userData?.arabicFullName || '').split(' ').filter(Boolean);
-                    setEditingName({
-                      first: userData?.firstName || parts[0] || '',
-                      middle: userData?.fatherName || (parts.length > 2 ? parts.slice(1, -1).join(' ') : (parts.length === 2 ? parts[1] : '')),
-                      last: userData?.familyName || (parts.length > 2 ? parts[parts.length - 1] : '')
-                    }); 
-                    setShowEditModal(true); 
-                  }}
-                  className="p-2 text-slate-400 hover:text-blue-600 bg-slate-50 hover:bg-blue-50 rounded-lg transition-colors"
-                  title={isAr ? 'تعديل الاسم' : 'Edit Name'}
-                >
-                  <Edit2 className="h-4 w-4" />
-                </button>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-y-2 gap-x-6 text-sm text-slate-600 pt-1">
-                <div className="flex items-center gap-1.5">
-                  <Building2 className="h-4 w-4 text-blue-600" />
-                  <span className="font-semibold">{departmentStr}</span>
-                </div>
-                {academicLevel && (
-                  <div className="flex items-center gap-1.5">
-                    <GraduationCap className="h-4 w-4 text-indigo-600" />
-                    <span>{academicLevel}</span>
-                  </div>
-                )}
-                {universityId && (
-                  <div className="flex items-center gap-1.5 text-xs bg-slate-100 px-2.5 py-1 rounded-md font-mono text-slate-500">
-                    <span>ID: {universityId}</span>
-                  </div>
-                )}
-                <button 
-                  onClick={() => {
-                    setEditingProfile({
-                      college: userData?.college || '',
-                      major: userData?.major || '',
-                      academicLevel: userData?.academicLevel || '',
-                      universityId: userData?.universityId || ''
-                    });
-                    setShowProfileModal(true);
-                  }}
-                  className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
-                  title={isAr ? 'تعديل البيانات الأكاديمية' : 'Edit Academic Details'}
-                >
-                  <Edit2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Link
-                href="/events"
-                className="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-sm shadow-blue-500/20 transition-all"
-              >
-                <span>{t('exploreEvents')}</span>
-                <ArrowRight className="h-4 w-4 rtl:-scale-x-100" />
-              </Link>
-              <button
-                onClick={logout}
-                className="inline-flex items-center justify-center gap-2 bg-slate-100 hover:bg-red-50 text-slate-700 hover:text-red-600 px-5 py-2.5 rounded-xl text-sm font-bold transition-all"
-              >
-                <LogOut className="h-4 w-4 rtl:rotate-180" />
-                <span>{isAr ? 'تسجيل الخروج' : 'Log Out'}</span>
-              </button>
-            </div>
-          </div>
-        </section>
+        {/* 1. Digital Member Card */}
+        <DigitalMemberCard 
+          user={user}
+          userData={userData}
+          rank={userRank}
+          totalPoints={totalPoints}
+          onEditName={() => {
+            const parts = (userData?.arabicFullName || '').split(' ').filter(Boolean);
+            setEditingName({
+              first: userData?.firstName || parts[0] || '',
+              middle: userData?.fatherName || (parts.length > 2 ? parts.slice(1, -1).join(' ') : (parts.length === 2 ? parts[1] : '')),
+              last: userData?.familyName || (parts.length > 2 ? parts[parts.length - 1] : '')
+            });
+            setShowEditModal(true);
+          }}
+          onEditProfile={() => {
+            setEditingProfile({
+              college: userData?.college || '',
+              major: userData?.major || '',
+              academicLevel: userData?.academicLevel || '',
+              universityId: userData?.universityId || ''
+            });
+            setShowProfileModal(true);
+          }}
+          onLogout={logout}
+        />
 
         {/* 2. Gamification Summary Cards */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">

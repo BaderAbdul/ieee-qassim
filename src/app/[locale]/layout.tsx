@@ -9,6 +9,7 @@ import { AuthProvider } from '@/context/AuthContext';
 import ProfileGuard from '@/components/auth/ProfileGuard';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
+import IdeaFloatingButton from '@/components/ui/IdeaFloatingButton';
 import "../globals.css";
 
 const thmanyah = localFont({
@@ -75,6 +76,7 @@ export default async function RootLayout({
                   {children}
                 </main>
                 <Footer />
+                <IdeaFloatingButton />
               </div>
             </ProfileGuard>
           </AuthProvider>
