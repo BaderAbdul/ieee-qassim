@@ -260,7 +260,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
   const gains = isAr ? event.gains : event.gainsEn || event.gains;
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-20 pt-16">
+    <div className="min-h-screen bg-slate-50 pb-20 pt-24">
       
       {/* Hero Banner with Cover */}
       <div className="w-full h-72 sm:h-96 bg-slate-900 relative overflow-hidden">

@@ -5,7 +5,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { useTranslations } from 'next-intl';
 import { useParams } from 'next/navigation';
-import { Users, ChevronDown, ChevronUp, User } from 'lucide-react';
+import { Users, ChevronDown, ChevronUp, User, Linkedin } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 
@@ -14,6 +14,7 @@ interface CommitteeMember {
   name: string;
   role: string;
   avatar?: string;
+  linkedin?: string;
 }
 
 interface Committee {
@@ -123,10 +124,20 @@ export default function StructurePage() {
                                   <User className="h-5 w-5 text-blue-400" />
                                 )}
                               </div>
-                              <div className="overflow-hidden">
+                              <div className="overflow-hidden flex-1">
                                 <h3 className="font-bold text-slate-900 text-sm truncate" title={member.name}>{member.name}</h3>
                                 <p className="text-xs font-bold text-blue-600 mt-0.5 truncate">{member.role}</p>
                               </div>
+                              {member.linkedin && (
+                                <a 
+                                  href={member.linkedin} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="h-8 w-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 transition-colors flex-shrink-0"
+                                >
+                                  <Linkedin className="h-4 w-4" />
+                                </a>
+                              )}
                             </div>
                           ))}
                         </div>

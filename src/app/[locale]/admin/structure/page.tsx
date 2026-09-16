@@ -3,13 +3,14 @@
 import { useEffect, useState } from 'react';
 import { doc, getDoc, setDoc, collection, getDocs, query, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
-import { Plus, Trash2, Edit2, Save, X, Search } from 'lucide-react';
+import { Plus, Trash2, Edit2, Save, X, Search, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface CommitteeMember {
   userId: string;
   name: string;
   role: string;
   avatar?: string;
+  linkedin?: string;
 }
 
 interface Committee {
@@ -31,6 +32,7 @@ export default function AdminStructurePage() {
   
   const [showMemberModal, setShowMemberModal] = useState<{ committeeId: string } | null>(null);
   const [memberRole, setMemberRole] = useState('عضو');
+  const [memberLinkedin, setMemberLinkedin] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
@@ -128,6 +130,7 @@ export default function AdminStructurePage() {
             userId: user.id,
             name: user.arabicFullName || user.displayName || 'بدون اسم',
             role: memberRole,
+            linkedin: memberLinkedin || undefined,
             avatar: user.photoURL
           }]
         };
@@ -141,6 +144,8 @@ export default function AdminStructurePage() {
     setShowMemberModal(null);
     setSearchQuery('');
     setSearchResults([]);
+    setMemberLinkedin('');
+    setMemberRole('عضو');
   };
 
   const handleRemoveMember = (committeeId: string, userId: string) => {
@@ -155,6 +160,20 @@ export default function AdminStructurePage() {
       updateCommitteesInDB(updated);
     }
   };
+  const moveCommittee = (index: number, direction: 'up' | 'down') => {
+    if (
+      (direction === 'up' && index === 0) || 
+      (direction === 'down' && index === committees.length - 1)
+    ) return;
+    
+    const updated = [...committees];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    [updated[index], updated[targetIndex]] = [updated[targetIndex], updated[index]];
+    
+    setCommittees(updated);
+    updateCommitteesInDB(updated);
+  };
+
 
   if (loading) {
     return <div className="py-20 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div></div>;
@@ -187,14 +206,17 @@ export default function AdminStructurePage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {committees.map(committee => (
+        {committees.map((committee, index) => (
           <div key={committee.id} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col">
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h3 className="text-xl font-bold font-cairo text-gray-900">{committee.name}</h3>
                 <p className="text-sm text-gray-500 mt-1">{committee.description}</p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
+                <button onClick={() => moveCommittee(index, 'up')} disabled={index === 0} className="p-2 text-gray-400 hover:text-blue-600 bg-gray-50 rounded-lg disabled:opacity-30"><ArrowUp size={16} /></button>
+                <button onClick={() => moveCommittee(index, 'down')} disabled={index === committees.length - 1} className="p-2 text-gray-400 hover:text-blue-600 bg-gray-50 rounded-lg disabled:opacity-30"><ArrowDown size={16} /></button>
+                <div className="w-px h-6 bg-gray-200 mx-1"></div>
                 <button onClick={() => { setCurrentCommittee(committee); setShowCommitteeModal(true); }} className="p-2 text-gray-400 hover:text-blue-600 bg-gray-50 rounded-lg"><Edit2 size={16} /></button>
                 <button onClick={() => handleDeleteCommittee(committee.id)} className="p-2 text-gray-400 hover:text-red-600 bg-gray-50 rounded-lg"><Trash2 size={16} /></button>
               </div>
@@ -248,6 +270,10 @@ export default function AdminStructurePage() {
                 <label className="block text-sm font-medium mb-1">الوصف</label>
                 <textarea required value={currentCommittee.description} onChange={e => setCurrentCommittee({...currentCommittee, description: e.target.value})} className="w-full border rounded-lg p-2 h-20" />
               </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">اسم الأيقونة (من Lucide)</label>
+                <input type="text" value={currentCommittee.iconName || 'Users'} onChange={e => setCurrentCommittee({...currentCommittee, iconName: e.target.value})} className="w-full border rounded-lg p-2" placeholder="Users, Code, Megaphone..." />
+              </div>
               <div className="flex justify-end gap-3 mt-6">
                 <button type="button" onClick={() => setShowCommitteeModal(false)} className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg">إلغاء</button>
                 <button type="submit" className="px-4 py-2 text-white bg-blue-600 rounded-lg font-bold">حفظ</button>
@@ -266,9 +292,15 @@ export default function AdminStructurePage() {
               <button onClick={() => setShowMemberModal(null)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
             </div>
             
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-1">صفة العضو (المنصب)</label>
-              <input type="text" value={memberRole} onChange={e => setMemberRole(e.target.value)} className="w-full border rounded-lg p-2" placeholder="مثال: رئيس اللجنة، نائب، عضو..." />
+            <div className="mb-4 space-y-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">صفة العضو (المنصب)</label>
+                <input type="text" value={memberRole} onChange={e => setMemberRole(e.target.value)} className="w-full border rounded-lg p-2" placeholder="مثال: رئيس اللجنة، نائب، عضو..." />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">رابط لينكد إن (اختياري)</label>
+                <input type="url" value={memberLinkedin} onChange={e => setMemberLinkedin(e.target.value)} className="w-full border rounded-lg p-2 text-left" placeholder="https://linkedin.com/in/..." dir="ltr" />
+              </div>
             </div>
 
             <div className="flex gap-2 mb-4">

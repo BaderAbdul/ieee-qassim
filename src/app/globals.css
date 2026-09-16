@@ -13,6 +13,14 @@
     --background: #f8fafc;
     --foreground: #0f172a;
   }
+  html {
+    font-size: 15px; /* Slightly smaller base font for mobile */
+  }
+  @media (min-width: 640px) {
+    html {
+      font-size: 16px; /* Default for larger screens */
+    }
+  }
 }
 
 body {

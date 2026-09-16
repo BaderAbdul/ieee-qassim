@@ -370,11 +370,9 @@ export default function EngineeringProfilePage() {
   
   const getLabel = (type: 'colleges' | 'majors' | 'levels', val?: string | null) => {
     if (!val) return '';
-    try {
-      return tOnboard(`${type}.${val}`);
-    } catch {
-      return val;
-    }
+    const key = `${type}.${val}`;
+    const result = tOnboard(key);
+    return result === key || result.includes('Onboarding') ? val : result;
   };
 
   const departmentStr = userData?.isQassimStudent 

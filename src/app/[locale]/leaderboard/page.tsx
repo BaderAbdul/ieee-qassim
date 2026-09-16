@@ -34,7 +34,7 @@ export default function LeaderboardPage() {
           const data = d.data();
           return {
             id: d.id,
-            name: data.arabicFullName || data.displayName || (isAr ? 'طالب هندسي' : 'Engineering Student'),
+            name: data.arabicFullName || data.displayName || (isAr ? 'عضو' : 'Member'),
             points: data.totalPoints || 0,
             photoUrl: data.photoURL || data.photoUrl,
             department: data.department
@@ -75,12 +75,12 @@ export default function LeaderboardPage() {
             <Trophy className="h-10 w-10 sm:h-12 sm:w-12" />
           </div>
           <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-900 font-cairo">
-            {isAr ? 'لوحة الشرف الهندسية' : 'Engineering Leaderboard'}
+            {isAr ? 'المتصدرون' : 'Leaderboard'}
           </h1>
           <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
             {isAr 
-              ? 'تعرّف على أكثر طلاب الهندسة تميزاً وتفاعلاً في فعاليات وأنشطة مجتمع IEEE هذا الفصل.' 
-              : 'Recognizing the most active and distinguished engineering students in IEEE community events this semester.'}
+              ? 'تعرّف على الأعضاء الأكثر تميزاً وتفاعلاً في فعاليات وأنشطة مجتمع IEEE هذا الفصل.' 
+              : 'Recognizing the most active and distinguished members in IEEE community events this semester.'}
           </p>
         </div>
 

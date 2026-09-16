@@ -16,12 +16,13 @@ export default function HomePage() {
   const router = useRouter();
   const { user, userData, login } = useAuth();
   
-  const [stats, setStats] = useState({ membersCount: '+500', eventsCount: '+25', tracksCount: '4', featuredEventId: '', showStructure: true, heroTitle: '', heroSubtitleAr: '', heroSubtitleEn: '', committees: [] as any[] });
+  const [stats, setStats] = useState({ membersCount: '+500', eventsCount: '+25', adminsCount: '+40', featuredEventId: '', showStructure: true, heroTitle: '', heroSubtitleAr: '', heroSubtitleEn: '', committees: [] as any[] });
   const [latestEvent, setLatestEvent] = useState<PlatformEvent | null>(null);
   const [eventsList, setEventsList] = useState<PlatformEvent[]>([]);
   const [latestEventRegStatus, setLatestEventRegStatus] = useState<string | null>(null);
   const [latestCert, setLatestCert] = useState<{title: string, date: string} | null>(null);
   const [activeCard, setActiveCard] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const handleCardClick = (cardId: number, path: string) => {
     if (activeCard === cardId || window.innerWidth >= 1024) {
@@ -36,43 +37,49 @@ export default function HomePage() {
   };
 
   useEffect(() => {
+    let active = true;
     const fetchHomepageData = async () => {
       try {
+        const [statsDoc, eventsSnap] = await Promise.all([
+          getDoc(doc(db, 'settings', 'homepage')),
+          getDocs(query(collection(db, 'events'), orderBy('date', 'desc'), limit(15)))
+        ]);
+
         let featuredId = '';
-        const statsDoc = await getDoc(doc(db, 'settings', 'homepage'));
-        if (statsDoc.exists()) {
+        if (statsDoc.exists() && active) {
           const data = statsDoc.data() as any;
           setStats(data);
           featuredId = data.featuredEventId;
         }
 
-        // Fetch up to 3 recent events for carousel
-        const eventsQ = query(
-          collection(db, 'events'),
-          where('state', 'in', ['Published', 'Registration Open', 'Ongoing', 'Completed']),
-          orderBy('date', 'desc'),
-          limit(3)
-        );
-        const eventsSnap = await getDocs(eventsQ);
-        const evs = eventsSnap.docs.map(d => ({id: d.id, ...d.data()} as PlatformEvent));
-        setEventsList(evs);
+        const validStates = ['Published', 'Registration Open', 'Ongoing', 'Completed', 'Registration Closed'];
+        const evs = eventsSnap.docs
+          .map(d => ({id: d.id, ...d.data()} as PlatformEvent))
+          .filter(e => validStates.includes(e.state));
 
-        if (featuredId) {
-          const evDoc = await getDoc(doc(db, 'events', featuredId));
-          if (evDoc.exists()) {
-            setLatestEvent({ id: evDoc.id, ...evDoc.data() } as PlatformEvent);
+        if (active) {
+          setEventsList(evs.slice(0, 3));
+
+          if (featuredId) {
+            const evDoc = await getDoc(doc(db, 'events', featuredId));
+            if (evDoc.exists()) {
+              setLatestEvent({ id: evDoc.id, ...evDoc.data() } as PlatformEvent);
+            } else if (evs.length > 0) {
+              setLatestEvent(evs[0]);
+            }
           } else if (evs.length > 0) {
             setLatestEvent(evs[0]);
           }
-        } else if (evs.length > 0) {
-          setLatestEvent(evs[0]);
         }
       } catch (error) {
         console.error("Error fetching homepage data:", error);
+      } finally {
+        if (active) setLoading(false);
       }
     };
 
     fetchHomepageData();
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -112,6 +119,15 @@ export default function HomePage() {
     }
   }, [user]);
 
+  if (loading) {
+    return (
+      <div className="flex flex-col bg-[#F8FAFC] min-h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4" />
+        <span className="text-sm font-medium text-slate-500">{isAr ? 'جاري التحميل...' : 'Loading...'}</span>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col bg-[#F8FAFC] min-h-screen">
       {/* Light Mode Premium Hero Section */}
@@ -132,10 +148,10 @@ export default function HomePage() {
                 </span>
               </div>
               
-              <h1 className="text-5xl sm:text-7xl lg:text-8xl font-black mb-4 font-thmanyah text-slate-900 drop-shadow-sm uppercase tracking-tight">
+              <h1 className="text-4xl sm:text-7xl lg:text-8xl font-black mb-4 font-thmanyah text-slate-900 drop-shadow-sm uppercase tracking-tight">
                 {t('Hero.headline')}
               </h1>
-              <p className="text-slate-600 font-medium text-sm sm:text-base max-w-lg mx-auto lg:mx-0 mb-10 leading-relaxed">
+              <p className="text-slate-600 font-medium text-sm sm:text-base max-w-lg mx-auto lg:mx-0 mb-6 lg:mb-10 leading-relaxed">
                 {t('Hero.description')}
               </p>
             </div>
@@ -277,35 +293,35 @@ export default function HomePage() {
 
       {/* Hero Stats Strip */}
       <section className="relative z-20 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 w-full -mt-8 mb-12">
-        <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/40 border border-slate-100 p-6 md:p-8 grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-4 divide-y md:divide-y-0 md:divide-x md:rtl:divide-x-reverse divide-slate-100">
+        <div className="grid grid-cols-3 gap-2 sm:gap-4">
           
-          <div className="flex items-center gap-4 justify-center px-4">
-            <div className="h-14 w-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
-              <Users className="h-7 w-7" />
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-3 sm:p-6 flex flex-col sm:flex-row items-center gap-2 sm:gap-4 justify-center text-center sm:text-start">
+            <div className="h-10 w-10 sm:h-14 sm:w-14 rounded-xl sm:rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+              <Users className="h-5 w-5 sm:h-7 sm:w-7" />
             </div>
-            <div className="flex flex-col text-start">
-              <span className="text-3xl font-black text-slate-900">{stats.membersCount}</span>
-              <span className="text-sm font-bold text-slate-500">{isAr ? 'عضو في المجتمع' : 'Community Members'}</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4 justify-center px-4 pt-6 md:pt-0">
-            <div className="h-14 w-14 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center flex-shrink-0">
-              <Calendar className="h-7 w-7" />
-            </div>
-            <div className="flex flex-col text-start">
-              <span className="text-3xl font-black text-slate-900">{stats.eventsCount}</span>
-              <span className="text-sm font-bold text-slate-500">{isAr ? 'فعالية وورشة عمل' : 'Events & Workshops'}</span>
+            <div className="flex flex-col">
+              <span className="text-lg sm:text-3xl font-black text-slate-900">{stats.membersCount || '+500'}</span>
+              <span className="text-[9px] sm:text-sm font-bold text-slate-500 leading-tight">{isAr ? 'عضو مجتمع' : 'Members'}</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-4 justify-center px-4 pt-6 md:pt-0">
-            <div className="h-14 w-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
-              <LayoutList className="h-7 w-7" />
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-3 sm:p-6 flex flex-col sm:flex-row items-center gap-2 sm:gap-4 justify-center text-center sm:text-start">
+            <div className="h-10 w-10 sm:h-14 sm:w-14 rounded-xl sm:rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center flex-shrink-0">
+              <Calendar className="h-5 w-5 sm:h-7 sm:w-7" />
             </div>
-            <div className="flex flex-col text-start">
-              <span className="text-3xl font-black text-slate-900">{stats.tracksCount}</span>
-              <span className="text-sm font-bold text-slate-500">{isAr ? 'مسارات ولجان' : 'Tracks & Committees'}</span>
+            <div className="flex flex-col">
+              <span className="text-lg sm:text-3xl font-black text-slate-900">{stats.eventsCount || '+25'}</span>
+              <span className="text-[9px] sm:text-sm font-bold text-slate-500 leading-tight">{isAr ? 'فعالية وورشة' : 'Events'}</span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-3 sm:p-6 flex flex-col sm:flex-row items-center gap-2 sm:gap-4 justify-center text-center sm:text-start">
+            <div className="h-10 w-10 sm:h-14 sm:w-14 rounded-xl sm:rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
+              <Trophy className="h-5 w-5 sm:h-7 sm:w-7" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-lg sm:text-3xl font-black text-slate-900">{stats.adminsCount || '+40'}</span>
+              <span className="text-[9px] sm:text-sm font-bold text-slate-500 leading-tight">{isAr ? 'في الإدارة لخدمتكم' : 'Admins to serve'}</span>
             </div>
           </div>
 
@@ -444,7 +460,7 @@ export default function HomePage() {
               </p>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
               
               {stats.committees && stats.committees.length > 0 ? (
                 stats.committees.map((committee: any, index: number) => {
@@ -452,15 +468,15 @@ export default function HomePage() {
                   const color = colors[index % colors.length];
                   
                   return (
-                    <div key={committee.id || index} className="bg-[#F8FAFC] border border-slate-100 rounded-3xl p-6 text-center hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                      <div className={`h-16 w-16 bg-${color}-100 text-${color}-600 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-inner`}>
-                        <Users className="w-8 h-8" />
+                    <Link href="/structure" key={committee.id || index} className="bg-[#F8FAFC] border border-slate-100 rounded-2xl sm:rounded-3xl p-3 sm:p-6 text-center hover:shadow-xl hover:-translate-y-1 transition-all duration-300 block">
+                      <div className={`h-10 w-10 sm:h-16 sm:w-16 bg-${color}-100 text-${color}-600 rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-2 sm:mb-5 shadow-inner`}>
+                        <Users className="w-5 h-5 sm:w-8 sm:h-8" />
                       </div>
-                      <h3 className="text-lg font-black font-cairo text-slate-900 mb-2">{committee.name}</h3>
-                      <p className="text-sm text-slate-500 mb-4">{committee.description}</p>
+                      <h3 className="text-[10px] sm:text-lg font-black font-cairo text-slate-900 mb-1 sm:mb-2 line-clamp-2">{committee.name}</h3>
+                      <p className="hidden sm:block text-sm text-slate-500 mb-4">{committee.description}</p>
                       
                       {committee.members && committee.members.length > 0 && (
-                        <div className="flex -space-x-2 rtl:space-x-reverse justify-center mt-2">
+                        <div className="hidden sm:flex -space-x-2 rtl:space-x-reverse justify-center mt-2">
                           {committee.members.slice(0, 4).map((member: any) => (
                             <div key={member.userId} className={`h-8 w-8 rounded-full border-2 border-white bg-${color}-200 flex items-center justify-center text-xs font-bold text-${color}-700 overflow-hidden relative group`} title={member.name}>
                               {member.avatar ? (
@@ -480,7 +496,7 @@ export default function HomePage() {
                           )}
                         </div>
                       )}
-                    </div>
+                    </Link>
                   );
                 })
               ) : (
