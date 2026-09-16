@@ -10,6 +10,7 @@ import ProfileGuard from '@/components/auth/ProfileGuard';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import IdeaFloatingButton from '@/components/ui/IdeaFloatingButton';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import "../globals.css";
 
 const thmanyah = localFont({
@@ -81,6 +82,7 @@ export default async function RootLayout({
             </ProfileGuard>
           </AuthProvider>
         </NextIntlClientProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
