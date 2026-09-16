@@ -105,7 +105,7 @@ export default async function HomePage({ params }: PageProps) {
           
           <div className="relative block w-full h-[320px] lg:h-full lg:min-h-[500px] mt-4 lg:mt-0 flex items-center justify-center lg:block">
             <div className="relative w-full max-w-sm lg:max-w-none h-full">
-               <HeroUserCards latestEvent={latestEvent} activeCard={null} setActiveCard={() => {}} />
+               <HeroUserCards latestEvent={latestEvent} />
             </div>
           </div>
         </div>

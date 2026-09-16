@@ -10,16 +10,15 @@ import { useRouter } from '@/i18n/routing';
 
 interface HeroUserCardsProps {
   latestEvent: any | null;
-  activeCard: number | null;
-  setActiveCard: (id: number) => void;
 }
 
-export default function HeroUserCards({ latestEvent, activeCard, setActiveCard }: HeroUserCardsProps) {
+export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
   const { user, userData } = useAuth();
   const locale = useLocale();
   const isAr = locale === 'ar';
   const router = useRouter();
 
+  const [activeCard, setActiveCard] = useState<number | null>(null);
   const [latestEventRegStatus, setLatestEventRegStatus] = useState<string | null>(null);
   const [latestCert, setLatestCert] = useState<{title: string, date: string} | null>(null);
 
