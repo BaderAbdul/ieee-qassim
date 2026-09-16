@@ -22,7 +22,8 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "resend": "^6.28.0",
-    "tailwind-merge": "^3.7.0"
+    "tailwind-merge": "^3.7.0",
+    "@vercel/speed-insights": "^1.0.12"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

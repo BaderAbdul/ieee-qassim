@@ -5,7 +5,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { useTranslations } from 'next-intl';
 import { useParams } from 'next/navigation';
-import { Users, ChevronDown, ChevronUp, User, Linkedin } from 'lucide-react';
+import { Users, ChevronDown, ChevronUp, User, Link as LinkIcon } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 
@@ -135,7 +135,7 @@ export default function StructurePage() {
                                   rel="noopener noreferrer"
                                   className="h-8 w-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 transition-colors flex-shrink-0"
                                 >
-                                  <Linkedin className="h-4 w-4" />
+                                  <LinkIcon className="h-4 w-4" />
                                 </a>
                               )}
                             </div>
