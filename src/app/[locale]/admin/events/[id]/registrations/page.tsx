@@ -517,8 +517,8 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Points Modal */}
       {showPointsModal && (

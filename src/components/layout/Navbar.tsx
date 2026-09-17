@@ -80,10 +80,14 @@ export default function Navbar() {
           {/* Brand Logo */}
           <div className="flex items-center lg:px-2">
             <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="flex flex-col">
-                <span className="text-xl sm:text-2xl font-black font-cairo text-slate-900 leading-none group-hover:text-blue-600 transition-colors uppercase tracking-tight">
-                  IEEE QU
-                </span>
+              <div className="flex flex-col relative w-32 h-10">
+                <Image 
+                  src="/logo.svg" 
+                  alt="IEEE Qassim Logo" 
+                  fill
+                  className="object-contain"
+                  priority
+                />
               </div>
             </Link>
           </div>

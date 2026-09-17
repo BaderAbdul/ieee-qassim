@@ -25,6 +25,7 @@ export interface PlatformEvent {
   hasCertificate: boolean;
   state: EventState;
   registrationMode: RegistrationMode;
+  checkinToken?: string;
   createdAt: Timestamp | Date;
   updatedAt: Timestamp | Date;
 }

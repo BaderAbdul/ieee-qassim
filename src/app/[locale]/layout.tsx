@@ -38,8 +38,18 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Tech Community Platform | IEEE Qassim University",
-  description: "University Student Technology Community - College of Engineering",
+  title: "IEEE Qassim Tech Community",
+  description: "The Official IEEE Qassim Technology Community Platform",
+  openGraph: {
+    title: "IEEE Qassim Tech Community",
+    description: "The Official IEEE Qassim Technology Community Platform",
+    siteName: "IEEE Qassim",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "IEEE Qassim Tech Community",
+    description: "The Official IEEE Qassim Technology Community Platform",
+  }
 };
 
 export default async function RootLayout({
