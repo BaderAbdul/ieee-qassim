@@ -80,9 +80,9 @@ export default function Navbar() {
           {/* Brand Logo */}
           <div className="flex items-center lg:px-2">
             <Link href="/" className="flex items-center gap-2 group">
-              <div className="relative w-12 h-12 flex-shrink-0">
+              <div className="relative w-16 h-12 flex-shrink-0">
                 <Image 
-                  src="/site-logo.png" 
+                  src="/ogo.png" 
                   alt="IEEE Logo" 
                   fill
                   className="object-contain"
