@@ -82,7 +82,7 @@ export default function Navbar() {
             <Link href="/" className="flex items-center gap-2 group">
               <div className="relative w-16 h-12 flex-shrink-0">
                 <Image 
-                  src="/ogo.png" 
+                  src="/ogo.svg" 
                   alt="IEEE Logo" 
                   fill
                   className="object-contain"
