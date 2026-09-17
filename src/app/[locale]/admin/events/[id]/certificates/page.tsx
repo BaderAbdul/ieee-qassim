@@ -28,6 +28,7 @@ export default function CertificatesManagementPage() {
   const [uploadingCSV, setUploadingCSV] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [manualLinks, setManualLinks] = useState<Record<string, string>>({});
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -159,6 +160,40 @@ export default function CertificatesManagementPage() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error revoking certificate';
       setError(msg);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const saveManualLink = async (attendee: Attendee) => {
+    const url = manualLinks[attendee.userId];
+    if (!url || !url.startsWith('http')) {
+      alert('يجب إدخال رابط صحيح يبدأ بـ http أو https');
+      return;
+    }
+    setProcessing(true);
+    try {
+      const certId = `certificate_${eventId}_${attendee.userId}`;
+      const certRef = doc(db, 'certificates', certId);
+      await setDoc(certRef, {
+        id: certId,
+        eventId,
+        userId: attendee.userId,
+        status: 'Available',
+        externalUrl: url,
+        studentName: attendee.name,
+        eventTitle: event?.title || '',
+        eventType: event?.type || 'Workshop',
+        attendanceDate: new Date(),
+        issueDate: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        attemptCount: 1
+      });
+      alert('تم رفع الشهادة بنجاح');
+      setReloadKey(k => k + 1);
+    } catch (err: any) {
+      alert('خطأ في حفظ الرابط: ' + err.message);
     } finally {
       setProcessing(false);
     }
@@ -361,9 +396,27 @@ export default function CertificatesManagementPage() {
                     </button>
                   )}
                   {attendee.certificate?.status === 'Available' && (
-                    <button onClick={() => handleRevoke(attendee.certificate!.id)} disabled={processing} className="text-red-600 hover:bg-red-50 px-3 py-1 rounded text-sm font-bold">
+                    <button onClick={() => handleRevoke(attendee.certificate!.id)} disabled={processing} className="text-red-600 hover:bg-red-50 px-3 py-1 rounded text-sm font-bold mt-1 block">
                       إلغاء الشهادة
                     </button>
+                  )}
+                  {(!attendee.certificate || attendee.certificate.status !== 'Available') && (
+                    <div className="flex gap-2 items-center mt-2">
+                      <input 
+                        type="url" 
+                        placeholder="رابط الشهادة..." 
+                        value={manualLinks[attendee.userId] || ''}
+                        onChange={(e) => setManualLinks(prev => ({ ...prev, [attendee.userId]: e.target.value }))}
+                        className="p-2 border rounded-lg text-sm flex-1 outline-none focus:ring-1 focus:ring-blue-500 dir-ltr text-left"
+                      />
+                      <button 
+                        onClick={() => saveManualLink(attendee)}
+                        disabled={processing || !manualLinks[attendee.userId]}
+                        className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        رفع
+                      </button>
+                    </div>
                   )}
                 </td>
               </tr>

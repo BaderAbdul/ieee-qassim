@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useState, use } from 'react';
-import { collection, query, where, getDocs, doc, getDoc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, updateDoc, setDoc, serverTimestamp, increment, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
-import { ArrowRight, Download, Users, Check, X, Clock, UserCheck, CheckSquare, Square } from 'lucide-react';
+import { ArrowRight, Download, Users, Check, X, Clock, UserCheck, CheckSquare, Square, Trophy, Link as LinkIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -14,6 +14,7 @@ interface RegistrationData {
   userId: string;
   userName: string;
   userEmail: string;
+  universityId?: string;
   status: string;
   timestamp: { toDate?: () => Date } | Date | null;
 }
@@ -33,6 +34,16 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isUpdatingBulk, setIsUpdatingBulk] = useState(false);
+
+  // Points Awarding Modal State
+  const [showPointsModal, setShowPointsModal] = useState(false);
+  const [pointsAmount, setPointsAmount] = useState<number>(5);
+  const [pointsDesc, setPointsDesc] = useState('');
+  const [isAwarding, setIsAwarding] = useState(false);
+
+  // Self Check-in State
+  const [selfCheckinLink, setSelfCheckinLink] = useState('');
+  const [isGeneratingLink, setIsGeneratingLink] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -168,6 +179,50 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
     }
   };
 
+  const handleAwardPoints = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedIds.length === 0 || !pointsAmount) return;
+    
+    setIsAwarding(true);
+    try {
+      const promises = selectedIds.map(async (id) => {
+        const reg = registrations.find(r => r.id === id);
+        if (!reg) return;
+        const userId = reg.userId || (id.includes('_') ? id.slice(eventId.length + 1) : null);
+        if (!userId) return;
+
+        // 1. Update user totalPoints
+        const userRef = doc(db, 'users', userId);
+        const updatePromise = updateDoc(userRef, {
+          totalPoints: increment(pointsAmount)
+        });
+
+        // 2. Add transaction record
+        const transPromise = addDoc(collection(db, 'point_transactions'), {
+          userId,
+          eventId,
+          points: pointsAmount,
+          description: pointsDesc || 'مشاركة في الفعالية',
+          createdAt: serverTimestamp(),
+          type: 'event_attendance'
+        });
+
+        return Promise.all([updatePromise, transPromise]);
+      });
+
+      await Promise.all(promises);
+      alert(`تم رصد ${pointsAmount} نقاط لـ ${selectedIds.length} مستخدم بنجاح!`);
+      setShowPointsModal(false);
+      setSelectedIds([]);
+      setPointsDesc('');
+    } catch (error) {
+      console.error("Error awarding points:", error);
+      alert("حدث خطأ أثناء رصد النقاط");
+    } finally {
+      setIsAwarding(false);
+    }
+  };
+
   const toggleSelectAll = () => {
     if (selectedIds.length === registrations.length) {
       setSelectedIds([]);
@@ -183,12 +238,13 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
   const exportCSV = () => {
     if (!event) return;
     
-    const headers = ['Name', 'Email', 'Status', 'Date'];
+    const headers = ['Name', 'Email', 'University ID', 'Status', 'Date'];
     const rows = registrations.map(r => {
       const d = toDate(r.timestamp);
       return [
         `"${r.userName}"`,
         `"${r.userEmail}"`,
+        `"${r.universityId || ''}"`,
         r.status,
         d ? format(d, 'yyyy-MM-dd HH:mm:ss') : ''
       ];
@@ -206,6 +262,37 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
     link.click();
     document.body.removeChild(link);
   };
+
+  const generateCheckinLink = async () => {
+    setIsGeneratingLink(true);
+    try {
+      const token = Math.random().toString(36).substring(2, 10).toUpperCase();
+      await updateDoc(doc(db, 'events', eventId), {
+        checkinToken: token
+      });
+      const link = `${window.location.origin}/events/${eventId}/checkin?token=${token}`;
+      setSelfCheckinLink(link);
+      setEvent(prev => prev ? { ...prev, checkinToken: token } : null);
+    } catch (error) {
+      console.error('Error generating checkin link', error);
+      alert('حدث خطأ أثناء إنشاء رابط التحضير');
+    } finally {
+      setIsGeneratingLink(false);
+    }
+  };
+
+  const copyLink = () => {
+    if (selfCheckinLink) {
+      navigator.clipboard.writeText(selfCheckinLink);
+      alert('تم نسخ الرابط!');
+    }
+  };
+
+  useEffect(() => {
+    if (event?.checkinToken && typeof window !== 'undefined') {
+      setSelfCheckinLink(`${window.location.origin}/events/${eventId}/checkin?token=${event.checkinToken}`);
+    }
+  }, [event?.checkinToken, eventId]);
 
   if (loading) {
     return <div className="py-20 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div></div>;
@@ -230,10 +317,56 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
           <p className="text-gray-600 text-lg">{event.title}</p>
         </div>
         
-        <button onClick={exportCSV} className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center shadow-sm">
-          <Download size={18} className="me-2" />
-          تصدير (CSV)
-        </button>
+        <div className="flex gap-2">
+          <button onClick={exportCSV} className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center shadow-sm">
+            <Download size={18} className="me-2" />
+            تصدير (CSV)
+          </button>
+        </div>
+      </div>
+
+      {/* Self Check-in Link Section */}
+      <div className="bg-white border border-purple-100 rounded-xl p-6 mb-6 shadow-sm">
+        <h3 className="text-lg font-bold text-gray-800 mb-2 flex items-center gap-2">
+          <LinkIcon size={20} className="text-purple-600" />
+          رابط التحضير الذاتي (Self Check-in)
+        </h3>
+        <p className="text-gray-600 text-sm mb-4">
+          شارك هذا الرابط مع الحضور ليتمكنوا من تحضير أنفسهم ذاتياً بدلاً من مسح الـ QR.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3">
+          {selfCheckinLink ? (
+            <>
+              <input 
+                type="text" 
+                readOnly 
+                value={selfCheckinLink} 
+                className="flex-1 p-3 bg-gray-50 border rounded-xl text-left dir-ltr text-sm outline-none"
+              />
+              <button 
+                onClick={copyLink}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl font-bold transition-colors"
+              >
+                نسخ الرابط
+              </button>
+              <button 
+                onClick={generateCheckinLink}
+                disabled={isGeneratingLink}
+                className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-4 py-3 rounded-xl font-bold transition-colors disabled:opacity-50"
+              >
+                إنشاء رابط جديد (يُبطل القديم)
+              </button>
+            </>
+          ) : (
+            <button 
+              onClick={generateCheckinLink}
+              disabled={isGeneratingLink}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl font-bold transition-colors disabled:opacity-50"
+            >
+              {isGeneratingLink ? 'جاري الإنشاء...' : 'توليد رابط التحضير الآن'}
+            </button>
+          )}
+        </div>
       </div>
 
       {selectedIds.length > 0 && (
@@ -242,6 +375,12 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
             تم تحديد {selectedIds.length} مسجل
           </div>
           <div className="flex flex-wrap gap-2">
+            <button 
+              onClick={() => setShowPointsModal(true)}
+              className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition-colors"
+            >
+              <Trophy size={16} /> رصد نقاط
+            </button>
             <button 
               disabled={isUpdatingBulk}
               onClick={() => handleBulkUpdateStatus('approved')}
@@ -378,8 +517,66 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Points Modal */}
+      {showPointsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
+            <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 p-4 flex justify-between items-center text-white">
+              <h3 className="text-xl font-bold font-cairo flex items-center gap-2">
+                <Trophy size={20} />
+                رصد نقاط للمسجلين ({selectedIds.length})
+              </h3>
+              <button onClick={() => setShowPointsModal(false)} className="hover:bg-white/20 p-1 rounded-lg transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleAwardPoints} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">عدد النقاط</label>
+                <input 
+                  type="number" 
+                  required
+                  min="1"
+                  value={pointsAmount}
+                  onChange={e => setPointsAmount(Number(e.target.value))}
+                  className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-yellow-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">الوصف (يظهر للمستخدم)</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="مثال: حضور الفعالية وتفاعل مميز"
+                  value={pointsDesc}
+                  onChange={e => setPointsDesc(e.target.value)}
+                  className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-yellow-500 outline-none"
+                />
+              </div>
+              <div className="flex gap-2 pt-4">
+                <button 
+                  type="submit" 
+                  disabled={isAwarding}
+                  className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 rounded-xl disabled:opacity-50 transition-colors"
+                >
+                  {isAwarding ? 'جاري الرصد...' : 'رصد النقاط الآن'}
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setShowPointsModal(false)}
+                  className="px-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 rounded-xl transition-colors"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

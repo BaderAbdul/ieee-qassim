@@ -74,7 +74,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               createdAt: new Date().toISOString(),
               profileCompleted: false, // Onboarding required
             };
-            await setDoc(userRef, newUserData);
+            await setDoc(userRef, newUserData, { merge: true });
             // onSnapshot will automatically fire again after setDoc creates the doc
           }
           setLoading(false);
