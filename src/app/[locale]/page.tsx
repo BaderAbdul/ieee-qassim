@@ -1,16 +1,13 @@
 import React from 'react';
-import { collection, query, orderBy, limit, getDocs, doc, getDoc, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
 import { PlatformEvent } from '@/lib/types';
 import { getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/routing';
 import Image from 'next/image';
-import { Calendar, Trophy, ArrowRight, UserCircle, Users, LayoutList, Sparkles } from 'lucide-react';
+import { Calendar, Trophy, ArrowRight, UserCircle, Users } from 'lucide-react';
 import HeroUserCards from './HeroUserCards';
 import HeroActionButtons from './HeroActionButtons';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+export const revalidate = 60; // Enable ISR, cache for 60 seconds
 
 interface PageProps {
   params: Promise<{ locale: string }>;
@@ -21,61 +18,71 @@ export default async function HomePage({ params }: PageProps) {
   const isAr = locale === 'ar';
   const t = await getTranslations({ locale, namespace: 'Index' });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let stats = { membersCount: '+500', eventsCount: '+25', adminsCount: '+40', featuredEventId: '', showStructure: true, heroTitle: '', heroSubtitleAr: '', heroSubtitleEn: '', committees: [] as any[] };
   let eventsList: PlatformEvent[] = [];
   let latestEvent: PlatformEvent | null = null;
 
   try {
-    const statsDoc = await getDoc(doc(db, 'settings', 'homepage'));
-    if (statsDoc.exists()) {
-      stats = { ...stats, ...statsDoc.data() };
-    }
+    // Dynamic import to avoid loading admin SDK in client bundles if mistakenly tree-shaken
+    const { adminDb } = await import('@/lib/firebase/admin');
+    
+    if (adminDb) {
+      const statsDoc = await adminDb.collection('settings').doc('homepage').get();
+      if (statsDoc.exists) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        stats = { ...stats, ...(statsDoc.data() as any) };
+      }
 
-    const validStates = ['Published', 'Registration Open', 'Ongoing', 'Completed', 'Registration Closed'];
-    const eventsSnap = await getDocs(query(
-      collection(db, 'events'),
-      where('state', 'in', validStates),
-      limit(20)
-    ));
+      const validStates = ['Published', 'Registration Open', 'Ongoing', 'Completed', 'Registration Closed'];
+      const eventsSnap = await adminDb.collection('events')
+        .where('state', 'in', validStates)
+        .limit(20)
+        .get();
 
-    const evs = eventsSnap.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-        date: data.date?.toDate ? data.date.toDate().toISOString() : data.date,
-        createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
-        updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt
-      };
-    }) as PlatformEvent[];
-
-    evs.sort((a, b) => {
-      const dateA = typeof a.date === 'string' ? new Date(a.date) : (a.date as any)?.toDate?.() || new Date(0);
-      const dateB = typeof b.date === 'string' ? new Date(b.date) : (b.date as any)?.toDate?.() || new Date(0);
-      return dateB.getTime() - dateA.getTime();
-    });
-    eventsList = evs.slice(0, 3);
-
-    let featuredId = stats.featuredEventId;
-    if (featuredId) {
-      const evDoc = await getDoc(doc(db, 'events', featuredId));
-      if (evDoc.exists()) {
-        const data = evDoc.data() as any;
-        latestEvent = { 
-          id: evDoc.id, 
+      const evs = eventsSnap.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
           ...data,
           date: data.date?.toDate ? data.date.toDate().toISOString() : data.date,
           createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
           updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt
-        } as PlatformEvent;
+        };
+      }) as PlatformEvent[];
+
+      evs.sort((a, b) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const dateA = typeof a.date === 'string' ? new Date(a.date) : typeof (a.date as any)?.toDate === 'function' ? (a.date as any).toDate() : new Date(0);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const dateB = typeof b.date === 'string' ? new Date(b.date) : typeof (b.date as any)?.toDate === 'function' ? (b.date as any).toDate() : new Date(0);
+        return dateB.getTime() - dateA.getTime();
+      });
+      eventsList = evs.slice(0, 3);
+
+      const featuredId = stats.featuredEventId;
+      if (featuredId) {
+        const evDoc = await adminDb.collection('events').doc(featuredId).get();
+        if (evDoc.exists) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const data = evDoc.data() as any;
+          latestEvent = {  
+            id: evDoc.id, 
+            ...data,
+            date: data.date?.toDate ? data.date.toDate().toISOString() : data.date,
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
+            updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt
+          } as PlatformEvent;
+        } else if (evs.length > 0) {
+          latestEvent = evs[0];
+        }
       } else if (evs.length > 0) {
         latestEvent = evs[0];
       }
-    } else if (evs.length > 0) {
-      latestEvent = evs[0];
     }
   } catch (error) {
-    console.error("Error fetching homepage data:", error);
+    console.error("Error fetching homepage data gracefully:", error);
+    // Graceful degradation: page will still render with default stats and empty events
   }
 
   return (

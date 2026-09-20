@@ -3,8 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Trophy, UserCircle } from 'lucide-react';
-import { collection, query, getDocs, where, limit, doc, getDoc, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
 import { useLocale } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
 
@@ -26,6 +24,8 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
     if (user && latestEvent) {
       const fetchRegStatus = async () => {
         try {
+          const { doc, getDoc } = await import('firebase/firestore');
+          const { db } = await import('@/lib/firebase/client');
           const regDoc = await getDoc(doc(db, 'registrations', `${latestEvent.id}_${user.uid}`));
           if (regDoc.exists()) {
             setLatestEventRegStatus(regDoc.data().status);
@@ -40,6 +40,8 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
     if (user) {
       const fetchCerts = async () => {
         try {
+          const { collection, query, getDocs, where, limit, orderBy } = await import('firebase/firestore');
+          const { db } = await import('@/lib/firebase/client');
           const certQ = query(
             collection(db, 'certificates'),
             where('userId', '==', user.uid),

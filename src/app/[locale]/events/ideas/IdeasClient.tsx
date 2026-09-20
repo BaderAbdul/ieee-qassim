@@ -26,10 +26,6 @@ export default function IdeasClient() {
   const locale = useLocale();
   const isAr = locale === 'ar';
 
-  useEffect(() => {
-    fetchIdeas();
-  }, []);
-
   const fetchIdeas = async () => {
     try {
       const q = query(collection(db, 'ideas'), where('isPublic', '==', true));
@@ -49,6 +45,11 @@ export default function IdeasClient() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchIdeas();
+  }, []);
 
   const handleVote = async (ideaId: string, currentVoters: string[]) => {
     if (!user) {

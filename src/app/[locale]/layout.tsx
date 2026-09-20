@@ -16,10 +16,10 @@ import "../globals.css";
 
 const thmanyah = localFont({
   src: [
-    { path: '../../fonts/thmanyah-serif-display-regular.otf', weight: '400', style: 'normal' },
-    { path: '../../fonts/thmanyah-serif-display-medium.otf', weight: '500', style: 'normal' },
-    { path: '../../fonts/thmanyah-serif-display-bold.otf', weight: '700', style: 'normal' },
-    { path: '../../fonts/thmanyah-serif-display-black.otf', weight: '900', style: 'normal' }
+    { path: '../../fonts/thmanyah-serif-display-regular.woff2', weight: '400', style: 'normal' },
+    { path: '../../fonts/thmanyah-serif-display-medium.woff2', weight: '500', style: 'normal' },
+    { path: '../../fonts/thmanyah-serif-display-bold.woff2', weight: '700', style: 'normal' },
+    { path: '../../fonts/thmanyah-serif-display-black.woff2', weight: '900', style: 'normal' }
   ],
   variable: '--font-thmanyah',
   display: 'swap',
