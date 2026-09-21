@@ -303,7 +303,10 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
   
   const title = isAr ? event.title : event.titleEn || event.title;
   const description = isAr ? event.description : event.descriptionEn || event.description;
-  const lo  return (
+  const location = isAr ? event.location : event.locationEn || event.location;
+  const gains = isAr ? event.gains : event.gainsEn || event.gains;
+
+  return (
     <div className="min-h-screen bg-slate-50 pb-20 pt-24 sm:pt-32">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
@@ -570,20 +573,6 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
              )}
              
           </div>
-        </div>
-      </div>
-    </div>
-  );on>
-                        )}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-
-            </div>
-          </div>
-          
         </div>
       </div>
     </div>
