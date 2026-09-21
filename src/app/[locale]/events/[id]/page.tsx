@@ -317,8 +317,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
             alt={title} 
             fill
             priority
-            unoptimized
-            quality={95}
+            quality={85}
             sizes="(max-width: 1200px) 100vw, 1200px"
             className="object-cover" 
           />
@@ -360,24 +359,24 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
           <div className="lg:col-span-2 space-y-8">
             
             {/* About Section */}
-            <section className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100 text-start">
-              <h2 className="text-2xl font-bold mb-5 font-cairo text-slate-900 flex items-center gap-3">
-                <span className="w-1.5 h-6 bg-blue-600 rounded-full" />
+            <section className="bg-white rounded-3xl p-5 sm:p-8 shadow-sm border border-gray-100 text-start">
+              <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-5 font-cairo text-slate-900 flex items-center gap-3">
+                <span className="w-1.5 h-5 sm:h-6 bg-blue-600 rounded-full" />
                 <span>{t('about')}</span>
               </h2>
-              <p className="text-slate-600 text-base sm:text-lg leading-relaxed whitespace-pre-wrap">
+              <p className="text-slate-600 text-sm sm:text-lg leading-relaxed whitespace-pre-wrap">
                 {description}
               </p>
             </section>
             
             {/* Learning Gains */}
             {gains && gains.length > 0 && (
-              <section className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100 text-start">
-                <h2 className="text-2xl font-bold mb-5 font-cairo text-slate-900 flex items-center gap-3">
-                  <span className="w-1.5 h-6 bg-emerald-500 rounded-full" />
+              <section className="bg-white rounded-3xl p-5 sm:p-8 shadow-sm border border-gray-100 text-start">
+                <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-5 font-cairo text-slate-900 flex items-center gap-3">
+                  <span className="w-1.5 h-5 sm:h-6 bg-emerald-500 rounded-full" />
                   <span>{t('whatYouWillLearn')}</span>
                 </h2>
-                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
                   {gains.map((gain, idx) => (
                     <li key={idx} className="flex items-start gap-3 p-3 rounded-2xl bg-emerald-50/50 border border-emerald-100/60">
                       <div className="p-1 bg-emerald-100 text-emerald-700 rounded-lg flex-shrink-0 mt-0.5">
@@ -392,8 +391,8 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
 
             {/* Speakers */}
             {event.speakers && event.speakers.length > 0 && (
-              <section className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100 text-start">
-                <h2 className="text-2xl font-bold mb-5 font-cairo text-slate-900 flex items-center gap-3">
+              <section className="bg-white rounded-3xl p-5 sm:p-8 shadow-sm border border-gray-100 text-start">
+                <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-5 font-cairo text-slate-900 flex items-center gap-3">
                   <span className="w-1.5 h-6 bg-purple-600 rounded-full" />
                   <span>{t('speakers')}</span>
                 </h2>
@@ -414,7 +413,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
 
           {/* Sidebar CTA & Event Snapshot (1 Col) */}
           <div className="space-y-6">
-            <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100 sticky top-24 space-y-6 text-start">
+            <div className="bg-white rounded-3xl p-5 sm:p-8 shadow-sm border border-gray-100 sticky top-24 space-y-6 text-start">
               
               {/* Event Metadata list */}
               <div className="space-y-5">
@@ -544,13 +543,13 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                             {registrationStatus === 'approved' 
                               ? ((event.state === 'Completed' || event.state === 'Archived') ? (isAr ? 'انتهت الفعالية' : 'Event Ended') : t('registeredSuccess')) :
                              registrationStatus === 'waitlisted' ? t('waitlistedTitle') :
-                             t('pendingTitle')}
+                             ((event.state === 'Completed' || event.state === 'Archived') ? (isAr ? 'انتهت الفعالية' : 'Event Ended') : t('pendingTitle'))}
                           </span>
                           <span className="text-xs opacity-80">
                             {registrationStatus === 'approved' 
                               ? ((event.state === 'Completed' || event.state === 'Archived') ? (isAr ? 'شكراً لاهتمامك بهذه الفعالية' : 'Thank you for your interest in this event') : t('registeredNotice')) :
                              registrationStatus === 'waitlisted' ? t('waitlistedNotice') :
-                             t('pendingNotice')}
+                             ((event.state === 'Completed' || event.state === 'Archived') ? (isAr ? 'تم الانتهاء من الفعالية' : 'Event has concluded') : t('pendingNotice'))}
                           </span>
                         </div>
 

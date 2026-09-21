@@ -231,18 +231,41 @@ export default async function HomePage({ params }: PageProps) {
         </div>
 
         {eventsList.length > 0 ? (
-          <div className="flex overflow-x-auto pb-8 -mx-4 px-4 sm:mx-0 sm:px-0 snap-x snap-mandatory hide-scrollbar gap-6">
-            {eventsList.map((event) => {
+          <div className="flex overflow-x-auto pb-8 -mx-4 px-4 sm:mx-0 sm:px-0 snap-x snap-mandatory hide-scrollbar gap-4 sm:gap-6">
+            {eventsList.slice(0, 2).map((event) => {
               const isCompleted = event.state === 'Completed' || event.state === 'Archived';
               return (
                 <div 
                   key={event.id}
-                  className={`min-w-[280px] sm:min-w-[340px] max-w-[340px] flex-shrink-0 snap-start ${isCompleted ? 'grayscale-[40%] opacity-90' : ''}`}
+                  className={`min-w-[85vw] sm:min-w-[340px] max-w-[85vw] sm:max-w-[340px] flex-shrink-0 snap-start ${isCompleted ? 'grayscale-[40%] opacity-90' : ''}`}
                 >
                   <EventCard event={event} />
                 </div>
               );
             })}
+            
+            {/* View All Card */}
+            {eventsList.length > 2 && (
+              <div className="min-w-[85vw] sm:min-w-[340px] max-w-[85vw] sm:max-w-[340px] flex-shrink-0 snap-start">
+                <div className="h-full min-h-[300px] bg-gradient-to-br from-blue-50 to-indigo-50 rounded-3xl sm:rounded-[2rem] border-2 border-dashed border-blue-200 flex flex-col items-center justify-center p-8 text-center transition-all duration-500 hover:bg-blue-100 hover:border-blue-300 group cursor-pointer">
+                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4 group-hover:scale-110 transition-transform duration-500">
+                    <ArrowRight className="w-8 h-8 text-blue-600 rtl:-scale-x-100" />
+                  </div>
+                  <h3 className="text-xl font-black text-slate-800 mb-2 font-cairo">
+                    {isAr ? 'استكشف المزيد' : 'Explore More'}
+                  </h3>
+                  <p className="text-slate-500 text-sm mb-6">
+                    {isAr ? 'هناك المزيد من الفعاليات وورش العمل بانتظارك' : 'More events and workshops are waiting for you'}
+                  </p>
+                  <Link 
+                    href="/events"
+                    className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold shadow-md shadow-blue-500/20 hover:bg-blue-700 transition-colors w-full"
+                  >
+                    {isAr ? 'استعرض كل الفعاليات' : 'View All Events'}
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="text-center py-12 bg-white/60 backdrop-blur-md rounded-3xl border border-slate-200 border-dashed">
