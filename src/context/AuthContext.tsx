@@ -1,10 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, onAuthStateChanged, signInWithPopup, signOut, setPersistence, browserLocalPersistence } from 'firebase/auth';
-import { auth, googleProvider } from '@/lib/firebase/client';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
+import type { User } from 'firebase/auth';
 
 export interface UserData {
   role: 'student' | 'event_organizer' | 'super_admin';
@@ -50,54 +47,69 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     let unsubscribeSnapshot: () => void;
+    let unsubscribeAuth: () => void;
 
-    // Ensure persistence is set to LOCAL
-    setPersistence(auth, browserLocalPersistence).catch(console.error);
+    const initFirebase = async () => {
+      try {
+        const { auth } = await import('@/lib/firebase/client');
+        const { onAuthStateChanged, setPersistence, browserLocalPersistence } = await import('firebase/auth');
+        const { doc, setDoc, onSnapshot } = await import('firebase/firestore');
+        const { db } = await import('@/lib/firebase/client');
 
-    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      
-      if (currentUser) {
-        const userRef = doc(db, 'users', currentUser.uid);
-        
-        // Listen to the document in real-time to sync profileCompleted, points, etc.
-        unsubscribeSnapshot = onSnapshot(userRef, async (userSnap) => {
-          if (userSnap.exists()) {
-            setUserData(userSnap.data() as UserData);
+        setPersistence(auth, browserLocalPersistence).catch(console.error);
+
+        unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
+          setUser(currentUser);
+          
+          if (currentUser) {
+            const userRef = doc(db, 'users', currentUser.uid);
+            
+            unsubscribeSnapshot = onSnapshot(userRef, async (userSnap) => {
+              if (userSnap.exists()) {
+                setUserData(userSnap.data() as UserData);
+              } else {
+                const newUserData: UserData = {
+                  role: 'student',
+                  totalPoints: 0,
+                  email: currentUser.email,
+                  displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Student',
+                  photoURL: currentUser.photoURL || null,
+                  createdAt: new Date().toISOString(),
+                  profileCompleted: false,
+                };
+                await setDoc(userRef, newUserData, { merge: true });
+              }
+              setLoading(false);
+            });
           } else {
-            const newUserData: UserData = {
-              role: 'student', // Default role
-              totalPoints: 0,
-              email: currentUser.email,
-              displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Student',
-              photoURL: currentUser.photoURL || null,
-              createdAt: new Date().toISOString(),
-              profileCompleted: false, // Onboarding required
-            };
-            await setDoc(userRef, newUserData, { merge: true });
-            // onSnapshot will automatically fire again after setDoc creates the doc
+            setUserData(null);
+            setLoading(false);
+            if (unsubscribeSnapshot) {
+              unsubscribeSnapshot();
+            }
           }
-          setLoading(false);
         });
-      } else {
-        setUserData(null);
+      } catch (err) {
+        console.error("Firebase Auth Init Error", err);
         setLoading(false);
-        if (unsubscribeSnapshot) {
-          unsubscribeSnapshot();
-        }
       }
-    });
+    };
+
+    // We delay the Firebase initialization very slightly so it doesn't block the initial main thread paint
+    if (typeof window !== 'undefined') {
+      setTimeout(initFirebase, 100);
+    }
 
     return () => {
-      unsubscribeAuth();
-      if (unsubscribeSnapshot) {
-        unsubscribeSnapshot();
-      }
+      if (unsubscribeAuth) unsubscribeAuth();
+      if (unsubscribeSnapshot) unsubscribeSnapshot();
     };
   }, []);
 
   const login = async () => {
     try {
+      const { auth, googleProvider } = await import('@/lib/firebase/client');
+      const { signInWithPopup } = await import('firebase/auth');
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
       console.error("Login failed", error);
@@ -108,7 +120,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (typeof window !== 'undefined' && !window.confirm('هل أنت متأكد من تسجيل الخروج؟ / Are you sure you want to log out?')) {
       return;
     }
-    await signOut(auth);
+    try {
+      const { auth } = await import('@/lib/firebase/client');
+      const { signOut } = await import('firebase/auth');
+      await signOut(auth);
+    } catch (e) {
+      console.error("Logout error", e);
+    }
   };
 
   return (

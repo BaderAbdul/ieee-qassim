@@ -3,9 +3,11 @@ import { PlatformEvent } from '@/lib/types';
 import { getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/routing';
 import Image from 'next/image';
+import dynamic from 'next/dynamic';
 import { Calendar, Trophy, ArrowRight, UserCircle, Users } from 'lucide-react';
-import HeroUserCards from './HeroUserCards';
-import HeroActionButtons from './HeroActionButtons';
+
+const HeroUserCards = dynamic(() => import('./HeroUserCards'), { ssr: true });
+const HeroActionButtons = dynamic(() => import('./HeroActionButtons'), { ssr: true });
 import EventCard from '@/components/ui/EventCard';
 
 export const revalidate = 60; // Enable ISR, cache for 60 seconds
