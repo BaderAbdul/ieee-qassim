@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { Calendar, Trophy, ArrowRight, UserCircle, Users } from 'lucide-react';
 import HeroUserCards from './HeroUserCards';
 import HeroActionButtons from './HeroActionButtons';
+import EventCard from '@/components/ui/EventCard';
 
 export const revalidate = 60; // Enable ISR, cache for 60 seconds
 
@@ -81,8 +82,64 @@ export default async function HomePage({ params }: PageProps) {
       }
     }
   } catch (error) {
-    console.error("Error fetching homepage data gracefully:", error);
-    // Graceful degradation: page will still render with default stats and empty events
+    console.warn("Firebase Admin failed or threw an error. Falling back to Client SDK for homepage events.", error);
+    try {
+      const { collection, getDocs, doc, getDoc, query, where, limit } = await import('firebase/firestore');
+      const { db } = await import('@/lib/firebase/client');
+      
+      const statsDoc = await getDoc(doc(db, 'settings', 'homepage'));
+      if (statsDoc.exists()) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        stats = { ...stats, ...(statsDoc.data() as any) };
+      }
+
+      const validStates = ['Published', 'Registration Open', 'Ongoing', 'Completed', 'Registration Closed'];
+      const eventsSnap = await getDocs(
+        query(collection(db, 'events'), where('state', 'in', validStates), limit(20))
+      );
+
+      const evs = eventsSnap.docs.map(d => {
+        const data = d.data();
+        return {
+          id: d.id,
+          ...data,
+          date: data.date?.toDate ? data.date.toDate().toISOString() : data.date,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt
+        };
+      }) as PlatformEvent[];
+
+      evs.sort((a, b) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const dateA = typeof a.date === 'string' ? new Date(a.date) : typeof (a.date as any)?.toDate === 'function' ? (a.date as any).toDate() : new Date(0);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const dateB = typeof b.date === 'string' ? new Date(b.date) : typeof (b.date as any)?.toDate === 'function' ? (b.date as any).toDate() : new Date(0);
+        return dateB.getTime() - dateA.getTime();
+      });
+      eventsList = evs.slice(0, 3);
+
+      const featuredId = stats.featuredEventId;
+      if (featuredId) {
+        const evDoc = await getDoc(doc(db, 'events', featuredId));
+        if (evDoc.exists()) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const data = evDoc.data() as any;
+          latestEvent = {  
+            id: evDoc.id, 
+            ...data,
+            date: data.date?.toDate ? data.date.toDate().toISOString() : data.date,
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
+            updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt
+          } as PlatformEvent;
+        } else if (evs.length > 0) {
+          latestEvent = evs[0];
+        }
+      } else if (evs.length > 0) {
+        latestEvent = evs[0];
+      }
+    } catch (fallbackError) {
+      console.error("Fallback Client SDK also failed:", fallbackError);
+    }
   }
 
   return (
@@ -178,56 +235,12 @@ export default async function HomePage({ params }: PageProps) {
             {eventsList.map((event) => {
               const isCompleted = event.state === 'Completed' || event.state === 'Archived';
               return (
-                <Link 
-                  href={`/events/${event.id}`} 
+                <div 
                   key={event.id}
-                  className={`min-w-[280px] sm:min-w-[340px] max-w-[340px] flex-shrink-0 snap-start bg-white rounded-3xl shadow-lg shadow-slate-200/40 border border-slate-100 hover:shadow-xl transition-all flex flex-col overflow-hidden group ${isCompleted ? 'grayscale-[40%] opacity-90' : ''}`}
+                  className={`min-w-[280px] sm:min-w-[340px] max-w-[340px] flex-shrink-0 snap-start ${isCompleted ? 'grayscale-[40%] opacity-90' : ''}`}
                 >
-                  <div className="relative h-48 w-full bg-slate-100 overflow-hidden">
-                    {event.coverUrl ? (
-                      <Image 
-                        src={event.coverUrl} 
-                        alt={isAr ? event.title : (event.titleEn || event.title)} 
-                        fill 
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                        className={`object-cover group-hover:scale-105 transition-transform duration-500 ${isCompleted ? 'blur-sm brightness-90' : ''}`} 
-                      />
-                    ) : (
-                      <div className={`w-full h-full bg-gradient-to-br from-[#00629B] to-blue-800 flex items-center justify-center group-hover:scale-105 transition-transform duration-500 ${isCompleted ? 'blur-sm brightness-90' : ''}`}>
-                        <span className="text-white/30 font-black text-4xl uppercase tracking-widest">IEEE QU</span>
-                      </div>
-                    )}
-                    <div className="absolute top-4 rtl:right-4 ltr:left-4">
-                      <span className={`bg-white/95 backdrop-blur-md text-slate-900 text-xs font-black px-3 py-1.5 rounded-full shadow-sm ${isCompleted ? 'opacity-80' : ''}`}>
-                        {event.state === 'Registration Open' ? (isAr ? 'التسجيل مفتوح' : 'Registration Open') : 
-                         event.state === 'Completed' ? (isAr ? 'منتهية' : 'Completed') :
-                         event.state === 'Archived' ? (isAr ? 'مؤرشفة' : 'Archived') :
-                         event.state === 'Ongoing' ? (isAr ? 'جاري الآن' : 'Ongoing') :
-                         (isAr ? 'قريباً' : 'Coming Soon')}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="p-6 flex-1 flex flex-col relative bg-white/60">
-                    <div className="flex items-center text-xs font-bold text-slate-500 mb-3 gap-4">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="h-4 w-4 text-blue-600" />
-                        {new Date(event.date as any).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
-                      </div>
-                    </div>
-                    <h3 className="text-lg font-black text-slate-900 mb-2 line-clamp-2">
-                      {isAr ? event.title : (event.titleEn || event.title)}
-                    </h3>
-                    <p className="text-sm text-slate-600 line-clamp-2 mb-4 flex-1">
-                      {isAr ? event.description : (event.descriptionEn || event.description)}
-                    </p>
-                    <div className="mt-auto pt-4 border-t border-slate-100/80 flex items-center justify-between">
-                      <span className="text-sm font-bold text-blue-600 group-hover:text-blue-700 transition-colors">
-                        {isAr ? 'التفاصيل' : 'Details'}
-                      </span>
-                      <ArrowRight className="h-5 w-5 text-blue-600 rtl:-scale-x-100 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" />
-                    </div>
-                  </div>
-                </Link>
+                  <EventCard event={event} />
+                </div>
               );
             })}
           </div>

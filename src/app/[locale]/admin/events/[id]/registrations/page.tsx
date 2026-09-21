@@ -5,7 +5,7 @@ import { collection, query, where, getDocs, doc, getDoc, updateDoc, setDoc, serv
 import { db } from '@/lib/firebase/client';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
-import { ArrowRight, Download, Users, Check, X, Clock, UserCheck, CheckSquare, Square, Trophy, Link as LinkIcon } from 'lucide-react';
+import { ArrowRight, Download, Users, Check, X, Clock, UserCheck, CheckSquare, Square, Trophy, Link as LinkIcon, QrCode } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -41,9 +41,7 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
   const [pointsDesc, setPointsDesc] = useState('');
   const [isAwarding, setIsAwarding] = useState(false);
 
-  // Self Check-in State
-  const [selfCheckinLink, setSelfCheckinLink] = useState('');
-  const [isGeneratingLink, setIsGeneratingLink] = useState(false);
+
 
   useEffect(() => {
     let active = true;
@@ -263,36 +261,7 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
     document.body.removeChild(link);
   };
 
-  const generateCheckinLink = async () => {
-    setIsGeneratingLink(true);
-    try {
-      const token = Math.random().toString(36).substring(2, 10).toUpperCase();
-      await updateDoc(doc(db, 'events', eventId), {
-        checkinToken: token
-      });
-      const link = `${window.location.origin}/events/${eventId}/checkin?token=${token}`;
-      setSelfCheckinLink(link);
-      setEvent(prev => prev ? { ...prev, checkinToken: token } : null);
-    } catch (error) {
-      console.error('Error generating checkin link', error);
-      alert('حدث خطأ أثناء إنشاء رابط التحضير');
-    } finally {
-      setIsGeneratingLink(false);
-    }
-  };
 
-  const copyLink = () => {
-    if (selfCheckinLink) {
-      navigator.clipboard.writeText(selfCheckinLink);
-      alert('تم نسخ الرابط!');
-    }
-  };
-
-  useEffect(() => {
-    if (event?.checkinToken && typeof window !== 'undefined') {
-      setSelfCheckinLink(`${window.location.origin}/events/${eventId}/checkin?token=${event.checkinToken}`);
-    }
-  }, [event?.checkinToken, eventId]);
 
   if (loading) {
     return <div className="py-20 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div></div>;
@@ -325,48 +294,24 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
         </div>
       </div>
 
-      {/* Self Check-in Link Section */}
-      <div className="bg-white border border-purple-100 rounded-xl p-6 mb-6 shadow-sm">
-        <h3 className="text-lg font-bold text-gray-800 mb-2 flex items-center gap-2">
-          <LinkIcon size={20} className="text-purple-600" />
-          رابط التحضير الذاتي (Self Check-in)
-        </h3>
-        <p className="text-gray-600 text-sm mb-4">
-          شارك هذا الرابط مع الحضور ليتمكنوا من تحضير أنفسهم ذاتياً بدلاً من مسح الـ QR.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-3">
-          {selfCheckinLink ? (
-            <>
-              <input 
-                type="text" 
-                readOnly 
-                value={selfCheckinLink} 
-                className="flex-1 p-3 bg-gray-50 border rounded-xl text-left dir-ltr text-sm outline-none"
-              />
-              <button 
-                onClick={copyLink}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl font-bold transition-colors"
-              >
-                نسخ الرابط
-              </button>
-              <button 
-                onClick={generateCheckinLink}
-                disabled={isGeneratingLink}
-                className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-4 py-3 rounded-xl font-bold transition-colors disabled:opacity-50"
-              >
-                إنشاء رابط جديد (يُبطل القديم)
-              </button>
-            </>
-          ) : (
-            <button 
-              onClick={generateCheckinLink}
-              disabled={isGeneratingLink}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl font-bold transition-colors disabled:opacity-50"
-            >
-              {isGeneratingLink ? 'جاري الإنشاء...' : 'توليد رابط التحضير الآن'}
-            </button>
-          )}
+      {/* Check-in Desk Link Section */}
+      <div className="bg-gradient-to-r from-blue-900 to-indigo-900 rounded-2xl p-6 mb-6 shadow-sm text-white flex flex-col md:flex-row items-center justify-between gap-6">
+        <div>
+          <h3 className="text-xl font-bold mb-2 flex items-center gap-2 font-cairo">
+            <QrCode size={24} className="text-blue-300" />
+            مكتب التحضير (Check-in Desk)
+          </h3>
+          <p className="text-blue-100 text-sm max-w-lg">
+            قم بالانتقال إلى مكتب التحضير لفتح شاشة الـ QR للطلاب، أو استخدام كاميرا الجهاز لمسح بطاقاتهم الجامعية/الرقمية للتحضير السريع والآمن.
+          </p>
         </div>
+        <Link 
+          href={`/admin/events/${eventId}/checkin-desk`}
+          className="shrink-0 bg-white text-blue-900 hover:bg-blue-50 px-6 py-3 rounded-xl font-bold transition-colors flex items-center shadow-lg"
+        >
+          فتح مكتب التحضير
+          <ArrowRight className="w-5 h-5 ms-2 rtl:-scale-x-100" />
+        </Link>
       </div>
 
       {selectedIds.length > 0 && (

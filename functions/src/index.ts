@@ -7,6 +7,7 @@ admin.initializeApp();
 export * from './registerForEvent';
 export * from './generateCheckInToken';
 export * from './processCheckIn';
+export * from './submitCheckIn';
 export * from './manualAttendanceOverride';
 export * from './addManualPoints';
 export * from './onPointTransactionCreated';

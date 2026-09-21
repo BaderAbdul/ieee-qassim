@@ -2,7 +2,8 @@
 
 import { useEffect, useState, use } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { db } from '@/lib/firebase/client';
+import { db, functions } from '@/lib/firebase/client';
+import { httpsCallable } from 'firebase/functions';
 import { doc, getDoc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Link } from '@/i18n/routing';
@@ -38,58 +39,22 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
 
     const processCheckin = async () => {
       try {
-        const eventRef = doc(db, 'events', eventId);
-        const eventSnap = await getDoc(eventRef);
-
-        if (!eventSnap.exists()) {
-          setStatus('error');
-          setErrorMessage(locale === 'ar' ? 'الفعالية غير موجودة' : 'Event not found');
-          return;
-        }
-
-        const eventData = eventSnap.data();
-        if (eventData.checkinToken !== token) {
-          setStatus('error');
-          setErrorMessage(locale === 'ar' ? 'رابط التحضير غير صالح أو منتهي الصلاحية' : 'Check-in link is invalid or expired');
-          return;
-        }
-
-        const regId = `${eventId}_${user.uid}`;
-        const regRef = doc(db, 'registrations', regId);
-        const regSnap = await getDoc(regRef);
-
-        if (!regSnap.exists()) {
-          setStatus('error');
-          setErrorMessage(locale === 'ar' ? 'لست مسجلاً في هذه الفعالية' : 'You are not registered for this event');
-          return;
-        }
-
-        const regData = regSnap.data();
-        if (regData.status === 'attended') {
-          setStatus('already_attended');
-          return;
-        }
-
-        if (regData.status !== 'approved') {
-          setStatus('error');
-          setErrorMessage(locale === 'ar' ? 'حالة تسجيلك لا تسمح بالتحضير (يجب أن يكون مقبولاً أولاً)' : 'Your registration status does not allow check-in');
-          return;
-        }
-
-        // Process check-in
-        await updateDoc(regRef, { status: 'attended' });
-        await setDoc(doc(db, 'attendance_logs', `${eventId}_${user.uid}`), {
+        const submitCheckInFn = httpsCallable(functions, 'submitCheckIn');
+        const response = await submitCheckInFn({
           eventId,
-          userId: user.uid,
-          timestamp: serverTimestamp(),
-          type: 'self_checkin'
-        }, { merge: true });
-
-        setStatus('success');
-      } catch (error) {
+          token
+        });
+        
+        const result = response.data as any;
+        if (result.status === 'already_checked_in') {
+          setStatus('already_attended');
+        } else {
+          setStatus('success');
+        }
+      } catch (error: any) {
         console.error("Error during self check-in:", error);
         setStatus('error');
-        setErrorMessage(locale === 'ar' ? 'حدث خطأ أثناء التحضير' : 'Error during check-in');
+        setErrorMessage(error.message || (locale === 'ar' ? 'حدث خطأ أثناء التحضير' : 'Error during check-in'));
       }
     };
 

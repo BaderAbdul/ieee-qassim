@@ -28,6 +28,10 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
     locationEn: '',
     durationHours: 2,
     capacity: 50,
+    isUnlimitedCapacity: false,
+    hideExactCapacity: false,
+    registeredCount: 0,
+    attendanceCount: 0,
     points: 10,
     hasCertificate: false,
     registrationMode: 'Auto' as RegistrationMode,
@@ -59,6 +63,10 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
             locationEn: data.locationEn || '',
             durationHours: data.durationHours || 2,
             capacity: data.capacity || 50,
+            isUnlimitedCapacity: data.isUnlimitedCapacity || false,
+            hideExactCapacity: data.hideExactCapacity || false,
+            registeredCount: data.registeredCount || 0,
+            attendanceCount: data.attendanceCount || 0,
             points: data.points || 10,
             hasCertificate: data.hasCertificate || false,
             registrationMode: data.registrationMode || 'Auto',
@@ -105,6 +113,10 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         locationEn: formData.locationEn,
         durationHours: formData.durationHours,
         capacity: formData.capacity,
+        isUnlimitedCapacity: formData.isUnlimitedCapacity,
+        hideExactCapacity: formData.hideExactCapacity,
+        registeredCount: formData.registeredCount,
+        attendanceCount: formData.attendanceCount,
         points: formData.points,
         hasCertificate: formData.hasCertificate,
         registrationMode: formData.registrationMode,
@@ -215,7 +227,33 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">السعة (عدد المقاعد)</label>
-              <input required type="number" min="1" name="capacity" value={formData.capacity} onChange={handleChange} className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500" />
+              <input 
+                required={!formData.isUnlimitedCapacity}
+                disabled={formData.isUnlimitedCapacity}
+                type="number" 
+                min="1" 
+                name="capacity" 
+                value={formData.capacity} 
+                onChange={handleChange} 
+                className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500 disabled:opacity-50 disabled:bg-gray-100" 
+              />
+              
+              <div className="mt-3 flex flex-col gap-2">
+                <div className="flex items-center">
+                  <input type="checkbox" id="isUnlimitedCapacity" name="isUnlimitedCapacity" checked={formData.isUnlimitedCapacity} onChange={handleChange} className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded" />
+                  <label htmlFor="isUnlimitedCapacity" className="ms-2 block text-sm font-medium text-gray-700">
+                    تسجيل مفتوح (بدون حد أقصى)
+                  </label>
+                </div>
+                {!formData.isUnlimitedCapacity && (
+                  <div className="flex items-center">
+                    <input type="checkbox" id="hideExactCapacity" name="hideExactCapacity" checked={formData.hideExactCapacity} onChange={handleChange} className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded" />
+                    <label htmlFor="hideExactCapacity" className="ms-2 block text-sm font-medium text-gray-700">
+                      إخفاء السعة للعامة (عرض "مقاعد محدودة" فقط)
+                    </label>
+                  </div>
+                )}
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">آلية القبول</label>
@@ -252,6 +290,14 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">المتحدثون (مفصولون بفاصلة)</label>
               <input type="text" name="speakers" value={formData.speakers} onChange={handleChange} placeholder="أحمد محمد, سارة خالد" className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">عدد المسجلين (للتعديل اليدوي)</label>
+              <input type="number" name="registeredCount" value={formData.registeredCount} onChange={handleChange} className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">عدد الحضور الفعلي (بعد انتهاء الفعالية)</label>
+              <input type="number" name="attendanceCount" value={formData.attendanceCount} onChange={handleChange} className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500" />
             </div>
           </div>
         </div>

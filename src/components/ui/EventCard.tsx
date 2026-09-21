@@ -4,7 +4,7 @@ import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
 import { ar, enUS } from 'date-fns/locale';
 import { useLocale, useTranslations } from 'next-intl';
-import { MapPin, Calendar, Clock, Users, ArrowRight } from 'lucide-react';
+import { MapPin, Calendar, Clock, Users, ArrowRight, UserCheck } from 'lucide-react';
 import { formatDateSafe } from '@/lib/dateUtils';
 
 interface EventCardProps {
@@ -17,10 +17,11 @@ export default function EventCard({ event }: EventCardProps) {
   const isAr = locale === 'ar';
   const dateLocale = isAr ? ar : enUS;
 
-  // Format dates securely
   const eventDate = event.date;
+  const day = formatDateSafe(eventDate, 'dd', { locale: dateLocale });
+  const month = formatDateSafe(eventDate, 'MMM', { locale: dateLocale }).toUpperCase();
   
-  // Determine badge styling based on state
+  // Badge setup
   let badgeColor = 'bg-slate-100 text-slate-800 border-slate-200';
   let badgeText: string = event.state;
   
@@ -42,93 +43,134 @@ export default function EventCard({ event }: EventCardProps) {
   }
 
   const title = isAr ? event.title : event.titleEn || event.title;
-  const description = isAr ? event.description : event.descriptionEn || event.description;
   const location = isAr ? event.location : event.locationEn || event.location;
 
+  // Capacity logic
+  let capacityDisplay = '';
+  if (event.state === 'Completed') {
+    capacityDisplay = `${isAr ? 'الحضور:' : 'Attendance:'} ${event.attendanceCount || event.registeredCount || 0}`;
+  } else if (event.isUnlimitedCapacity) {
+    capacityDisplay = isAr ? 'تسجيل مفتوح' : 'Open Registration';
+  } else if (event.hideExactCapacity) {
+    capacityDisplay = isAr ? 'مقاعد محدودة' : 'Limited Seats';
+  } else {
+    if (event.registeredCount !== undefined) {
+      capacityDisplay = `${event.registeredCount} / ${event.capacity} ${isAr ? 'مسجل' : 'Registered'}`;
+    } else {
+      capacityDisplay = `${isAr ? 'السعة:' : 'Capacity:'} ${event.capacity}`;
+    }
+  }
+
   return (
-    <Link href={`/events/${event.id}`} className="block group h-full">
-      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden h-full flex flex-col transition-all duration-300 transform group-hover:-translate-y-1 group-hover:shadow-xl group-hover:border-blue-100">
-        
-        {/* Banner Image / Abstract Pattern */}
-        <div className="h-48 w-full bg-slate-900 relative overflow-hidden flex-shrink-0">
-          {event.coverUrl && (
-            <Image
-              src={event.coverUrl}
-              alt={title}
-              fill
-              unoptimized
-              quality={95}
-              className="object-cover group-hover:scale-105 transition-transform duration-500"
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            />
-          )}
-          {/* Simple overlay instead of mix-blend-overlay for better mobile GPU performance */}
-          <div className="absolute inset-0 bg-gradient-to-t from-blue-900/60 to-transparent pointer-events-none" />
-          <div className="absolute inset-0 opacity-20 pointer-events-none">
-            <svg className="h-full w-full" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <pattern id={`grid-pattern-${event.id}`} width="32" height="32" patternUnits="userSpaceOnUse">
-                  <path d="M 32 0 L 0 0 0 32" fill="none" stroke="white" strokeWidth="1" />
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill={`url(#grid-pattern-${event.id})`} />
-            </svg>
+    <div className="group h-full bg-white rounded-[2rem] shadow-sm hover:shadow-2xl border border-gray-100/80 overflow-hidden flex flex-col transition-all duration-500 hover:-translate-y-2 relative">
+      {/* Top Image Section */}
+      <div className="relative h-56 w-full bg-slate-100 overflow-hidden shrink-0">
+        {event.coverUrl ? (
+          <Image
+            src={event.coverUrl}
+            alt={title}
+            fill
+            unoptimized
+            quality={95}
+            className="object-cover transition-transform duration-700 group-hover:scale-110"
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-900 to-indigo-900">
+            {/* Abstract fallback pattern */}
+            <div className="absolute inset-0 opacity-20">
+               <svg className="h-full w-full" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <pattern id={`grid-pattern-${event.id}`} width="32" height="32" patternUnits="userSpaceOnUse">
+                    <path d="M 32 0 L 0 0 0 32" fill="none" stroke="white" strokeWidth="1" />
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill={`url(#grid-pattern-${event.id})`} />
+              </svg>
+            </div>
           </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent pointer-events-none" />
 
-          <div className="absolute top-4 end-4 flex flex-col gap-2 z-10">
-            <span className={`px-3 py-1 rounded-full text-xs font-bold border shadow-xs ${badgeColor}`}>
-              {badgeText}
-            </span>
-          </div>
-          
-          <div className="absolute bottom-0 inset-x-0 p-5 bg-gradient-to-t from-slate-950/80 via-slate-900/40 to-transparent">
-            <span className="inline-block text-[11px] font-bold text-blue-200 uppercase tracking-wider mb-1 bg-white/10 px-2 py-0.5 rounded-md backdrop-blur-xs">
-              {event.type}
-            </span>
-            <h3 className="text-xl font-extrabold text-white line-clamp-1 font-cairo">
-              {title}
-            </h3>
-          </div>
+        {/* Floating Date Badge */}
+        <div className="absolute top-4 start-4 bg-white/95 backdrop-blur-md rounded-2xl p-2 px-3 text-center shadow-lg border border-white/20">
+          <div className="text-sm font-bold text-blue-600 leading-none mb-1">{month}</div>
+          <div className="text-xl font-black text-slate-900 leading-none font-cairo">{day}</div>
         </div>
 
-        {/* Content Details */}
-        <div className="p-6 flex flex-col flex-grow text-start">
-          <p className="text-slate-600 text-sm mb-6 line-clamp-3 leading-relaxed flex-grow">
-            {description}
-          </p>
-          
-          <div className="space-y-2.5 mt-auto pt-4 border-t border-slate-100">
-            <div className="flex items-center text-xs sm:text-sm text-slate-500">
-              <Calendar className="h-4 w-4 me-2 text-blue-600 flex-shrink-0" />
-              <span>{formatDateSafe(eventDate, 'EEEE, d MMMM yyyy', { locale: dateLocale })}</span>
-            </div>
-            
-            <div className="flex items-center text-xs sm:text-sm text-slate-500">
-              <Clock className="h-4 w-4 me-2 text-blue-600 flex-shrink-0" />
-              <span dir="ltr" className="text-start">
-                {formatDateSafe(eventDate, 'HH:mm', { locale: dateLocale })} ({event.durationHours}h)
-              </span>
-            </div>
-            
-            <div className="flex items-center text-xs sm:text-sm text-slate-500">
-              <MapPin className="h-4 w-4 me-2 text-blue-600 flex-shrink-0" />
-              <span className="truncate">{location}</span>
-            </div>
-
-            <div className="flex items-center justify-between text-xs sm:text-sm text-slate-500 pt-3 border-t border-slate-50">
-              <div className="flex items-center font-medium">
-                <Users className="h-4 w-4 me-1.5 text-slate-400" />
-                <span>{t('capacity')}: {event.capacity}</span>
-              </div>
-              <div className="font-bold text-blue-600 group-hover:text-blue-700 transition-colors inline-flex items-center gap-1">
-                <span>{t('details')}</span>
-                <ArrowRight className="h-3.5 w-3.5 rtl:-scale-x-100 transition-transform group-hover:translate-x-1 rtl:group-hover:-translate-x-1" />
-              </div>
-            </div>
-          </div>
+        {/* State Badge */}
+        <div className="absolute top-4 end-4">
+          <span className={`px-3 py-1.5 rounded-full text-[11px] font-bold border shadow-md backdrop-blur-md bg-white/90 ${badgeColor.replace('bg-', 'text-').replace('text-', '')}`}>
+            {badgeText}
+          </span>
         </div>
 
+        {/* Category Label overlay */}
+        <div className="absolute bottom-4 start-4">
+          <span className="px-3 py-1 bg-white/20 backdrop-blur-md border border-white/30 text-white text-xs font-bold rounded-full tracking-wide">
+            {event.type}
+          </span>
+        </div>
       </div>
-    </Link>
+
+      {/* Content Section */}
+      <div className="p-6 flex flex-col grow">
+        <h3 className="text-xl font-black text-slate-900 mb-4 line-clamp-2 font-cairo group-hover:text-blue-600 transition-colors leading-tight">
+          {title}
+        </h3>
+
+        <div className="space-y-3 mb-6">
+          <div className="flex items-center text-sm text-slate-600">
+            <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center me-3 shrink-0">
+              <Calendar className="h-4 w-4 text-blue-600" />
+            </div>
+            <span className="font-medium">{formatDateSafe(eventDate, 'EEEE, d MMMM yyyy', { locale: dateLocale })}</span>
+          </div>
+
+          <div className="flex items-center text-sm text-slate-600">
+            <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center me-3 shrink-0">
+              <Clock className="h-4 w-4 text-blue-600" />
+            </div>
+            <span className="font-medium" dir="ltr">
+              {formatDateSafe(eventDate, 'HH:mm', { locale: dateLocale })} ({event.durationHours}h)
+            </span>
+          </div>
+
+          <div className="flex items-center text-sm text-slate-600">
+            <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center me-3 shrink-0">
+              <MapPin className="h-4 w-4 text-blue-600" />
+            </div>
+            <span className="font-medium truncate">{location}</span>
+          </div>
+        </div>
+
+        <div className="mt-auto flex items-center justify-between pt-4 border-t border-slate-100">
+          <div className="flex items-center gap-2">
+             <div className="flex -space-x-2 rtl:space-x-reverse">
+                {/* Fake avatars to make it look active, or you could use actual users later */}
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="w-7 h-7 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center shrink-0">
+                    <Users className="w-3 h-3 text-slate-400" />
+                  </div>
+                ))}
+             </div>
+             <div className="text-xs font-bold text-slate-500 ms-1">
+               {capacityDisplay}
+             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Button placed at the very bottom overlapping the card or completely full width */}
+      <div className="p-4 pt-0">
+        <Link 
+          href={`/events/${event.id}`}
+          className="flex items-center justify-center w-full py-3.5 bg-slate-900 hover:bg-blue-600 text-white rounded-xl text-sm font-bold transition-colors duration-300 gap-2"
+        >
+          <span>{isAr ? 'التفاصيل' : 'Details'}</span>
+          <ArrowRight className="w-4 h-4 rtl:-scale-x-100" />
+        </Link>
+      </div>
+    </div>
   );
 }
