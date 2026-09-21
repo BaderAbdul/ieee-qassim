@@ -66,11 +66,11 @@ export default function AdminCheckInDashboard() {
                     {format(eventDate, 'dd MMM yyyy', { locale: ar })}
                   </p>
                   <Link 
-                    href={`/admin/events/${event.id}/qr`}
+                    href={`/admin/events/${event.id}/checkin-desk`}
                     className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-purple-700 transition-colors flex items-center justify-center"
                   >
                     <QrCode className="me-2 h-5 w-5" />
-                    عرض QR Code
+                    مكتب التحضير (Check-in Desk)
                   </Link>
                 </div>
               );

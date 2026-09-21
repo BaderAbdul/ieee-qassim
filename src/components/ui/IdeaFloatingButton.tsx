@@ -57,10 +57,11 @@ export default function IdeaFloatingButton() {
       {/* Floating Button */}
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 rtl:left-6 ltr:right-6 z-40 bg-gradient-to-br from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white p-4 rounded-full shadow-lg shadow-amber-500/30 hover:shadow-xl hover:shadow-amber-500/40 hover:-translate-y-1 transition-all duration-300 group flex items-center justify-center border border-white/20"
-        aria-label={isAr ? 'شارك فكرتك' : 'Share your idea'}
+        className="fixed bottom-6 rtl:left-6 ltr:right-6 z-40 bg-white hover:bg-slate-50 text-slate-700 px-4 py-3 rounded-full shadow-md shadow-slate-200/50 hover:shadow-lg transition-all duration-300 group flex items-center gap-2.5 border border-slate-200 hover:-translate-y-0.5"
+        aria-label={isAr ? 'عطنا اقتراحك' : 'Give a suggestion'}
       >
-        <Lightbulb className="w-6 h-6 animate-pulse group-hover:animate-none" />
+        <Lightbulb className="w-4 h-4 text-amber-500" />
+        <span className="text-xs font-bold">{isAr ? 'عطنا اقتراحك' : 'Suggest'}</span>
       </button>
 
       {/* Modal */}

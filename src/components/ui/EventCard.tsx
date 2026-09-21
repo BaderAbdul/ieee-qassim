@@ -62,9 +62,9 @@ export default function EventCard({ event }: EventCardProps) {
   }
 
   return (
-    <div className="group h-full bg-white rounded-3xl sm:rounded-[2rem] shadow-sm hover:shadow-2xl border border-gray-100/80 overflow-hidden flex flex-col transition-all duration-500 hover:-translate-y-2 relative">
+    <div className="group h-full bg-white rounded-[1.5rem] sm:rounded-[2rem] shadow-sm hover:shadow-2xl border border-gray-100/80 overflow-hidden flex flex-col transition-all duration-500 hover:-translate-y-2 relative">
       {/* Top Image Section */}
-      <div className="relative h-40 sm:h-56 w-full bg-slate-100 overflow-hidden shrink-0">
+      <div className="relative h-32 sm:h-56 w-full bg-slate-100 overflow-hidden shrink-0">
         {event.coverUrl ? (
           <Image
             src={event.coverUrl}
@@ -113,47 +113,47 @@ export default function EventCard({ event }: EventCardProps) {
       </div>
 
       {/* Content Section */}
-      <div className="p-4 sm:p-6 flex flex-col grow">
-        <h3 className="text-lg sm:text-xl font-black text-slate-900 mb-3 sm:mb-4 line-clamp-2 font-cairo group-hover:text-blue-600 transition-colors leading-tight">
+      <div className="p-3 sm:p-6 flex flex-col grow">
+        <h3 className="text-sm sm:text-xl font-black text-slate-900 mb-2 sm:mb-4 line-clamp-2 font-cairo group-hover:text-blue-600 transition-colors leading-tight">
           {title}
         </h3>
 
-        <div className="space-y-2.5 sm:space-y-3 mb-4 sm:mb-6">
-          <div className="flex items-center text-xs sm:text-sm text-slate-600">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-50 flex items-center justify-center me-2.5 sm:me-3 shrink-0">
-              <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600" />
+        <div className="space-y-1.5 sm:space-y-3 mb-3 sm:mb-6">
+          <div className="flex items-center text-[10px] sm:text-sm text-slate-600">
+            <div className="w-5 h-5 sm:w-8 sm:h-8 rounded-full bg-blue-50 flex items-center justify-center me-1.5 sm:me-3 shrink-0">
+              <Calendar className="h-2.5 w-2.5 sm:h-4 sm:w-4 text-blue-600" />
             </div>
-            <span className="font-medium">{formatDateSafe(eventDate, 'EEEE, d MMMM yyyy', { locale: dateLocale })}</span>
+            <span className="font-medium truncate">{formatDateSafe(eventDate, 'd MMMM yyyy', { locale: dateLocale })}</span>
           </div>
 
-          <div className="flex items-center text-xs sm:text-sm text-slate-600">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-50 flex items-center justify-center me-2.5 sm:me-3 shrink-0">
-              <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600" />
+          <div className="flex items-center text-[10px] sm:text-sm text-slate-600">
+            <div className="w-5 h-5 sm:w-8 sm:h-8 rounded-full bg-blue-50 flex items-center justify-center me-1.5 sm:me-3 shrink-0">
+              <Clock className="h-2.5 w-2.5 sm:h-4 sm:w-4 text-blue-600" />
             </div>
-            <span className="font-medium" dir="ltr">
-              {formatDateSafe(eventDate, 'HH:mm', { locale: dateLocale })} ({event.durationHours}h)
+            <span className="font-medium truncate" dir="ltr">
+              {formatDateSafe(eventDate, 'HH:mm', { locale: dateLocale })} <span className="hidden sm:inline">({event.durationHours}h)</span>
             </span>
           </div>
 
-          <div className="flex items-center text-xs sm:text-sm text-slate-600">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-50 flex items-center justify-center me-2.5 sm:me-3 shrink-0">
-              <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600" />
+          <div className="flex items-center text-[10px] sm:text-sm text-slate-600">
+            <div className="w-5 h-5 sm:w-8 sm:h-8 rounded-full bg-blue-50 flex items-center justify-center me-1.5 sm:me-3 shrink-0">
+              <MapPin className="h-2.5 w-2.5 sm:h-4 sm:w-4 text-blue-600" />
             </div>
             <span className="font-medium truncate">{location}</span>
           </div>
         </div>
 
-        <div className="mt-auto flex items-center justify-between pt-3 sm:pt-4 border-t border-slate-100">
-          <div className="flex items-center gap-2">
-             <div className="flex -space-x-2 rtl:space-x-reverse">
+        <div className="mt-auto flex items-center justify-between pt-2.5 sm:pt-4 border-t border-slate-100">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+             <div className="hidden sm:flex -space-x-2 rtl:space-x-reverse">
                 {/* Fake avatars to make it look active, or you could use actual users later */}
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center shrink-0">
-                    <Users className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-400" />
+                  <div key={i} className="w-7 h-7 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center shrink-0">
+                    <Users className="w-3 h-3 text-slate-400" />
                   </div>
                 ))}
              </div>
-             <div className="text-[11px] sm:text-xs font-bold text-slate-500 ms-1">
+             <div className="text-[10px] sm:text-xs font-bold text-slate-500">
                {capacityDisplay}
              </div>
           </div>
@@ -161,10 +161,10 @@ export default function EventCard({ event }: EventCardProps) {
       </div>
 
       {/* Button placed at the very bottom overlapping the card or completely full width */}
-      <div className="p-3 sm:p-4 pt-0">
+      <div className="p-2 sm:p-4 pt-0">
         <Link 
           href={`/events/${event.id}`}
-          className="flex items-center justify-center w-full py-2.5 sm:py-3.5 bg-slate-900 hover:bg-blue-600 text-white rounded-xl text-sm font-bold transition-colors duration-300 gap-2"
+          className="flex items-center justify-center w-full py-2 sm:py-3.5 bg-slate-900 hover:bg-blue-600 text-white rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold transition-colors duration-300 gap-1.5 sm:gap-2"
         >
           <span>{isAr ? 'التفاصيل' : 'Details'}</span>
           <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 rtl:-scale-x-100" />

@@ -154,7 +154,7 @@ export default async function HomePage({ params }: PageProps) {
           <div className="flex flex-col space-y-6 text-center lg:text-start lg:rtl:text-right lg:ltr:text-left">
             <div>
               <div className="inline-flex items-center gap-2.5 bg-blue-50 border border-blue-100 px-4 py-2 rounded-full mb-6 shadow-sm">
-                <span className="flex h-2 w-2 rounded-full bg-blue-600 animate-pulse" />
+                <span className="flex h-2 w-2 rounded-full bg-blue-600" />
                 <span className="text-sm font-bold text-blue-700 tracking-wide uppercase">
                   {t('Hero.identityLabel')}
                 </span>

@@ -8,7 +8,13 @@ import { httpsCallable } from 'firebase/functions';
 import { QRCodeSVG } from 'qrcode.react';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
-import { Loader2, ArrowRight, QrCode, Link as LinkIcon, UserCheck, ShieldCheck, CheckCircle2, XCircle } from 'lucide-react';
+import { Loader2, ArrowRight, QrCode, Link as LinkIcon, UserCheck, ShieldCheck, CheckCircle2, XCircle, Camera } from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+const Scanner = dynamic(() => import('@yudiel/react-qr-scanner').then((mod) => mod.Scanner), {
+  ssr: false,
+  loading: () => <div className="p-8 text-center bg-slate-50 rounded-2xl animate-pulse text-slate-500 text-sm font-bold">جاري تحميل الكاميرا...</div>,
+});
 
 export default function CheckinDeskPage({ params }: { params: Promise<{ id: string, locale: string }> }) {
   const { id: eventId, locale } = use(params);
@@ -23,6 +29,7 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
   const [manualInput, setManualInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [scanResult, setScanResult] = useState<{ status: 'success' | 'error' | 'already_checked_in' | null, message: string }>({ status: null, message: '' });
+  const [showCamera, setShowCamera] = useState(false);
 
   // Self Check-in Link
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
@@ -45,9 +52,13 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
     fetchEvent();
   }, [eventId]);
 
-  const handleManualSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const targetUserId = manualInput.trim();
+  const handleManualSubmit = async (e?: React.FormEvent, scannedId?: string) => {
+    if (e) e.preventDefault();
+    
+    // Support either manual input state or direct scanned ID, and strip the potential 'ieee-qu-user:' prefix
+    let rawInput = scannedId || manualInput;
+    const targetUserId = rawInput.replace('ieee-qu-user:', '').trim();
+    
     if (!targetUserId) return;
 
     setIsSubmitting(true);
@@ -192,9 +203,40 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
           <h2 className="text-2xl font-bold text-slate-900 font-cairo mb-3">
             المسح السريع للبطاقات الجامعية أو الرقمية
           </h2>
-          <p className="text-slate-600 text-sm mb-10 leading-relaxed max-w-md mx-auto">
+          <p className="text-slate-600 text-sm mb-6 leading-relaxed max-w-md mx-auto">
             قم بتوصيل جهاز قراءة الباركود (USB Scanner) أو استخدم كاميرا جوالك الأساسية لمسح رمز الطالب من بطاقته الرقمية ولصق المعرّف هنا.
           </p>
+
+          {!showCamera ? (
+            <button
+              onClick={() => setShowCamera(true)}
+              className="mb-8 mx-auto flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-6 py-3 rounded-xl font-bold text-sm transition-colors border border-slate-200"
+            >
+              <Camera className="w-4 h-4" />
+              افتح كاميرا الجوال للمسح
+            </button>
+          ) : (
+            <div className="mb-8 max-w-sm mx-auto overflow-hidden rounded-2xl border-4 border-slate-100 shadow-inner relative">
+              <Scanner 
+                onScan={(result) => {
+                  if (result && result.length > 0) {
+                    const scannedText = result[0].rawValue;
+                    setManualInput(scannedText);
+                    setShowCamera(false); // Close camera after scan
+                    handleManualSubmit(undefined, scannedText); // Auto submit
+                  }
+                }}
+                onError={(err) => console.error("Scanner Error:", err)}
+                formats={['qr_code']}
+              />
+              <button
+                onClick={() => setShowCamera(false)}
+                className="absolute top-3 right-3 bg-white/80 hover:bg-white text-slate-800 p-2 rounded-lg backdrop-blur-sm shadow-sm transition-colors z-10"
+              >
+                إغلاق
+              </button>
+            </div>
+          )}
 
           <form onSubmit={handleManualSubmit} className="max-w-md mx-auto relative">
             <div className="relative">
