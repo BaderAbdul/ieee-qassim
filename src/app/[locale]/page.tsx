@@ -160,7 +160,7 @@ export default async function HomePage({ params }: PageProps) {
                 </span>
               </div>
               
-              <h1 className="text-4xl sm:text-7xl lg:text-8xl font-black mb-4 text-slate-900 drop-shadow-sm uppercase tracking-tight">
+              <h1 className="text-4xl sm:text-7xl lg:text-8xl font-black mb-4 font-thmanyah text-slate-900 drop-shadow-sm uppercase tracking-tight">
                 {t('Hero.headline')}
               </h1>
               <p className="text-slate-600 font-medium text-sm sm:text-base max-w-lg mx-auto lg:mx-0 mb-6 lg:mb-10 leading-relaxed">
