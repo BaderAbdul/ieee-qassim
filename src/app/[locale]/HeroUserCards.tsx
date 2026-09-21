@@ -77,7 +77,7 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
     <>
       {/* Card 1: Featured Event (Top Right) */}
       <div 
-        className={`absolute top-0 lg:top-4 rtl:left-2 lg:rtl:left-0 lg:ltr:right-0 ltr:-right-2 w-72 lg:w-80 bg-white/60 backdrop-blur-2xl rounded-3xl p-4 lg:p-5 shadow-2xl shadow-blue-900/15 border border-white/50 transform hover:-translate-y-2 lg:hover:z-50 transition-all duration-300 group cursor-pointer ${activeCard === 1 ? 'z-50 scale-105' : 'z-30'}`}
+        className={`absolute top-0 lg:top-4 rtl:left-2 lg:rtl:left-0 lg:ltr:right-0 ltr:-right-2 w-72 lg:w-80 bg-white/60 rounded-3xl p-4 lg:p-5 shadow-2xl shadow-blue-900/15 border border-white/50 transform hover:-translate-y-2 lg:hover:z-50 transition-all duration-300 group cursor-pointer ${activeCard === 1 ? 'z-50 scale-105' : 'z-30'}`}
         onClick={() => { if(latestEvent) handleCardClick(1, `/events/${latestEvent.id}`) }}
       >
         <div className="flex items-center justify-between mb-4">
@@ -104,7 +104,7 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
 
       {/* Card 2: Points / Leaderboard */}
       <div 
-        className={`absolute top-20 lg:top-32 rtl:-right-2 lg:rtl:-right-8 ltr:-left-2 lg:ltr:-left-8 w-56 lg:w-64 bg-white/60 backdrop-blur-2xl rounded-3xl p-4 lg:p-5 shadow-xl shadow-slate-200/50 border border-white/50 transform -rotate-2 hover:rotate-0 hover:-translate-y-1 lg:hover:z-50 transition-all duration-300 cursor-pointer ${activeCard === 2 ? 'z-50 scale-105 rotate-0' : 'z-20'}`}
+        className={`absolute top-20 lg:top-32 rtl:-right-2 lg:rtl:-right-8 ltr:-left-2 lg:ltr:-left-8 w-56 lg:w-64 bg-white/60 rounded-3xl p-4 lg:p-5 shadow-xl shadow-slate-200/50 border border-white/50 transform -rotate-2 hover:rotate-0 hover:-translate-y-1 lg:hover:z-50 transition-all duration-300 cursor-pointer ${activeCard === 2 ? 'z-50 scale-105 rotate-0' : 'z-20'}`}
         onClick={() => handleCardClick(2, '/leaderboard')}
       >
         <div className="flex items-start gap-3 lg:gap-4">
@@ -128,7 +128,7 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
 
       {/* Card 3: Activity/Certificate */}
       <div 
-        className={`absolute top-40 lg:top-auto lg:bottom-10 rtl:left-6 lg:rtl:left-12 ltr:right-6 lg:ltr:right-12 w-60 lg:w-72 bg-[#002855]/70 backdrop-blur-2xl rounded-3xl p-4 lg:p-5 shadow-2xl shadow-blue-900/40 border border-white/10 transform rotate-2 hover:rotate-0 hover:-translate-y-1 lg:hover:z-50 transition-all duration-300 cursor-pointer ${activeCard === 3 ? 'z-50 scale-105 rotate-0' : 'z-40'}`}
+        className={`absolute top-40 lg:top-auto lg:bottom-10 rtl:left-6 lg:rtl:left-12 ltr:right-6 lg:ltr:right-12 w-60 lg:w-72 bg-[#002855]/70 rounded-3xl p-4 lg:p-5 shadow-2xl shadow-blue-900/40 border border-white/10 transform rotate-2 hover:rotate-0 hover:-translate-y-1 lg:hover:z-50 transition-all duration-300 cursor-pointer ${activeCard === 3 ? 'z-50 scale-105 rotate-0' : 'z-40'}`}
         onClick={() => handleCardClick(3, '/profile')}
       >
         <div className="flex items-center justify-between mb-3 lg:mb-4">

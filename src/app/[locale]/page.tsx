@@ -4,13 +4,9 @@ import { getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/routing';
 import Image from 'next/image';
 import { Calendar, Trophy, ArrowRight, UserCircle, Users } from 'lucide-react';
-import dynamic from 'next/dynamic';
+import HeroUserCards from './HeroUserCards';
 import HeroActionButtons from './HeroActionButtons';
 import EventCard from '@/components/ui/EventCard';
-
-const HeroUserCards = dynamic(() => import('./HeroUserCards'), {
-  ssr: false,
-});
 
 export const revalidate = 60; // Enable ISR, cache for 60 seconds
 
@@ -150,8 +146,8 @@ export default async function HomePage({ params }: PageProps) {
     <div className="flex flex-col bg-[#F8FAFC] min-h-screen">
       {/* Light Mode Premium Hero Section */}
       <section className="relative overflow-hidden pt-24 pb-12 lg:pb-20 px-4 sm:px-6 lg:px-8">
-        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-blue-600/30 rounded-full blur-[120px] pointer-events-none" />
-        <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-96 h-96 bg-indigo-600/30 rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-blue-600/30 rounded-full pointer-events-none" />
+        <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-96 h-96 bg-indigo-600/30 rounded-full pointer-events-none" />
         
         <div className="relative max-w-7xl mx-auto z-10 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
           
@@ -272,7 +268,7 @@ export default async function HomePage({ params }: PageProps) {
             )}
           </div>
         ) : (
-          <div className="text-center py-12 bg-white/60 backdrop-blur-md rounded-3xl border border-slate-200 border-dashed">
+          <div className="text-center py-12 bg-white/60 rounded-3xl border border-slate-200 border-dashed">
             <p className="text-slate-500 font-medium">{isAr ? 'لا توجد فعاليات حالياً' : 'No events available right now'}</p>
           </div>
         )}
@@ -320,7 +316,7 @@ export default async function HomePage({ params }: PageProps) {
       {/* IEEE QU Structure */}
       {stats.showStructure !== false && (
         <section className="py-16 bg-white border-t border-slate-100 mt-8 relative overflow-hidden">
-          <div className="absolute top-0 right-1/4 w-96 h-96 bg-blue-50 rounded-full blur-[100px] pointer-events-none opacity-60"></div>
+          <div className="absolute top-0 right-1/4 w-96 h-96 bg-blue-50 rounded-full pointer-events-none opacity-60"></div>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div className="text-center mb-12">
               <h2 className="text-3xl font-black font-cairo text-slate-900 mb-4">هيكلة النادي</h2>
