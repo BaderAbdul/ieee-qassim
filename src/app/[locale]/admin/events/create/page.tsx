@@ -11,6 +11,7 @@ import { Link } from '@/i18n/routing';
 export default function CreateEventPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   
   const [formData, setFormData] = useState({
     title: '',
@@ -42,6 +43,34 @@ export default function CreateEventPage() {
       [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : 
               type === 'number' ? Number(value) : value
     }));
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', 'Ieee_events');
+
+    try {
+      const res = await fetch('https://api.cloudinary.com/v1_1/jhjhfrnr/image/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.secure_url) {
+        setFormData(prev => ({ ...prev, coverUrl: data.secure_url }));
+      } else {
+        throw new Error('Upload failed');
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      alert('حدث خطأ أثناء رفع الصورة');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -133,8 +162,26 @@ export default function CreateEventPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">رابط صورة الغلاف (URL)</label>
-              <input type="url" name="coverUrl" value={formData.coverUrl} onChange={handleChange} dir="ltr" className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500" />
+              <label className="block text-sm font-medium text-gray-700 mb-1">صورة الغلاف (Cover Image)</label>
+              {formData.coverUrl && (
+                <div className="mb-2 rounded-lg overflow-hidden border border-gray-200">
+                  <img src={formData.coverUrl} alt="Cover Preview" className="w-full h-32 object-cover" />
+                </div>
+              )}
+              <div className="relative">
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleImageUpload} 
+                  disabled={isUploading}
+                  className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 cursor-pointer disabled:opacity-50" 
+                />
+                {isUploading && (
+                  <div className="absolute inset-0 bg-white/50 flex items-center justify-center rounded-lg">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600"></div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
