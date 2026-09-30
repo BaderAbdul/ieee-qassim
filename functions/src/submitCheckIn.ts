@@ -114,11 +114,8 @@ export const submitCheckIn = functions.https.onCall(async (data, context) => {
         timestamp: FieldValue.serverTimestamp()
       });
 
-      // Update user total points
-      const userRef = db.collection('users').doc(uidToCheckIn);
-      transaction.update(userRef, {
-        totalPoints: FieldValue.increment(pointsToAward)
-      });
+      // User total points will be updated by the onPointTransactionCreated trigger
+      // to maintain a single source of truth and prevent double-counting.
     }
 
     return { status: 'success', userId: uidToCheckIn, awardedPoints: pointsToAward };

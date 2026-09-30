@@ -329,7 +329,7 @@ export default async function HomePage({ params }: PageProps) {
             
             <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
               {stats.committees && stats.committees.length > 0 ? (
-                stats.committees.map((committee: any, index: number) => {
+                stats.committees.map((committee: { id: string; name: string; description: string; members: { userId: string; name: string; role: string; avatar?: string }[] }, index: number) => {
                   const colors = ['blue', 'indigo', 'emerald', 'pink', 'amber', 'purple'];
                   const color = colors[index % colors.length];
                   
@@ -343,7 +343,7 @@ export default async function HomePage({ params }: PageProps) {
                       
                       {committee.members && committee.members.length > 0 && (
                         <div className="hidden sm:flex -space-x-2 rtl:space-x-reverse justify-center mt-2">
-                          {committee.members.slice(0, 4).map((member: any) => (
+                          {committee.members.slice(0, 4).map((member: { userId: string; name: string; role: string; avatar?: string }) => (
                             <div key={member.userId} className={`h-8 w-8 rounded-full border-2 border-white bg-${color}-200 flex items-center justify-center text-xs font-bold text-${color}-700 overflow-hidden relative group`} title={member.name}>
                               {member.avatar ? (
                                 <Image 

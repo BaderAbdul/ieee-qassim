@@ -200,8 +200,10 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
           userId,
           eventId,
           points: pointsAmount,
+          amount: pointsAmount,
           description: pointsDesc || 'مشاركة في الفعالية',
           createdAt: serverTimestamp(),
+          timestamp: serverTimestamp(),
           type: 'event_attendance'
         });
 

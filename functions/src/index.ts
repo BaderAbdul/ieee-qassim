@@ -25,3 +25,4 @@ export * from './triggers/emailRegistrations';
 export * from './triggers/emailAttendance';
 export * from './triggers/emailCertificates';
 export * from './cron/sendEventReminders';
+export * from './triggers/onRegistrationCancelled';

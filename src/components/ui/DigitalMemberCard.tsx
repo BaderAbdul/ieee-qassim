@@ -6,9 +6,10 @@ import { ShieldCheck, Calendar, Trophy, Zap, Edit2, LogOut, Hexagon } from 'luci
 import Image from 'next/image';
 import { useLocale } from 'next-intl';
 
+import { User } from 'firebase/auth';
 interface DigitalMemberCardProps {
-  user: any;
-  userData: any;
+  user: User;
+  userData: { arabicFullName?: string; name?: string; major?: string | null; college?: string | null; } | null;
   rank: number | null;
   totalPoints: number;
   onEditName: () => void;

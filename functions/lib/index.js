@@ -60,4 +60,5 @@ __exportStar(require("./triggers/emailRegistrations"), exports);
 __exportStar(require("./triggers/emailAttendance"), exports);
 __exportStar(require("./triggers/emailCertificates"), exports);
 __exportStar(require("./cron/sendEventReminders"), exports);
+__exportStar(require("./triggers/onRegistrationCancelled"), exports);
 //# sourceMappingURL=index.js.map

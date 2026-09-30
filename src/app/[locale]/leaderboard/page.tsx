@@ -8,7 +8,7 @@ import LeaderboardList, { LeaderboardUser } from './LeaderboardList';
 import { useTranslations, useLocale } from 'next-intl';
 
 export default function LeaderboardPage() {
-  const t = useTranslations('leaderboard' as any);
+
   const locale = useLocale();
   const isAr = locale === 'ar';
   

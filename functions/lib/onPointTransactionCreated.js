@@ -41,7 +41,8 @@ exports.onPointTransactionCreated = functions.firestore
     .document('point_transactions/{transactionId}')
     .onCreate(async (snap, context) => {
     const data = snap.data();
-    const { userId, amount } = data;
+    const userId = data.userId;
+    const amount = typeof data.amount === 'number' ? data.amount : data.points;
     if (!userId || typeof amount !== 'number') {
         console.error('Invalid point transaction data:', data);
         return null;

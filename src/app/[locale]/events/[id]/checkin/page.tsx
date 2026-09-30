@@ -18,8 +18,11 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
   const router = useRouter();
   const t = useTranslations();
 
-  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'already_attended'>('loading');
-  const [errorMessage, setErrorMessage] = useState('');
+  const initialStatus = !token ? 'error' : 'loading';
+  const initialErrorMessage = !token ? (locale === 'ar' ? 'الرابط غير صالح أو مفقود رمزه السري' : 'Invalid link or missing token') : '';
+
+  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'already_attended'>(initialStatus);
+  const [errorMessage, setErrorMessage] = useState(initialErrorMessage);
 
   useEffect(() => {
     if (authLoading) return;
@@ -32,8 +35,6 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
     }
 
     if (!token) {
-      setStatus('error');
-      setErrorMessage(locale === 'ar' ? 'الرابط غير صالح أو مفقود رمزه السري' : 'Invalid link or missing token');
       return;
     }
 
@@ -45,16 +46,17 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
           token
         });
         
-        const result = response.data as any;
+        const result = response.data as { status?: string; message?: string };
         if (result.status === 'already_checked_in') {
           setStatus('already_attended');
         } else {
           setStatus('success');
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Error during self check-in:", error);
         setStatus('error');
-        setErrorMessage(error.message || (locale === 'ar' ? 'حدث خطأ أثناء التحضير' : 'Error during check-in'));
+        const err = error as Error;
+        setErrorMessage(err.message || (locale === 'ar' ? 'حدث خطأ أثناء التحضير' : 'Error during check-in'));
       }
     };
 

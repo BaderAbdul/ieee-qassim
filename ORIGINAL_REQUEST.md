@@ -79,3 +79,39 @@ Add robust fallback loading states (e.g., skeletons) and Error Boundaries for al
 
 ### UX
 - [ ] A QA agent confirms the presence of React `<Suspense>` boundaries or `loading.tsx` files for dynamic routes.
+
+## 2026-09-30T11:14:09Z
+
+Take the CURRENT IEEE QASSIM platform from its current release-candidate state to a genuinely production-ready system for real students, real events, real attendance, real points, and real certificates.
+
+Working directory: /home/bader/Documents/IEEE QU SITE
+Integrity mode: benchmark
+
+## Requirements
+
+### R1. Repository Discovery & Architecture Integration
+Use a multidisciplinary engineering team (Principal, React, Firebase, Security, QA, UX) to inspect the entire repository architecture (Next.js App Router, Firebase Client/Admin, Firestore, Storage, Cloud Functions, tests, security rules). Do not assume previous audits are correct. Verify current code.
+
+### R2. Complete Product Journey Validation
+Audit and test the entire Visitor/Student journey (Login → ProfileGuard → Discover → Register → Waitlist/Approve/Cancel → Attend → Earn Points → Certificate) and the Organizer journey (Create → Publish → Manage Registrations → Run Attendance → Complete Event). Pay special attention to Waitlist FIFO auto-promotion (which must happen securely on the backend) and capacity integrity.
+
+### R3. Security, Authentication, & Authorization
+Verify any Google account can authenticate. ProfileGuard must handle Qassim vs Non-Qassim users without reintroducing the @qu.edu.sa domain restriction. Perform a strict security review of `firestore.rules` and `storage.rules`. Verify students cannot self-escalate roles, manipulate points, forge attendance, or modify other users' registrations. Ensure admin operations require true backend authorization, not just UI hiding.
+
+### R4. Performance, UI, & Localization
+Do not redesign the UI or introduce new features. Preserve the IEEE QASSIM identity, Arabic-first RTL, English secondary, and mobile-first layout. Verify all event states in the UI. Ensure accessibility, responsive design, and graceful failure on edge cases (e.g., missing covers, network failures, full capacity). Identify actual performance bottlenecks without speculative changes (preserve CLS=0).
+
+### R5. Backend Production Readiness
+Determine exactly which Cloud Functions are required (e.g., generateCheckInToken, submitCheckIn, onPointTransactionCreated, onRegistrationCancelled). For each, verify if it is exported, tested, and actually deployed. Check required composite indexes and environment variables. Do not fabricate deployment status if it cannot be verified.
+
+### R6. Automated Verification
+Run `npm run build`, `npm run lint`, `npx tsc --noEmit`, and `npm test`. Fix any real failures. Perform a final integration review as a Principal Engineer to ensure fixes don't introduce regressions.
+
+## Acceptance Criteria
+
+### Final Release Gate & Reporting
+- [ ] A `FINAL_PRODUCTION_RELEASE_REPORT.md` artifact is created.
+- [ ] The report classifies the project as exactly one of: READY FOR LAUNCH, READY WITH MANUAL ACTIONS, or NOT READY.
+- [ ] The report contains an executive summary, changes made, test results, route/user/admin journey matrices, and verification status for attendance, points, certificates, waitlist, security, Firebase, Cloud Functions deployment, indexes, and env vars.
+- [ ] Any required manual actions are explicitly listed.
+- [ ] "CODE EXISTS" is strictly differentiated from "PRODUCTION DEPLOYED". Unverifiable backend dependencies must be clearly marked.

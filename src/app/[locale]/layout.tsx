@@ -38,6 +38,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://ieeequ.org'),
   title: "IEEE Qassim Tech Community",
   description: "The Official IEEE Qassim Technology Community Platform",
   openGraph: {

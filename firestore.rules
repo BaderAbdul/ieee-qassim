@@ -69,10 +69,11 @@ service cloud.firestore {
 
       // Updates:
       // 1. Super Admin has unrestricted write access.
-      // 2. Event Organizers can ONLY update totalPoints (cannot escalate role or personal info).
+      // 2. Event Organizers can ONLY update totalPoints on other users (cannot self-inflate points or alter profile/role).
       // 3. Owners can update their profile fields, but CANNOT touch role, totalPoints, badges, or isAdmin.
       allow update: if isSuperAdmin() || (
         isEventOrganizer()
+        && request.auth.uid != userId
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalPoints'])
         && isPositiveInt(request.resource.data.totalPoints)
       ) || (
@@ -189,8 +190,12 @@ service cloud.firestore {
     match /point_transactions/{transactionId} {
       allow read: if isOwner(resource.data.userId) || isEventOrganizer();
       allow create: if isEventOrganizer()
-        && request.resource.data.points is int
-        && request.resource.data.keys().hasAll(['userId', 'points', 'timestamp']);
+        && ('userId' in request.resource.data)
+        && (
+          (('points' in request.resource.data) && request.resource.data.points is int) ||
+          (('amount' in request.resource.data) && request.resource.data.amount is int)
+        )
+        && request.resource.data.keys().hasAny(['timestamp', 'createdAt']);
       allow update, delete: if false; // Strict immutability
     }
 

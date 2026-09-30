@@ -42,6 +42,24 @@ test('Security Rules Audit: User document updates must block organizer role esca
   );
 });
 
+test('Security Rules Audit: User document updates must block organizer self-points inflation (VULN-02)', () => {
+  assert.ok(
+    firestoreRulesContent.includes("request.auth.uid != userId"),
+    'CRITICAL: Event organizers must be prevented from modifying totalPoints on their own user document'
+  );
+});
+
+test('Security Rules Audit: Point transactions schema alignment allows points/amount and timestamp/createdAt (VULN-04)', () => {
+  assert.ok(
+    firestoreRulesContent.includes("request.resource.data.keys().hasAny(['timestamp', 'createdAt'])"),
+    'CRITICAL: point_transactions creation must accommodate both timestamp and createdAt'
+  );
+  assert.ok(
+    firestoreRulesContent.includes("points is int") && firestoreRulesContent.includes("amount is int"),
+    'CRITICAL: point_transactions creation must accommodate both points and amount'
+  );
+});
+
 test('Security Rules Audit: Event registeredCount counter updates must be bounded', () => {
   assert.ok(
     firestoreRulesContent.includes("resource.data.state == 'Registration Open'"),

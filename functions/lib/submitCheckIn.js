@@ -132,11 +132,8 @@ exports.submitCheckIn = functions.https.onCall(async (data, context) => {
                 description: `حضور فعالية: ${(eventData === null || eventData === void 0 ? void 0 : eventData.title) || 'Unknown'}`,
                 timestamp: firestore_1.FieldValue.serverTimestamp()
             });
-            // Update user total points
-            const userRef = db.collection('users').doc(uidToCheckIn);
-            transaction.update(userRef, {
-                totalPoints: firestore_1.FieldValue.increment(pointsToAward)
-            });
+            // User total points will be updated by the onPointTransactionCreated trigger
+            // to maintain a single source of truth and prevent double-counting.
         }
         return { status: 'success', userId: uidToCheckIn, awardedPoints: pointsToAward };
     });

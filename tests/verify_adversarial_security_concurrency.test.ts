@@ -175,9 +175,10 @@ class FirestoreRulesSimulator {
 
     const diff = this.computeDiff(oldData, newData);
 
-    // Branch 2: Event Organizers can ONLY update totalPoints
+    // Branch 2: Event Organizers can ONLY update totalPoints on other users (VULN-02 remediation)
     if (
       this.isEventOrganizer(auth) &&
+      auth?.uid !== userId &&
       diff.affectedKeys().hasOnly(['totalPoints']) &&
       this.isPositiveInt(newData.totalPoints)
     ) {
@@ -196,6 +197,17 @@ class FirestoreRulesSimulator {
 
   canDeleteUser(userId: string, auth?: AuthContext | null): boolean {
     return this.isSuperAdmin(auth);
+  }
+
+  // --- Point Transactions Collection Rules ---
+  canCreatePointTransaction(data: Record<string, any>, auth?: AuthContext | null): boolean {
+    if (!this.isEventOrganizer(auth)) return false;
+    if (!('userId' in data)) return false;
+    const hasPointsOrAmount =
+      (('points' in data) && Number.isInteger(data.points)) ||
+      (('amount' in data) && Number.isInteger(data.amount));
+    const hasTimestampOrCreatedAt = ('timestamp' in data) || ('createdAt' in data);
+    return hasPointsOrAmount && hasTimestampOrCreatedAt;
   }
 
   // --- Registrations Collection Rules ---
@@ -399,6 +411,24 @@ test('ADVERSARIAL RED-TEAM: /users/{userId} Privilege Escalation Attacks', () =>
   // Attack 10: Anonymous unauthenticated read on /users
   const anonRead = sim.canReadUser('std_eve', null);
   assert.equal(anonRead, false, 'Anonymous user MUST NOT be allowed to read /users/{userId}');
+
+  // Attack 11: Event Organizer tries to inflate their own totalPoints (VULN-02)
+  const orgSelfPointsAttempt = sim.canUpdateUser(
+    'org_dave',
+    sim.state.users['org_dave'],
+    { ...sim.state.users['org_dave'], totalPoints: 9999 },
+    organizerAuth
+  );
+  assert.equal(orgSelfPointsAttempt, false, 'Event Organizer MUST NOT be allowed to inflate their own totalPoints');
+
+  // Legitimate: Event Organizer updates student totalPoints
+  const orgLegitUpdateStudent = sim.canUpdateUser(
+    'std_eve',
+    sim.state.users['std_eve'],
+    { ...sim.state.users['std_eve'], totalPoints: 100 },
+    organizerAuth
+  );
+  assert.equal(orgLegitUpdateStudent, true, 'Event Organizer MUST be allowed to update student totalPoints');
 });
 
 test('ADVERSARIAL RED-TEAM: /registrations Forgery & Self-Attendance Attacks', () => {
@@ -534,6 +564,57 @@ test('ADVERSARIAL RED-TEAM: /registrations Unauthenticated & Cross-User Read Att
   // Legitimate: Alice reads her own registration
   const aliceGetAlice = sim.canGetRegistration('event101_std_alice', { userId: 'std_alice' }, aliceAuth);
   assert.equal(aliceGetAlice, true, 'Student Alice MUST be allowed to read her own registration');
+});
+
+test('ADVERSARIAL RED-TEAM: /point_transactions Schema Alignment & Ledger Integrity (VULN-04)', () => {
+  const sim = new FirestoreRulesSimulator();
+  const organizerAuth: AuthContext = { uid: 'org_dave', token: { email: 'dave@qu.edu.sa', email_verified: true } };
+  const studentAuth: AuthContext = { uid: 'std_eve', token: { email: 'eve@qu.edu.sa', email_verified: true } };
+
+  sim.state.users['org_dave'] = { role: 'event_organizer' };
+  sim.state.users['std_eve'] = { role: 'student' };
+
+  // 1. Client writes points and createdAt (from admin registration desk)
+  const clientTx = sim.canCreatePointTransaction({
+    userId: 'std_eve',
+    eventId: 'event101',
+    points: 25,
+    description: 'Attendance',
+    createdAt: new Date(),
+    type: 'event_attendance'
+  }, organizerAuth);
+  assert.equal(clientTx, true, 'Organizer writing { points, createdAt } MUST be allowed');
+
+  // 2. Cloud Function writes amount and timestamp
+  const fnTx = sim.canCreatePointTransaction({
+    userId: 'std_eve',
+    amount: 25,
+    source: 'attendance',
+    timestamp: new Date()
+  }, organizerAuth);
+  assert.equal(fnTx, true, 'Organizer writing { amount, timestamp } MUST be allowed');
+
+  // 3. Student tries to forge a point transaction directly
+  const studentTx = sim.canCreatePointTransaction({
+    userId: 'std_eve',
+    points: 500,
+    createdAt: new Date()
+  }, studentAuth);
+  assert.equal(studentTx, false, 'Student MUST NOT be allowed to create point transactions');
+
+  // 4. Missing both points and amount
+  const missingPoints = sim.canCreatePointTransaction({
+    userId: 'std_eve',
+    createdAt: new Date()
+  }, organizerAuth);
+  assert.equal(missingPoints, false, 'Transaction without points or amount MUST be rejected');
+
+  // 5. Missing both timestamp and createdAt
+  const missingTime = sim.canCreatePointTransaction({
+    userId: 'std_eve',
+    points: 25
+  }, organizerAuth);
+  assert.equal(missingTime, false, 'Transaction without timestamp or createdAt MUST be rejected');
 });
 
 test('ADVERSARIAL RED-TEAM: Event registeredCount Counter Tampering Attacks', () => {

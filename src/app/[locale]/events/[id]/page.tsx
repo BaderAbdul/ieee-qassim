@@ -200,28 +200,6 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
       const regRef = doc(db, 'registrations', regId);
       const eventRef = doc(db, 'events', eventId);
 
-      // Query waitlisted candidates to auto-promote FIFO
-      const waitlistQ = query(
-        collection(db, 'registrations'),
-        where('eventId', '==', eventId),
-        where('status', '==', 'waitlisted')
-      );
-      const waitlistSnap = await getDocs(waitlistQ);
-      let candidateToPromote: DocumentReference | null = null;
-      if (!waitlistSnap.empty) {
-        const sortedWaitlist = [...waitlistSnap.docs].sort((a, b) => {
-          const getTs = (d: typeof a): number => {
-            const data = d.data();
-            const ts = data.timestamp as { toMillis?: () => number; seconds?: number } | undefined;
-            if (ts && typeof ts.toMillis === 'function') return ts.toMillis();
-            if (ts && typeof ts.seconds === 'number') return ts.seconds * 1000;
-            return 0;
-          };
-          return getTs(a) - getTs(b);
-        });
-        candidateToPromote = sortedWaitlist[0].ref;
-      }
-
       await runTransaction(db, async (transaction) => {
         const regDoc = await transaction.get(regRef);
         const prevStatus = regDoc.exists() ? regDoc.data().status : null;
@@ -233,27 +211,13 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
         }, { merge: true });
 
         if (wasApproved) {
-          let promoted = false;
-          if (candidateToPromote) {
-            const promDoc = await transaction.get(candidateToPromote);
-            if (promDoc.exists() && promDoc.data().status === 'waitlisted') {
-              transaction.update(candidateToPromote, {
-                status: 'approved',
-                promotedAt: serverTimestamp()
+          const eventDoc = await transaction.get(eventRef);
+          if (eventDoc.exists()) {
+            const currentCount = (eventDoc.data() as PlatformEvent).registeredCount || 0;
+            if (currentCount > 0) {
+              transaction.update(eventRef, {
+                registeredCount: increment(-1)
               });
-              promoted = true;
-            }
-          }
-
-          if (!promoted) {
-            const eventDoc = await transaction.get(eventRef);
-            if (eventDoc.exists()) {
-              const currentCount = (eventDoc.data() as PlatformEvent).registeredCount || 0;
-              if (currentCount > 0) {
-                transaction.update(eventRef, {
-                  registeredCount: increment(-1)
-                });
-              }
             }
           }
         }

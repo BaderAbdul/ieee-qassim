@@ -221,7 +221,7 @@ export default function AdminDashboardPage() {
               هيكلة وإدارات النادي (IEEE Structure)
             </h2>
             <p className="text-gray-500 text-sm mb-4">
-              التحكم في ظهور قسم "هيكلة مجتمع IEEE" في الصفحة الرئيسية.
+              التحكم في ظهور قسم &quot;هيكلة مجتمع IEEE&quot; في الصفحة الرئيسية.
             </p>
             <label className="flex items-center gap-3 cursor-pointer">
               <input 

@@ -34,7 +34,16 @@ export default function AdminStructurePage() {
   const [memberRole, setMemberRole] = useState('عضو');
   const [memberLinkedin, setMemberLinkedin] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+
+  interface SearchResultUser {
+    id: string;
+    email?: string;
+    displayName?: string;
+    arabicFullName?: string;
+    photoURL?: string;
+  }
+
+  const [searchResults, setSearchResults] = useState<SearchResultUser[]>([]);
   const [searching, setSearching] = useState(false);
 
   useEffect(() => {
@@ -105,12 +114,12 @@ export default function AdminStructurePage() {
       const snap = await getDocs(q);
       const res = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
-        .filter((u: any) => 
+        .filter((u: SearchResultUser) => 
           (u.arabicFullName && u.arabicFullName.includes(searchQuery)) || 
           (u.email && u.email.includes(searchQuery)) || 
           (u.displayName && u.displayName.includes(searchQuery))
         );
-      setSearchResults(res);
+      setSearchResults(res as SearchResultUser[]);
     } catch (e) {
       console.error(e);
     } finally {
@@ -118,7 +127,7 @@ export default function AdminStructurePage() {
     }
   };
 
-  const handleAddMember = (user: any) => {
+  const handleAddMember = (user: SearchResultUser) => {
     if (!showMemberModal) return;
     const { committeeId } = showMemberModal;
     
@@ -239,6 +248,7 @@ export default function AdminStructurePage() {
                   <div key={member.userId} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
                     <div className="flex items-center gap-3">
                       <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold overflow-hidden">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         {member.avatar ? <img src={member.avatar} alt={member.name} className="h-full w-full object-cover" /> : member.name.charAt(0)}
                       </div>
                       <div>

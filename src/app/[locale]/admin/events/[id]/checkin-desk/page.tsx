@@ -2,14 +2,20 @@
 
 import React, { useEffect, useState, use } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase/client';
 import { httpsCallable } from 'firebase/functions';
 import { QRCodeSVG } from 'qrcode.react';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
-import { Loader2, ArrowRight, QrCode, Link as LinkIcon, UserCheck, ShieldCheck, CheckCircle2, XCircle, Camera } from 'lucide-react';
+import { Loader2, ArrowRight, QrCode, Link as LinkIcon, UserCheck, ShieldCheck, CheckCircle2, XCircle, Camera, RefreshCw } from 'lucide-react';
 import dynamic from 'next/dynamic';
+
+interface CheckInResult {
+  status?: 'success' | 'already_checked_in' | 'error';
+  awardedPoints?: number;
+  message?: string;
+}
 
 const Scanner = dynamic(() => import('@yudiel/react-qr-scanner').then((mod) => mod.Scanner), {
   ssr: false,
@@ -30,10 +36,27 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [scanResult, setScanResult] = useState<{ status: 'success' | 'error' | 'already_checked_in' | null, message: string }>({ status: null, message: '' });
   const [showCamera, setShowCamera] = useState(false);
+  const [isGeneratingToken, setIsGeneratingToken] = useState(false);
 
   // Self Check-in Link
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
   const selfCheckinUrl = event?.checkinToken ? `${baseUrl}/${locale}/events/${eventId}/checkin?token=${event.checkinToken}` : '';
+
+  const handleGenerateToken = async () => {
+    setIsGeneratingToken(true);
+    try {
+      const newToken = Math.random().toString(36).substring(2, 10).toUpperCase();
+      await updateDoc(doc(db, 'events', eventId), {
+        checkinToken: newToken
+      });
+      setEvent(prev => prev ? { ...prev, checkinToken: newToken } : null);
+    } catch (error) {
+      console.error("Error generating check-in token:", error);
+      alert("حدث خطأ أثناء توليد رمز التحضير");
+    } finally {
+      setIsGeneratingToken(false);
+    }
+  };
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -56,7 +79,7 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
     if (e) e.preventDefault();
     
     // Support either manual input state or direct scanned ID, and strip the potential 'ieee-qu-user:' prefix
-    let rawInput = scannedId || manualInput;
+    const rawInput = scannedId || manualInput;
     const targetUserId = rawInput.replace('ieee-qu-user:', '').trim();
     
     if (!targetUserId) return;
@@ -71,7 +94,7 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
         targetUserId
       });
       
-      const result = response.data as any;
+      const result = response.data as CheckInResult;
       if (result.status === 'success') {
         setScanResult({ status: 'success', message: `تم تحضير الطالب بنجاح! النقاط المكتسبة: ${result.awardedPoints || 0}` });
         setManualInput('');
@@ -79,9 +102,10 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
         setScanResult({ status: 'already_checked_in', message: 'الطالب محضر مسبقاً.' });
         setManualInput('');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Checkin error", error);
-      setScanResult({ status: 'error', message: error.message || 'فشل التحضير. تأكد من أن الطالب مسجل في الفعالية.' });
+      const err = error as Error;
+      setScanResult({ status: 'error', message: err.message || 'فشل التحضير. تأكد من أن الطالب مسجل في الفعالية.' });
     } finally {
       setIsSubmitting(false);
       // Auto clear success message after 5 seconds
@@ -180,14 +204,35 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
                     <LinkIcon className="w-4 h-4 me-2" />
                     نسخ الرابط
                   </button>
+                  <button 
+                    onClick={() => {
+                      if (confirm('هل أنت متأكد من إنشاء رمز تحضير جديد؟ الرابط الحالي سيتوقف عن العمل.')) {
+                        handleGenerateToken();
+                      }
+                    }}
+                    disabled={isGeneratingToken}
+                    className="shrink-0 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors flex items-center shadow-sm w-full sm:w-auto justify-center disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-4 h-4 me-2 ${isGeneratingToken ? 'animate-spin' : ''}`} />
+                    تحديث الرمز
+                  </button>
                 </div>
               </>
             ) : (
-              <div className="text-slate-500">
-                <p className="mb-4">لا يوجد رابط تحضير لهذه الفعالية.</p>
-                <Link href={`/admin/events/${eventId}/registrations`} className="text-blue-600 hover:underline">
-                  قم بتوليد الرابط من مكتب التسجيل أولاً
-                </Link>
+              <div className="text-slate-500 py-6 max-w-md mx-auto">
+                <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <QrCode className="w-8 h-8" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-800 mb-2 font-cairo">لم يتم إنشاء رمز تحضير لهذه الفعالية بعد</h3>
+                <p className="text-sm text-slate-500 mb-6">قم بتوليد رمز التحضير الذاتي ليتمكن الحضور من مسح رمز QR أو استخدام رابط التحضير المباشر.</p>
+                <button
+                  onClick={handleGenerateToken}
+                  disabled={isGeneratingToken}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold text-sm transition-colors shadow-md shadow-blue-600/20 flex items-center mx-auto disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-4 h-4 me-2 ${isGeneratingToken ? 'animate-spin' : ''}`} />
+                  {isGeneratingToken ? 'جاري توليد الرمز...' : 'توليد رمز التحضير الآن'}
+                </button>
               </div>
             )}
           </div>

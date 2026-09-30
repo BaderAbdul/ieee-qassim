@@ -33,8 +33,8 @@ export default async function EventsPage() {
     
     // Sort by date descending
     fetchedEvents.sort((a, b) => {
-      const dateA = new Date(a.date as any).getTime() || 0;
-      const dateB = new Date(b.date as any).getTime() || 0;
+      const dateA = new Date(a.date as string | number | Date).getTime() || 0;
+      const dateB = new Date(b.date as string | number | Date).getTime() || 0;
       return dateB - dateA;
     });
 
