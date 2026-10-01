@@ -162,7 +162,7 @@ export default async function HomePage({ params }: PageProps) {
                 </span>
               </div>
               
-              <h1 className="text-4xl sm:text-7xl lg:text-8xl font-black mb-4 font-thmanyah text-slate-900 drop-shadow-sm uppercase tracking-tight">
+              <h1 className="text-4xl sm:text-7xl lg:text-8xl font-black mb-2 sm:mb-4 font-thmanyah text-slate-900 drop-shadow-sm uppercase tracking-tight">
                 {t('Hero.headline')}
               </h1>
               <p className="text-slate-600 font-medium text-sm sm:text-base max-w-lg mx-auto lg:mx-0 mb-6 lg:mb-10 leading-relaxed">
@@ -182,36 +182,30 @@ export default async function HomePage({ params }: PageProps) {
       </section>
 
       {/* Hero Stats Strip */}
-      <section className="relative z-20 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 w-full -mt-8 mb-12">
+      <section className="relative z-20 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 w-full -mt-8 sm:-mt-8 mb-6 sm:mb-10">
         <div className="grid grid-cols-3 gap-2 sm:gap-4">
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-3 sm:p-6 flex flex-col sm:flex-row items-center gap-2 sm:gap-4 justify-center text-center sm:text-start">
-            <div className="h-10 w-10 sm:h-14 sm:w-14 rounded-xl sm:rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
-              <Users className="h-5 w-5 sm:h-7 sm:w-7" />
+          <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-slate-100 p-2.5 sm:p-5 flex flex-col items-center justify-center text-center">
+            <div className="h-8 w-8 sm:h-12 sm:w-12 rounded-lg sm:rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-1.5 sm:mb-3 shadow-inner">
+              <Users className="h-4 w-4 sm:h-6 sm:w-6" />
             </div>
-            <div className="flex flex-col">
-              <span className="text-lg sm:text-3xl font-black text-slate-900">{stats.membersCount || '+500'}</span>
-              <span className="text-[9px] sm:text-sm font-bold text-slate-500 leading-tight">{isAr ? 'عضو مجتمع' : 'Members'}</span>
-            </div>
+            <span className="text-sm sm:text-2xl font-black text-slate-900 leading-none">{stats.membersCount || '+500'}</span>
+            <span className="text-[9px] sm:text-sm font-bold text-slate-500 mt-1">{isAr ? 'عضو مجتمع' : 'Members'}</span>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-3 sm:p-6 flex flex-col sm:flex-row items-center gap-2 sm:gap-4 justify-center text-center sm:text-start">
-            <div className="h-10 w-10 sm:h-14 sm:w-14 rounded-xl sm:rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center flex-shrink-0">
-              <Calendar className="h-5 w-5 sm:h-7 sm:w-7" />
+          <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-slate-100 p-2.5 sm:p-5 flex flex-col items-center justify-center text-center">
+            <div className="h-8 w-8 sm:h-12 sm:w-12 rounded-lg sm:rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mb-1.5 sm:mb-3 shadow-inner">
+              <Calendar className="h-4 w-4 sm:h-6 sm:w-6" />
             </div>
-            <div className="flex flex-col">
-              <span className="text-lg sm:text-3xl font-black text-slate-900">{stats.eventsCount || '+25'}</span>
-              <span className="text-[9px] sm:text-sm font-bold text-slate-500 leading-tight">{isAr ? 'فعالية وورشة' : 'Events'}</span>
-            </div>
+            <span className="text-sm sm:text-2xl font-black text-slate-900 leading-none">{stats.eventsCount || '+25'}</span>
+            <span className="text-[9px] sm:text-sm font-bold text-slate-500 mt-1">{isAr ? 'فعالية' : 'Events'}</span>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-3 sm:p-6 flex flex-col sm:flex-row items-center gap-2 sm:gap-4 justify-center text-center sm:text-start">
-            <div className="h-10 w-10 sm:h-14 sm:w-14 rounded-xl sm:rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
-              <Trophy className="h-5 w-5 sm:h-7 sm:w-7" />
+          <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-slate-100 p-2.5 sm:p-5 flex flex-col items-center justify-center text-center">
+            <div className="h-8 w-8 sm:h-12 sm:w-12 rounded-lg sm:rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mb-1.5 sm:mb-3 shadow-inner">
+              <Trophy className="h-4 w-4 sm:h-6 sm:w-6" />
             </div>
-            <div className="flex flex-col">
-              <span className="text-lg sm:text-3xl font-black text-slate-900">{stats.adminsCount || '+40'}</span>
-              <span className="text-[9px] sm:text-sm font-bold text-slate-500 leading-tight">{isAr ? 'في الإدارة لخدمتكم' : 'Admins to serve'}</span>
-            </div>
+            <span className="text-sm sm:text-2xl font-black text-slate-900 leading-none">{stats.adminsCount || '+40'}</span>
+            <span className="text-[9px] sm:text-sm font-bold text-slate-500 mt-1">{isAr ? 'نقاط' : 'Points'}</span>
           </div>
         </div>
       </section>
@@ -239,7 +233,7 @@ export default async function HomePage({ params }: PageProps) {
               return (
                 <div 
                   key={event.id}
-                  className={`min-w-[85vw] sm:min-w-[340px] max-w-[85vw] sm:max-w-[340px] flex-shrink-0 snap-start ${isCompleted ? 'grayscale-[40%] opacity-90' : ''}`}
+                  className={`min-w-[42vw] max-w-[42vw] sm:min-w-[340px] sm:max-w-[340px] flex-shrink-0 snap-start ${isCompleted ? 'grayscale-[40%] opacity-90' : ''}`}
                 >
                   <EventCard event={event} />
                 </div>
@@ -247,7 +241,7 @@ export default async function HomePage({ params }: PageProps) {
             })}
             
             {/* View All Card */}
-            <div className="min-w-[85vw] sm:min-w-[340px] max-w-[85vw] sm:max-w-[340px] flex-shrink-0 snap-start">
+            <div className="min-w-[42vw] max-w-[42vw] sm:min-w-[340px] sm:max-w-[340px] flex-shrink-0 snap-start">
               <Link 
                 href="/events"
                 className="h-full min-h-[300px] bg-gradient-to-br from-blue-50 to-indigo-50 rounded-3xl sm:rounded-[2rem] border-2 border-dashed border-blue-200 flex flex-col items-center justify-center p-8 text-center transition-all duration-500 hover:bg-blue-100 hover:border-blue-300 group cursor-pointer block"
@@ -285,29 +279,38 @@ export default async function HomePage({ params }: PageProps) {
       </section>
 
       {/* Quick Links / Feature Highlights */}
-      <section className="py-6 sm:py-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full mb-8 sm:mb-12">
+      <section className="py-6 sm:py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full mb-6 sm:mb-10">
         <div className="grid grid-cols-3 gap-2 sm:gap-6">
-          <Link href={latestEvent ? `/events/${latestEvent.id}` : "/events"} className="bg-white rounded-2xl p-3 sm:p-8 shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center hover:-translate-y-1 transition-transform group">
-            <div className="w-10 h-10 sm:w-16 sm:h-16 bg-blue-50 text-blue-600 rounded-xl sm:rounded-2xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-blue-100 transition-colors">
+          <Link href={latestEvent ? `/events/${latestEvent.id}` : "/events"} className="bg-gradient-to-b from-white to-slate-50 rounded-2xl p-3 sm:p-8 shadow-sm hover:shadow-md border border-slate-200/80 flex flex-col items-center justify-center text-center hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden">
+            <div className="absolute top-1.5 sm:top-3 end-1.5 sm:end-3 text-slate-300 group-hover:text-blue-500 transition-colors">
+              <ArrowRight className="w-3 h-3 sm:w-5 sm:h-5 rtl:-scale-x-100" />
+            </div>
+            <div className="w-10 h-10 sm:w-16 sm:h-16 bg-blue-50 text-blue-600 rounded-xl sm:rounded-2xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-blue-100 group-hover:scale-110 transition-all duration-300 shadow-inner">
               <Calendar className="w-5 h-5 sm:w-8 sm:h-8" />
             </div>
-            <h3 className="text-slate-900 font-black text-[10px] sm:text-xl leading-tight">{latestEvent ? (isAr ? 'الفعالية القادمة' : 'Next Event') : t('upcomingEvents')}</h3>
+            <h3 className="text-slate-900 font-black text-[10px] sm:text-xl leading-tight group-hover:text-blue-700 transition-colors">{latestEvent ? (isAr ? 'الفعالية القادمة' : 'Next Event') : t('upcomingEvents')}</h3>
             <p className="hidden sm:block text-slate-500 text-sm mt-2">{t('upcomingEventsDesc')}</p>
           </Link>
           
-          <Link href="/leaderboard" className="bg-white rounded-2xl p-3 sm:p-8 shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center hover:-translate-y-1 transition-transform group">
-            <div className="w-10 h-10 sm:w-16 sm:h-16 bg-amber-50 text-amber-600 rounded-xl sm:rounded-2xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-amber-100 transition-colors">
+          <Link href="/leaderboard" className="bg-gradient-to-b from-white to-slate-50 rounded-2xl p-3 sm:p-8 shadow-sm hover:shadow-md border border-slate-200/80 flex flex-col items-center justify-center text-center hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden">
+            <div className="absolute top-1.5 sm:top-3 end-1.5 sm:end-3 text-slate-300 group-hover:text-amber-500 transition-colors">
+              <ArrowRight className="w-3 h-3 sm:w-5 sm:h-5 rtl:-scale-x-100" />
+            </div>
+            <div className="w-10 h-10 sm:w-16 sm:h-16 bg-amber-50 text-amber-600 rounded-xl sm:rounded-2xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-amber-100 group-hover:scale-110 transition-all duration-300 shadow-inner">
               <Trophy className="w-5 h-5 sm:w-8 sm:h-8" />
             </div>
-            <h3 className="text-slate-900 font-black text-[10px] sm:text-xl leading-tight">{t('leaderboard')}</h3>
+            <h3 className="text-slate-900 font-black text-[10px] sm:text-xl leading-tight group-hover:text-amber-700 transition-colors">{t('leaderboard')}</h3>
             <p className="hidden sm:block text-slate-500 text-sm mt-2">{t('leaderboardDesc')}</p>
           </Link>
 
-          <Link href="/profile" className="bg-white rounded-2xl p-3 sm:p-8 shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center hover:-translate-y-1 transition-transform group">
-            <div className="w-10 h-10 sm:w-16 sm:h-16 bg-emerald-50 text-emerald-600 rounded-xl sm:rounded-2xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-emerald-100 transition-colors">
+          <Link href="/profile" className="bg-gradient-to-b from-white to-slate-50 rounded-2xl p-3 sm:p-8 shadow-sm hover:shadow-md border border-slate-200/80 flex flex-col items-center justify-center text-center hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden">
+            <div className="absolute top-1.5 sm:top-3 end-1.5 sm:end-3 text-slate-300 group-hover:text-emerald-500 transition-colors">
+              <ArrowRight className="w-3 h-3 sm:w-5 sm:h-5 rtl:-scale-x-100" />
+            </div>
+            <div className="w-10 h-10 sm:w-16 sm:h-16 bg-emerald-50 text-emerald-600 rounded-xl sm:rounded-2xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-emerald-100 group-hover:scale-110 transition-all duration-300 shadow-inner">
               <UserCircle className="w-5 h-5 sm:w-8 sm:h-8" />
             </div>
-            <h3 className="text-slate-900 font-black text-[10px] sm:text-xl leading-tight">{t('activityAndCerts')}</h3>
+            <h3 className="text-slate-900 font-black text-[10px] sm:text-xl leading-tight group-hover:text-emerald-700 transition-colors">{t('activityAndCerts')}</h3>
             <p className="hidden sm:block text-slate-500 text-sm mt-2">{t('activityAndCertsDesc')}</p>
           </Link>
         </div>
@@ -315,17 +318,17 @@ export default async function HomePage({ params }: PageProps) {
 
       {/* IEEE QU Structure */}
       {stats.showStructure !== false && (
-        <section className="py-16 bg-white border-t border-slate-100 mt-8 relative overflow-hidden">
+        <section className="py-10 sm:py-16 bg-white border-t border-slate-100 relative overflow-hidden">
           <div className="absolute top-0 right-1/4 w-96 h-96 bg-blue-50 rounded-full pointer-events-none opacity-60"></div>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl font-black font-cairo text-slate-900 mb-4">هيكلة النادي</h2>
-              <p className="text-slate-500 font-medium max-w-2xl mx-auto">
+            <div className="text-center mb-8 sm:mb-12">
+              <h2 className="text-2xl sm:text-3xl font-black font-cairo text-slate-900 mb-2 sm:mb-4">هيكلة النادي</h2>
+              <p className="text-slate-500 font-medium text-sm sm:text-base max-w-2xl mx-auto">
                 يتكون الفرع الطلابي لجمعية مهندسي الكهرباء والإلكترونيات (IEEE) بجامعة القصيم من عدة لجان ومسارات تعمل بتكامل لتحقيق أهداف النادي.
               </p>
             </div>
             
-            <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
               {stats.committees && stats.committees.length > 0 ? (
                 stats.committees.map((committee: { id: string; name: string; description: string; members: { userId: string; name: string; role: string; avatar?: string }[] }, index: number) => {
                   const themePalette = [
@@ -339,17 +342,20 @@ export default async function HomePage({ params }: PageProps) {
                   const theme = themePalette[index % themePalette.length];
                   
                   return (
-                    <Link href="/structure" key={committee.id || index} className="bg-[#F8FAFC] border border-slate-100 rounded-2xl sm:rounded-3xl p-3 sm:p-6 text-center hover:shadow-xl hover:-translate-y-1 transition-all duration-300 block">
-                      <div className={`h-10 w-10 sm:h-16 sm:w-16 ${theme.badge} rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-2 sm:mb-5 shadow-inner`}>
-                        <Users className="w-5 h-5 sm:w-8 sm:h-8" />
+                    <Link href="/structure" key={committee.id || index} className="group bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 flex flex-col h-full hover:shadow-lg hover:-translate-y-1 hover:border-slate-300 transition-all duration-300 relative overflow-hidden text-start">
+                      <div className="absolute top-2 end-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                         <ArrowRight className="w-4 h-4 text-slate-400 rtl:-scale-x-100" />
                       </div>
-                      <h3 className="text-[10px] sm:text-lg font-black font-cairo text-slate-900 mb-1 sm:mb-2 line-clamp-2">{committee.name}</h3>
-                      <p className="hidden sm:block text-sm text-slate-500 mb-4">{committee.description}</p>
+                      <div className={`h-10 w-10 sm:h-12 sm:w-12 ${theme.badge} rounded-xl flex items-center justify-center mb-3 shadow-inner group-hover:scale-110 transition-transform duration-300`}>
+                        <Users className="w-5 h-5 sm:w-6 sm:h-6" />
+                      </div>
+                      <h3 className="text-sm sm:text-base font-black font-cairo text-slate-900 mb-1">{committee.name}</h3>
+                      <p className="hidden sm:block text-xs text-slate-500 mb-4 line-clamp-2 flex-grow">{committee.description}</p>
                       
                       {committee.members && committee.members.length > 0 && (
-                        <div className="hidden sm:flex -space-x-2 rtl:space-x-reverse justify-center mt-2">
+                        <div className="flex -space-x-2 rtl:space-x-reverse justify-start mt-auto pt-2 border-t border-slate-100">
                           {committee.members.slice(0, 4).map((member: { userId: string; name: string; role: string; avatar?: string }) => (
-                            <div key={member.userId} className={`h-8 w-8 rounded-full border-2 border-white ${theme.avatar} flex items-center justify-center text-xs font-bold overflow-hidden relative group`} title={member.name}>
+                            <div key={member.userId} className={`h-6 w-6 sm:h-8 sm:w-8 rounded-full border-2 border-white ${theme.avatar} flex items-center justify-center text-[10px] sm:text-xs font-bold overflow-hidden relative group/avatar`} title={member.name}>
                               {member.avatar ? (
                                 <Image 
                                   src={member.avatar} 
@@ -361,13 +367,13 @@ export default async function HomePage({ params }: PageProps) {
                               ) : (
                                 <span>{member.name.charAt(0)}</span>
                               )}
-                              <div className="absolute hidden group-hover:block bottom-full mb-1 w-max px-2 py-1 bg-gray-900 text-white text-[10px] rounded z-50">
+                              <div className="absolute hidden group-hover/avatar:block bottom-full mb-1 w-max px-2 py-1 bg-gray-900 text-white text-[10px] rounded z-50">
                                 {member.name} - {member.role}
                               </div>
                             </div>
                           ))}
                           {committee.members.length > 4 && (
-                            <div className="h-8 w-8 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-600">
+                            <div className="h-6 w-6 sm:h-8 sm:w-8 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[9px] sm:text-[10px] font-bold text-slate-600">
                               +{committee.members.length - 4}
                             </div>
                           )}
