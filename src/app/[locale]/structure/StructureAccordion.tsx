@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Users, ChevronDown, ChevronUp, User, Link as LinkIcon } from 'lucide-react';
+import { User, Link as LinkIcon, ExternalLink, X, Shield, Award, Sparkles } from 'lucide-react';
 import Image from 'next/image';
+import { Link } from '@/i18n/routing';
 
 export interface CommitteeMember {
   userId: string;
@@ -25,21 +26,21 @@ interface StructureAccordionProps {
   isAr: boolean;
 }
 
-export default function StructureAccordion({ committees, isAr }: StructureAccordionProps) {
-  const [expandedCommittee, setExpandedCommittee] = useState<string | null>(null);
+// Helper function to extract First & Last Name
+function getShortName(fullName: string): string {
+  if (!fullName) return '';
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length <= 2) return fullName;
+  return `${parts[0]} ${parts[parts.length - 1]}`;
+}
 
-  const toggleCommittee = (id: string) => {
-    if (expandedCommittee === id) {
-      setExpandedCommittee(null);
-    } else {
-      setExpandedCommittee(id);
-    }
-  };
+export default function StructureAccordion({ committees, isAr }: StructureAccordionProps) {
+  const [selectedMember, setSelectedMember] = useState<CommitteeMember | null>(null);
 
   if (committees.length === 0) {
     return (
-      <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 shadow-sm">
-        <p className="text-slate-500 font-medium">
+      <div className="text-center py-16 bg-white rounded-2xl border border-slate-200 shadow-xs">
+        <p className="text-slate-500 text-sm font-medium">
           {isAr ? 'لم يتم إضافة الهيكلة الإدارية بعد.' : 'Organizational structure not added yet.'}
         </p>
       </div>
@@ -47,95 +48,138 @@ export default function StructureAccordion({ committees, isAr }: StructureAccord
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {committees.map((committee) => {
-        const isExpanded = expandedCommittee === committee.id;
         const memberCount = committee.members?.length || 0;
         return (
           <div 
             key={committee.id} 
-            className={`bg-white rounded-3xl shadow-xs border transition-all duration-300 overflow-hidden ${
-              isExpanded ? 'border-blue-200 shadow-md' : 'border-slate-200 hover:border-slate-300'
-            }`}
+            className="bg-white rounded-2xl shadow-xs border border-slate-200/90 overflow-hidden"
           >
-            <button 
-              onClick={() => toggleCommittee(committee.id)}
-              className="w-full px-5 py-5 sm:px-8 sm:py-6 flex items-center justify-between bg-white hover:bg-slate-50/80 transition-colors focus:outline-none"
-            >
-              <div className="flex items-center gap-3.5 sm:gap-4 text-start min-w-0">
-                <div className={`h-12 w-12 sm:h-14 sm:w-14 rounded-2xl flex items-center justify-center flex-shrink-0 transition-colors ${
-                  isExpanded ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'bg-blue-50 text-blue-600'
-                }`}>
-                  <Users className="h-6 w-6 sm:h-7 sm:w-7" />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg sm:text-2xl font-bold text-slate-900 truncate">{committee.name}</h2>
-                    <span className="sm:hidden text-[11px] font-bold bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full flex-shrink-0">
-                      {memberCount}
-                    </span>
-                  </div>
-                  {committee.description && (
-                    <p className="text-xs sm:text-sm text-slate-500 mt-0.5 truncate max-w-xl">{committee.description}</p>
-                  )}
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <div className="hidden sm:flex bg-slate-100 text-slate-700 px-3.5 py-1 rounded-full text-xs font-bold">
-                  {memberCount} {isAr ? 'أعضاء' : 'Members'}
-                </div>
-                <div className={`h-9 w-9 sm:h-10 sm:w-10 rounded-full flex items-center justify-center transition-colors ${
-                  isExpanded ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'
-                }`}>
-                  {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-                </div>
-              </div>
-            </button>
-
-            <div 
-              className={`transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'} overflow-hidden`}
-            >
-              <div className="p-5 sm:p-8 border-t border-slate-100 bg-slate-50/50">
-                {committee.members && committee.members.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {committee.members.map((member) => (
-                      <div key={member.userId} className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition-all flex items-center gap-3.5">
-                        <div className="h-12 w-12 relative rounded-2xl overflow-hidden bg-gradient-to-br from-blue-100 to-indigo-100 flex-shrink-0 flex items-center justify-center border-2 border-white shadow-xs">
-                          {member.avatar ? (
-                            <Image src={member.avatar} alt={member.name} fill sizes="48px" className="object-cover" />
-                          ) : (
-                            <User className="h-5 w-5 text-blue-500" />
-                          )}
-                        </div>
-                        <div className="overflow-hidden flex-1 text-start">
-                          <h3 className="font-bold text-slate-900 text-sm truncate" title={member.name}>{member.name}</h3>
-                          <p className="text-xs font-bold text-blue-600 mt-0.5 truncate">{member.role}</p>
-                        </div>
-                        {member.linkedin && (
-                          <a 
-                            href={member.linkedin} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="h-8 w-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-colors flex-shrink-0"
-                            title="LinkedIn"
-                          >
-                            <LinkIcon className="h-4 w-4" />
-                          </a>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-slate-500 bg-white rounded-2xl border border-dashed border-slate-200 text-sm">
-                    {isAr ? 'لا يوجد أعضاء مضافين في هذه اللجنة حتى الآن.' : 'No members added to this committee yet.'}
-                  </div>
+            {/* Header Section */}
+            <div className="px-5 py-4 sm:px-6 sm:py-5 border-b border-slate-100 bg-slate-50/60 flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-slate-900">{committee.name}</h2>
+                {committee.description && (
+                  <p className="text-xs text-slate-500 mt-0.5 max-w-2xl">{committee.description}</p>
                 )}
               </div>
+              <span className="text-xs font-semibold bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100/60 flex-shrink-0">
+                {memberCount} {isAr ? 'عضو' : 'Members'}
+              </span>
+            </div>
+
+            {/* Members Grid Section */}
+            <div className="p-4 sm:p-5">
+              {committee.members && committee.members.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                  {committee.members.map((member) => {
+                    const displayName = getShortName(member.name);
+
+                    return (
+                      <div 
+                        key={member.userId || member.name} 
+                        onClick={() => setSelectedMember(member)}
+                        className="group relative bg-white p-3 rounded-xl border border-slate-200/80 hover:border-blue-300 hover:shadow-xs transition-all cursor-pointer flex items-center justify-between gap-2 text-start"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-bold text-slate-900 text-xs sm:text-sm group-hover:text-blue-600 transition-colors truncate" title={member.name}>
+                            {displayName}
+                          </h3>
+                          <p className="text-[11px] font-medium text-slate-500 truncate mt-0.5">
+                            {member.role}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {member.linkedin && (
+                            <a 
+                              href={member.linkedin} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="h-7 w-7 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 flex items-center justify-center transition-colors"
+                              title="LinkedIn"
+                            >
+                              <LinkIcon className="h-3.5 w-3.5" />
+                            </a>
+                          )}
+                          <span className="h-7 w-7 rounded-lg text-slate-400 group-hover:text-blue-600 group-hover:bg-blue-50 flex items-center justify-center transition-colors">
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-slate-400 text-xs">
+                  {isAr ? 'لا يوجد أعضاء مضافين في هذه اللجنة حتى الآن.' : 'No members added to this committee yet.'}
+                </div>
+              )}
             </div>
           </div>
         );
       })}
+
+      {/* Member Profile Modal */}
+      {selectedMember && (
+        <div 
+          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setSelectedMember(null)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-sm w-full p-6 relative animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button 
+              onClick={() => setSelectedMember(null)}
+              className="absolute top-4 left-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <div className="text-center space-y-3 pt-2">
+              <div className="h-16 w-16 mx-auto rounded-2xl overflow-hidden bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center border-2 border-white shadow-md relative">
+                {selectedMember.avatar ? (
+                  <Image src={selectedMember.avatar} alt={selectedMember.name} fill sizes="64px" className="object-cover" />
+                ) : (
+                  <User className="h-8 w-8 text-white/90" />
+                )}
+              </div>
+
+              <div>
+                <h3 className="font-bold text-slate-900 text-base">{selectedMember.name}</h3>
+                <p className="text-xs font-semibold text-blue-600 mt-0.5">{selectedMember.role}</p>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex flex-col gap-2">
+                {selectedMember.userId && (
+                  <Link 
+                    href={`/profile?id=${selectedMember.userId}`}
+                    className="w-full inline-flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors shadow-xs"
+                  >
+                    <User className="h-3.5 w-3.5" />
+                    {isAr ? 'عرض البروفايل الشخصي' : 'View Profile'}
+                  </Link>
+                )}
+                {selectedMember.linkedin && (
+                  <a 
+                    href={selectedMember.linkedin}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full inline-flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200 transition-colors"
+                  >
+                    <LinkIcon className="h-3.5 w-3.5" />
+                    LinkedIn
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
