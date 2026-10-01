@@ -16,7 +16,8 @@ import {
   updateDoc,
   getCountFromServer
 } from 'firebase/firestore';
-import { db, functions } from '@/lib/firebase/client';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, functions, storage } from '@/lib/firebase/client';
 import ProfileSkeleton from '@/components/skeletons/ProfileSkeleton';
 import { httpsCallable } from 'firebase/functions';
 import { PlatformEvent, Certificate, PointTransaction } from '@/lib/types';
@@ -178,29 +179,31 @@ export default function EngineeringProfilePage() {
   });
   const [isSavingPublicProfile, setIsSavingPublicProfile] = useState(false);
 
-  const presetAvatars = [
-    'https://api.dicebear.com/9.x/lorelei/svg?seed=Felix&backgroundColor=b6e3f4',
-    'https://api.dicebear.com/9.x/lorelei/svg?seed=Aneka&backgroundColor=c0aede',
-    'https://api.dicebear.com/9.x/lorelei/svg?seed=Jasper&backgroundColor=ffd5dc',
-    'https://api.dicebear.com/9.x/lorelei/svg?seed=Leo&backgroundColor=d1d4f9',
-    'https://api.dicebear.com/9.x/lorelei/svg?seed=Avery&backgroundColor=b6e3f4',
-    'https://api.dicebear.com/9.x/lorelei/svg?seed=Destiny&backgroundColor=ffdfbf',
-  ];
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
 
   const handleSavePublicProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     setIsSavingPublicProfile(true);
     try {
+      let avatarUrl = editingPublicProfile.avatar;
+      
+      if (avatarFile) {
+        const fileRef = ref(storage, `avatars/${user.uid}/${Date.now()}_${avatarFile.name}`);
+        await uploadBytes(fileRef, avatarFile);
+        avatarUrl = await getDownloadURL(fileRef);
+      }
+
       await updateDoc(doc(db, 'users', user.uid), {
         publicProfile: {
           linkedin: editingPublicProfile.linkedin.trim(),
           bio: editingPublicProfile.bio.trim(),
-          avatar: editingPublicProfile.avatar
+          avatar: avatarUrl
         }
       });
       alert(isAr ? 'تم الحفظ بنجاح!' : 'Saved successfully!');
       setShowPublicProfileModal(false);
+      setAvatarFile(null);
       setReloadKey(k => k + 1); // reload data
     } catch (err) {
       console.error('Error saving public profile:', err);
@@ -1032,19 +1035,36 @@ export default function EngineeringProfilePage() {
               
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-3">
-                  {isAr ? 'اختر صورة العرض (Avatar)' : 'Choose your Avatar'}
+                  {isAr ? 'صورة العرض (Avatar)' : 'Avatar'}
                 </label>
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-                  {presetAvatars.map((url, i) => (
-                    <div 
-                      key={i}
-                      onClick={() => setEditingPublicProfile({...editingPublicProfile, avatar: url})}
-                      className={`relative aspect-square rounded-2xl cursor-pointer border-2 transition-all overflow-hidden ${editingPublicProfile.avatar === url ? 'border-blue-600 shadow-md ring-2 ring-blue-600/20' : 'border-transparent hover:border-slate-300 bg-slate-50'}`}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt={`Avatar ${i}`} className="w-full h-full object-cover" />
-                    </div>
-                  ))}
+                <div className="flex items-center gap-4">
+                  <div className="relative h-16 w-16 rounded-full overflow-hidden bg-slate-100 border-2 border-slate-200">
+                    {avatarFile ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={URL.createObjectURL(avatarFile)} alt="Preview" className="w-full h-full object-cover" />
+                    ) : editingPublicProfile.avatar ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={editingPublicProfile.avatar} alt="Current" className="w-full h-full object-cover" />
+                    ) : (
+                      <UserCheck className="w-8 h-8 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-slate-400" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
+                      className="block w-full text-sm text-slate-500
+                        file:mr-4 file:py-2 file:px-4
+                        file:rounded-xl file:border-0
+                        file:text-sm file:font-semibold
+                        file:bg-blue-50 file:text-blue-700
+                        hover:file:bg-blue-100 cursor-pointer transition-colors"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      {isAr ? 'الصيغ المدعومة: PNG, JPG (الحد الأقصى 2MB)' : 'Supported formats: PNG, JPG (Max 2MB)'}
+                    </p>
+                  </div>
                 </div>
               </div>
 

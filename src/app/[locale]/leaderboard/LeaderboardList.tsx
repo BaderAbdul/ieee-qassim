@@ -49,13 +49,7 @@ export default function LeaderboardList({ users }: { users: LeaderboardUser[] })
               <Medal className="h-3.5 w-3.5 text-slate-600" />
               <span>#2</span>
             </div>
-            <div className="h-16 w-16 relative rounded-2xl bg-slate-200 text-slate-700 font-black text-xl flex items-center justify-center overflow-hidden border-2 border-slate-300 shadow-sm mb-3 mt-2">
-              {second.photoUrl ? (
-                <Image src={second.photoUrl} alt={second.name} fill sizes="64px" className="object-cover" />
-              ) : (
-                <span>{second.name.charAt(0).toUpperCase()}</span>
-              )}
-            </div>
+            <div className="mt-4 mb-2"></div>
             <h3 className="font-bold text-slate-900 text-base max-w-full truncate">{second.name}</h3>
             {second.department && <span className="text-xs text-slate-500 font-medium truncate max-w-full">{second.department}</span>}
             <div className="mt-3 bg-white px-4 py-1.5 rounded-xl border border-slate-200 text-slate-800 font-black text-lg flex items-center gap-1 shadow-2xs">
@@ -72,13 +66,7 @@ export default function LeaderboardList({ users }: { users: LeaderboardUser[] })
               <Trophy className="h-4 w-4" />
               <span>{isAr ? 'البطل #1' : 'Champion #1'}</span>
             </div>
-            <div className="h-20 w-20 relative rounded-2xl bg-amber-200 text-amber-900 font-black text-2xl flex items-center justify-center overflow-hidden border-4 border-amber-300 shadow-md mb-3 mt-2">
-              {first.photoUrl ? (
-                <Image src={first.photoUrl} alt={first.name} fill sizes="80px" className="object-cover" />
-              ) : (
-                <span>{first.name.charAt(0).toUpperCase()}</span>
-              )}
-            </div>
+            <div className="mt-4 mb-2"></div>
             <h3 className="font-black text-slate-900 text-lg max-w-full truncate">{first.name}</h3>
             {first.department && <span className="text-xs text-amber-800 font-bold truncate max-w-full">{first.department}</span>}
             <div className="mt-3 bg-amber-500 text-white px-5 py-2 rounded-xl font-black text-xl flex items-center gap-1.5 shadow-sm">
@@ -95,13 +83,7 @@ export default function LeaderboardList({ users }: { users: LeaderboardUser[] })
               <Medal className="h-3.5 w-3.5 text-amber-300" />
               <span>#3</span>
             </div>
-            <div className="h-16 w-16 relative rounded-2xl bg-amber-100 text-amber-900 font-black text-xl flex items-center justify-center overflow-hidden border-2 border-amber-300 shadow-sm mb-3 mt-2">
-              {third.photoUrl ? (
-                <Image src={third.photoUrl} alt={third.name} fill sizes="64px" className="object-cover" />
-              ) : (
-                <span>{third.name.charAt(0).toUpperCase()}</span>
-              )}
-            </div>
+            <div className="mt-4 mb-2"></div>
             <h3 className="font-bold text-slate-900 text-base max-w-full truncate">{third.name}</h3>
             {third.department && <span className="text-xs text-slate-500 font-medium truncate max-w-full">{third.department}</span>}
             <div className="mt-3 bg-white px-4 py-1.5 rounded-xl border border-slate-200 text-amber-900 font-black text-lg flex items-center gap-1 shadow-2xs">
@@ -131,13 +113,7 @@ export default function LeaderboardList({ users }: { users: LeaderboardUser[] })
                     <span className="w-8 text-center font-bold text-slate-400 text-sm sm:text-base flex-shrink-0">
                       #{rank}
                     </span>
-                    <div className="h-11 w-11 relative rounded-2xl bg-blue-100 text-blue-700 font-bold flex items-center justify-center overflow-hidden border border-blue-200 flex-shrink-0 shadow-xs">
-                      {u.photoUrl ? (
-                        <Image src={u.photoUrl} alt={u.name} fill sizes="44px" className="object-cover" />
-                      ) : (
-                        <span className="text-base">{u.name.charAt(0).toUpperCase()}</span>
-                      )}
-                    </div>
+
                     <div className="min-w-0">
                       <div className="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2 truncate">
                         <span className="truncate">{u.name}</span>
