@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { User, Link as LinkIcon, ExternalLink, X, Users } from 'lucide-react';
 import Image from 'next/image';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase/client';
 
 export interface CommitteeMember {
   userId: string;
@@ -37,6 +39,30 @@ export default function StructureAccordion({ committees, isAr }: StructureAccord
   const [activeTabId, setActiveTabId] = useState<string>('');
   const [selectedMember, setSelectedMember] = useState<CommitteeMember | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [richProfile, setRichProfile] = useState<{avatar?: string, linkedin?: string, bio?: string} | null>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    if (selectedMember && selectedMember.userId) {
+      setIsLoadingProfile(true);
+      setRichProfile(null);
+      getDoc(doc(db, 'users', selectedMember.userId))
+        .then((snap) => {
+          if (active && snap.exists()) {
+            const data = snap.data();
+            if (data.publicProfile) {
+              setRichProfile(data.publicProfile);
+            }
+          }
+          if (active) setIsLoadingProfile(false);
+        })
+        .catch(() => {
+          if (active) setIsLoadingProfile(false);
+        });
+    }
+    return () => { active = false; };
+  }, [selectedMember]);
 
   useEffect(() => {
     if (committees.length > 0 && !activeTabId) {
@@ -206,22 +232,31 @@ export default function StructureAccordion({ committees, isAr }: StructureAccord
 
             <div className="text-center space-y-3 pt-2">
               <div className="relative h-20 w-20 mx-auto rounded-full overflow-hidden bg-slate-100 text-slate-400 flex items-center justify-center border border-slate-200">
-                {selectedMember.avatar ? (
-                  <Image src={selectedMember.avatar} alt={selectedMember.name} fill sizes="80px" className="object-cover" />
+                {(richProfile?.avatar || selectedMember.avatar) ? (
+                  <Image src={richProfile?.avatar || selectedMember.avatar!} alt={selectedMember.name} fill sizes="80px" className="object-cover" />
                 ) : (
                   <User className="h-8 w-8 opacity-60" />
                 )}
               </div>
 
               <div>
-                <h3 className="text-lg font-bold text-slate-900">{selectedMember.name}</h3>
+                <h3 className="text-lg font-bold text-slate-900 flex items-center justify-center gap-2">
+                  {selectedMember.name}
+                  {isLoadingProfile && <div className="h-3 w-3 rounded-full border-2 border-slate-300 border-t-blue-600 animate-spin" title="Loading latest profile..." />}
+                </h3>
                 <p className="text-blue-600 font-semibold text-sm mt-0.5">{selectedMember.role}</p>
               </div>
+
+              {richProfile?.bio && (
+                <div className="px-2 pt-1 pb-1">
+                  <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100">{richProfile.bio}</p>
+                </div>
+              )}
               
               <div className="pt-3">
-                {selectedMember.linkedin && (
+                {(richProfile?.linkedin || selectedMember.linkedin) && (
                   <a 
-                    href={selectedMember.linkedin}
+                    href={richProfile?.linkedin || selectedMember.linkedin}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center justify-center gap-2 bg-slate-50 hover:bg-[#0A66C2]/10 text-slate-600 hover:text-[#0A66C2] px-4 py-2.5 rounded-xl text-sm font-bold transition-all border border-slate-200 w-full"

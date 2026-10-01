@@ -169,6 +169,47 @@ export default function EngineeringProfilePage() {
   });
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
+  // Public Board Profile State
+  const [showPublicProfileModal, setShowPublicProfileModal] = useState(false);
+  const [editingPublicProfile, setEditingPublicProfile] = useState({
+    linkedin: '',
+    bio: '',
+    avatar: ''
+  });
+  const [isSavingPublicProfile, setIsSavingPublicProfile] = useState(false);
+
+  const presetAvatars = [
+    'https://api.dicebear.com/9.x/lorelei/svg?seed=Felix&backgroundColor=b6e3f4',
+    'https://api.dicebear.com/9.x/lorelei/svg?seed=Aneka&backgroundColor=c0aede',
+    'https://api.dicebear.com/9.x/lorelei/svg?seed=Jasper&backgroundColor=ffd5dc',
+    'https://api.dicebear.com/9.x/lorelei/svg?seed=Leo&backgroundColor=d1d4f9',
+    'https://api.dicebear.com/9.x/lorelei/svg?seed=Avery&backgroundColor=b6e3f4',
+    'https://api.dicebear.com/9.x/lorelei/svg?seed=Destiny&backgroundColor=ffdfbf',
+  ];
+
+  const handleSavePublicProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    setIsSavingPublicProfile(true);
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        publicProfile: {
+          linkedin: editingPublicProfile.linkedin.trim(),
+          bio: editingPublicProfile.bio.trim(),
+          avatar: editingPublicProfile.avatar
+        }
+      });
+      alert(isAr ? 'تم الحفظ بنجاح!' : 'Saved successfully!');
+      setShowPublicProfileModal(false);
+      setReloadKey(k => k + 1); // reload data
+    } catch (err) {
+      console.error('Error saving public profile:', err);
+      alert(isAr ? 'حدث خطأ أثناء الحفظ.' : 'Error saving profile.');
+    } finally {
+      setIsSavingPublicProfile(false);
+    }
+  };
+
   useEffect(() => {
     let active = true;
 
@@ -448,6 +489,34 @@ export default function EngineeringProfilePage() {
              </Link>
           </div>
         </div>
+
+        {/* Public Board Profile Edit Button (Admin/Organizer Only) */}
+        {(userData?.role === 'super_admin' || userData?.role === 'event_organizer') && (
+          <div className="bg-white rounded-3xl p-5 border border-blue-100 shadow-sm flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+                <UserCheck className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900">{isAr ? 'الملف التعريفي العام (أعضاء الإدارة)' : 'Public Board Profile'}</h3>
+                <p className="text-xs text-slate-500 mt-0.5">{isAr ? 'تحديث اللينكدإن، النبذة والصورة لصفحة الهيكلة.' : 'Update your avatar, LinkedIn & Bio for the Structure page.'}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setEditingPublicProfile({
+                  linkedin: userData?.publicProfile?.linkedin || '',
+                  bio: userData?.publicProfile?.bio || '',
+                  avatar: userData?.publicProfile?.avatar || ''
+                });
+                setShowPublicProfileModal(true);
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-sm whitespace-nowrap"
+            >
+              {isAr ? 'تعديل الملف' : 'Edit Profile'}
+            </button>
+          </div>
+        )}
 
         {/* 2. Gamification Summary Cards */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
@@ -945,6 +1014,94 @@ export default function EngineeringProfilePage() {
           </div>
         </div>
       )}
+      {/* Public Board Profile Modal */}
+      {showPublicProfileModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-slate-900">{isAr ? 'تحديث الملف التعريفي' : 'Update Public Profile'}</h2>
+              <button
+                onClick={() => setShowPublicProfileModal(false)}
+                className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleSavePublicProfile} className="p-6 space-y-6">
+              
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-3">
+                  {isAr ? 'اختر صورة العرض (Avatar)' : 'Choose your Avatar'}
+                </label>
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+                  {presetAvatars.map((url, i) => (
+                    <div 
+                      key={i}
+                      onClick={() => setEditingPublicProfile({...editingPublicProfile, avatar: url})}
+                      className={`relative aspect-square rounded-2xl cursor-pointer border-2 transition-all overflow-hidden ${editingPublicProfile.avatar === url ? 'border-blue-600 shadow-md ring-2 ring-blue-600/20' : 'border-transparent hover:border-slate-300 bg-slate-50'}`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt={`Avatar ${i}`} className="w-full h-full object-cover" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  {isAr ? 'حساب لينكدإن (LinkedIn URL)' : 'LinkedIn URL'}
+                </label>
+                <input
+                  type="url"
+                  value={editingPublicProfile.linkedin}
+                  onChange={(e) => setEditingPublicProfile({...editingPublicProfile, linkedin: e.target.value})}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-right"
+                  placeholder="https://linkedin.com/in/username"
+                  dir="ltr"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  {isAr ? 'نبذة تعريفية قصيرة' : 'Short Bio'}
+                </label>
+                <textarea
+                  value={editingPublicProfile.bio}
+                  onChange={(e) => setEditingPublicProfile({...editingPublicProfile, bio: e.target.value})}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all resize-none h-24"
+                  placeholder={isAr ? 'اكتب نبذة بسيطة عنك...' : 'Write a short bio about yourself...'}
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowPublicProfileModal(false)}
+                  className="flex-1 px-4 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors"
+                >
+                  {tCommon('cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingPublicProfile}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-70"
+                >
+                  {isSavingPublicProfile ? (
+                    <LoadingSpinner size="sm" color="white" />
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4" />
+                      <span>{tCommon('save')}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

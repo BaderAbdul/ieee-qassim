@@ -22,6 +22,11 @@ export interface UserData {
   profileCompleted?: boolean;
   profileCompletedAt?: string | null;
   badges?: string[];
+  publicProfile?: {
+    avatar?: string;
+    linkedin?: string;
+    bio?: string;
+  };
 }
 
 interface AuthContextType {
