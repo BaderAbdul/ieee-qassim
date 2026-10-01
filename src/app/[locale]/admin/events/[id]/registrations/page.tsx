@@ -201,10 +201,12 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
           eventId,
           points: pointsAmount,
           amount: pointsAmount,
+          source: 'attendance',
+          type: 'earned',
+          createdBy: 'admin',
           description: pointsDesc || 'مشاركة في الفعالية',
           createdAt: serverTimestamp(),
-          timestamp: serverTimestamp(),
-          type: 'event_attendance'
+          timestamp: serverTimestamp()
         });
 
         return Promise.all([updatePromise, transPromise]);

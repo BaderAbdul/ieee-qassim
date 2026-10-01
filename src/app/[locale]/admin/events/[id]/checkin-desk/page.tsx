@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, use } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, runTransaction, serverTimestamp, increment } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase/client';
 import { httpsCallable } from 'firebase/functions';
 import { QRCodeSVG } from 'qrcode.react';
@@ -102,10 +102,89 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
         setScanResult({ status: 'already_checked_in', message: 'الطالب محضر مسبقاً.' });
         setManualInput('');
       }
-    } catch (error: unknown) {
-      console.error("Checkin error", error);
-      const err = error as Error;
-      setScanResult({ status: 'error', message: err.message || 'فشل التحضير. تأكد من أن الطالب مسجل في الفعالية.' });
+    } catch (error: any) {
+      console.warn("Cloud function unavailable, attempting client fallback for manual checkin:", error);
+      
+      try {
+        const points = event?.points || 0;
+        const regId = `${eventId}_${targetUserId}`;
+        const logId = `${eventId}_${targetUserId}`;
+        const pointTxId = `attendance_${eventId}_${targetUserId}`;
+
+        const isAlreadyCheckedIn = await runTransaction(db, async (tx) => {
+          // Verify Event state
+          const evRef = doc(db, 'events', eventId);
+          const evSnap = await tx.get(evRef);
+          if (!evSnap.exists()) {
+            throw new Error('الفعالية غير موجودة');
+          }
+
+          // Check if log exists (idempotency guard)
+          const logRef = doc(db, 'attendance_logs', logId);
+          const logSnap = await tx.get(logRef);
+          if (logSnap.exists()) {
+            return true; // already checked in
+          }
+
+          const regRef = doc(db, 'registrations', regId);
+          const regSnap = await tx.get(regRef);
+
+          // Admin writes
+          tx.set(logRef, {
+            userId: targetUserId,
+            eventId: eventId,
+            timestamp: serverTimestamp(),
+            verifiedByAdmin: true,
+          });
+
+          if (regSnap.exists() && regSnap.data().status !== 'attended') {
+            tx.update(regRef, {
+              status: 'attended',
+              attended: true,
+              attendedAt: serverTimestamp(),
+            });
+          }
+
+          tx.update(evRef, {
+            attendanceCount: increment(1)
+          });
+
+          if (points > 0) {
+            const pointTxRef = doc(db, 'point_transactions', pointTxId);
+            tx.set(pointTxRef, {
+              userId: targetUserId,
+              amount: points,
+              points: points,
+              source: 'attendance',
+              type: 'earned',
+              createdBy: 'admin',
+              reason: `حضور فعالية: ${evSnap.data().title || ''}`,
+              description: `حضور فعالية: ${evSnap.data().title || ''}`,
+              sourceEventId: eventId,
+              createdAt: serverTimestamp(),
+              timestamp: serverTimestamp()
+            });
+
+            const userRef = doc(db, 'users', targetUserId);
+            tx.update(userRef, {
+              totalPoints: increment(points)
+            });
+          }
+
+          return false;
+        });
+
+        if (isAlreadyCheckedIn) {
+          setScanResult({ status: 'already_checked_in', message: 'الطالب محضر مسبقاً.' });
+          setManualInput('');
+        } else {
+          setScanResult({ status: 'success', message: `تم تحضير الطالب بنجاح! النقاط المكتسبة: ${points}` });
+          setManualInput('');
+        }
+      } catch (fallbackError: any) {
+        console.error("Fallback checkin error", fallbackError);
+        setScanResult({ status: 'error', message: fallbackError.message || 'فشل التحضير. تأكد من أن الطالب مسجل في الفعالية.' });
+      }
     } finally {
       setIsSubmitting(false);
       // Auto clear success message after 5 seconds
