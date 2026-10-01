@@ -193,7 +193,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
 
   const handleCancelRegistration = async () => {
     if (!user || !event) return;
-    if (!confirm(t('confirmCancel'))) return;
+    if (!confirm(isAr ? 'هل أنت تأكد من رغبتك في إلغاء التسجيل في هذه الفعالية؟' : 'Are you sure you want to cancel your registration?')) return;
     
     setIsRegistering(true);
     try {
@@ -202,24 +202,29 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
       const eventRef = doc(db, 'events', eventId);
 
       await runTransaction(db, async (transaction) => {
+        // 1. All reads MUST come before any writes in Firestore transactions
         const regDoc = await transaction.get(regRef);
-        const prevStatus = regDoc.exists() ? regDoc.data().status : null;
-        const wasApproved = prevStatus === 'approved' || prevStatus === 'pending';
+        const eventDoc = await transaction.get(eventRef);
 
+        const prevStatus = regDoc.exists() ? regDoc.data().status : null;
+        if (prevStatus === 'attended') {
+          throw new Error(isAr ? 'لا يمكن إلغاء التسجيل بعد أن تم تسجيل حضورك الفعلي في الفعالية' : 'Cannot cancel registration after attendance has been recorded.');
+        }
+
+        const wasApprovedOrPending = prevStatus === 'approved' || prevStatus === 'pending';
+
+        // 2. All writes executed after reads
         transaction.set(regRef, {
           status: 'cancelled',
           cancelledAt: serverTimestamp()
         }, { merge: true });
 
-        if (wasApproved) {
-          const eventDoc = await transaction.get(eventRef);
-          if (eventDoc.exists()) {
-            const currentCount = (eventDoc.data() as PlatformEvent).registeredCount || 0;
-            if (currentCount > 0) {
-              transaction.update(eventRef, {
-                registeredCount: increment(-1)
-              });
-            }
+        if (wasApprovedOrPending && eventDoc.exists()) {
+          const currentCount = (eventDoc.data() as PlatformEvent).registeredCount || 0;
+          if (currentCount > 0) {
+            transaction.update(eventRef, {
+              registeredCount: increment(-1)
+            });
           }
         }
       });
@@ -229,7 +234,8 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
       alert(isAr ? 'تم إلغاء التسجيل بنجاح.' : 'Registration cancelled successfully.');
     } catch (error: unknown) {
       console.error("Error cancelling registration", error);
-      alert(isAr ? 'حدث خطأ أثناء إلغاء التسجيل.' : 'Error cancelling registration.');
+      const msg = error instanceof Error ? error.message : (isAr ? 'حدث خطأ أثناء إلغاء التسجيل.' : 'Error cancelling registration.');
+      alert(msg);
     } finally {
       setIsRegistering(false);
     }
@@ -436,21 +442,26 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                         ) : (
                           <div className="space-y-3">
                             <div className={`p-4 rounded-2xl text-center border ${
+                              registrationStatus === 'attended' ? 'bg-emerald-500/30 border-emerald-400/50 text-emerald-50' :
                               registrationStatus === 'approved' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-50' : 
                               registrationStatus === 'waitlisted' ? 'bg-amber-500/20 border-amber-500/30 text-amber-50' : 
                               'bg-blue-500/20 border-blue-500/30 text-blue-50'
                             }`}>
                               <div className="font-bold text-sm mb-0.5">
-                                {registrationStatus === 'approved' 
-                                  ? ((event.state === 'Completed' || event.state === 'Archived') ? (isAr ? 'انتهت الفعالية' : 'Event Ended') : t('registeredSuccess')) :
-                                 registrationStatus === 'waitlisted' ? t('waitlistedTitle') :
-                                 ((event.state === 'Completed' || event.state === 'Archived') ? (isAr ? 'تم الانتهاء من الفعالية' : 'Event has concluded') : t('pendingTitle'))}
+                                {registrationStatus === 'attended'
+                                  ? (isAr ? 'تم تسجيل حضورك في هذه الفعالية! 🎉' : 'Attendance Recorded! 🎉')
+                                  : registrationStatus === 'approved' 
+                                    ? ((event.state === 'Completed' || event.state === 'Archived') ? (isAr ? 'انتهت الفعالية' : 'Event Ended') : t('registeredSuccess')) :
+                                   registrationStatus === 'waitlisted' ? t('waitlistedTitle') :
+                                   ((event.state === 'Completed' || event.state === 'Archived') ? (isAr ? 'تم الانتهاء من الفعالية' : 'Event has concluded') : t('pendingTitle'))}
                               </div>
                               <div className="text-[10px] opacity-80">
-                                {registrationStatus === 'approved' 
-                                  ? ((event.state === 'Completed' || event.state === 'Archived') ? (isAr ? 'شكراً لاهتمامك بهذه الفعالية' : 'Thank you for your interest in this event') : t('registeredNotice')) :
-                                 registrationStatus === 'waitlisted' ? t('waitlistedNotice') :
-                                 ((event.state === 'Completed' || event.state === 'Archived') ? (isAr ? 'تم الانتهاء من الفعالية' : 'Event has concluded') : t('pendingNotice'))}
+                                {registrationStatus === 'attended'
+                                  ? (isAr ? 'تم احتساب نقاط الحضور وانطباعك بنجاح' : 'Attendance points & feedback recorded')
+                                  : registrationStatus === 'approved' 
+                                    ? ((event.state === 'Completed' || event.state === 'Archived') ? (isAr ? 'شكراً لاهتمامك بهذه الفعالية' : 'Thank you for your interest in this event') : t('registeredNotice')) :
+                                   registrationStatus === 'waitlisted' ? t('waitlistedNotice') :
+                                   ((event.state === 'Completed' || event.state === 'Archived') ? (isAr ? 'تم الانتهاء من الفعالية' : 'Event has concluded') : t('pendingNotice'))}
                               </div>
                             </div>
                             
@@ -459,10 +470,10 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                               className="w-full inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-100 text-slate-900 py-3 rounded-xl text-sm font-bold shadow-md transition-colors"
                             >
                               <QrCode className="h-4 w-4 text-blue-600" />
-                              <span>{t('checkInCTA')}</span>
+                              <span>{registrationStatus === 'attended' ? (isAr ? 'تعديل انطباعك أو التحضير' : 'View Check-In / Feedback') : t('checkInCTA')}</span>
                             </Link>
                             
-                            {event.state === 'Registration Open' && (
+                            {registrationStatus !== 'attended' && (event.state === 'Registration Open' || event.state === 'Ongoing') && (
                               <button 
                                 onClick={handleCancelRegistration}
                                 disabled={isRegistering}
