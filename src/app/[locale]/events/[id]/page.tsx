@@ -32,6 +32,7 @@ import {
   QrCode
 } from 'lucide-react';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import EventDetailsSkeleton from '@/components/skeletons/EventDetailsSkeleton';
 import { formatDateSafe } from '@/lib/dateUtils';
 
 export default function EventDetailsPage({ params }: { params: Promise<{ id: string; locale: string }> }) {
@@ -235,12 +236,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
   };
 
   if (loading) {
-    return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center bg-slate-50">
-        <LoadingSpinner size="lg" color="border-blue-600" />
-        <p className="mt-4 text-slate-600 font-medium text-sm">{t('loading')}</p>
-      </div>
-    );
+    return <EventDetailsSkeleton />;
   }
 
   if (!event) {
@@ -459,7 +455,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                             </div>
                             
                             <Link
-                              href={`/check-in/${event.id}`}
+                              href={`/events/${event.id}/checkin`}
                               className="w-full inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-100 text-slate-900 py-3 rounded-xl text-sm font-bold shadow-md transition-colors"
                             >
                               <QrCode className="h-4 w-4 text-blue-600" />

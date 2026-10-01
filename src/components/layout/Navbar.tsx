@@ -78,7 +78,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           
           {/* Brand Logo */}
-          <div className="flex items-center lg:px-2">
+          <div className="flex items-center">
             <Link href="/" className="flex items-center gap-2 group">
               <div className="relative w-28 h-10 sm:w-36 sm:h-12 flex-shrink-0">
                 <Image 
@@ -92,8 +92,8 @@ export default function Navbar() {
             </Link>
           </div>
 
-          {/* Navigation Links */}
-          <nav className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar mx-2 flex-1 justify-center sm:justify-start px-2">
+          {/* Desktop Navigation Links */}
+          <nav className="hidden md:flex items-center gap-1.5 flex-1 justify-center px-4">
             {navLinks.map((item) => {
               const active = isActive(item.href);
               const Icon = item.icon;
@@ -109,32 +109,32 @@ export default function Navbar() {
                         : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100/70'
                   }`}
                 >
-                  <Icon className="h-4 w-4 sm:h-4 sm:w-4 flex-shrink-0" />
-                  <span className="hidden sm:inline">{item.label}</span>
+                  <Icon className="h-4 w-4 flex-shrink-0" />
+                  <span>{item.label}</span>
                 </Link>
               );
             })}
           </nav>
 
-          {/* Right Controls: Language Switcher & User Auth */}
+          {/* Right Controls: Language & Auth & Mobile Toggle */}
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             
-            {/* Language Switcher Preserving Route (Icon Only) */}
+            {/* Language Switcher */}
             <Link
               href={pathname || '/'}
               locale={isAr ? 'en' : 'ar'}
-              className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-colors"
+              className="inline-flex items-center justify-center w-9 h-9 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 transition-colors"
               title={isAr ? 'English' : 'العربية'}
             >
               <Globe className="h-5 w-5" />
             </Link>
 
-            {/* Auth Session */}
+            {/* Desktop Auth Session */}
             {user ? (
-              <div className="flex items-center gap-2 ps-2 border-s border-gray-200">
+              <div className="hidden md:flex items-center gap-2 ps-2 border-s border-gray-200">
                 <Link 
                   href="/profile" 
-                  className="hidden sm:flex items-center gap-2.5 p-1 pe-3 rounded-full hover:bg-slate-100/70 transition-colors"
+                  className="flex items-center gap-2.5 p-1 pe-3 rounded-full hover:bg-slate-100/70 transition-colors"
                   title={displayName}
                 >
                   <div className="h-8 w-8 relative rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center overflow-hidden border border-blue-200 shadow-xs">
@@ -157,17 +157,101 @@ export default function Navbar() {
             ) : (
               <button
                 onClick={login}
-                className="inline-flex items-center gap-1.5 sm:gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold shadow-sm shadow-blue-500/20 hover:shadow-md transition-all transform hover:-translate-y-0.5"
+                className="hidden md:inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm shadow-blue-500/20 hover:shadow-md transition-all transform hover:-translate-y-0.5"
               >
                 <LogIn className="h-4 w-4" />
-                <span className="hidden sm:inline">{t('login')}</span>
-                <span className="sm:hidden">{t('login')}</span>
+                <span>{t('login')}</span>
               </button>
             )}
+
+            {/* Mobile Hamburger Toggle Button */}
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className="md:hidden inline-flex items-center justify-center p-2 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100/80 focus:outline-none transition-colors"
+              aria-label="Toggle menu"
+            >
+              {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
+
           </div>
 
         </div>
       </div>
+
+      {/* Mobile Drawer Menu */}
+      {isOpen && (
+        <div className="md:hidden bg-white/95 backdrop-blur-xl border-b border-slate-200 px-4 pt-3 pb-6 space-y-3 shadow-xl animate-in slide-in-from-top duration-200">
+          
+          {/* User Profile Card (if logged in) */}
+          {user ? (
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 flex items-center justify-between">
+              <Link 
+                href="/profile" 
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-3 min-w-0"
+              >
+                <div className="h-10 w-10 relative rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center overflow-hidden border border-blue-200 flex-shrink-0 shadow-xs">
+                  {user.photoURL ? (
+                    <Image src={user.photoURL} alt={displayName} fill sizes="40px" className="object-cover" />
+                  ) : (
+                    <span className="text-base">{displayName.charAt(0).toUpperCase()}</span>
+                  )}
+                </div>
+                <div className="flex flex-col text-start min-w-0">
+                  <span className="text-sm font-bold text-slate-900 truncate">
+                    {displayName}
+                  </span>
+                  <span className="text-xs text-blue-600 font-bold">
+                    {userData?.totalPoints ?? 0} {isAr ? 'نقطة معتمدة' : 'points'}
+                  </span>
+                </div>
+              </Link>
+              
+              <button
+                onClick={() => { logout(); setIsOpen(false); }}
+                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                title={isAr ? 'تسجيل الخروج' : 'Logout'}
+              >
+                <LogOut className="h-5 w-5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => { login(); setIsOpen(false); }}
+              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-2xl font-bold shadow-md shadow-blue-500/20 transition-all text-sm"
+            >
+              <LogIn className="h-5 w-5" />
+              <span>{t('login')}</span>
+            </button>
+          )}
+
+          {/* Navigation Items */}
+          <div className="space-y-1 pt-1">
+            {navLinks.map((item) => {
+              const active = isActive(item.href);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setIsOpen(false)}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
+                    active 
+                      ? 'bg-blue-50 text-blue-700' 
+                      : item.isAdmin
+                        ? 'text-purple-600 bg-purple-50/50'
+                        : 'text-slate-700 hover:bg-slate-100/70'
+                  }`}
+                >
+                  <Icon className="h-5 w-5 flex-shrink-0" />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+
+        </div>
+      )}
     </header>
   );
 }

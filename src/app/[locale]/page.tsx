@@ -234,7 +234,7 @@ export default async function HomePage({ params }: PageProps) {
 
         {eventsList.length > 0 ? (
           <div className="flex overflow-x-auto pb-8 -mx-4 px-4 sm:mx-0 sm:px-0 snap-x snap-mandatory hide-scrollbar gap-4 sm:gap-6">
-            {eventsList.slice(0, 2).map((event) => {
+            {eventsList.map((event) => {
               const isCompleted = event.state === 'Completed' || event.state === 'Archived';
               return (
                 <div 
@@ -247,27 +247,25 @@ export default async function HomePage({ params }: PageProps) {
             })}
             
             {/* View All Card */}
-            {eventsList.length > 2 && (
-              <div className="min-w-[85vw] sm:min-w-[340px] max-w-[85vw] sm:max-w-[340px] flex-shrink-0 snap-start">
-                <div className="h-full min-h-[300px] bg-gradient-to-br from-blue-50 to-indigo-50 rounded-3xl sm:rounded-[2rem] border-2 border-dashed border-blue-200 flex flex-col items-center justify-center p-8 text-center transition-all duration-500 hover:bg-blue-100 hover:border-blue-300 group cursor-pointer">
-                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4 group-hover:scale-110 transition-transform duration-500">
-                    <ArrowRight className="w-8 h-8 text-blue-600 rtl:-scale-x-100" />
-                  </div>
-                  <h3 className="text-xl font-black text-slate-800 mb-2 font-cairo">
-                    {isAr ? 'استكشف المزيد' : 'Explore More'}
-                  </h3>
-                  <p className="text-slate-500 text-sm mb-6">
-                    {isAr ? 'هناك المزيد من الفعاليات وورش العمل بانتظارك' : 'More events and workshops are waiting for you'}
-                  </p>
-                  <Link 
-                    href="/events"
-                    className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold shadow-md shadow-blue-500/20 hover:bg-blue-700 transition-colors w-full"
-                  >
-                    {isAr ? 'استعرض كل الفعاليات' : 'View All Events'}
-                  </Link>
+            <div className="min-w-[85vw] sm:min-w-[340px] max-w-[85vw] sm:max-w-[340px] flex-shrink-0 snap-start">
+              <Link 
+                href="/events"
+                className="h-full min-h-[300px] bg-gradient-to-br from-blue-50 to-indigo-50 rounded-3xl sm:rounded-[2rem] border-2 border-dashed border-blue-200 flex flex-col items-center justify-center p-8 text-center transition-all duration-500 hover:bg-blue-100 hover:border-blue-300 group cursor-pointer block"
+              >
+                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4 group-hover:scale-110 transition-transform duration-500 mx-auto">
+                  <ArrowRight className="w-8 h-8 text-blue-600 rtl:-scale-x-100" />
                 </div>
-              </div>
-            )}
+                <h3 className="text-xl font-black text-slate-800 mb-2 font-cairo">
+                  {isAr ? 'استكشف المزيد' : 'Explore More'}
+                </h3>
+                <p className="text-slate-500 text-sm mb-6">
+                  {isAr ? 'هناك المزيد من الفعاليات وورش العمل بانتظارك' : 'More events and workshops are waiting for you'}
+                </p>
+                <span className="inline-flex items-center justify-center bg-blue-600 text-white px-8 py-3 rounded-xl font-bold shadow-md shadow-blue-500/20 hover:bg-blue-700 transition-colors w-full">
+                  {isAr ? 'استعرض كل الفعاليات' : 'View All Events'}
+                </span>
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="text-center py-12 bg-white/60 rounded-3xl border border-slate-200 border-dashed">
@@ -330,12 +328,19 @@ export default async function HomePage({ params }: PageProps) {
             <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
               {stats.committees && stats.committees.length > 0 ? (
                 stats.committees.map((committee: { id: string; name: string; description: string; members: { userId: string; name: string; role: string; avatar?: string }[] }, index: number) => {
-                  const colors = ['blue', 'indigo', 'emerald', 'pink', 'amber', 'purple'];
-                  const color = colors[index % colors.length];
+                  const themePalette = [
+                    { badge: 'bg-blue-100 text-blue-600', avatar: 'bg-blue-200 text-blue-700' },
+                    { badge: 'bg-indigo-100 text-indigo-600', avatar: 'bg-indigo-200 text-indigo-700' },
+                    { badge: 'bg-emerald-100 text-emerald-600', avatar: 'bg-emerald-200 text-emerald-700' },
+                    { badge: 'bg-purple-100 text-purple-600', avatar: 'bg-purple-200 text-purple-700' },
+                    { badge: 'bg-amber-100 text-amber-600', avatar: 'bg-amber-200 text-amber-700' },
+                    { badge: 'bg-pink-100 text-pink-600', avatar: 'bg-pink-200 text-pink-700' }
+                  ];
+                  const theme = themePalette[index % themePalette.length];
                   
                   return (
                     <Link href="/structure" key={committee.id || index} className="bg-[#F8FAFC] border border-slate-100 rounded-2xl sm:rounded-3xl p-3 sm:p-6 text-center hover:shadow-xl hover:-translate-y-1 transition-all duration-300 block">
-                      <div className={`h-10 w-10 sm:h-16 sm:w-16 bg-${color}-100 text-${color}-600 rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-2 sm:mb-5 shadow-inner`}>
+                      <div className={`h-10 w-10 sm:h-16 sm:w-16 ${theme.badge} rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-2 sm:mb-5 shadow-inner`}>
                         <Users className="w-5 h-5 sm:w-8 sm:h-8" />
                       </div>
                       <h3 className="text-[10px] sm:text-lg font-black font-cairo text-slate-900 mb-1 sm:mb-2 line-clamp-2">{committee.name}</h3>
@@ -344,7 +349,7 @@ export default async function HomePage({ params }: PageProps) {
                       {committee.members && committee.members.length > 0 && (
                         <div className="hidden sm:flex -space-x-2 rtl:space-x-reverse justify-center mt-2">
                           {committee.members.slice(0, 4).map((member: { userId: string; name: string; role: string; avatar?: string }) => (
-                            <div key={member.userId} className={`h-8 w-8 rounded-full border-2 border-white bg-${color}-200 flex items-center justify-center text-xs font-bold text-${color}-700 overflow-hidden relative group`} title={member.name}>
+                            <div key={member.userId} className={`h-8 w-8 rounded-full border-2 border-white ${theme.avatar} flex items-center justify-center text-xs font-bold overflow-hidden relative group`} title={member.name}>
                               {member.avatar ? (
                                 <Image 
                                   src={member.avatar} 

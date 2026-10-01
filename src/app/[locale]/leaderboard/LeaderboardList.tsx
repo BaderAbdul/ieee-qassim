@@ -19,77 +19,156 @@ export default function LeaderboardList({ users }: { users: LeaderboardUser[] })
   const locale = useLocale();
   const isAr = locale === 'ar';
 
-  return (
-    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-      {users.length === 0 ? (
-        <div className="p-16 text-center text-slate-500 font-medium">
-          <Sparkles className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-          <p className="text-base">{isAr ? 'لا توجد نقاط مسجلة بعد. كن أول من يحصل على النقاط!' : 'No points recorded yet. Be the first to earn points!'}</p>
-        </div>
-      ) : (
-        <ul className="divide-y divide-gray-100">
-          {users.map((u, idx) => {
-            const isCurrentUser = user?.uid === u.id;
-            return (
-              <li 
-                key={u.id} 
-                className={`p-4 sm:p-6 flex items-center justify-between transition-colors ${
-                  isCurrentUser ? 'bg-blue-50/70 border-s-4 border-blue-600' : 'hover:bg-slate-50'
-                }`}
-              >
-                
-                {/* Rank & Student */}
-                <div className="flex items-center gap-4 flex-grow text-start">
-                  
-                  {/* Rank Medal / Number */}
-                  <div className="w-10 text-center font-bold text-lg flex-shrink-0">
-                    {idx === 0 ? <Trophy className="h-7 w-7 text-amber-500 mx-auto" /> :
-                     idx === 1 ? <Medal className="h-7 w-7 text-slate-400 mx-auto" /> :
-                     idx === 2 ? <Medal className="h-7 w-7 text-amber-700 mx-auto" /> :
-                     <span className="text-slate-400 font-bold text-base">#{idx + 1}</span>}
-                  </div>
-                  
-                  {/* Avatar */}
-                  <div className="h-12 w-12 relative rounded-2xl bg-blue-100 text-blue-600 font-bold flex items-center justify-center overflow-hidden border border-blue-200 shadow-xs flex-shrink-0">
-                    {u.photoUrl ? (
-                      <Image src={u.photoUrl} alt={u.name} fill sizes="48px" className="object-cover" />
-                    ) : (
-                      <span className="text-lg">{u.name.charAt(0).toUpperCase()}</span>
-                    )}
-                  </div>
+  if (users.length === 0) {
+    return (
+      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-16 text-center text-slate-500 font-medium">
+        <Sparkles className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+        <p className="text-base">{isAr ? 'لا توجد نقاط مسجلة بعد. كن أول من يحصل على النقاط!' : 'No points recorded yet. Be the first to earn points!'}</p>
+      </div>
+    );
+  }
 
-                  {/* Name & Dept */}
-                  <div className="min-w-0">
-                    <div className="font-bold text-slate-900 text-base sm:text-lg flex items-center gap-2 truncate">
-                      <span className="truncate">{u.name}</span>
-                      {isCurrentUser && (
-                        <span className="text-[11px] font-bold bg-blue-600 text-white px-2 py-0.5 rounded-full flex-shrink-0">
-                          {isAr ? 'أنت' : 'You'}
-                        </span>
+  const top3 = users.slice(0, 3);
+  const remaining = users.slice(3);
+
+  // Rearrange top3 for podium: 2nd place (idx 1), 1st place (idx 0), 3rd place (idx 2)
+  const first = top3[0];
+  const second = top3[1];
+  const third = top3[2];
+
+  return (
+    <div className="space-y-8">
+      
+      {/* Top 3 Podium Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 items-end pt-4">
+        
+        {/* 2nd Place (Silver) */}
+        {second ? (
+          <div className="order-2 sm:order-1 bg-gradient-to-b from-slate-50 to-slate-100/80 rounded-3xl border border-slate-200/80 p-6 flex flex-col items-center text-center relative shadow-sm hover:shadow-md transition-all">
+            <div className="absolute -top-4 bg-slate-300 text-slate-800 text-xs font-black px-3 py-1 rounded-full shadow-xs flex items-center gap-1">
+              <Medal className="h-3.5 w-3.5 text-slate-600" />
+              <span>#2</span>
+            </div>
+            <div className="h-16 w-16 relative rounded-2xl bg-slate-200 text-slate-700 font-black text-xl flex items-center justify-center overflow-hidden border-2 border-slate-300 shadow-sm mb-3 mt-2">
+              {second.photoUrl ? (
+                <Image src={second.photoUrl} alt={second.name} fill sizes="64px" className="object-cover" />
+              ) : (
+                <span>{second.name.charAt(0).toUpperCase()}</span>
+              )}
+            </div>
+            <h3 className="font-bold text-slate-900 text-base max-w-full truncate">{second.name}</h3>
+            {second.department && <span className="text-xs text-slate-500 font-medium truncate max-w-full">{second.department}</span>}
+            <div className="mt-3 bg-white px-4 py-1.5 rounded-xl border border-slate-200 text-slate-800 font-black text-lg flex items-center gap-1 shadow-2xs">
+              <span>{second.points}</span>
+              <Award className="h-4 w-4 text-slate-400" />
+            </div>
+          </div>
+        ) : <div className="hidden sm:block order-1" />}
+
+        {/* 1st Place (Gold Champion) */}
+        {first && (
+          <div className="order-1 sm:order-2 bg-gradient-to-b from-amber-50 to-amber-100/80 rounded-3xl border-2 border-amber-300 p-7 flex flex-col items-center text-center relative shadow-md hover:shadow-xl transition-all sm:-translate-y-3">
+            <div className="absolute -top-5 bg-gradient-to-r from-amber-500 to-yellow-500 text-white text-xs font-black px-4 py-1.5 rounded-full shadow-md flex items-center gap-1.5 uppercase tracking-wide">
+              <Trophy className="h-4 w-4" />
+              <span>{isAr ? 'البطل #1' : 'Champion #1'}</span>
+            </div>
+            <div className="h-20 w-20 relative rounded-2xl bg-amber-200 text-amber-900 font-black text-2xl flex items-center justify-center overflow-hidden border-4 border-amber-300 shadow-md mb-3 mt-2">
+              {first.photoUrl ? (
+                <Image src={first.photoUrl} alt={first.name} fill sizes="80px" className="object-cover" />
+              ) : (
+                <span>{first.name.charAt(0).toUpperCase()}</span>
+              )}
+            </div>
+            <h3 className="font-black text-slate-900 text-lg max-w-full truncate">{first.name}</h3>
+            {first.department && <span className="text-xs text-amber-800 font-bold truncate max-w-full">{first.department}</span>}
+            <div className="mt-3 bg-amber-500 text-white px-5 py-2 rounded-xl font-black text-xl flex items-center gap-1.5 shadow-sm">
+              <span>{first.points}</span>
+              <Award className="h-5 w-5 text-amber-200" />
+            </div>
+          </div>
+        )}
+
+        {/* 3rd Place (Bronze) */}
+        {third ? (
+          <div className="order-3 bg-gradient-to-b from-amber-900/5 to-amber-900/10 rounded-3xl border border-amber-800/20 p-6 flex flex-col items-center text-center relative shadow-sm hover:shadow-md transition-all">
+            <div className="absolute -top-4 bg-amber-800 text-amber-100 text-xs font-black px-3 py-1 rounded-full shadow-xs flex items-center gap-1">
+              <Medal className="h-3.5 w-3.5 text-amber-300" />
+              <span>#3</span>
+            </div>
+            <div className="h-16 w-16 relative rounded-2xl bg-amber-100 text-amber-900 font-black text-xl flex items-center justify-center overflow-hidden border-2 border-amber-300 shadow-sm mb-3 mt-2">
+              {third.photoUrl ? (
+                <Image src={third.photoUrl} alt={third.name} fill sizes="64px" className="object-cover" />
+              ) : (
+                <span>{third.name.charAt(0).toUpperCase()}</span>
+              )}
+            </div>
+            <h3 className="font-bold text-slate-900 text-base max-w-full truncate">{third.name}</h3>
+            {third.department && <span className="text-xs text-slate-500 font-medium truncate max-w-full">{third.department}</span>}
+            <div className="mt-3 bg-white px-4 py-1.5 rounded-xl border border-slate-200 text-amber-900 font-black text-lg flex items-center gap-1 shadow-2xs">
+              <span>{third.points}</span>
+              <Award className="h-4 w-4 text-amber-700" />
+            </div>
+          </div>
+        ) : <div className="hidden sm:block order-3" />}
+
+      </div>
+
+      {/* Ranks 4+ List Container */}
+      {remaining.length > 0 && (
+        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+          <ul className="divide-y divide-gray-100">
+            {remaining.map((u, idx) => {
+              const rank = idx + 4;
+              const isCurrentUser = user?.uid === u.id;
+              return (
+                <li 
+                  key={u.id} 
+                  className={`p-4 sm:p-5 flex items-center justify-between transition-colors ${
+                    isCurrentUser ? 'bg-blue-50/80 border-s-4 border-blue-600' : 'hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-4 text-start min-w-0">
+                    <span className="w-8 text-center font-bold text-slate-400 text-sm sm:text-base flex-shrink-0">
+                      #{rank}
+                    </span>
+                    <div className="h-11 w-11 relative rounded-2xl bg-blue-100 text-blue-700 font-bold flex items-center justify-center overflow-hidden border border-blue-200 flex-shrink-0 shadow-xs">
+                      {u.photoUrl ? (
+                        <Image src={u.photoUrl} alt={u.name} fill sizes="44px" className="object-cover" />
+                      ) : (
+                        <span className="text-base">{u.name.charAt(0).toUpperCase()}</span>
                       )}
                     </div>
-                    {u.department && (
-                      <span className="text-xs text-slate-500 block truncate">{u.department}</span>
-                    )}
+                    <div className="min-w-0">
+                      <div className="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2 truncate">
+                        <span className="truncate">{u.name}</span>
+                        {isCurrentUser && (
+                          <span className="text-[10px] font-bold bg-blue-600 text-white px-2 py-0.5 rounded-full flex-shrink-0">
+                            {isAr ? 'أنت' : 'You'}
+                          </span>
+                        )}
+                      </div>
+                      {u.department && (
+                        <span className="text-xs text-slate-500 block truncate">{u.department}</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-                
-                {/* Points Total */}
-                <div className="text-end ps-4 flex-shrink-0">
-                  <div className="font-black text-xl sm:text-2xl text-blue-700 font-cairo flex items-center justify-end gap-1">
-                    <span>{u.points}</span>
-                    <Award className="h-5 w-5 text-amber-500 flex-shrink-0" />
-                  </div>
-                  <div className="text-xs text-slate-500 font-semibold">
-                    {isAr ? 'نقطة معتمدة' : 'points'}
-                  </div>
-                </div>
 
-              </li>
-            );
-          })}
-        </ul>
+                  <div className="text-end ps-4 flex-shrink-0">
+                    <div className="font-black text-lg sm:text-xl text-blue-700 font-cairo flex items-center justify-end gap-1">
+                      <span>{u.points}</span>
+                      <Award className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                    </div>
+                    <div className="text-[11px] text-slate-400 font-semibold">
+                      {isAr ? 'نقطة' : 'pts'}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
+
     </div>
   );
 }

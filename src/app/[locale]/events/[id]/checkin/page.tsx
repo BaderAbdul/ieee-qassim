@@ -14,7 +14,7 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
   const { id: eventId, locale } = use(params);
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
-  const { user, loading: authLoading } = useAuth();
+  const { user, login, loading: authLoading } = useAuth();
   const router = useRouter();
   const t = useTranslations();
 
@@ -28,9 +28,7 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
     if (authLoading) return;
 
     if (!user) {
-      // Need to login first
-      const currentUrl = encodeURIComponent(`/events/${eventId}/checkin?token=${token}`);
-      router.push(`/?redirect=${currentUrl}`);
+      // User will see inline login prompt on this page
       return;
     }
 
@@ -66,7 +64,27 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full text-center">
-        {status === 'loading' && (
+        {!user && !authLoading && (
+          <div className="flex flex-col items-center justify-center py-6">
+            <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4">
+              <CheckCircle className="w-8 h-8 text-blue-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900 font-cairo mb-2">
+              {locale === 'ar' ? 'سجّل دخولك للتحضير' : 'Log in to Check-In'}
+            </h2>
+            <p className="text-slate-600 text-sm mb-6">
+              {locale === 'ar' ? 'يتطلب تحضير الفعالية تسجيل الدخول بحسابك أولاً.' : 'Self check-in requires signing in to your account first.'}
+            </p>
+            <button
+              onClick={login}
+              className="w-full bg-blue-600 text-white py-3.5 px-6 rounded-xl font-bold shadow-md shadow-blue-500/20 hover:bg-blue-700 transition-colors text-sm"
+            >
+              {locale === 'ar' ? 'تسجيل الدخول بجوجل' : 'Sign in with Google'}
+            </button>
+          </div>
+        )}
+
+        {user && status === 'loading' && (
           <div className="flex flex-col items-center justify-center py-10">
             <Loader2 className="w-16 h-16 text-blue-600 animate-spin mb-4" />
             <h2 className="text-2xl font-bold text-gray-800 font-cairo">

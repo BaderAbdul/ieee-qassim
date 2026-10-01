@@ -17,6 +17,7 @@ import {
   getCountFromServer
 } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase/client';
+import ProfileSkeleton from '@/components/skeletons/ProfileSkeleton';
 import { httpsCallable } from 'firebase/functions';
 import { PlatformEvent, Certificate, PointTransaction } from '@/lib/types';
 import { formatDateSafe, toJsDate } from '@/lib/dateUtils';
@@ -329,12 +330,7 @@ export default function EngineeringProfilePage() {
   };
 
   if (authLoading) {
-    return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center">
-        <LoadingSpinner size="lg" color="border-blue-600" />
-        <p className="mt-4 text-slate-600 text-sm font-medium">{tCommon('loading')}</p>
-      </div>
-    );
+    return <ProfileSkeleton />;
   }
 
   if (!user) {

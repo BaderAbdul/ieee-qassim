@@ -5,7 +5,8 @@ import { Trophy } from 'lucide-react';
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import LeaderboardList, { LeaderboardUser } from './LeaderboardList';
-import { useTranslations, useLocale } from 'next-intl';
+import LeaderboardSkeleton from '@/components/skeletons/LeaderboardSkeleton';
+import { useLocale } from 'next-intl';
 
 export default function LeaderboardPage() {
 
@@ -43,6 +44,10 @@ export default function LeaderboardPage() {
     fetchLeaderboard();
   }, [isAr]);
 
+  if (loading) {
+    return <LeaderboardSkeleton />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 pt-24 pb-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto space-y-8">
@@ -63,13 +68,7 @@ export default function LeaderboardPage() {
         </div>
 
         {/* Board Container */}
-        {loading ? (
-          <div className="py-20 flex justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div>
-          </div>
-        ) : (
-          <LeaderboardList users={topUsers} />
-        )}
+        <LeaderboardList users={topUsers} />
 
       </div>
     </div>
