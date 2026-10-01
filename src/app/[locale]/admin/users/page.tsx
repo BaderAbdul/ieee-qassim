@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase/client';
 import { httpsCallable } from 'firebase/functions';
 import { useAuth } from '@/context/AuthContext';
-import { Search, Trophy, Shield, ShieldAlert } from 'lucide-react';
+import { Search, Trophy, Shield, ShieldAlert, AlertOctagon, Trash2, Edit3, Lock, Unlock, MoreVertical } from 'lucide-react';
 
 interface AdminUserItem {
   id: string;
@@ -14,6 +14,7 @@ interface AdminUserItem {
   email?: string;
   role?: string;
   totalPoints?: number;
+  isRestricted?: boolean;
 }
 
 export default function AdminUsersPage() {
@@ -95,6 +96,43 @@ export default function AdminUsersPage() {
     }
   };
 
+  const handleRoleChange = async (userId: string, newRole: string) => {
+    if (userData?.role !== 'super_admin') return alert('غير مصرح لك بتغيير الصلاحيات');
+    if (!confirm('هل أنت متأكد من تغيير صلاحية هذا المستخدم؟')) return;
+    try {
+      await updateDoc(doc(db, 'users', userId), { role: newRole });
+      setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء تغيير الصلاحية.');
+    }
+  };
+
+  const handleToggleRestrict = async (userId: string, currentRestricted: boolean) => {
+    if (userData?.role !== 'super_admin') return alert('غير مصرح لك بتقييد الحسابات');
+    const actionStr = currentRestricted ? 'فك التقييد عن' : 'تقييد';
+    if (!confirm(`هل أنت متأكد من ${actionStr} هذا المستخدم؟`)) return;
+    try {
+      await updateDoc(doc(db, 'users', userId), { isRestricted: !currentRestricted });
+      setUsers(users.map(u => u.id === userId ? { ...u, isRestricted: !currentRestricted } : u));
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء تعديل حالة التقييد.');
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (userData?.role !== 'super_admin') return alert('غير مصرح لك بحذف الحسابات');
+    if (!confirm('هل أنت متأكد من حذف هذا المستخدم بشكل نهائي من قاعدة البيانات؟ (لا يمكن التراجع عن هذا الإجراء)')) return;
+    try {
+      await deleteDoc(doc(db, 'users', userId));
+      setUsers(users.filter(u => u.id !== userId));
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء حذف المستخدم.');
+    }
+  };
+
   const filteredUsers = users.filter(u => 
     (u.arabicFullName || u.displayName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (u.email || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -152,12 +190,24 @@ export default function AdminUsersPage() {
                   </td>
                   <td className="py-4 px-6 text-gray-500">{u.email}</td>
                   <td className="py-4 px-6">
-                    {u.role === 'super_admin' ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded text-xs font-bold bg-purple-100 text-purple-700"><ShieldAlert className="h-3 w-3 me-1"/> مدير عام</span>
-                    ) : u.role === 'event_organizer' ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded text-xs font-bold bg-blue-100 text-blue-700"><Shield className="h-3 w-3 me-1"/> منظم فعاليات</span>
+                    {userData?.role === 'super_admin' ? (
+                      <select
+                        value={u.role || 'student'}
+                        onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                        className="text-sm border border-gray-200 rounded-lg px-2 py-1 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                      >
+                        <option value="student">طالب</option>
+                        <option value="event_organizer">منظم فعاليات</option>
+                        <option value="super_admin">مدير عام</option>
+                      </select>
                     ) : (
-                      <span className="text-gray-500 text-sm">طالب</span>
+                      u.role === 'super_admin' ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded text-xs font-bold bg-purple-100 text-purple-700"><ShieldAlert className="h-3 w-3 me-1"/> مدير عام</span>
+                      ) : u.role === 'event_organizer' ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded text-xs font-bold bg-blue-100 text-blue-700"><Shield className="h-3 w-3 me-1"/> منظم فعاليات</span>
+                      ) : (
+                        <span className="text-gray-500 text-sm">طالب</span>
+                      )
                     )}
                   </td>
                   <td className="py-4 px-6">
@@ -167,12 +217,35 @@ export default function AdminUsersPage() {
                     </div>
                   </td>
                   <td className="py-4 px-6">
-                    <button
-                      onClick={() => { setSelectedUser(u); setIsModalOpen(true); }}
-                      className="text-purple-600 hover:bg-purple-50 px-3 py-1 rounded-lg text-sm font-bold transition-colors"
-                    >
-                      تعديل النقاط
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => { setSelectedUser(u); setIsModalOpen(true); }}
+                        className="text-purple-600 hover:bg-purple-50 p-2 rounded-lg transition-colors"
+                        title="تعديل النقاط"
+                      >
+                        <Edit3 className="h-4 w-4" />
+                      </button>
+                      
+                      {userData?.role === 'super_admin' && (
+                        <>
+                          <button
+                            onClick={() => handleToggleRestrict(u.id, !!u.isRestricted)}
+                            className={`${u.isRestricted ? 'text-amber-600 hover:bg-amber-50' : 'text-gray-400 hover:bg-gray-100'} p-2 rounded-lg transition-colors`}
+                            title={u.isRestricted ? 'فك التقييد' : 'تقييد الحساب'}
+                          >
+                            {u.isRestricted ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+                          </button>
+                          
+                          <button
+                            onClick={() => handleDeleteUser(u.id)}
+                            className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"
+                            title="حذف الحساب"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

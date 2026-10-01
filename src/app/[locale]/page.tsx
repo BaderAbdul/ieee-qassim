@@ -9,6 +9,7 @@ import { Calendar, Trophy, ArrowRight, UserCircle, Users } from 'lucide-react';
 const HeroUserCards = dynamic(() => import('./HeroUserCards'), { ssr: true });
 const HeroActionButtons = dynamic(() => import('./HeroActionButtons'), { ssr: true });
 import EventCard from '@/components/ui/EventCard';
+import { sortEventsByClosestDate } from '@/lib/dateUtils';
 
 export const revalidate = 60; // Enable ISR, cache for 60 seconds
 
@@ -111,14 +112,8 @@ export default async function HomePage({ params }: PageProps) {
         };
       }) as PlatformEvent[];
 
-      evs.sort((a, b) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const dateA = typeof a.date === 'string' ? new Date(a.date) : typeof (a.date as any)?.toDate === 'function' ? (a.date as any).toDate() : new Date(0);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const dateB = typeof b.date === 'string' ? new Date(b.date) : typeof (b.date as any)?.toDate === 'function' ? (b.date as any).toDate() : new Date(0);
-        return dateB.getTime() - dateA.getTime();
-      });
-      eventsList = evs.slice(0, 3);
+      const sortedEvs = sortEventsByClosestDate(evs);
+      eventsList = sortedEvs.slice(0, 3);
 
       const featuredId = stats.featuredEventId;
       if (featuredId) {
@@ -133,11 +128,11 @@ export default async function HomePage({ params }: PageProps) {
             createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
             updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt
           } as PlatformEvent;
-        } else if (evs.length > 0) {
-          latestEvent = evs[0];
+        } else if (sortedEvs.length > 0) {
+          latestEvent = sortedEvs[0];
         }
-      } else if (evs.length > 0) {
-        latestEvent = evs[0];
+      } else if (sortedEvs.length > 0) {
+        latestEvent = sortedEvs[0];
       }
     } catch (fallbackError) {
       console.error("Fallback Client SDK also failed:", fallbackError);

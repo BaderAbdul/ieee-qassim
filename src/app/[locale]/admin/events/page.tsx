@@ -7,7 +7,7 @@ import { PlatformEvent, EventState } from '@/lib/types';
 import { Link } from '@/i18n/routing';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { Plus, Users, QrCode, Award, Eye, Edit2, Star } from 'lucide-react';
+import { Plus, Users, QrCode, Award, Eye, Edit2, Star, Pin } from 'lucide-react';
 
 export default function AdminEventsPage() {
   const [events, setEvents] = useState<PlatformEvent[]>([]);
@@ -22,6 +22,8 @@ export default function AdminEventsPage() {
       
       // Sort client-side
       fetchedEvents.sort((a, b) => {
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
         const dateA = a.createdAt instanceof Date ? a.createdAt : (a.createdAt as { toDate?: () => Date })?.toDate?.() || new Date();
         const dateB = b.createdAt instanceof Date ? b.createdAt : (b.createdAt as { toDate?: () => Date })?.toDate?.() || new Date();
         return dateB.getTime() - dateA.getTime();
@@ -46,6 +48,8 @@ export default function AdminEventsPage() {
         const fetchedEvents = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as PlatformEvent[];
         
         fetchedEvents.sort((a, b) => {
+          if (a.isPinned && !b.isPinned) return -1;
+          if (!a.isPinned && b.isPinned) return 1;
           const dateA = a.createdAt instanceof Date ? a.createdAt : (a.createdAt as { toDate?: () => Date })?.toDate?.() || new Date();
           const dateB = b.createdAt instanceof Date ? b.createdAt : (b.createdAt as { toDate?: () => Date })?.toDate?.() || new Date();
           return dateB.getTime() - dateA.getTime();
@@ -67,6 +71,19 @@ export default function AdminEventsPage() {
       active = false;
     };
   }, []);
+
+  const handleTogglePin = async (eventId: string, currentPinned: boolean) => {
+    try {
+      await updateDoc(doc(db, 'events', eventId), {
+        isPinned: !currentPinned,
+        updatedAt: new Date()
+      });
+      fetchEvents();
+    } catch (error) {
+      console.error("Error toggling pin state", error);
+      alert("حدث خطأ أثناء تعديل تثبيت الفعالية");
+    }
+  };
 
   const handleStateChange = async (eventId: string, newState: EventState) => {
     try {
@@ -172,6 +189,16 @@ export default function AdminEventsPage() {
                             <Eye size={16} />
                           </Link>
                           
+                          <button
+                            onClick={() => handleTogglePin(event.id, !!event.isPinned)}
+                            className={`p-2 rounded-lg transition-colors ${
+                              event.isPinned ? 'text-amber-600 bg-amber-100 hover:bg-amber-200' : 'text-gray-400 bg-gray-50 hover:bg-gray-100'
+                            }`}
+                            title={event.isPinned ? 'إلغاء التثبيت' : 'تثبيت الفعالية بالبداية'}
+                          >
+                            <Pin size={16} className={event.isPinned ? 'fill-current' : ''} />
+                          </button>
+
                           <Link href={`/admin/events/${event.id}/edit`} className="text-amber-600 hover:text-amber-900 bg-amber-50 p-2 rounded-lg" title="تعديل الفعالية">
                             <Edit2 size={16} />
                           </Link>

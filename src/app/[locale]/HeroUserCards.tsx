@@ -1,12 +1,12 @@
-'use client';
-
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
-import { Trophy, UserCircle } from 'lucide-react';
+import { Trophy, UserCircle, Pin } from 'lucide-react';
 import { useLocale } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
 
 interface HeroUserCardsProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   latestEvent: any | null;
 }
 
@@ -73,15 +73,15 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
           }
 
           if (!attSnap.empty) {
-            // We just know they attended recently
             setLatestAttendance({ title: isAr ? 'حضور موثّق' : 'Attendance Verified', date: isAr ? 'تم توثيق حضورك بنجاح' : 'Check-in successful' });
           }
 
-          // Fetch Rank
-          if (userData?.totalPoints) {
+          // Fetch Rank accurately for logged-in user
+          if (user && userData !== undefined) {
+            const pts = typeof userData?.totalPoints === 'number' ? userData.totalPoints : 0;
             const rankQuery = query(
               collection(db, 'users'),
-              where('totalPoints', '>', userData.totalPoints)
+              where('totalPoints', '>', pts)
             );
             const rankCountSnap = await getCountFromServer(rankQuery);
             setUserRank(rankCountSnap.data().count + 1);
@@ -99,7 +99,7 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
     } else {
       setLoadingData(false);
     }
-  }, [user, userData?.totalPoints, isAr]);
+  }, [user, userData, isAr]);
 
   const handleCardClick = (cardId: number, path: string) => {
     if (activeCard === cardId || window.innerWidth >= 1024) {
@@ -113,32 +113,71 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
     }
   };
 
+  const coverUrl = latestEvent?.coverUrl || latestEvent?.imageUrl || latestEvent?.image;
+
   return (
     <>
       {/* Card 1: Featured Event (Top Right) */}
       <div 
-        className={`absolute top-0 lg:top-4 rtl:left-2 lg:rtl:left-0 lg:ltr:right-0 ltr:-right-2 w-72 lg:w-80 bg-white/70 backdrop-blur-md rounded-3xl p-4 lg:p-5 shadow-2xl shadow-blue-900/15 border border-white/60 transform hover:-translate-y-2 hover:shadow-blue-500/20 lg:hover:z-50 transition-all duration-300 group cursor-pointer ${activeCard === 1 ? 'z-50 scale-105' : 'z-30'}`}
+        className={`absolute top-0 lg:top-4 rtl:left-2 lg:rtl:left-0 lg:ltr:right-0 ltr:-right-2 w-72 lg:w-80 bg-white/80 backdrop-blur-md rounded-3xl p-4 lg:p-5 shadow-2xl transition-all duration-300 group cursor-pointer ${
+          latestEvent?.isPinned 
+            ? 'ring-2 ring-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.4)] border-amber-300' 
+            : 'border border-white/60 shadow-blue-900/15 hover:shadow-blue-500/20'
+        } transform hover:-translate-y-2 lg:hover:z-50 ${activeCard === 1 ? 'z-50 scale-105' : 'z-30'}`}
         onClick={() => { if(latestEvent) handleCardClick(1, `/events/${latestEvent.id}`) }}
       >
-        <div className="flex items-center justify-between mb-4">
-          <div className="bg-blue-50/80 text-blue-700 text-[10px] font-black tracking-wider uppercase px-3 py-1.5 rounded-full">{latestEvent?.state === 'Ongoing' ? (isAr ? 'جاري الآن' : 'Ongoing') : (latestEvent?.state === 'Registration Open' ? (isAr ? 'التسجيل مفتوح' : 'Open') : (isAr ? 'قريباً' : 'Soon'))}</div>
-          <div className="bg-slate-50/80 text-slate-500 text-[10px] font-bold px-2 py-1 rounded-md">{latestEvent ? (latestEvent.date as any)?.toDate?.()?.toLocaleDateString(isAr ? 'ar-SA' : 'en-US') || new Date(latestEvent.date as any).toLocaleDateString(isAr ? 'ar-SA' : 'en-US') : '---'}</div>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-1.5">
+            <span className="bg-blue-50/90 text-blue-700 text-[10px] font-black tracking-wider uppercase px-3 py-1 rounded-full border border-blue-200/50">
+              {latestEvent?.state === 'Ongoing' ? (isAr ? 'جاري الآن' : 'Ongoing') : (latestEvent?.state === 'Registration Open' ? (isAr ? 'التسجيل مفتوح' : 'Open') : (isAr ? 'قريباً' : 'Soon'))}
+            </span>
+            {latestEvent?.isPinned && (
+              <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-amber-300">
+                <Pin className="w-2.5 h-2.5 fill-current" />
+                {isAr ? 'مثبتة' : 'Pinned'}
+              </span>
+            )}
+          </div>
+          <div className="bg-slate-100/90 text-slate-600 text-[10px] font-bold px-2 py-1 rounded-md">
+            {latestEvent ? (latestEvent.date as any)?.toDate?.()?.toLocaleDateString(isAr ? 'ar-SA' : 'en-US') || new Date(latestEvent.date as any).toLocaleDateString(isAr ? 'ar-SA' : 'en-US') : '---'}
+          </div>
         </div>
-        <div className="w-full h-24 lg:h-32 bg-gradient-to-br from-[#00629B] to-indigo-700 rounded-2xl mb-4 relative overflow-hidden">
-           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-           <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors duration-300"></div>
-           <div className="absolute bottom-3 right-3 left-3">
-             <h4 className="text-white font-bold text-sm lg:text-base leading-tight truncate">{latestEvent ? (isAr ? latestEvent.title : (latestEvent.titleEn || latestEvent.title)) : (isAr ? 'لا توجد فعاليات' : 'No Events')}</h4>
-             <p className="text-blue-100 text-[10px] lg:text-xs mt-1">{latestEvent ? `${latestEvent.registeredCount || 0} ${isAr ? 'مسجل' : 'Registered'}` : ''}</p>
+
+        {/* Poster Card Container */}
+        <div className="w-full h-28 lg:h-36 rounded-2xl mb-3 relative overflow-hidden bg-slate-900 shadow-inner group-hover:shadow-lg transition-shadow">
+           {coverUrl ? (
+             <Image 
+               src={coverUrl}
+               alt={latestEvent ? (latestEvent.title || '') : ''}
+               fill
+               className="object-cover object-center group-hover:scale-110 transition-transform duration-700"
+               sizes="(max-width: 768px) 100vw, 320px"
+             />
+           ) : (
+             <div className="absolute inset-0 bg-gradient-to-br from-[#00629B] via-indigo-800 to-purple-900">
+               <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-15"></div>
+             </div>
+           )}
+           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/40 to-transparent pointer-events-none" />
+           <div className="absolute bottom-3 right-3 left-3 z-10">
+             <h4 className="text-white font-black text-sm lg:text-base leading-snug drop-shadow-md truncate font-cairo">
+               {latestEvent ? (isAr ? latestEvent.title : (latestEvent.titleEn || latestEvent.title)) : (isAr ? 'لا توجد فعاليات' : 'No Events')}
+             </h4>
+             <p className="text-blue-200 text-[10px] lg:text-xs font-medium mt-0.5">
+               {latestEvent ? `${latestEvent.registeredCount || 0} ${isAr ? 'مسجل' : 'Registered'}` : ''}
+             </p>
            </div>
         </div>
+
         <div className="flex items-center justify-between">
           <div className="flex -space-x-2 rtl:space-x-reverse">
-            <div className="h-6 w-6 rounded-full border-2 border-white bg-blue-100"></div>
-            <div className="h-6 w-6 rounded-full border-2 border-white bg-indigo-100"></div>
-            <div className="h-6 w-6 rounded-full border-2 border-white bg-purple-100"></div>
+            <div className="h-6 w-6 rounded-full border-2 border-white bg-blue-100 shadow-xs"></div>
+            <div className="h-6 w-6 rounded-full border-2 border-white bg-indigo-100 shadow-xs"></div>
+            <div className="h-6 w-6 rounded-full border-2 border-white bg-purple-100 shadow-xs"></div>
           </div>
-          <span className="text-[10px] lg:text-xs font-bold text-slate-500">{latestEvent ? `+${latestEvent.registeredCount || 0} ${isAr ? 'انضموا' : 'Joined'}` : ''}</span>
+          <span className="text-[10px] lg:text-xs font-bold text-slate-500">
+            {latestEvent ? `+${latestEvent.registeredCount || 0} ${isAr ? 'انضموا' : 'Joined'}` : ''}
+          </span>
         </div>
       </div>
 

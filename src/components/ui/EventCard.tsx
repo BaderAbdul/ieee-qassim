@@ -4,7 +4,7 @@ import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
 import { ar, enUS } from 'date-fns/locale';
 import { useLocale, useTranslations } from 'next-intl';
-import { MapPin, Calendar, Clock, Users, ArrowRight, UserCheck } from 'lucide-react';
+import { MapPin, Calendar, Clock, Users, ArrowRight, UserCheck, Pin } from 'lucide-react';
 import { formatDateSafe } from '@/lib/dateUtils';
 
 interface EventCardProps {
@@ -62,7 +62,11 @@ export default function EventCard({ event }: EventCardProps) {
   }
 
   return (
-    <div className="group h-full bg-white rounded-[1.5rem] sm:rounded-[2rem] shadow-sm hover:shadow-2xl border border-gray-100/80 overflow-hidden flex flex-col transition-all duration-500 hover:-translate-y-2 relative">
+    <div className={`group h-full bg-white rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden flex flex-col transition-all duration-500 hover:-translate-y-2 relative ${
+      event.isPinned 
+        ? 'ring-2 ring-amber-400 shadow-[0_0_25px_rgba(245,158,11,0.35)] border border-amber-300' 
+        : 'shadow-sm hover:shadow-2xl border border-gray-100/80'
+    }`}>
       {/* Top Image Section */}
       <div className="relative h-32 sm:h-56 w-full bg-slate-100 overflow-hidden shrink-0">
         {event.coverUrl ? (
@@ -91,14 +95,24 @@ export default function EventCard({ event }: EventCardProps) {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent pointer-events-none" />
 
+        {/* Pinned Badge */}
+        {event.isPinned && (
+          <div className="absolute top-3 sm:top-4 start-1/2 -translate-x-1/2 z-10">
+            <span className="flex items-center gap-1 px-3 py-1 bg-amber-500/90 text-white text-[10px] sm:text-xs font-black rounded-full shadow-lg backdrop-blur-md border border-amber-300/50">
+              <Pin className="w-3 h-3 fill-current" />
+              {isAr ? 'مميزة ومثبتة' : 'Featured'}
+            </span>
+          </div>
+        )}
+
         {/* Floating Date Badge */}
-        <div className="absolute top-3 sm:top-4 start-3 sm:start-4 bg-white/95 backdrop-blur-md rounded-xl sm:rounded-2xl p-1.5 sm:p-2 px-2.5 sm:px-3 text-center shadow-lg border border-white/20">
+        <div className="absolute top-3 sm:top-4 start-3 sm:start-4 bg-white/95 backdrop-blur-md rounded-xl sm:rounded-2xl p-1.5 sm:p-2 px-2.5 sm:px-3 text-center shadow-lg border border-white/20 z-10">
           <div className="text-[10px] sm:text-sm font-bold text-blue-600 leading-none mb-1">{month}</div>
           <div className="text-base sm:text-xl font-black text-slate-900 leading-none font-cairo">{day}</div>
         </div>
 
         {/* State Badge */}
-        <div className="absolute top-3 sm:top-4 end-3 sm:end-4">
+        <div className="absolute top-3 sm:top-4 end-3 sm:end-4 z-10">
           <span className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-[11px] font-bold border shadow-md backdrop-blur-md bg-white/90 ${badgeColor.replace('bg-', 'text-').replace('text-', '')}`}>
             {badgeText}
           </span>

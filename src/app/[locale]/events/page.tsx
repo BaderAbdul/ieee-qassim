@@ -2,6 +2,7 @@ import React from 'react';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { PlatformEvent } from '@/lib/types';
+import { sortEventsByClosestDate } from '@/lib/dateUtils';
 import EventsList from './EventsList';
 
 export const dynamic = 'force-dynamic';
@@ -31,14 +32,7 @@ export default async function EventsPage() {
       };
     }) as PlatformEvent[];
     
-    // Sort by date descending
-    fetchedEvents.sort((a, b) => {
-      const dateA = new Date(a.date as string | number | Date).getTime() || 0;
-      const dateB = new Date(b.date as string | number | Date).getTime() || 0;
-      return dateB - dateA;
-    });
-
-    events = fetchedEvents;
+    events = sortEventsByClosestDate(fetchedEvents);
   } catch (error) {
     console.error("Error fetching events", error);
   }

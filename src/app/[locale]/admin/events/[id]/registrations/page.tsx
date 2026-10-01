@@ -15,6 +15,10 @@ interface RegistrationData {
   userName: string;
   userEmail: string;
   universityId?: string;
+  major?: string;
+  college?: string;
+  academicLevel?: string;
+  isQassimStudent?: boolean;
   status: string;
   timestamp: { toDate?: () => Date } | Date | null;
 }
@@ -60,7 +64,7 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
         const userIdsToFetch = new Set<string>();
         snap.docs.forEach(d => {
           const data = d.data();
-          if (!data.userName && data.userId) {
+          if (data.userId) {
             userIdsToFetch.add(data.userId);
           }
         });
@@ -87,6 +91,11 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
             userId: regData.userId,
             userName: regData.userName || cachedName || 'Unknown',
             userEmail: regData.userEmail || cachedEmail || 'Unknown',
+            universityId: (cachedUser?.universityId as string | undefined) || regData.universityId,
+            major: cachedUser?.major as string | undefined,
+            college: cachedUser?.college as string | undefined,
+            academicLevel: cachedUser?.academicLevel as string | undefined,
+            isQassimStudent: cachedUser?.isQassimStudent as boolean | undefined,
             status: regData.status,
             timestamp: regData.timestamp
           };
@@ -240,13 +249,17 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
   const exportCSV = () => {
     if (!event) return;
     
-    const headers = ['Name', 'Email', 'University ID', 'Status', 'Date'];
+    const headers = ['Name', 'Email', 'University ID', 'College', 'Major', 'Academic Level', 'Qassim Student?', 'Status', 'Date'];
     const rows = registrations.map(r => {
       const d = toDate(r.timestamp);
       return [
         `"${r.userName}"`,
         `"${r.userEmail}"`,
         `"${r.universityId || ''}"`,
+        `"${r.college || ''}"`,
+        `"${r.major || ''}"`,
+        `"${r.academicLevel || ''}"`,
+        `"${r.isQassimStudent ? 'Yes' : 'No'}"`,
         r.status,
         d ? format(d, 'yyyy-MM-dd HH:mm:ss') : ''
       ];

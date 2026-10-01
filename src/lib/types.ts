@@ -43,6 +43,7 @@ export interface PlatformEvent {
   registrationMode: RegistrationMode;
   checkinToken?: string;
   feedbackQuestions?: CustomQuestion[];
+  isPinned?: boolean;
   createdAt: Timestamp | Date;
   updatedAt: Timestamp | Date;
 }

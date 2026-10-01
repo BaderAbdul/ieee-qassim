@@ -5,6 +5,7 @@ import { collection, query, getDocs, where, doc, getDoc, setDoc, getCountFromSer
 import { db } from '@/lib/firebase/client';
 import { Users, Calendar, CheckSquare, Award, Save, Settings, Star, LayoutTemplate } from 'lucide-react';
 import { PlatformEvent } from '@/lib/types';
+import Link from 'next/link';
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState({
@@ -97,7 +98,7 @@ export default function AdminDashboardPage() {
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {statCards.map((stat, idx) => (
-          <div key={idx} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center">
+          <div key={idx} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center transition-all hover:shadow-md hover:-translate-y-1">
             <div className={`h-16 w-16 rounded-xl ${stat.bg} flex items-center justify-center me-4 flex-shrink-0`}>
               {stat.icon}
             </div>
@@ -107,6 +108,39 @@ export default function AdminDashboardPage() {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="mb-8">
+        <h2 className="text-xl font-bold text-gray-900 font-cairo mb-4 flex items-center gap-2">
+          <CheckSquare className="h-5 w-5 text-purple-600" />
+          وصول سريع
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Link href="/admin/users" className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center text-center gap-2 hover:bg-blue-50 hover:border-blue-200 transition-colors group">
+            <div className="bg-blue-100 p-3 rounded-full text-blue-600 group-hover:scale-110 transition-transform">
+              <Users className="h-6 w-6" />
+            </div>
+            <span className="font-bold text-sm text-gray-700">إدارة المستخدمين</span>
+          </Link>
+          <Link href="/admin/events" className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center text-center gap-2 hover:bg-purple-50 hover:border-purple-200 transition-colors group">
+            <div className="bg-purple-100 p-3 rounded-full text-purple-600 group-hover:scale-110 transition-transform">
+              <Calendar className="h-6 w-6" />
+            </div>
+            <span className="font-bold text-sm text-gray-700">الفعاليات</span>
+          </Link>
+          <Link href="/admin/structure" className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center text-center gap-2 hover:bg-amber-50 hover:border-amber-200 transition-colors group">
+            <div className="bg-amber-100 p-3 rounded-full text-amber-600 group-hover:scale-110 transition-transform">
+              <LayoutTemplate className="h-6 w-6" />
+            </div>
+            <span className="font-bold text-sm text-gray-700">هيكلة الإدارة</span>
+          </Link>
+          <Link href="/admin/ideas" className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center text-center gap-2 hover:bg-green-50 hover:border-green-200 transition-colors group">
+            <div className="bg-green-100 p-3 rounded-full text-green-600 group-hover:scale-110 transition-transform">
+              <Star className="h-6 w-6" />
+            </div>
+            <span className="font-bold text-sm text-gray-700">بنك الأفكار</span>
+          </Link>
+        </div>
       </div>
 
       <form onSubmit={handleSaveHeroStats} className="space-y-8">
