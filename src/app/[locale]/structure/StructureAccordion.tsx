@@ -72,7 +72,7 @@ export default function StructureAccordion({ committees, isAr }: StructureAccord
             {/* Members Grid Section */}
             <div className="p-4 sm:p-5">
               {committee.members && committee.members.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3">
                   {committee.members.map((member) => {
                     const displayName = getShortName(member.name);
 
