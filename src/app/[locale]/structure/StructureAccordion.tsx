@@ -38,7 +38,6 @@ function getShortName(fullName: string): string {
 export default function StructureAccordion({ committees, isAr }: StructureAccordionProps) {
   const [activeTabId, setActiveTabId] = useState<string>('');
   const [selectedMember, setSelectedMember] = useState<CommitteeMember | null>(null);
-  const [isAnimating, setIsAnimating] = useState(false);
   const [richProfile, setRichProfile] = useState<{avatar?: string, linkedin?: string, bio?: string} | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
 
@@ -68,15 +67,41 @@ export default function StructureAccordion({ committees, isAr }: StructureAccord
     if (committees.length > 0 && !activeTabId) {
       setActiveTabId(committees[0].id);
     }
-  }, [committees, activeTabId]);
+    
+    const observerOptions = {
+      root: null,
+      rootMargin: '-120px 0px -50% 0px',
+      threshold: 0
+    };
+
+    const observerCallback: IntersectionObserverCallback = (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          setActiveTabId(entry.target.id.replace('committee-', ''));
+        }
+      });
+    };
+
+    const observer = new IntersectionObserver(observerCallback, observerOptions);
+    
+    // We need to wait a tick for elements to be rendered
+    setTimeout(() => {
+      committees.forEach((committee) => {
+        const element = document.getElementById(`committee-${committee.id}`);
+        if (element) observer.observe(element);
+      });
+    }, 100);
+
+    return () => observer.disconnect();
+  }, [committees]);
 
   const handleTabChange = (id: string) => {
-    if (id === activeTabId) return;
-    setIsAnimating(true);
-    setTimeout(() => {
-      setActiveTabId(id);
-      setIsAnimating(false);
-    }, 150); // Small delay to allow fade out
+    setActiveTabId(id);
+    const element = document.getElementById(`committee-${id}`);
+    if (element) {
+      const y = element.getBoundingClientRect().top + window.scrollY - 100; // offset for sticky header + tabs
+      window.scrollTo({ top: y, behavior: 'smooth' });
+    }
   };
 
   if (committees.length === 0) {
@@ -89,13 +114,13 @@ export default function StructureAccordion({ committees, isAr }: StructureAccord
     );
   }
 
-  const activeCommittee = committees.find(c => c.id === activeTabId) || committees[0];
+
 
   return (
     <div className="space-y-6 sm:space-y-8 pb-10">
       
       {/* 1. Tabs / Pills Navigation */}
-      <div className="relative">
+      <div className="sticky top-16 sm:top-20 z-40 bg-gray-50/95 backdrop-blur-md py-4 border-b border-slate-200/50 -mx-4 px-4 sm:mx-0 sm:px-0">
         <div className="flex items-center gap-2 overflow-x-auto pb-2 px-1 sm:justify-center sm:flex-wrap snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {committees.map((committee) => {
             const isActive = committee.id === activeTabId;
@@ -124,31 +149,33 @@ export default function StructureAccordion({ committees, isAr }: StructureAccord
         </div>
       </div>
 
-      {/* 2. Active Committee Content */}
-      <div 
-        className={`transition-all duration-300 ${isAnimating ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'}`}
-      >
-        {activeCommittee && (
-          <div className="bg-white rounded-[1.5rem] shadow-sm border border-slate-200 p-4 sm:p-6 lg:p-8">
+      {/* 2. Committees Content */}
+      <div className="space-y-12">
+        {committees.map((committee) => (
+          <div 
+            key={committee.id}
+            id={`committee-${committee.id}`}
+            className="bg-white rounded-[1.5rem] shadow-sm border border-slate-200 p-4 sm:p-6 lg:p-8 scroll-mt-32"
+          >
             
             {/* Header info */}
             <div className="text-center max-w-2xl mx-auto mb-6 sm:mb-8">
               <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 mb-3 border border-blue-100">
                  <Users className="w-6 h-6" />
               </div>
-              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">{activeCommittee.name}</h2>
-              {activeCommittee.description && (
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">{committee.name}</h2>
+              {committee.description && (
                 <p className="text-sm text-slate-500 leading-relaxed">
-                  {activeCommittee.description}
+                  {committee.description}
                 </p>
               )}
             </div>
 
             {/* Members Grid */}
             <div>
-              {activeCommittee.members && activeCommittee.members.length > 0 ? (
+              {committee.members && committee.members.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-                  {activeCommittee.members.map((member) => {
+                  {committee.members.map((member) => {
                     const displayName = getShortName(member.name);
                     
                     return (
@@ -210,7 +237,7 @@ export default function StructureAccordion({ committees, isAr }: StructureAccord
             </div>
             
           </div>
-        )}
+        ))}
       </div>
 
       {/* Member Profile Modal */}

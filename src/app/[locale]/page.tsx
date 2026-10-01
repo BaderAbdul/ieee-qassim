@@ -176,34 +176,7 @@ export default async function HomePage({ params }: PageProps) {
         </div>
       </section>
 
-      {/* Hero Stats Strip */}
-      <section className="relative z-20 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 w-full -mt-8 sm:-mt-8 mb-6 sm:mb-10">
-        <div className="grid grid-cols-3 gap-2 sm:gap-4">
-          <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-slate-100 p-2.5 sm:p-5 flex flex-col items-center justify-center text-center">
-            <div className="h-8 w-8 sm:h-12 sm:w-12 rounded-lg sm:rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-1.5 sm:mb-3 shadow-inner">
-              <Users className="h-4 w-4 sm:h-6 sm:w-6" />
-            </div>
-            <span className="text-sm sm:text-2xl font-black text-slate-900 leading-none">{stats.membersCount || '+500'}</span>
-            <span className="text-[9px] sm:text-sm font-bold text-slate-500 mt-1">{isAr ? 'عضو مجتمع' : 'Members'}</span>
-          </div>
 
-          <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-slate-100 p-2.5 sm:p-5 flex flex-col items-center justify-center text-center">
-            <div className="h-8 w-8 sm:h-12 sm:w-12 rounded-lg sm:rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mb-1.5 sm:mb-3 shadow-inner">
-              <Calendar className="h-4 w-4 sm:h-6 sm:w-6" />
-            </div>
-            <span className="text-sm sm:text-2xl font-black text-slate-900 leading-none">{stats.eventsCount || '+25'}</span>
-            <span className="text-[9px] sm:text-sm font-bold text-slate-500 mt-1">{isAr ? 'فعالية' : 'Events'}</span>
-          </div>
-
-          <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-slate-100 p-2.5 sm:p-5 flex flex-col items-center justify-center text-center">
-            <div className="h-8 w-8 sm:h-12 sm:w-12 rounded-lg sm:rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mb-1.5 sm:mb-3 shadow-inner">
-              <Trophy className="h-4 w-4 sm:h-6 sm:w-6" />
-            </div>
-            <span className="text-sm sm:text-2xl font-black text-slate-900 leading-none">{stats.adminsCount || '+40'}</span>
-            <span className="text-[9px] sm:text-sm font-bold text-slate-500 mt-1">{isAr ? 'نقاط' : 'Points'}</span>
-          </div>
-        </div>
-      </section>
 
       {/* Events Carousel Section */}
       <section className="py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full relative z-20">
