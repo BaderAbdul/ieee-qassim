@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { useRouter } from '@/i18n/routing';
-import { EventType, RegistrationMode, EventState } from '@/lib/types';
-import { ArrowRight, Save } from 'lucide-react';
+import { EventType, RegistrationMode, EventState, CustomQuestion } from '@/lib/types';
+import { ArrowRight, Save, Plus, Trash2, HelpCircle } from 'lucide-react';
 import { Link } from '@/i18n/routing';
 
 export default function CreateEventPage() {
@@ -35,6 +35,35 @@ export default function CreateEventPage() {
     speakers: '',
     coverUrl: ''
   });
+
+  const [feedbackQuestions, setFeedbackQuestions] = useState<CustomQuestion[]>([
+    {
+      id: 'q_default_1',
+      title: 'ما هي أهم فائدة اكتسبتها من الفعالية؟',
+      type: 'choice',
+      required: false,
+      options: ['محتوى متميز', 'شرح واضح', 'تنظيم ممتاز', 'تطبيق عملي مفيد'],
+    }
+  ]);
+
+  const addFeedbackQuestion = () => {
+    const newQ: CustomQuestion = {
+      id: `q_${Date.now()}`,
+      title: '',
+      type: 'choice',
+      required: false,
+      options: ['محتوى مميز', 'تنظيم رائع', 'تفاعل ممتاز'],
+    };
+    setFeedbackQuestions(prev => [...prev, newQ]);
+  };
+
+  const removeFeedbackQuestion = (id: string) => {
+    setFeedbackQuestions(prev => prev.filter(q => q.id !== id));
+  };
+
+  const updateFeedbackQuestion = (id: string, field: keyof CustomQuestion, value: any) => {
+    setFeedbackQuestions(prev => prev.map(q => q.id === id ? { ...q, [field]: value } : q));
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -102,6 +131,7 @@ export default function CreateEventPage() {
         gains: formData.gains.split('\n').filter(g => g.trim()),
         gainsEn: formData.gainsEn.split('\n').filter(g => g.trim()),
         speakers: formData.speakers.split(',').map(s => s.trim()).filter(s => s),
+        feedbackQuestions: feedbackQuestions.filter(q => q.title.trim().length > 0),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
@@ -284,6 +314,110 @@ export default function CreateEventPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">المتحدثون (مفصولون بفاصلة)</label>
               <input type="text" name="speakers" value={formData.speakers} onChange={handleChange} placeholder="أحمد محمد, سارة خالد" className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500" />
             </div>
+          </div>
+        </div>
+
+        {/* Section 5: Custom Feedback Questions */}
+        <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900 font-cairo flex items-center gap-2">
+                <span>أسئلة التقييم والانطباع عند التحضير ⭐</span>
+              </h2>
+              <p className="text-xs text-slate-500 mt-1">
+                تظهر هذه الأسئلة للمشترك فور مسح رمز QR أو رابط التحضير لتسجيل الحضور والحصول على النقاط.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={addFeedbackQuestion}
+              className="bg-purple-600 text-white text-xs font-bold px-3.5 py-2 rounded-xl hover:bg-purple-700 transition-colors flex items-center gap-1.5 shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              <span>إضافة سؤال</span>
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {feedbackQuestions.map((q, idx) => (
+              <div key={q.id} className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-bold text-slate-400">سؤال #{idx + 1}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeFeedbackQuestion(q.id)}
+                    className="text-red-500 hover:text-red-700 p-1 rounded-lg hover:bg-red-50 transition-colors"
+                    title="حذف السؤال"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-slate-700 mb-1">نص السؤال</label>
+                    <input
+                      type="text"
+                      value={q.title}
+                      onChange={(e) => updateFeedbackQuestion(q.id, 'title', e.target.value)}
+                      placeholder="مثال: كيف تقيم جودة محتوى الفعالية؟"
+                      className="w-full text-sm border-gray-300 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">نوع الإجابة</label>
+                    <select
+                      value={q.type}
+                      onChange={(e) => updateFeedbackQuestion(q.id, 'type', e.target.value as 'choice' | 'text')}
+                      className="w-full text-sm border-gray-300 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500"
+                    >
+                      <option value="choice">خيارات سريعة (Pill Buttons)</option>
+                      <option value="text">نص حر مع اقتراحات</option>
+                    </select>
+                  </div>
+                </div>
+
+                {q.type === 'choice' && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">الخيارات (مفصولة بفاصلة)</label>
+                    <input
+                      type="text"
+                      value={(q.options || []).join(', ')}
+                      onChange={(e) => updateFeedbackQuestion(q.id, 'options', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                      placeholder="ممتاز, جيد جداً, مناسب"
+                      className="w-full text-xs border-gray-300 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500"
+                    />
+                  </div>
+                )}
+
+                {q.type === 'text' && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">اقتراحات الكتابة السريعة (مفصولة بفاصلة)</label>
+                    <input
+                      type="text"
+                      value={(q.quickChips || []).join(', ')}
+                      onChange={(e) => updateFeedbackQuestion(q.id, 'quickChips', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                      placeholder="محتوى ممتاز, تطبيق رائع, شكراً لكم"
+                      className="w-full text-xs border-gray-300 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500"
+                    />
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id={`req_${q.id}`}
+                    checked={q.required || false}
+                    onChange={(e) => updateFeedbackQuestion(q.id, 'required', e.target.checked)}
+                    className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor={`req_${q.id}`} className="text-xs font-bold text-slate-700">
+                    إجابة إجبارية عند التحضير
+                  </label>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 

@@ -93,6 +93,23 @@ export const submitCheckIn = functions.https.onCall(async (data, context) => {
       attendedAt: FieldValue.serverTimestamp(),
     });
 
+    // 4c. Record feedback response if provided
+    const { feedbackData } = data;
+    if (feedbackData && typeof feedbackData === 'object') {
+      const feedbackId = `${eventId}_${uidToCheckIn}`;
+      const feedbackRef = db.collection('event_feedback').doc(feedbackId);
+      const ratingVal = typeof feedbackData.rating === 'number' ? Math.max(1, Math.min(5, feedbackData.rating)) : 5;
+      
+      transaction.set(feedbackRef, {
+        id: feedbackId,
+        eventId,
+        userId: uidToCheckIn,
+        rating: ratingVal,
+        answers: feedbackData.answers || {},
+        createdAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
+
     // 5. Award Points Atomically
     const pointsToAward = typeof eventData?.points === 'number' ? eventData.points : 0;
     

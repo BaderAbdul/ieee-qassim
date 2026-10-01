@@ -4,9 +4,22 @@ export type EventType = 'Workshop' | 'Camp' | 'Lecture' | 'Competition' | 'Meetu
 export type EventState = 'Draft' | 'Published' | 'Registration Open' | 'Registration Closed' | 'Ongoing' | 'Completed' | 'Archived';
 export type RegistrationMode = 'Auto' | 'Manual';
 
+export type QuestionType = 'choice' | 'text';
+
+export interface CustomQuestion {
+  id: string;
+  title: string;
+  type: QuestionType;
+  options?: string[]; // for 'choice' pill type
+  placeholder?: string; // for 'text' type
+  quickChips?: string[]; // for 'text' type auto suggestions
+  required: boolean;
+}
+
 export interface PlatformEvent {
   id: string;
   title: string;
+  titleAr?: string;
   titleEn: string;
   description: string;
   descriptionEn: string;
@@ -29,8 +42,20 @@ export interface PlatformEvent {
   state: EventState;
   registrationMode: RegistrationMode;
   checkinToken?: string;
+  feedbackQuestions?: CustomQuestion[];
   createdAt: Timestamp | Date;
   updatedAt: Timestamp | Date;
+}
+
+export interface EventFeedbackResponse {
+  id: string;
+  eventId: string;
+  userId: string;
+  userEmail?: string;
+  userName?: string;
+  rating: number; // 1 to 5 stars
+  answers?: Record<string, string>; // questionId -> answer
+  createdAt: Timestamp | Date | any;
 }
 
 export type PointTransactionSource = 'attendance' | 'attendance_override' | 'manual_adjustment';
