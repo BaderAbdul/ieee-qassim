@@ -27,6 +27,10 @@ export interface UserData {
     linkedin?: string;
     bio?: string;
   };
+  cardPreferences?: {
+    theme?: string;
+    pattern?: string;
+  };
 }
 
 interface AuthContextType {

@@ -200,15 +200,7 @@ export default function EngineeringProfilePage() {
     }
   };
 
-  // Public Board Profile State
-  const [showProfileModal, setShowProfileModal] = useState(false);
-  const [editingProfile, setEditingProfile] = useState({
-    college: '',
-    major: '',
-    academicLevel: '',
-    universityId: ''
-  });
-  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
 
   // Public Board Profile State
   const [showPublicProfileModal, setShowPublicProfileModal] = useState(false);
