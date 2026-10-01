@@ -92,11 +92,22 @@ export default function Footer() {
         </div>
 
         {/* Bottom Disclaimer & Copyright */}
-        <div className="mt-8 pt-6 border-t border-slate-800/80 text-center space-y-2 text-xs text-slate-500 max-w-4xl mx-auto">
+        <div className="mt-8 pt-6 border-t border-slate-800/80 text-center space-y-2.5 text-xs text-slate-500 max-w-4xl mx-auto">
           <p className="leading-relaxed">
             {isAr 
               ? `© حقوق النشر ${currentYear} لجمعية IEEE – جميع الحقوق محفوظة. تعتبر IEEE أكبر منظمة مهنية تقنية عالمية غير ربحية مكرسة لتقدم التكنولوجيا لخدمة البشرية.`
               : `© Copyright ${currentYear} IEEE – All rights reserved. A public charity, IEEE is the world’s largest technical professional organization dedicated to advancing technology for the benefit of humanity.`}
+          </p>
+          <p className="text-[11px] text-slate-400/80 pt-1 flex items-center justify-center gap-1.5">
+            <span>{isAr ? 'تطوير وتصميم:' : 'Developed & Designed by:'}</span>
+            <a 
+              href="https://www.linkedin.com/in/bader-aldukhailallah" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-blue-400 hover:text-blue-300 font-semibold transition-colors underline underline-offset-4 decoration-blue-500/40 hover:decoration-blue-400"
+            >
+              {isAr ? 'بدر الدخيل الله' : 'Bader Al-Dukhailallah'}
+            </a>
           </p>
         </div>
       </div>
