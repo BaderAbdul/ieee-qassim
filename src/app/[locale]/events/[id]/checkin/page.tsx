@@ -128,18 +128,20 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
             throw new Error(isAr ? 'رابط التحضير غير صالح أو منتهي الصلاحية' : 'Invalid or expired check-in token');
           }
 
-          // Check if log exists
+          // Check if log exists (idempotency guard)
           const logRef = doc(db, 'attendance_logs', logId);
           const logSnap = await tx.get(logRef);
           if (logSnap.exists()) {
             return true; // already checked in
           }
 
-          // Check registration
+          // Check registration (read before writes)
           const regRef = doc(db, 'registrations', regId);
           const regSnap = await tx.get(regRef);
 
-          // Write attendance log
+          // --- WRITES START HERE ---
+
+          // Write attendance log (ID format: eventId_userId — matches security rule pattern)
           tx.set(logRef, {
             userId: user.uid,
             eventId: eventId,
@@ -147,8 +149,8 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
             verifiedByAdmin: false,
           });
 
-          // Update registration if exists
-          if (regSnap.exists()) {
+          // Update registration status if exists
+          if (regSnap.exists() && regSnap.data().status !== 'attended') {
             tx.update(regRef, {
               status: 'attended',
               attended: true,
@@ -156,7 +158,7 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
             });
           }
 
-          // Increment event attendance
+          // Increment event attendanceCount (allowed for 'Ongoing' events)
           tx.update(evRef, {
             attendanceCount: increment(1)
           });
@@ -173,23 +175,25 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
             createdAt: serverTimestamp()
           }, { merge: true });
 
-          // Write point transaction & update user total points
+          // Write point transaction & update user 'points' field
+          // (Security rules allow self-write of attendance point_transactions with id pattern attendance_*_uid)
           if (points > 0) {
             const pointTxRef = doc(db, 'point_transactions', pointTxId);
             tx.set(pointTxRef, {
               userId: user.uid,
               amount: points,
-              source: 'attendance',
-              reason: `حضور فعالية: ${evData.title || ''}`,
-              sourceEventId: eventId,
-              createdBy: 'system',
-              createdAt: serverTimestamp(),
-              type: 'earned',
               points: points,
+              source: 'attendance',
+              type: 'earned',
+              createdBy: 'system',
+              reason: `حضور فعالية: ${evData.title || ''}`,
               description: `حضور فعالية: ${evData.title || ''}`,
+              sourceEventId: eventId,
+              createdAt: serverTimestamp(),
               timestamp: serverTimestamp()
             });
 
+            // Update user 'points' field (rules allow self-increment of 'points' field)
             const userRef = doc(db, 'users', user.uid);
             tx.update(userRef, {
               points: increment(points)
