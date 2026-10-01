@@ -205,7 +205,7 @@ export default function StructureAccordion({ committees, isAr }: StructureAccord
             </button>
 
             <div className="text-center space-y-3 pt-2">
-              <div className="h-20 w-20 mx-auto rounded-full overflow-hidden bg-slate-100 text-slate-400 flex items-center justify-center border border-slate-200">
+              <div className="relative h-20 w-20 mx-auto rounded-full overflow-hidden bg-slate-100 text-slate-400 flex items-center justify-center border border-slate-200">
                 {selectedMember.avatar ? (
                   <Image src={selectedMember.avatar} alt={selectedMember.name} fill sizes="80px" className="object-cover" />
                 ) : (
