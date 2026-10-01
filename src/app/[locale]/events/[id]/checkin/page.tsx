@@ -4,7 +4,7 @@ import { useEffect, useState, use } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { db, functions } from '@/lib/firebase/client';
 import { httpsCallable } from 'firebase/functions';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, runTransaction, serverTimestamp, increment } from 'firebase/firestore';
 import { useSearchParams } from 'next/navigation';
 import { Link } from '@/i18n/routing';
 import { CheckCircle, XCircle, Loader2, Star, Sparkles, Award, Send } from 'lucide-react';
@@ -86,6 +86,7 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
     setStatus('submitting');
 
     try {
+      // 1. Try Cloud Function first
       const submitCheckInFn = httpsCallable(functions, 'submitCheckIn');
       const response = await submitCheckInFn({
         eventId,
@@ -104,11 +105,111 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
         setAwardedPoints(result.awardedPoints || event?.points || 0);
         setStatus('success');
       }
-    } catch (error: unknown) {
-      console.error("Error during checkin:", error);
-      setStatus('error');
-      const err = error as Error;
-      setErrorMessage(err.message || (isAr ? 'حدث خطأ أثناء التحضير' : 'Error during check-in'));
+    } catch (cfError: any) {
+      console.warn("Cloud function unavailable or returned error, attempting client fallback:", cfError);
+
+      try {
+        // Fallback: Perform check-in directly using Firestore Client SDK Transaction
+        const points = event?.points || 0;
+        const regId = `${eventId}_${user.uid}`;
+        const logId = `${eventId}_${user.uid}`;
+        const feedbackId = `${eventId}_${user.uid}`;
+        const pointTxId = `attendance_${eventId}_${user.uid}`;
+
+        const isAlreadyCheckedIn = await runTransaction(db, async (tx) => {
+          // Verify Event state & token
+          const evRef = doc(db, 'events', eventId);
+          const evSnap = await tx.get(evRef);
+          if (!evSnap.exists()) {
+            throw new Error(isAr ? 'الفعالية غير موجودة' : 'Event not found');
+          }
+          const evData = evSnap.data();
+          if (evData.checkinToken !== token) {
+            throw new Error(isAr ? 'رابط التحضير غير صالح أو منتهي الصلاحية' : 'Invalid or expired check-in token');
+          }
+
+          // Check if log exists
+          const logRef = doc(db, 'attendance_logs', logId);
+          const logSnap = await tx.get(logRef);
+          if (logSnap.exists()) {
+            return true; // already checked in
+          }
+
+          // Check registration
+          const regRef = doc(db, 'registrations', regId);
+          const regSnap = await tx.get(regRef);
+
+          // Write attendance log
+          tx.set(logRef, {
+            userId: user.uid,
+            eventId: eventId,
+            timestamp: serverTimestamp(),
+            verifiedByAdmin: false,
+          });
+
+          // Update registration if exists
+          if (regSnap.exists()) {
+            tx.update(regRef, {
+              status: 'attended',
+              attended: true,
+              attendedAt: serverTimestamp(),
+            });
+          }
+
+          // Increment event attendance
+          tx.update(evRef, {
+            attendanceCount: increment(1)
+          });
+
+          // Write feedback
+          const feedbackRef = doc(db, 'event_feedback', feedbackId);
+          tx.set(feedbackRef, {
+            id: feedbackId,
+            eventId,
+            userId: user.uid,
+            userEmail: user.email || '',
+            rating,
+            answers,
+            createdAt: serverTimestamp()
+          }, { merge: true });
+
+          // Write point transaction & update user total points
+          if (points > 0) {
+            const pointTxRef = doc(db, 'point_transactions', pointTxId);
+            tx.set(pointTxRef, {
+              userId: user.uid,
+              amount: points,
+              source: 'attendance',
+              reason: `حضور فعالية: ${evData.title || ''}`,
+              sourceEventId: eventId,
+              createdBy: 'system',
+              createdAt: serverTimestamp(),
+              type: 'earned',
+              points: points,
+              description: `حضور فعالية: ${evData.title || ''}`,
+              timestamp: serverTimestamp()
+            });
+
+            const userRef = doc(db, 'users', user.uid);
+            tx.update(userRef, {
+              points: increment(points)
+            });
+          }
+
+          return false;
+        });
+
+        if (isAlreadyCheckedIn) {
+          setStatus('already_attended');
+        } else {
+          setAwardedPoints(points);
+          setStatus('success');
+        }
+      } catch (fallbackError: any) {
+        console.error("Fallback check-in failed:", fallbackError);
+        setStatus('error');
+        setErrorMessage(fallbackError.message || (isAr ? 'حدث خطأ أثناء التحضير' : 'Error during check-in'));
+      }
     } finally {
       setIsSubmitting(false);
     }
