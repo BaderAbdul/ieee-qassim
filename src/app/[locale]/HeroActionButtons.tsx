@@ -11,7 +11,7 @@ export default function HeroActionButtons() {
   const t = useTranslations('Index');
 
   return (
-    <div className="flex flex-row flex-wrap items-center gap-4 justify-center lg:justify-start pt-6">
+    <div className="flex flex-row flex-wrap items-center gap-3 sm:gap-4 justify-center lg:justify-start pt-1 sm:pt-2">
       <Link 
         href="/events"
         className="group inline-flex items-center justify-center bg-[#00629B]/80 border border-white/20 text-white px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold hover:bg-[#004b78]/90 transition-all shadow-md shadow-blue-900/20 hover:shadow-lg hover:shadow-blue-900/30 hover:-translate-y-0.5 text-sm sm:text-base"

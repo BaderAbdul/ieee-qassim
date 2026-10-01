@@ -148,19 +148,19 @@ export default async function HomePage({ params }: PageProps) {
         
         <div className="relative max-w-7xl mx-auto z-10 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
           
-          <div className="flex flex-col space-y-6 text-center lg:text-start lg:rtl:text-right lg:ltr:text-left">
+          <div className="flex flex-col space-y-3 sm:space-y-4 text-center lg:text-start lg:rtl:text-right lg:ltr:text-left">
             <div>
-              <div className="inline-flex items-center gap-2.5 bg-blue-50 border border-blue-100 px-4 py-2 rounded-full mb-6 shadow-sm">
+              <div className="inline-flex items-center gap-2.5 bg-blue-50 border border-blue-100 px-4 py-2 rounded-full mb-3 sm:mb-4 shadow-sm">
                 <span className="flex h-2 w-2 rounded-full bg-blue-600" />
                 <span className="text-sm font-bold text-blue-700 tracking-wide uppercase">
                   {t('Hero.identityLabel')}
                 </span>
               </div>
               
-              <h1 className="text-4xl sm:text-7xl lg:text-8xl font-black mb-2 sm:mb-4 font-thmanyah text-slate-900 drop-shadow-sm uppercase tracking-tight">
+              <h1 className="text-4xl sm:text-7xl lg:text-8xl font-black mb-2 sm:mb-3 font-thmanyah text-slate-900 drop-shadow-sm uppercase tracking-tight">
                 {t('Hero.headline')}
               </h1>
-              <p className="text-slate-600 font-medium text-sm sm:text-base max-w-lg mx-auto lg:mx-0 mb-6 lg:mb-10 leading-relaxed">
+              <p className="text-slate-600 font-medium text-sm sm:text-base max-w-lg mx-auto lg:mx-0 mb-2 sm:mb-4 lg:mb-6 leading-relaxed">
                 {t('Hero.description')}
               </p>
             </div>
