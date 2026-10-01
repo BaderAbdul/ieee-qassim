@@ -85,11 +85,10 @@ service cloud.firestore {
         && (!('arabicFullName' in request.resource.data) || isStringWithMax(request.resource.data.arabicFullName, 150))
         && (!('universityId' in request.resource.data) || isStringWithMax(request.resource.data.universityId, 20))
       ) || (
-        // Allow self-increment of points field ONLY via attendance self-check-in
-        // points field (not totalPoints) can be incremented; security is enforced by the transaction
+        // Allow self-increment of totalPoints field ONLY via attendance self-check-in
         isOwner(userId)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['points'])
-        && request.resource.data.get('points', 0) >= resource.data.get('points', 0)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalPoints'])
+        && request.resource.data.get('totalPoints', 0) >= resource.data.get('totalPoints', 0)
       );
 
       allow delete: if isSuperAdmin();
@@ -118,9 +117,9 @@ service cloud.firestore {
         )
         && request.resource.data.registeredCount >= 0
       ) || (
-        // Allow self-check-in to increment attendanceCount only during Ongoing events
+        // Allow self-check-in to increment attendanceCount during active event states
         isAuthenticated()
-        && resource.data.state == 'Ongoing'
+        && resource.data.state in ['Registration Open', 'Registration Closed', 'Ongoing']
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['attendanceCount'])
         && request.resource.data.attendanceCount == resource.data.get('attendanceCount', 0) + 1
       );

@@ -128,6 +128,12 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
             throw new Error(isAr ? 'رابط التحضير غير صالح أو منتهي الصلاحية' : 'Invalid or expired check-in token');
           }
 
+          // Validate event state — reject completed/archived events
+          const validStates = ['Registration Open', 'Registration Closed', 'Ongoing'];
+          if (!validStates.includes(evData.state)) {
+            throw new Error(isAr ? 'لا يمكن التحضير — الفعالية منتهية أو غير نشطة' : 'Cannot check in — event is not active');
+          }
+
           // Check if log exists (idempotency guard)
           const logRef = doc(db, 'attendance_logs', logId);
           const logSnap = await tx.get(logRef);
@@ -193,10 +199,10 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
               timestamp: serverTimestamp()
             });
 
-            // Update user 'points' field (rules allow self-increment of 'points' field)
+            // Update user 'totalPoints' field (rules allow self-increment of 'totalPoints' field)
             const userRef = doc(db, 'users', user.uid);
             tx.update(userRef, {
-              points: increment(points)
+              totalPoints: increment(points)
             });
           }
 
