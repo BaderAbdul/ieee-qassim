@@ -79,35 +79,15 @@ export default function Footer() {
             </li>
           </ul>
 
-          {/* Official IEEE Global Policy Links */}
+          {/* Local Policy Links */}
           <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-2 text-xs text-slate-400 pt-2 border-t border-slate-800/60 w-full max-w-4xl text-center">
             <Link href="/privacy" className="hover:text-slate-200 transition-colors">
-              {isAr ? 'خصوصية النادي' : 'Branch Privacy'}
+              {isAr ? 'سياسة الخصوصية' : 'Privacy Policy'}
             </Link>
             <span className="text-slate-700">|</span>
             <Link href="/terms" className="hover:text-slate-200 transition-colors">
               {isAr ? 'الشروط والأحكام' : 'Terms & Conditions'}
             </Link>
-            <span className="text-slate-700">|</span>
-            <a href="https://www.ieee.org/accessibility_statement.html" target="_blank" rel="noopener noreferrer" className="hover:text-slate-200 transition-colors">
-              {isAr ? 'إمكانية الوصول (IEEE)' : 'Accessibility'}
-            </a>
-            <span className="text-slate-700">|</span>
-            <a href="https://www.ieee.org/nondiscrimination" target="_blank" rel="noopener noreferrer" className="hover:text-slate-200 transition-colors">
-              {isAr ? 'سياسة عدم التمييز' : 'Nondiscrimination Policy'}
-            </a>
-            <span className="text-slate-700">|</span>
-            <a href="http://www.ieee-ethics-reporting.org/" target="_blank" rel="noopener noreferrer" className="hover:text-slate-200 transition-colors">
-              {isAr ? 'بلاغات الأخلاقيات' : 'IEEE Ethics Reporting'}
-            </a>
-            <span className="text-slate-700">|</span>
-            <a href="https://privacy.ieee.org/policies" target="_blank" rel="noopener noreferrer" className="hover:text-slate-200 transition-colors">
-              {isAr ? 'سياسة خصوصية IEEE' : 'IEEE Privacy Policy'}
-            </a>
-            <span className="text-slate-700">|</span>
-            <a href="https://www.ieee.org/site_terms_conditions.html" target="_blank" rel="noopener noreferrer" className="hover:text-slate-200 transition-colors">
-              {isAr ? 'الشروط والإفصاحات العالمية' : 'Terms & Disclosures'}
-            </a>
           </div>
         </div>
 
