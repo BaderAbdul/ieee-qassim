@@ -310,42 +310,16 @@ export default async function HomePage({ params }: PageProps) {
                   const theme = themePalette[index % themePalette.length];
                   
                   return (
-                    <Link href="/structure" key={committee.id || index} className="group bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 flex flex-col h-full hover:shadow-lg hover:-translate-y-1 hover:border-slate-300 transition-all duration-300 relative overflow-hidden text-start">
-                      <div className="absolute top-2 end-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                         <ArrowRight className="w-4 h-4 text-slate-400 rtl:-scale-x-100" />
+                    <Link href="/structure" key={committee.id || index} className="group bg-white border border-slate-100 shadow-sm rounded-2xl p-5 sm:p-6 flex flex-col items-center justify-center text-center h-full hover:shadow-xl hover:-translate-y-1 hover:border-blue-200 transition-all duration-300 relative overflow-hidden">
+                      <div className={`h-14 w-14 sm:h-16 sm:w-16 ${theme.badge} rounded-2xl flex items-center justify-center mb-4 shadow-sm group-hover:scale-110 transition-transform duration-300`}>
+                        <Users className="w-7 h-7 sm:w-8 sm:h-8" />
                       </div>
-                      <div className={`h-10 w-10 sm:h-12 sm:w-12 ${theme.badge} rounded-xl flex items-center justify-center mb-3 shadow-inner group-hover:scale-110 transition-transform duration-300`}>
-                        <Users className="w-5 h-5 sm:w-6 sm:h-6" />
-                      </div>
-                      <h3 className="text-sm sm:text-base font-black font-cairo text-slate-900 mb-1">{committee.name}</h3>
-                      <p className="hidden sm:block text-xs text-slate-500 mb-4 line-clamp-2 flex-grow">{committee.description}</p>
-                      
+                      <h3 className="text-base sm:text-lg font-bold font-cairo text-slate-900 mb-2">{committee.name}</h3>
                       {committee.members && committee.members.length > 0 && (
-                        <div className="flex -space-x-2 rtl:space-x-reverse justify-start mt-auto pt-2 border-t border-slate-100">
-                          {committee.members.slice(0, 4).map((member: { userId: string; name: string; role: string; avatar?: string }) => (
-                            <div key={member.userId} className={`h-6 w-6 sm:h-8 sm:w-8 rounded-full border-2 border-white ${theme.avatar} flex items-center justify-center text-[10px] sm:text-xs font-bold overflow-hidden relative group/avatar`} title={member.name}>
-                              {member.avatar ? (
-                                <Image 
-                                  src={member.avatar} 
-                                  alt={member.name} 
-                                  fill
-                                  sizes="32px"
-                                  className="object-cover" 
-                                />
-                              ) : (
-                                <span>{member.name.charAt(0)}</span>
-                              )}
-                              <div className="absolute hidden group-hover/avatar:block bottom-full mb-1 w-max px-2 py-1 bg-gray-900 text-white text-[10px] rounded z-50">
-                                {member.name} - {member.role}
-                              </div>
-                            </div>
-                          ))}
-                          {committee.members.length > 4 && (
-                            <div className="h-6 w-6 sm:h-8 sm:w-8 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[9px] sm:text-[10px] font-bold text-slate-600">
-                              +{committee.members.length - 4}
-                            </div>
-                          )}
-                        </div>
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-50 text-slate-500 text-xs font-medium border border-slate-100 mt-auto">
+                          <Users className="w-3 h-3" />
+                          {committee.members.length} {isAr ? 'أعضاء' : 'Members'}
+                        </span>
                       )}
                     </Link>
                   );
