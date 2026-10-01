@@ -35,59 +35,89 @@ export default function Footer() {
 
   return (
     <footer className="bg-slate-900 text-slate-300 border-t border-slate-800 transition-colors">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex flex-col items-center justify-center gap-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div className="flex flex-col items-center justify-center gap-6">
           {/* Social Links */}
-          <div className="flex items-center gap-4 mb-2">
-            <a href="https://x.com/ieeeqaasim?s=11" target="_blank" rel="noopener noreferrer" className="p-2 rounded-full bg-slate-800 text-slate-400 hover:text-[#1DA1F2] hover:bg-slate-700 transition-all" title="X (Twitter)">
+          <div className="flex items-center gap-4">
+            <a href="https://x.com/ieeeqaasim?s=11" target="_blank" rel="noopener noreferrer" className="p-2.5 rounded-full bg-slate-800 text-slate-400 hover:text-[#1DA1F2] hover:bg-slate-700 transition-all" title="X (Twitter)">
               <TwitterIcon className="h-5 w-5" />
             </a>
-            <a href="https://www.linkedin.com/company/ieee-qassim/" target="_blank" rel="noopener noreferrer" className="p-2 rounded-full bg-slate-800 text-slate-400 hover:text-[#0A66C2] hover:bg-slate-700 transition-all" title="LinkedIn">
+            <a href="https://www.linkedin.com/company/ieee-qassim/" target="_blank" rel="noopener noreferrer" className="p-2.5 rounded-full bg-slate-800 text-slate-400 hover:text-[#0A66C2] hover:bg-slate-700 transition-all" title="LinkedIn">
               <LinkedinIcon className="h-5 w-5" />
             </a>
           </div>
-          {/* Quick Links */}
+
+          {/* Primary Quick Links */}
           <ul className="flex flex-wrap justify-center gap-6 text-sm font-medium">
             <li>
-              <Link href="/" className="hover:text-blue-400 transition-colors inline-flex items-center gap-2">
-                <span>{t('home')}</span>
+              <Link href="/" className="hover:text-blue-400 transition-colors">
+                {t('home')}
               </Link>
             </li>
             <li>
-              <Link href="/events" className="hover:text-blue-400 transition-colors inline-flex items-center gap-2">
-                <Calendar className="h-3.5 w-3.5 text-slate-500" />
+              <Link href="/events" className="hover:text-blue-400 transition-colors inline-flex items-center gap-1.5">
+                <Calendar className="h-4 w-4 text-slate-500" />
                 <span>{t('events')}</span>
               </Link>
             </li>
             <li>
-              <Link href="/leaderboard" className="hover:text-blue-400 transition-colors inline-flex items-center gap-2">
-                <Trophy className="h-3.5 w-3.5 text-slate-500" />
+              <Link href="/leaderboard" className="hover:text-blue-400 transition-colors inline-flex items-center gap-1.5">
+                <Trophy className="h-4 w-4 text-slate-500" />
                 <span>{t('leaderboard')}</span>
               </Link>
             </li>
             <li>
-              <Link href="/profile" className="hover:text-blue-400 transition-colors inline-flex items-center gap-2">
-                <UserCircle className="h-3.5 w-3.5 text-slate-500" />
+              <Link href="/structure" className="hover:text-blue-400 transition-colors">
+                {isAr ? 'الهيكلة' : 'Structure'}
+              </Link>
+            </li>
+            <li>
+              <Link href="/profile" className="hover:text-blue-400 transition-colors inline-flex items-center gap-1.5">
+                <UserCircle className="h-4 w-4 text-slate-500" />
                 <span>{t('profile')}</span>
               </Link>
             </li>
           </ul>
-          
-        </div>
 
-        {/* Bottom Bar */}
-        <div className="mt-8 pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>
-            {t('copyright', { year: currentYear })}
-          </p>
-          <div className="flex items-center gap-6">
-            <Link href="/privacy" className="hover:text-slate-300 transition-colors">
-              {isAr ? 'سياسة الخصوصية' : 'Privacy Policy'}
+          {/* Official IEEE Global Policy Links */}
+          <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-2 text-xs text-slate-400 pt-2 border-t border-slate-800/60 w-full max-w-4xl text-center">
+            <Link href="/privacy" className="hover:text-slate-200 transition-colors">
+              {isAr ? 'خصوصية النادي' : 'Branch Privacy'}
             </Link>
-            <Link href="/terms" className="hover:text-slate-300 transition-colors">
+            <span className="text-slate-700">|</span>
+            <Link href="/terms" className="hover:text-slate-200 transition-colors">
               {isAr ? 'الشروط والأحكام' : 'Terms & Conditions'}
             </Link>
+            <span className="text-slate-700">|</span>
+            <a href="https://www.ieee.org/accessibility_statement.html" target="_blank" rel="noopener noreferrer" className="hover:text-slate-200 transition-colors">
+              {isAr ? 'إمكانية الوصول (IEEE)' : 'Accessibility'}
+            </a>
+            <span className="text-slate-700">|</span>
+            <a href="https://www.ieee.org/nondiscrimination" target="_blank" rel="noopener noreferrer" className="hover:text-slate-200 transition-colors">
+              {isAr ? 'سياسة عدم التمييز' : 'Nondiscrimination Policy'}
+            </a>
+            <span className="text-slate-700">|</span>
+            <a href="http://www.ieee-ethics-reporting.org/" target="_blank" rel="noopener noreferrer" className="hover:text-slate-200 transition-colors">
+              {isAr ? 'بلاغات الأخلاقيات' : 'IEEE Ethics Reporting'}
+            </a>
+            <span className="text-slate-700">|</span>
+            <a href="https://privacy.ieee.org/policies" target="_blank" rel="noopener noreferrer" className="hover:text-slate-200 transition-colors">
+              {isAr ? 'سياسة خصوصية IEEE' : 'IEEE Privacy Policy'}
+            </a>
+            <span className="text-slate-700">|</span>
+            <a href="https://www.ieee.org/site_terms_conditions.html" target="_blank" rel="noopener noreferrer" className="hover:text-slate-200 transition-colors">
+              {isAr ? 'الشروط والإفصاحات العالمية' : 'Terms & Disclosures'}
+            </a>
           </div>
+        </div>
+
+        {/* Bottom Disclaimer & Copyright */}
+        <div className="mt-8 pt-6 border-t border-slate-800/80 text-center space-y-2 text-xs text-slate-500 max-w-4xl mx-auto">
+          <p className="leading-relaxed">
+            {isAr 
+              ? `© حقوق النشر ${currentYear} لجمعية IEEE – جميع الحقوق محفوظة. تعتبر IEEE أكبر منظمة مهنية تقنية عالمية غير ربحية مكرسة لتقدم التكنولوجيا لخدمة البشرية.`
+              : `© Copyright ${currentYear} IEEE – All rights reserved. A public charity, IEEE is the world’s largest technical professional organization dedicated to advancing technology for the benefit of humanity.`}
+          </p>
         </div>
       </div>
     </footer>
