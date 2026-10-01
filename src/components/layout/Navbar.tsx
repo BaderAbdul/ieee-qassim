@@ -80,7 +80,7 @@ export default function Navbar() {
           {/* Brand Logo */}
           <div className="flex items-center">
             <Link href="/" className="flex items-center gap-2 group">
-              <div className="relative w-28 h-10 sm:w-36 sm:h-12 flex-shrink-0">
+              <div className="relative w-20 h-8 sm:w-28 sm:h-10 flex-shrink-0">
                 <Image 
                   src="/logo.png" 
                   alt="IEEE Qassim Logo" 

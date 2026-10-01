@@ -78,9 +78,16 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
   const handleManualSubmit = async (e?: React.FormEvent, scannedId?: string) => {
     if (e) e.preventDefault();
     
-    // Support either manual input state or direct scanned ID, and strip the potential 'ieee-qu-user:' prefix
+    // Support either manual input state or direct scanned ID
     const rawInput = scannedId || manualInput;
-    const targetUserId = rawInput.replace('ieee-qu-user:', '').trim();
+    let targetUserId = rawInput.trim();
+    
+    // Parse ID from public pass URL or legacy prefix
+    if (targetUserId.includes('/pass/')) {
+      targetUserId = targetUserId.split('/pass/')[1].split('/')[0].split('?')[0];
+    } else if (targetUserId.startsWith('ieee-qu-user:')) {
+      targetUserId = targetUserId.replace('ieee-qu-user:', '');
+    }
     
     if (!targetUserId) return;
 

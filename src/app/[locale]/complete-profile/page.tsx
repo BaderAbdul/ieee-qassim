@@ -22,6 +22,7 @@ export default function CompleteProfilePage() {
   const [fatherName, setFatherName] = useState('');
   const [familyName, setFamilyName] = useState('');
   const [college, setCollege] = useState('');
+  const [customCollege, setCustomCollege] = useState('');
   const [major, setMajor] = useState('');
   const [academicLevel, setAcademicLevel] = useState('');
   
@@ -68,7 +69,11 @@ export default function CompleteProfilePage() {
         }
       }
 
-      if (!college) newErrors.college = t('errors.required');
+      if (!college) {
+        newErrors.college = t('errors.required');
+      } else if (college === 'other' && !customCollege.trim()) {
+        newErrors.college = t('errors.required');
+      }
       if (!major) newErrors.major = t('errors.required');
       if (!academicLevel) newErrors.academicLevel = t('errors.required');
     }
@@ -104,7 +109,7 @@ export default function CompleteProfilePage() {
 
       if (isStudent) {
         updateData.universityId = universityId.trim();
-        updateData.college = college;
+        updateData.college = college === 'other' ? customCollege.trim() : college;
         updateData.major = major;
         updateData.academicLevel = academicLevel;
       }
@@ -257,10 +262,20 @@ export default function CompleteProfilePage() {
                       className={`w-full p-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all ${errors.college ? 'border-red-400 focus:ring-red-500' : 'border-slate-200'}`}
                     >
                       <option value="">{t('collegePlaceholder')}</option>
-                      {['engineering', 'computer', 'science', 'other'].map(c => (
+                      {['engineering', 'computer', 'science'].map(c => (
                         <option key={c} value={c}>{t(`colleges.${c}`)}</option>
                       ))}
+                      <option value="other">{isAr ? 'أخرى' : 'Other'}</option>
                     </select>
+                    {college === 'other' && (
+                      <input
+                        type="text"
+                        value={customCollege}
+                        onChange={(e) => setCustomCollege(e.target.value)}
+                        placeholder={isAr ? 'اكتب اسم الكلية' : 'Enter college name'}
+                        className="w-full p-3 mt-2 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all border-slate-200"
+                      />
+                    )}
                     {errors.college && <p className="text-red-500 text-xs mt-1 font-medium">{errors.college}</p>}
                   </div>
 

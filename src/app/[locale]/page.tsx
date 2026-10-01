@@ -296,7 +296,7 @@ export default async function HomePage({ params }: PageProps) {
               </p>
             </div>
             
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+            <div className="flex flex-wrap justify-center gap-3 sm:gap-5">
               {stats.committees && stats.committees.length > 0 ? (
                 stats.committees.map((committee: { id: string; name: string; description: string; members: { userId: string; name: string; role: string; avatar?: string }[] }, index: number) => {
                   const themePalette = [
@@ -310,13 +310,13 @@ export default async function HomePage({ params }: PageProps) {
                   const theme = themePalette[index % themePalette.length];
                   
                   return (
-                    <Link href="/structure" key={committee.id || index} className="group bg-white border border-slate-100 shadow-sm rounded-2xl p-5 sm:p-6 flex flex-col items-center justify-center text-center h-full hover:shadow-xl hover:-translate-y-1 hover:border-blue-200 transition-all duration-300 relative overflow-hidden">
-                      <div className={`h-14 w-14 sm:h-16 sm:w-16 ${theme.badge} rounded-2xl flex items-center justify-center mb-4 shadow-sm group-hover:scale-110 transition-transform duration-300`}>
-                        <Users className="w-7 h-7 sm:w-8 sm:h-8" />
+                    <Link href="/structure" key={committee.id || index} className="w-[45%] sm:w-[22%] group bg-white border border-slate-100 shadow-sm rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center text-center hover:shadow-lg hover:-translate-y-1 hover:border-blue-200 transition-all duration-300 relative overflow-hidden">
+                      <div className={`h-12 w-12 sm:h-14 sm:w-14 ${theme.badge} rounded-2xl flex items-center justify-center mb-3 shadow-sm group-hover:scale-110 transition-transform duration-300`}>
+                        <Users className="w-6 h-6 sm:w-7 sm:h-7" />
                       </div>
-                      <h3 className="text-base sm:text-lg font-bold font-cairo text-slate-900 mb-2">{committee.name}</h3>
+                      <h3 className="text-sm sm:text-base font-bold font-cairo text-slate-900 mb-2">{committee.name}</h3>
                       {committee.members && committee.members.length > 0 && (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-50 text-slate-500 text-xs font-medium border border-slate-100 mt-auto">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-50 text-slate-500 text-[10px] sm:text-xs font-medium border border-slate-100 mt-auto">
                           <Users className="w-3 h-3" />
                           {committee.members.length} {isAr ? 'أعضاء' : 'Members'}
                         </span>

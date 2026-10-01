@@ -7,17 +7,27 @@ import Image from 'next/image';
 import { useLocale } from 'next-intl';
 
 import { User } from 'firebase/auth';
+import { Link as LinkIcon } from 'lucide-react'; // Added LinkIcon for linkedin
+
 interface DigitalMemberCardProps {
   user: User;
-  userData: { arabicFullName?: string; name?: string; major?: string | null; college?: string | null; } | null;
+  userData: { 
+    arabicFullName?: string; 
+    name?: string; 
+    major?: string | null; 
+    college?: string | null; 
+    publicProfile?: { linkedin?: string };
+    cardPreferences?: { theme?: string; pattern?: string; };
+  } | null;
   rank: number | null;
   totalPoints: number;
-  onEditName: () => void;
-  onEditProfile: () => void;
-  onLogout: () => void;
+  onEditName?: () => void; // Made optional for public view
+  onEditProfile?: () => void; // Made optional for public view
+  onLogout?: () => void; // Made optional for public view
+  isPublicView?: boolean; // New prop to disable editing UI
 }
 
-export default function DigitalMemberCard({ user, userData, rank, totalPoints, onEditName, onEditProfile, onLogout }: DigitalMemberCardProps) {
+export default function DigitalMemberCard({ user, userData, rank, totalPoints, onEditName, onEditProfile, onLogout, isPublicView = false }: DigitalMemberCardProps) {
   const locale = useLocale();
   const isAr = locale === 'ar';
 
@@ -32,14 +42,45 @@ export default function DigitalMemberCard({ user, userData, rank, totalPoints, o
     ? new Date(user.metadata.creationTime).getFullYear() 
     : new Date().getFullYear();
 
+  // Customization
+  const theme = userData?.cardPreferences?.theme || 'blue';
+  const pattern = userData?.cardPreferences?.pattern || 'none';
+  const linkedinUrl = userData?.publicProfile?.linkedin;
+
+  const getThemeColors = () => {
+    switch (theme) {
+      case 'emerald': return { glow1: 'bg-emerald-600/20', glow2: 'bg-teal-600/10', avatar: 'from-emerald-500 to-teal-500', shield: 'bg-emerald-500' };
+      case 'gold': return { glow1: 'bg-amber-500/20', glow2: 'bg-orange-600/10', avatar: 'from-amber-400 to-orange-500', shield: 'bg-amber-500' };
+      case 'purple': return { glow1: 'bg-purple-600/20', glow2: 'bg-fuchsia-600/10', avatar: 'from-purple-500 to-fuchsia-500', shield: 'bg-purple-500' };
+      case 'rose': return { glow1: 'bg-rose-600/20', glow2: 'bg-pink-600/10', avatar: 'from-rose-500 to-pink-500', shield: 'bg-rose-500' };
+      case 'blue':
+      default: return { glow1: 'bg-blue-600/20', glow2: 'bg-emerald-600/10', avatar: 'from-blue-500 to-indigo-500', shield: 'bg-emerald-500' };
+    }
+  };
+
+  const getPatternClass = () => {
+    switch (pattern) {
+      case 'dots': return 'bg-[radial-gradient(#ffffff22_1px,transparent_1px)] [background-size:16px_16px]';
+      case 'grid': return 'bg-[linear-gradient(to_right,#ffffff0a_1px,transparent_1px),linear-gradient(to_bottom,#ffffff0a_1px,transparent_1px)] [background-size:24px_24px]';
+      case 'waves': return 'bg-[repeating-radial-gradient(circle_at_0_0,transparent_0,#ffffff05_10px,transparent_20px)]';
+      default: return '';
+    }
+  };
+
+  const colors = getThemeColors();
+  const patternClass = getPatternClass();
+
+  // QR Code URL pointing to public pass view
+  const qrValue = `https://ieeequ.org/pass/${user.uid}`;
+
   return (
     <div className="w-full max-w-4xl mx-auto mb-10">
       {/* The Pass Container */}
-      <div className="relative bg-[#0B1121] rounded-[2rem] sm:rounded-[2.5rem] shadow-2xl shadow-blue-900/10 border border-slate-800 overflow-hidden flex flex-col sm:flex-row group">
+      <div className={`relative bg-[#0B1121] rounded-[2rem] sm:rounded-[2.5rem] shadow-2xl shadow-blue-900/10 border border-slate-800 overflow-hidden flex flex-col sm:flex-row group ${patternClass}`}>
         
         {/* Decorative elements */}
-        <div className="absolute top-0 right-0 -mt-20 -mr-20 w-80 h-80 bg-blue-600/20 rounded-full blur-[80px] pointer-events-none transition-opacity duration-700 group-hover:opacity-100 opacity-60"></div>
-        <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-80 h-80 bg-emerald-600/10 rounded-full blur-[80px] pointer-events-none transition-opacity duration-700 group-hover:opacity-100 opacity-60"></div>
+        <div className={`absolute top-0 right-0 -mt-20 -mr-20 w-80 h-80 ${colors.glow1} rounded-full blur-[80px] pointer-events-none transition-opacity duration-700 group-hover:opacity-100 opacity-60`}></div>
+        <div className={`absolute bottom-0 left-0 -mb-20 -ml-20 w-80 h-80 ${colors.glow2} rounded-full blur-[80px] pointer-events-none transition-opacity duration-700 group-hover:opacity-100 opacity-60`}></div>
         <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"></div>
 
         {/* Left Side: Pass Info */}
@@ -52,23 +93,39 @@ export default function DigitalMemberCard({ user, userData, rank, totalPoints, o
                   <span className="text-blue-200 font-bold text-xs tracking-widest uppercase">IEEE QU PASS</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
-                  <span className="text-emerald-400 text-[10px] font-bold uppercase tracking-wider">Active Member</span>
+                  <div className={`w-1.5 h-1.5 rounded-full ${colors.shield}`}></div>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider`} style={{color: theme === 'gold' ? '#fbbf24' : (theme === 'emerald' ? '#34d399' : (theme==='purple'?'#c084fc':(theme==='rose'?'#fb7185':'#34d399')) )}}>Active Member</span>
                 </div>
              </div>
-             <button 
-                onClick={onLogout}
-                className="flex items-center justify-center gap-1.5 text-[10px] font-bold text-white/40 hover:text-red-400 transition-colors bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-sm"
-              >
-                <LogOut className="w-3 h-3 rtl:rotate-180" />
-                <span>{isAr ? 'خروج' : 'Logout'}</span>
-              </button>
+             <div className="flex items-center gap-2">
+               {linkedinUrl && (
+                 <a 
+                   href={linkedinUrl}
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   className="flex items-center justify-center gap-1.5 text-[10px] font-bold text-white/60 hover:text-[#0A66C2] transition-colors bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-sm"
+                   title="LinkedIn Profile"
+                 >
+                   <LinkIcon className="w-3 h-3" />
+                   <span className="hidden sm:inline">LinkedIn</span>
+                 </a>
+               )}
+               {!isPublicView && onLogout && (
+                 <button 
+                    onClick={onLogout}
+                    className="flex items-center justify-center gap-1.5 text-[10px] font-bold text-white/40 hover:text-red-400 transition-colors bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-sm"
+                  >
+                    <LogOut className="w-3 h-3 rtl:rotate-180" />
+                    <span>{isAr ? 'خروج' : 'Logout'}</span>
+                  </button>
+               )}
+             </div>
            </div>
 
            {/* User Profile */}
            <div className="flex items-center gap-5 sm:gap-6 mb-8 sm:mb-12">
              <div className="relative shrink-0">
-               <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-2xl bg-gradient-to-tr from-blue-500 to-indigo-500 p-1 shadow-lg shadow-blue-900/30">
+               <div className={`w-20 h-20 sm:w-28 sm:h-28 rounded-2xl bg-gradient-to-tr ${colors.avatar} p-1 shadow-lg shadow-blue-900/30`}>
                  <div className="w-full h-full relative bg-slate-900 rounded-[0.9rem] sm:rounded-[0.6rem] overflow-hidden flex items-center justify-center text-3xl font-black text-white">
                    {user.photoURL ? (
                      <Image src={user.photoURL} alt={displayName} fill sizes="112px" className="object-cover" />
@@ -77,7 +134,7 @@ export default function DigitalMemberCard({ user, userData, rank, totalPoints, o
                    )}
                  </div>
                </div>
-               <div className="absolute -bottom-2 -right-2 bg-emerald-500 text-white p-1.5 sm:p-2 rounded-full border-2 sm:border-[3px] border-[#0B1121] shadow-sm">
+               <div className={`absolute -bottom-2 -right-2 ${colors.shield} text-white p-1.5 sm:p-2 rounded-full border-2 sm:border-[3px] border-[#0B1121] shadow-sm`}>
                  <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                </div>
              </div>
@@ -85,15 +142,19 @@ export default function DigitalMemberCard({ user, userData, rank, totalPoints, o
              <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1 sm:mb-2">
                   <h2 className="text-xl sm:text-3xl font-black text-white font-cairo leading-tight truncate">{displayName}</h2>
-                  <button onClick={onEditName} className="shrink-0 p-1.5 text-white/40 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors">
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
+                  {!isPublicView && onEditName && (
+                    <button onClick={onEditName} className="shrink-0 p-1.5 text-white/40 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors">
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <p className="text-blue-200 text-xs sm:text-sm font-medium truncate">{major}</p>
-                  <button onClick={onEditProfile} className="shrink-0 p-1 text-white/40 hover:text-white transition-colors">
-                    <Edit2 className="w-3 h-3" />
-                  </button>
+                  {!isPublicView && onEditProfile && (
+                    <button onClick={onEditProfile} className="shrink-0 p-1 text-white/40 hover:text-white transition-colors">
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
              </div>
            </div>
@@ -127,7 +188,7 @@ export default function DigitalMemberCard({ user, userData, rank, totalPoints, o
            
            <div className="bg-white p-3.5 sm:p-4 rounded-[1.5rem] shadow-2xl">
              <QRCodeSVG 
-               value={`ieee-qu-user:${user.uid}`} 
+               value={qrValue} 
                size={140}
                bgColor={"#ffffff"}
                fgColor={"#0f172a"}

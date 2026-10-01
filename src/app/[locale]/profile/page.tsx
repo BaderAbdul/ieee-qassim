@@ -170,6 +170,46 @@ export default function EngineeringProfilePage() {
   });
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
+  // Card Customization State
+  const [showCardModal, setShowCardModal] = useState(false);
+  const [editingCard, setEditingCard] = useState({
+    theme: 'blue',
+    pattern: 'none',
+    linkedin: ''
+  });
+  const [isSavingCard, setIsSavingCard] = useState(false);
+
+  const handleSaveCard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    setIsSavingCard(true);
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        'cardPreferences.theme': editingCard.theme,
+        'cardPreferences.pattern': editingCard.pattern,
+        'publicProfile.linkedin': editingCard.linkedin.trim()
+      });
+      setShowCardModal(false);
+      alert(isAr ? 'تم حفظ التخصيص بنجاح' : 'Card customization saved');
+      setReloadKey(k => k + 1);
+    } catch(err) {
+      console.error(err);
+      alert(isAr ? 'حدث خطأ أثناء الحفظ.' : 'Error saving customization');
+    } finally {
+      setIsSavingCard(false);
+    }
+  };
+
+  // Public Board Profile State
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [editingProfile, setEditingProfile] = useState({
+    college: '',
+    major: '',
+    academicLevel: '',
+    universityId: ''
+  });
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
   // Public Board Profile State
   const [showPublicProfileModal, setShowPublicProfileModal] = useState(false);
   const [editingPublicProfile, setEditingPublicProfile] = useState({
@@ -473,7 +513,21 @@ export default function EngineeringProfilePage() {
             }}
             onLogout={logout}
           />
-          <div className="absolute top-4 rtl:left-4 ltr:right-4 z-20 md:hidden">
+          <div className="absolute top-4 rtl:left-4 ltr:right-4 z-20 md:hidden flex gap-2">
+             <button 
+                onClick={() => {
+                  setEditingCard({
+                    theme: userData?.cardPreferences?.theme || 'blue',
+                    pattern: userData?.cardPreferences?.pattern || 'none',
+                    linkedin: userData?.publicProfile?.linkedin || ''
+                  });
+                  setShowCardModal(true);
+                }}
+                className="bg-indigo-600/80 hover:bg-indigo-600 backdrop-blur-md border border-indigo-400/30 text-white p-2 rounded-xl flex items-center justify-center transition-colors shadow-lg"
+                title={isAr ? 'تخصيص البطاقة' : 'Customize Pass'}
+             >
+                <Edit2 className="w-5 h-5" />
+             </button>
              <Link 
                 href="/profile/pass" 
                 className="bg-white/20 hover:bg-white/30 backdrop-blur-md border border-white/20 text-white p-2 rounded-xl flex items-center justify-center transition-colors shadow-lg"
@@ -482,10 +536,24 @@ export default function EngineeringProfilePage() {
                 <ExternalLink className="w-5 h-5" />
              </Link>
           </div>
-          <div className="hidden md:flex justify-end -mt-4 mb-4">
+          <div className="hidden md:flex justify-end -mt-4 mb-4 gap-2">
+             <button 
+                onClick={() => {
+                  setEditingCard({
+                    theme: userData?.cardPreferences?.theme || 'blue',
+                    pattern: userData?.cardPreferences?.pattern || 'none',
+                    linkedin: userData?.publicProfile?.linkedin || ''
+                  });
+                  setShowCardModal(true);
+                }}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-sm relative z-20"
+             >
+                <Edit2 className="w-4 h-4" />
+                <span>{isAr ? 'تخصيص البطاقة' : 'Customize Pass'}</span>
+             </button>
              <Link 
                 href="/profile/pass" 
-                className="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-sm"
+                className="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-sm relative z-20"
              >
                 <ExternalLink className="w-4 h-4" />
                 <span>{isAr ? 'عرض البطاقة الرقمية' : 'View Digital Pass'}</span>
@@ -1108,6 +1176,117 @@ export default function EngineeringProfilePage() {
                   className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-70"
                 >
                   {isSavingPublicProfile ? (
+                    <LoadingSpinner size="sm" color="white" />
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4" />
+                      <span>{tCommon('save')}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Card Customization Modal */}
+      {showCardModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-slate-900">{isAr ? 'تخصيص البطاقة الرقمية' : 'Customize Digital Pass'}</h2>
+              <button
+                onClick={() => setShowCardModal(false)}
+                className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleSaveCard} className="p-6 space-y-6">
+              
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-3">
+                  {isAr ? 'سمة الألوان (Theme)' : 'Color Theme'}
+                </label>
+                <div className="grid grid-cols-5 gap-2 sm:gap-4">
+                  {[
+                    { id: 'blue', color: 'bg-blue-500' },
+                    { id: 'emerald', color: 'bg-emerald-500' },
+                    { id: 'gold', color: 'bg-amber-500' },
+                    { id: 'purple', color: 'bg-purple-500' },
+                    { id: 'rose', color: 'bg-rose-500' }
+                  ].map(t => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setEditingCard({...editingCard, theme: t.id})}
+                      className={`h-12 w-full rounded-xl ${t.color} flex items-center justify-center transition-all ${
+                        editingCard.theme === t.id ? 'ring-4 ring-offset-2 ring-slate-800 scale-110' : 'hover:scale-105 opacity-80'
+                      }`}
+                    >
+                      {editingCard.theme === t.id && <CheckCircle className="h-5 w-5 text-white" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-3">
+                  {isAr ? 'النمط الهندسي (Pattern)' : 'Background Pattern'}
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { id: 'none', label: isAr ? 'بدون' : 'None' },
+                    { id: 'dots', label: isAr ? 'نقاط' : 'Dots' },
+                    { id: 'grid', label: isAr ? 'شبكة' : 'Grid' },
+                    { id: 'waves', label: isAr ? 'دوائر' : 'Waves' }
+                  ].map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setEditingCard({...editingCard, pattern: p.id})}
+                      className={`py-3 px-2 rounded-xl text-sm font-bold border transition-all ${
+                        editingCard.pattern === p.id 
+                          ? 'bg-slate-800 text-white border-slate-800' 
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  {isAr ? 'حساب لينكدإن (للظهور في البطاقة)' : 'LinkedIn (Display on Pass)'}
+                </label>
+                <input
+                  type="url"
+                  value={editingCard.linkedin}
+                  onChange={(e) => setEditingCard({...editingCard, linkedin: e.target.value})}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all text-right"
+                  placeholder="https://linkedin.com/in/username"
+                  dir="ltr"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowCardModal(false)}
+                  className="flex-1 px-4 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors"
+                >
+                  {tCommon('cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingCard}
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-70"
+                >
+                  {isSavingCard ? (
                     <LoadingSpinner size="sm" color="white" />
                   ) : (
                     <>
