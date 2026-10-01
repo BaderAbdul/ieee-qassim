@@ -79,14 +79,24 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
           }
 
           // Fetch Rank accurately for logged-in user
-          if (user && userData !== undefined) {
-            const pts = typeof userData?.totalPoints === 'number' ? userData.totalPoints : 0;
-            const rankQuery = query(
-              collection(db, 'users'),
-              where('totalPoints', '>', pts)
-            );
-            const rankCountSnap = await getCountFromServer(rankQuery);
-            setUserRank(rankCountSnap.data().count + 1);
+          if (user && userData) {
+            const pts = Number(userData?.totalPoints) || 0;
+            if (pts > 0) {
+              const rankQuery = query(
+                collection(db, 'users'),
+                where('totalPoints', '>', pts)
+              );
+              try {
+                const rankCountSnap = await getCountFromServer(rankQuery);
+                setUserRank(rankCountSnap.data().count + 1);
+              } catch (countErr) {
+                console.warn('getCountFromServer failed, falling back to getDocs', countErr);
+                const rankDocsSnap = await getDocs(rankQuery);
+                setUserRank(rankDocsSnap.size + 1);
+              }
+            } else {
+              setUserRank(null); // Unranked if 0 points
+            }
           } else {
             setUserRank(null);
           }
