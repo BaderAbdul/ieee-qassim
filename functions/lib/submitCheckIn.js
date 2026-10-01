@@ -38,104 +38,125 @@ const firestore_1 = require("firebase-admin/firestore");
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const auth_1 = require("./utils/auth");
-const errors_1 = require("./utils/errors");
 exports.submitCheckIn = functions.https.onCall(async (data, context) => {
+    var _a, _b, _c;
     const callerUid = (0, auth_1.verifyAuth)(context);
-    const { eventId, token, targetUserId } = data;
+    const { eventId, token, targetUserId, feedbackData } = data;
     if (!eventId || typeof eventId !== 'string') {
-        (0, errors_1.throwFailedPrecondition)('Invalid or missing eventId.');
+        throw new functions.https.HttpsError('invalid-argument', 'رقم الفعالية مفقود أو غير صالح');
     }
     const db = admin.firestore();
-    // Use a transaction to ensure idempotency and verify state securely
-    return db.runTransaction(async (transaction) => {
-        var _a, _b;
-        // 1. Verify Event State
-        const eventRef = db.collection('events').doc(eventId);
-        const eventSnap = await transaction.get(eventRef);
-        if (!eventSnap.exists) {
-            (0, errors_1.throwFailedPrecondition)('Event not found.');
+    // 1. Fetch Event first
+    const eventRef = db.collection('events').doc(eventId);
+    const eventSnap = await eventRef.get();
+    if (!eventSnap.exists) {
+        throw new functions.https.HttpsError('not-found', 'الفعالية غير موجودة');
+    }
+    const eventData = eventSnap.data();
+    // 2. Determine caller role
+    const callerUserSnap = await db.collection('users').doc(callerUid).get();
+    const callerData = callerUserSnap.data();
+    const callerRole = callerData === null || callerData === void 0 ? void 0 : callerData.role;
+    const callerEmail = (callerData === null || callerData === void 0 ? void 0 : callerData.email) || ((_b = (_a = context.auth) === null || _a === void 0 ? void 0 : _a.token) === null || _b === void 0 ? void 0 : _b.email) || '';
+    const isAdmin = callerRole === 'super_admin' || callerRole === 'event_organizer';
+    // 3. Determine target user ID to check-in
+    let uidToCheckIn = callerUid;
+    if (isAdmin && targetUserId) {
+        uidToCheckIn = targetUserId.replace('ieee-qu-user:', '');
+    }
+    else {
+        if (!token || typeof token !== 'string') {
+            throw new functions.https.HttpsError('invalid-argument', 'رمز التحضير مفقود أو غير صالح');
         }
-        const eventData = eventSnap.data();
-        // Check if the caller is an Admin (can bypass some restrictions)
-        const callerUserSnap = await transaction.get(db.collection('users').doc(callerUid));
-        const callerRole = (_a = callerUserSnap.data()) === null || _a === void 0 ? void 0 : _a.role;
-        const isAdmin = callerRole === 'super_admin' || callerRole === 'event_organizer';
-        // Determine WHO is being checked in
-        let uidToCheckIn = callerUid;
-        if (isAdmin && targetUserId) {
-            uidToCheckIn = targetUserId.replace('ieee-qu-user:', ''); // Strip prefix if scanned from QR
+        if ((eventData === null || eventData === void 0 ? void 0 : eventData.checkinToken) !== token) {
+            throw new functions.https.HttpsError('permission-denied', 'رابط التحضير غير صالح أو منتهي الصلاحية');
         }
-        else {
-            // If it's a student checking themselves in, they MUST provide the static token
-            if (!token || typeof token !== 'string') {
-                (0, errors_1.throwFailedPrecondition)('Invalid or missing token.');
+    }
+    // 4. Check Event state
+    if ((eventData === null || eventData === void 0 ? void 0 : eventData.state) !== 'Ongoing' && !isAdmin) {
+        throw new functions.https.HttpsError('failed-precondition', `الفعالية ليست قيد التحضير حالياً (حالتها الحالية: ${(eventData === null || eventData === void 0 ? void 0 : eventData.state) || 'غير محددة'}). يرجى التأكد من المنظمين لتفعيل حالة الفعالية إلى Ongoing.`);
+    }
+    // 5. Verify User Registration
+    const regId = `${eventId}_${uidToCheckIn}`;
+    const regRef = db.collection('registrations').doc(regId);
+    const regSnap = await regRef.get();
+    if (!regSnap.exists) {
+        throw new functions.https.HttpsError('failed-precondition', isAdmin ? 'المستخدم غير مسجل في هذه الفعالية' : 'عذراً، يجب التسجيل في الفعالية أولاً قبل التحضير');
+    }
+    const currentRegStatus = (_c = regSnap.data()) === null || _c === void 0 ? void 0 : _c.status;
+    if (currentRegStatus !== 'approved' && currentRegStatus !== 'attended') {
+        throw new functions.https.HttpsError('failed-precondition', 'طلب تسجيلك في الفعالية لم يتم قبوله بعد');
+    }
+    // 6. Transaction for Attendance, Feedback, and Points
+    try {
+        return await db.runTransaction(async (transaction) => {
+            // Re-verify log in transaction to avoid race conditions
+            const logId = `${eventId}_${uidToCheckIn}`;
+            const logRef = db.collection('attendance_logs').doc(logId);
+            const logSnap = await transaction.get(logRef);
+            if (logSnap.exists) {
+                return { status: 'already_checked_in', userId: uidToCheckIn };
             }
-            if ((eventData === null || eventData === void 0 ? void 0 : eventData.checkinToken) !== token) {
-                (0, errors_1.throwFailedPrecondition)('Check-in link is invalid or expired.');
-            }
-        }
-        if ((eventData === null || eventData === void 0 ? void 0 : eventData.state) !== 'Ongoing' && !isAdmin) {
-            (0, errors_1.throwFailedPrecondition)('Event is not currently accepting attendance.');
-        }
-        // 2. Verify User Registration
-        const regId = `${eventId}_${uidToCheckIn}`;
-        const regRef = db.collection('registrations').doc(regId);
-        const regSnap = await transaction.get(regRef);
-        if (!regSnap.exists) {
-            if (isAdmin) {
-                (0, errors_1.throwFailedPrecondition)('User is not registered for this event.');
-            }
-            else {
-                (0, errors_1.throwFailedPrecondition)('You are not registered for this event.');
-            }
-        }
-        const currentRegStatus = (_b = regSnap.data()) === null || _b === void 0 ? void 0 : _b.status;
-        if (currentRegStatus !== 'approved' && currentRegStatus !== 'attended') {
-            (0, errors_1.throwFailedPrecondition)('Registration is not approved.');
-        }
-        // 3. Check for existing attendance (Idempotency)
-        const logId = `${eventId}_${uidToCheckIn}`;
-        const logRef = db.collection('attendance_logs').doc(logId);
-        const logSnap = await transaction.get(logRef);
-        if (logSnap.exists) {
-            // Already checked in. Return success without writing again.
-            return { status: 'already_checked_in', userId: uidToCheckIn };
-        }
-        // 4. Write attendance log
-        transaction.set(logRef, {
-            userId: uidToCheckIn,
-            eventId: eventId,
-            timestamp: firestore_1.FieldValue.serverTimestamp(),
-            verifiedByAdmin: isAdmin && targetUserId ? callerUid : false,
-        });
-        // 4b. Update registration status to attended
-        transaction.update(regRef, {
-            status: 'attended',
-            attended: true,
-            attendedAt: firestore_1.FieldValue.serverTimestamp(),
-        });
-        // 5. Award Points Atomically
-        const pointsToAward = typeof (eventData === null || eventData === void 0 ? void 0 : eventData.points) === 'number' ? eventData.points : 0;
-        if (pointsToAward > 0) {
-            const pointTxId = `attendance_${eventId}_${uidToCheckIn}`;
-            const pointTxRef = db.collection('point_transactions').doc(pointTxId);
-            transaction.set(pointTxRef, {
+            // Record Attendance Log
+            transaction.set(logRef, {
                 userId: uidToCheckIn,
-                amount: pointsToAward,
-                source: 'attendance',
-                reason: `حضور فعالية: ${(eventData === null || eventData === void 0 ? void 0 : eventData.title) || 'Unknown'}`,
-                sourceEventId: eventId,
-                createdBy: isAdmin ? callerUid : 'system',
-                createdAt: firestore_1.FieldValue.serverTimestamp(),
-                type: 'earned',
-                points: pointsToAward,
-                description: `حضور فعالية: ${(eventData === null || eventData === void 0 ? void 0 : eventData.title) || 'Unknown'}`,
-                timestamp: firestore_1.FieldValue.serverTimestamp()
+                eventId: eventId,
+                timestamp: firestore_1.FieldValue.serverTimestamp(),
+                verifiedByAdmin: isAdmin && targetUserId ? callerUid : false,
             });
-            // User total points will be updated by the onPointTransactionCreated trigger
-            // to maintain a single source of truth and prevent double-counting.
+            // Update Registration Status
+            transaction.update(regRef, {
+                status: 'attended',
+                attended: true,
+                attendedAt: firestore_1.FieldValue.serverTimestamp(),
+            });
+            // Increment event attendance count
+            transaction.update(eventRef, {
+                attendanceCount: firestore_1.FieldValue.increment(1),
+            });
+            // Save Feedback if provided
+            if (feedbackData && typeof feedbackData === 'object') {
+                const feedbackId = `${eventId}_${uidToCheckIn}`;
+                const feedbackRef = db.collection('event_feedback').doc(feedbackId);
+                const ratingVal = typeof feedbackData.rating === 'number' ? Math.max(1, Math.min(5, feedbackData.rating)) : 5;
+                transaction.set(feedbackRef, {
+                    id: feedbackId,
+                    eventId,
+                    userId: uidToCheckIn,
+                    userEmail: callerEmail,
+                    rating: ratingVal,
+                    answers: feedbackData.answers || {},
+                    createdAt: firestore_1.FieldValue.serverTimestamp(),
+                }, { merge: true });
+            }
+            // Award Points
+            const pointsToAward = typeof (eventData === null || eventData === void 0 ? void 0 : eventData.points) === 'number' ? eventData.points : 0;
+            if (pointsToAward > 0) {
+                const pointTxId = `attendance_${eventId}_${uidToCheckIn}`;
+                const pointTxRef = db.collection('point_transactions').doc(pointTxId);
+                transaction.set(pointTxRef, {
+                    userId: uidToCheckIn,
+                    amount: pointsToAward,
+                    source: 'attendance',
+                    reason: `حضور فعالية: ${(eventData === null || eventData === void 0 ? void 0 : eventData.title) || 'Unknown'}`,
+                    sourceEventId: eventId,
+                    createdBy: isAdmin ? callerUid : 'system',
+                    createdAt: firestore_1.FieldValue.serverTimestamp(),
+                    type: 'earned',
+                    points: pointsToAward,
+                    description: `حضور فعالية: ${(eventData === null || eventData === void 0 ? void 0 : eventData.title) || 'Unknown'}`,
+                    timestamp: firestore_1.FieldValue.serverTimestamp(),
+                });
+            }
+            return { status: 'success', userId: uidToCheckIn, awardedPoints: pointsToAward };
+        });
+    }
+    catch (error) {
+        console.error('Error executing checkin transaction:', error);
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
         }
-        return { status: 'success', userId: uidToCheckIn, awardedPoints: pointsToAward };
-    });
+        throw new functions.https.HttpsError('internal', error.message || 'حدث خطأ غير متوقع أثناء التحضير');
+    }
 });
 //# sourceMappingURL=submitCheckIn.js.map
