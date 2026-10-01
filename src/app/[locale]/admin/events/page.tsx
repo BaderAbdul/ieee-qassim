@@ -156,7 +156,7 @@ export default function AdminEventsPage() {
                             <Users size={16} />
                           </Link>
                           
-                          <Link href={`/admin/events/${event.id}/qr`} className="text-indigo-600 hover:text-indigo-900 bg-indigo-50 p-2 rounded-lg" title="رمز التحقق (QR)">
+                          <Link href={`/admin/events/${event.id}/checkin-desk`} className="text-indigo-600 hover:text-indigo-900 bg-indigo-50 p-2 rounded-lg" title="منصة التحضير (QR)">
                             <QrCode size={16} />
                           </Link>
 
