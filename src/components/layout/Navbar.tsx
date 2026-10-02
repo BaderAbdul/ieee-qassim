@@ -62,7 +62,13 @@ export default function Navbar() {
   ];
 
   const getFirstAndLastName = (fullName?: string, fallback?: string | null) => {
-    return fullName || fallback || 'Student';
+    if (userData?.firstName && userData?.familyName) {
+      return `${userData.firstName} ${userData.familyName}`;
+    }
+    const name = fullName || fallback || (isAr ? 'عضو' : 'Student');
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length <= 2) return name;
+    return `${parts[0]} ${parts[parts.length - 1]}`;
   };
 
   const displayName = getFirstAndLastName(userData?.arabicFullName, user?.displayName);
@@ -145,7 +151,7 @@ export default function Navbar() {
                     )}
                   </div>
                   <div className="flex flex-col text-start">
-                    <span className="text-xs font-bold text-slate-900 max-w-[120px] truncate leading-tight">
+                    <span className="text-xs font-bold text-slate-900 max-w-[140px] truncate leading-tight">
                       {displayName}
                     </span>
                     <span className="text-[10px] text-blue-600 font-medium">
