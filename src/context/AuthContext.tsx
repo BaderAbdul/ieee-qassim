@@ -61,11 +61,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const initFirebase = async () => {
       try {
         const { auth } = await import('@/lib/firebase/client');
-        const { onAuthStateChanged, setPersistence, browserLocalPersistence } = await import('firebase/auth');
+        const { onAuthStateChanged, setPersistence, browserLocalPersistence, getRedirectResult } = await import('firebase/auth');
         const { doc, setDoc, onSnapshot } = await import('firebase/firestore');
         const { db } = await import('@/lib/firebase/client');
 
         setPersistence(auth, browserLocalPersistence).catch(console.error);
+        getRedirectResult(auth).catch((e) => console.warn('Redirect auth check notice:', e));
 
         unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
           setUser(currentUser);
@@ -118,10 +119,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const login = async () => {
     try {
       const { auth, googleProvider } = await import('@/lib/firebase/client');
-      const { signInWithPopup } = await import('firebase/auth');
-      await signInWithPopup(auth, googleProvider);
+      const { signInWithPopup, signInWithRedirect } = await import('firebase/auth');
+      try {
+        await signInWithPopup(auth, googleProvider);
+      } catch (popupErr: any) {
+        console.warn("Popup login blocked or failed, falling back to redirect...", popupErr);
+        await signInWithRedirect(auth, googleProvider);
+      }
     } catch (error) {
-      console.error("Login failed", error);
+      console.error("Login error", error);
+      try {
+        const { auth, googleProvider } = await import('@/lib/firebase/client');
+        const { signInWithRedirect } = await import('firebase/auth');
+        await signInWithRedirect(auth, googleProvider);
+      } catch (redirectErr) {
+        console.error("Redirect login error", redirectErr);
+      }
     }
   };
 
