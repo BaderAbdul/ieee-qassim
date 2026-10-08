@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, query, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { PlatformEvent, EventState } from '@/lib/types';
 import { Link } from '@/i18n/routing';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { Plus, Users, QrCode, Award, Eye, Edit2, Star, Pin } from 'lucide-react';
+import { Plus, Users, QrCode, Award, Eye, Edit2, Star, Pin, Trash2 } from 'lucide-react';
 
 export default function AdminEventsPage() {
   const [events, setEvents] = useState<PlatformEvent[]>([]);
@@ -96,6 +96,18 @@ export default function AdminEventsPage() {
     } catch (error) {
       console.error("Error updating event state", error);
       alert("حدث خطأ أثناء تحديث حالة الفعالية");
+    }
+  };
+
+  const handleDeleteEvent = async (eventId: string, eventTitle: string) => {
+    if (window.confirm(`هل أنت متأكد من رغبتك في حذف الفعالية "${eventTitle}"؟ هذا الإجراء لا يمكن التراجع عنه.`)) {
+      try {
+        await deleteDoc(doc(db, 'events', eventId));
+        fetchEvents();
+      } catch (error) {
+        console.error("Error deleting event", error);
+        alert("حدث خطأ أثناء حذف الفعالية");
+      }
     }
   };
 
@@ -202,6 +214,14 @@ export default function AdminEventsPage() {
                           <Link href={`/admin/events/${event.id}/edit`} className="text-amber-600 hover:text-amber-900 bg-amber-50 p-2 rounded-lg" title="تعديل الفعالية">
                             <Edit2 size={16} />
                           </Link>
+
+                          <button
+                            onClick={() => handleDeleteEvent(event.id, event.title)}
+                            className="text-red-600 hover:text-red-900 bg-red-50 p-2 rounded-lg transition-colors"
+                            title="حذف الفعالية"
+                          >
+                            <Trash2 size={16} />
+                          </button>
                           
                           <select 
                             value={event.state} 

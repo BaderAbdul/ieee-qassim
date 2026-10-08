@@ -16,6 +16,7 @@ interface CommitteeMember {
 interface Committee {
   id: string;
   name: string;
+  englishName?: string;
   description: string;
   iconName: string;
   members: CommitteeMember[];
@@ -197,7 +198,7 @@ export default function AdminStructurePage() {
         <div className="flex gap-3">
           <button 
             onClick={() => {
-              setCurrentCommittee({ id: '', name: '', description: '', iconName: 'Users', members: [] });
+              setCurrentCommittee({ id: '', name: '', englishName: '', description: '', iconName: 'Users', members: [] });
               setShowCommitteeModal(true);
             }}
             className="flex items-center gap-2 bg-purple-100 text-purple-700 px-4 py-2 rounded-lg font-bold hover:bg-purple-200 transition-colors"
@@ -222,6 +223,7 @@ export default function AdminStructurePage() {
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h3 className="text-xl font-bold font-cairo text-gray-900">{committee.name}</h3>
+                {committee.englishName && <p className="text-xs text-gray-500 font-mono mt-0.5">{committee.englishName}</p>}
                 <p className="text-sm text-gray-500 mt-1">{committee.description}</p>
               </div>
               <div className="flex gap-2 items-center">
@@ -277,6 +279,10 @@ export default function AdminStructurePage() {
               <div>
                 <label className="block text-sm font-medium mb-1">اسم اللجنة/المسار</label>
                 <input required type="text" value={currentCommittee.name} onChange={e => setCurrentCommittee({...currentCommittee, name: e.target.value})} className="w-full border rounded-lg p-2" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">الاسم بالانجليزي (English Name)</label>
+                <input type="text" value={currentCommittee.englishName || ''} onChange={e => setCurrentCommittee({...currentCommittee, englishName: e.target.value})} className="w-full border rounded-lg p-2 text-left" dir="ltr" />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">الوصف</label>
