@@ -2,6 +2,20 @@
 
 10 October 2026, Asia/Riyadh. Local core migration; not a verified production release.
 
+## Active production incident — NOT READY
+
+### Root cause and repair candidate
+
+After Vercel project access became available, runtime error clusters identified ERR_REQUIRE_ESM: jwks-rsa 4.1.0 required the ESM-only jose 6 package during Firebase Admin authentication initialization. This reproduced locally when Node's experimental require(ESM) support was disabled. A scoped firebase-admin → jwks-rsa 3.2.0 override restores CommonJS-compatible loading without changing other jose consumers. A regression test also resolves a generated RSA public signing key using the exact library Firebase Admin resolves.
+
+The certificate renderer now preserves native import() for its ESM-only Chromium/Puppeteer dependencies instead of Webpack converting them to require(). The candidate adds verification of the actual built Next.js API handlers, not only TypeScript-transpiled test copies, under the strict module-loading mode used to reproduce the Vercel failure. Existing empty-response handling, bounded requests and live leaderboard updates are included. This section records a repair candidate; deployment and live checks must still be recorded separately.
+
+Fresh production dependency audit completed and reports three unrelated advisories (basic-ftp high; gaxios/uuid moderate), with none against the selected jose/JWKS compatibility chain. Do not claim an all-clear dependency audit. The incident fix does not silently force unrelated major upgrades.
+
+At the owner's request, d5f9dfa was pushed to main and Vercel reported the Production deployment complete. Subsequent live checks found /ar and /en returning 200, but both /api/media and /api/platform/syncPublicProfile returning empty HTTP 500 responses, including unauthenticated GET/POST requests. Therefore registration, attendance, points and projection synchronization cannot be declared operational. The original JSON parsing alert was a client-side symptom of that empty upstream response, not evidence of incorrect points or missing attendance eligibility.
+
+Current local-only safeguards handle empty/HTML responses explicitly, bound request waiting and make the leaderboard subscribe to safe public-profile changes. They have not been deployed. An isolated test copying only Next.js-traced files successfully initialized both built API route modules and returned structured 401 responses for unauthenticated requests. That rules out a simple missing-file failure in the local trace copy; it does not identify the cloud runtime failure. Vercel runtime logs/access remain required before another production change. No database migration or points rewrite was run as incident recovery.
+
 ## Implemented
 
 - Browser operations use same-origin POST /api/platform/{action}, not Firebase callable transport. Every operation verifies a Firebase ID token and current account restriction; organizer operations use the Firestore role. Revoked tokens, invalid origins, oversized JSON and invalid operations are rejected. Per-account Firestore rate limits bound requests; Vercel platform protection is still needed for unauthenticated traffic.

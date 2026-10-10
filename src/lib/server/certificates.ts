@@ -82,7 +82,9 @@ export async function renderCertificate(id: string) {
   let browser: Awaited<ReturnType<typeof import('puppeteer-core')['default']['launch']>> | undefined;
   try {
     const [{ default: puppeteer }, { default: chromium }, regular, bold] = await Promise.all([
-      import('puppeteer-core'), import('@sparticuz/chromium'),
+      // These packages are ESM-only. Preserve native import() in the server bundle
+      // instead of letting Webpack turn the imports into CommonJS require().
+      import(/* webpackIgnore: true */ 'puppeteer-core'), import(/* webpackIgnore: true */ '@sparticuz/chromium'),
       readFile(path.join(process.cwd(), 'functions/src/assets/fonts/Cairo-Regular.ttf')),
       readFile(path.join(process.cwd(), 'functions/src/assets/fonts/Cairo-Bold.ttf')),
     ]);

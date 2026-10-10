@@ -10,7 +10,9 @@
     "test": "node --experimental-strip-types tests/runner.ts",
     "test:raw": "node --test --test-reporter=spec --experimental-strip-types tests/*.test.ts tests/tier*/*.test.ts",
     "test:firebase": "npm run build --prefix functions && firebase emulators:exec --project demo-ieee-qu --only firestore,storage \"node --test --test-reporter=spec tests/firebase/lifecycle.test.mjs\"",
-    "test:spark": "tsc -p tsconfig.spark-tests.json && firebase emulators:exec --project demo-ieee-qu --only auth,firestore \"node --test --test-reporter=spec tests/firebase/spark.test.mjs\""
+    "test:spark": "tsc -p tsconfig.spark-tests.json && firebase emulators:exec --project demo-ieee-qu --only auth,firestore \"node --test --test-reporter=spec tests/firebase/spark.test.mjs\"",
+    "test:bundle": "node --no-experimental-require-module scripts/verify-route-bundle.mjs",
+    "test:spark:build": "npm run build && tsc -p tsconfig.spark-tests.json && firebase emulators:exec --project demo-ieee-qu --only auth,firestore \"SPARK_TEST_USE_BUILD=1 node --no-experimental-require-module --test --test-reporter=spec tests/firebase/spark.test.mjs\""
   },
   "dependencies": {
     "@sparticuz/chromium": "^153.0.0",
@@ -44,6 +46,9 @@
     "typescript": "^5"
   },
   "overrides": {
+    "firebase-admin": {
+      "jwks-rsa": "3.2.0"
+    },
     "@grpc/grpc-js": "^1.14.6",
     "sharp": "^0.35.5",
     "source-map-js": "^1.2.2",

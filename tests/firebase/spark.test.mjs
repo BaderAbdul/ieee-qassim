@@ -21,8 +21,16 @@ Module._load = function (id, parent, main) {
   if (id.startsWith('@/')) id = path.join(process.cwd(), '.spark-test', id.slice(2));
   return originalLoad.call(this, id, parent, main);
 };
-const { POST } = require('../../.spark-test/app/api/platform/[action]/route.js');
-const { POST: upload } = require('../../.spark-test/app/api/media/route.js');
+let POST, upload;
+if (process.env.SPARK_TEST_USE_BUILD === '1') {
+  const platform = require('../../.next/server/app/api/platform/[action]/route.js');
+  const media = require('../../.next/server/app/api/media/route.js');
+  await platform.routeModule.ensureUserland(); await media.routeModule.ensureUserland();
+  POST = platform.routeModule.userland.POST; upload = media.routeModule.userland.POST;
+} else {
+  ({ POST } = require('../../.spark-test/app/api/platform/[action]/route.js'));
+  ({ POST: upload } = require('../../.spark-test/app/api/media/route.js'));
+}
 const { processNotification } = require('../../.spark-test/lib/server/notifications.js');
 const originalFetch = globalThis.fetch;
 let pdfUploaded = false;

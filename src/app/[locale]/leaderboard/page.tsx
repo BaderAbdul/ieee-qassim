@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Trophy } from 'lucide-react';
-import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import LeaderboardList, { LeaderboardUser } from './LeaderboardList';
 import LeaderboardSkeleton from '@/components/skeletons/LeaderboardSkeleton';
@@ -18,10 +18,8 @@ export default function LeaderboardPage() {
   const [loadError, setLoadError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const fetchLeaderboard = async () => {
-      try {
-        const q = query(collection(db, 'public_profiles'), orderBy('totalPoints', 'desc'), limit(50));
-        const snap = await getDocs(q);
+    const q = query(collection(db, 'public_profiles'), orderBy('totalPoints', 'desc'), limit(50));
+    return onSnapshot(q, snap => {
           
         const users = snap.docs.map(d => {
           const data = d.data();
@@ -35,15 +33,13 @@ export default function LeaderboardPage() {
         }).filter(u => u.points > 0);
         
         setTopUsers(users);
-      } catch (error) {
+        setLoadError(null);
+        setLoading(false);
+      }, error => {
         console.error("Error fetching leaderboard", error);
         setLoadError(error instanceof Error ? error : new Error('Unable to load leaderboard'));
-      } finally {
         setLoading(false);
-      }
-    };
-    
-    fetchLeaderboard();
+      });
   }, [isAr]);
 
   if (loadError) throw loadError;
