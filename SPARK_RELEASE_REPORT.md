@@ -13,19 +13,23 @@
 - External HTTPS certificate links remain assignable individually and via the existing CSV interface. Assignment requires completed enabled event and verified attendance. External links inherit privacy controls from their host.
 - Generation jobs use expiring leases and compare lease/status before publishing, preserving revocation during rendering. The organizer certificates page drains jobs sequentially while open. Failed jobs can be retried. Closing the page pauses new work; reopening resumes it. A terminated request's lease takes up to five minutes to expire.
 - Historical Firebase Functions and Storage code is retained, but the current frontend core flows no longer depend on deploying them.
+- Registration status changes, FIFO promotions, attendance, certificate availability and revocation now create notification_jobs within the same database transaction as the business change. Authoritative private profile email is used, including promotions; cached historical registration email is not trusted. These jobs are separate from legacy mail, so old pending messages are never silently replayed.
+- An opt-in Resend worker drains up to three due notifications each minute while the organizer dashboard is open. Jobs use leases, bounded retries and provider idempotency keys. Uncertain deliveries older than the provider's 24-hour dedupe window go to REVIEW rather than risk duplicate automatic sending. Provider error details are not exposed. Plain-text Arabic/English messages avoid HTML injection.
 
 ## Verification
 
 - Final production Next.js build, TypeScript and lint passed. The build contains both new API routes; traced backend files include Chromium and both Arabic fonts (about 86 MiB of traced files).
 - 144 existing regressions passed. They include simulations and historical Functions source contracts, not deployment proof.
-- New emulator suite: 11/11 passed against actual compiled Vercel route handlers with real local Auth and Firestore emulators. Tests cover bearer authentication, privilege boundaries, registration capacity/FIFO, token rotation, concurrent check-in deduplication/atomic points, deductions, external links, revocation, private projections, invalid media, actual Arabic Chromium PDF bytes, origin/body validation, super-admin account management, signed avatar uploads and rate limits.
+- New emulator suite: 14/14 passed against actual compiled Vercel route handlers with real local Auth and Firestore emulators. Tests cover bearer authentication, privilege boundaries, registration capacity/FIFO, token rotation, concurrent check-in deduplication/atomic points, deductions, external links, revocation, private projections, invalid media, actual Arabic Chromium PDF bytes, origin/body validation, super-admin account management, signed avatar uploads, rate limits, notification lease deduplication, safe retry and uncertain-send review.
 - Built local Arabic/English pages returned 200; both compiled API routes returned 401 without authentication. This is not a real-user provider pilot.
 - Cloudinary is a mocked service adapter in tests; no real files were uploaded. PDF upload mode and download signatures/expiry were checked, but actual account configuration is unverified.
 - Emulators use demo-ieee-qu only; no production data was written.
+- GitHub/Vercel reported the previous c000344 preview deployment successful. A read-only availability check was redirected to Vercel SSO protection. This does not verify authenticated flows, Preview secrets or live Cloudinary/Resend configuration, and protection was not bypassed or disabled.
 
 ## Before production merge
 
 1. Configure Firebase Admin and Cloudinary credentials in the Vercel environment serving this branch. The owner supplied screenshots/reports of Production configuration, not Preview; a preview without private credentials must fail closed. Do not copy secrets into Git or chat. Node 22 or newer is required; local verification uses Node 24.
+   For optional email sending, also configure RESEND_API_KEY and verified SENDER_EMAIL, then explicitly set EMAIL_NOTIFICATIONS_ENABLED=true. Until enabled, jobs are safely queued but not sent. Review the queued jobs/recipient list and provider quota before enabling. Preview tests must use a demo Firebase project and test-only recipients to avoid contacting real students. Add the chosen preview domain to Firebase Auth authorized domains if sign-in is rejected; do not weaken Firestore rules or remove Vercel protection to fix it.
 2. Enable Cloudinary PDF delivery in the product environment security settings. Test authenticated PDF upload/private download with the actual account. If unavailable, external links remain an alternative; never fall back to public certificate uploads.
 3. Back up existing data, inspect historical points/attendance, prepare safe public profiles and reconcile counters. The existing preparation script is dry-run first and requires ADC credentials. It was not run against production. Initial preparation and the required Firestore indexes remain release steps; the owner reports publishing the secured Firestore rules already.
 4. Deploy a preview containing the new API endpoints and server credentials, then test Google sign-in, registration, QR attendance, points, avatar/cover uploads, generated and externally linked certificates in Arabic and English. Confirm PDF fonts/Chromium are included in Vercel's traced deployment bundle and requests fit the account's function limits. Local compilation is not live provider verification.
@@ -34,7 +38,7 @@
 
 ## Explicit limitations
 
-- Automatic email notifications, mail retries and scheduled event reminders from the old Firebase Functions architecture have not been migrated. Do not promise automatic mail delivery in this candidate.
+- Scheduled upcoming-event reminders have not been migrated. Mail retries run only while the organizer dashboard is open; there is no always-on mail worker or fixed delivery SLA. Bounded queries/batches can delay a large backlog. FAILED and REVIEW jobs require manual inspection; no automatic resend beyond the provider dedupe window is attempted. Legacy mail remains untouched.
 - There is no cloud background certificate worker or cron scheduler in this release. The organizer page must remain open to drain its queue.
 - Existing Firebase Storage certificate files are not moved automatically. Such records report a migration-required error; existing approved external HTTPS links continue to work.
 - No new production deployment, live Cloudinary request, final mobile visual approval, backup schedule or alert channel has been verified.

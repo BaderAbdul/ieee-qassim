@@ -9,4 +9,4 @@ The regression domain engine remains a simulation and some tests inspect source 
 Production is not ready until the deployment, preparation and pilot actions in FINAL_PRODUCTION_RELEASE_REPORT.md are complete. No blanket production-readiness attestation is made.
 # Current Spark candidate
 
-See SPARK_RELEASE_REPORT.md for the Vercel/Cloudinary migration: 11 real Auth/Firestore emulator tests exercise the new backend, in addition to the 144 existing regressions. A live provider pilot remains required. The earlier Firebase Functions verification below is historical, not deployment evidence for Spark.
+See SPARK_RELEASE_REPORT.md for the Vercel/Cloudinary migration: 14 real Auth/Firestore emulator tests exercise the new backend and notification worker, in addition to the 144 existing regressions. A live provider pilot remains required. The earlier Firebase Functions verification above is historical, not deployment evidence for Spark.

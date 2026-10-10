@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useLocale } from 'next-intl';
+import NotificationQueueControl from '@/components/admin/NotificationQueueControl';
 
 const subscribeSidebar = (notify: () => void) => {
   window.addEventListener('storage', notify);
@@ -162,6 +163,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </nav>
 
         {/* Return to Main Site Button */}
+        <NotificationQueueControl />
         <div className="p-3 border-t border-slate-800/80">
           <Link 
             href="/" 

@@ -1,5 +1,7 @@
 import { ApiError } from './errors';
 import { publicProfile } from './profiles';
+import { queueNotification } from './notifications';
+import { randomUUID } from 'node:crypto';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 
 export function documentId(value: unknown, label: string): string {
@@ -18,6 +20,7 @@ export async function changeRegistration(uid: string, eventId: string, action: '
   const db = getFirestore();
   const eventRef = db.collection('events').doc(documentId(eventId, 'eventId'));
   const regRef = db.collection('registrations').doc(`${eventId}_${documentId(uid, 'userId')}`);
+  const notificationKey = randomUUID();
   return db.runTransaction(async tx => {
     // Always acquire the common event document before user-specific documents.
     const eventSnap = await tx.get(eventRef);
@@ -59,10 +62,15 @@ export async function changeRegistration(uid: string, eventId: string, action: '
     }
     count += (reserved(status) ? 1 : 0) - (reserved(before) ? 1 : 0);
     let candidate: FirebaseFirestore.QueryDocumentSnapshot | undefined;
+    let candidateEmail: unknown;
     if (reserved(before) && !reserved(status) && event.state === 'Registration Open' && hasCapacity(event, count)) {
       const waiting = await tx.get(db.collection('registrations').where('eventId', '==', eventId).where('status', '==', 'waitlisted').orderBy('timestamp').limit(1));
       candidate = waiting.docs[0];
-      if (candidate) count++;
+      if (candidate) {
+        const candidateUser = await tx.get(db.collection('users').doc(documentId(candidate.data().userId, 'userId')));
+        candidateEmail = candidateUser.data()?.email;
+        count++;
+      }
     }
     // All reads precede writes.
     if (action === 'register') {
@@ -75,6 +83,8 @@ export async function changeRegistration(uid: string, eventId: string, action: '
       tx.update(regRef, { status, updatedBy: actorUid, ...(status === 'cancelled' ? { cancelledAt: FieldValue.serverTimestamp() } : {}) });
     }
     if (candidate) tx.update(candidate.ref, { status: event.registrationMode === 'Manual' ? 'pending' : 'approved', promotedAt: FieldValue.serverTimestamp() });
+    if (before !== status) queueNotification(tx, notificationKey, user?.email, `حالة التسجيل: ${status} / Registration status: ${status}`, event.title);
+    if (candidate) queueNotification(tx, `${notificationKey}_promotion`, candidateEmail, 'توفر لك مقعد؛ راجع حالة تسجيلك. / A seat became available; check your registration.', event.title);
     if (count !== initialCount) tx.update(eventRef, { registeredCount: Math.max(0, count) });
     return { status, attendeeCount: Math.max(0, count) };
   }, { maxAttempts: 10 });
@@ -139,6 +149,7 @@ export async function recordAttendance(input: AttendanceInput) {
     tx.update(eventRef, { attendanceCount: FieldValue.increment(1) });
     if (feedback) tx.set(db.collection('event_feedback').doc(`${eventId}_${userId}`), { eventId, userId, userEmail: userSnap.data()?.email || '', rating: feedback.rating, answers: feedback.answers || {}, createdAt: FieldValue.serverTimestamp() });
     if (points > 0 && !pointSnap.exists) tx.create(pointRef, { userId, amount: points, source: 'attendance', reason: `Attendance: ${event.title || eventId}`, sourceEventId: eventId, createdBy: input.admin ? actorUid : 'system', createdAt: FieldValue.serverTimestamp(), aggregatedAt: FieldValue.serverTimestamp() });
+    queueNotification(tx, `attendance_${eventId}_${userId}`, userData.email, `تم تأكيد حضورك، النقاط: ${awardedPoints}. / Attendance confirmed, points: ${awardedPoints}.`, event.title);
     return { status: 'success', userId, awardedPoints };
   }, { maxAttempts: 10 });
 }

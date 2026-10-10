@@ -1,10 +1,11 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { authenticate, errorResponse, limitRequests, readJson, requireAdmin } from '@/lib/server/request';
 import { ApiError } from '@/lib/server/errors';
 import { changeRegistration, documentId, recordAttendance, type AttendanceInput } from '@/lib/server/lifecycle';
 import { publicProfile, syncPublicProfile } from '@/lib/server/profiles';
 import { assignCertificate, authorizeCertificate, certificateDownload, renderCertificate } from '@/lib/server/certificates';
+import { processNotificationBatch, queueNotification } from '@/lib/server/notifications';
 
 export const runtime = 'nodejs';
 export const maxDuration = 180;
@@ -19,6 +20,7 @@ export async function POST(request: Request, context: { params: Promise<{ action
     const admin = ['event_organizer', 'super_admin'].includes(actor.role);
     let result: unknown;
     switch (action) {
+      case 'processNotifications': requireAdmin(actor); result = await processNotificationBatch(); break;
       case 'registerForEvent': case 'cancelRegistration':
         result = await changeRegistration(actor.uid, documentId(data.eventId, 'eventId'), action === 'registerForEvent' ? 'register' : 'cancel'); break;
       case 'manageRegistration':
@@ -102,11 +104,15 @@ export async function POST(request: Request, context: { params: Promise<{ action
       }
       case 'retryCertificate': case 'revokeCertificate': {
         requireAdmin(actor); const { ref } = await authorizeCertificate(data.certificateId, actor.uid, true);
+        const notificationKey = randomUUID();
         await db.runTransaction(async tx => {
           const current = (await tx.get(ref)).data();
           if (!current) throw new ApiError('not-found', 'Certificate not found.');
+          if (action === 'revokeCertificate' && current.status === 'Revoked') return;
           if (action === 'retryCertificate' && current.status !== 'Failed') throw new ApiError('failed-precondition', 'Only failed certificates can be retried.');
+          const recipient = action === 'revokeCertificate' ? await tx.get(db.collection('users').doc(current.userId)) : null;
           tx.update(ref, { status: action === 'retryCertificate' ? 'Generating' : 'Revoked', updatedAt: FieldValue.serverTimestamp(), revokedBy: action === 'revokeCertificate' ? actor.uid : FieldValue.delete(), lease: FieldValue.delete(), leaseExpiresAt: FieldValue.delete(), lastError: FieldValue.delete() });
+          if (recipient) queueNotification(tx, notificationKey, recipient.data()?.email, 'تم إلغاء الشهادة. / Your certificate was revoked.', current.eventTitle);
         }); result = { status: 'success' }; break;
       }
       case 'getCertificateDownloadUrl': result = await certificateDownload(data.certificateId, actor.uid, admin); break;

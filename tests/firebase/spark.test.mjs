@@ -23,6 +23,7 @@ Module._load = function (id, parent, main) {
 };
 const { POST } = require('../../.spark-test/app/api/platform/[action]/route.js');
 const { POST: upload } = require('../../.spark-test/app/api/media/route.js');
+const { processNotification } = require('../../.spark-test/lib/server/notifications.js');
 const originalFetch = globalThis.fetch;
 let pdfUploaded = false;
 globalThis.fetch = async (url, options) => {
@@ -163,4 +164,30 @@ test('Valid avatar uploads are signed; request limits return 429', async () => {
   assert.equal(r.status, 200); assert.ok((await r.json()).url.startsWith('https://'));
   await db.collection('api_limits').doc('platform_alice').set({ count: 60, startedAt: Date.now() });
   assert.equal((await call('alice', 'syncPublicProfile')).status, 429);
+});
+test('Concurrent notification delivery is leased and deduplicated; core events queue mail', async () => {
+  const pending = await db.collection('notification_jobs').where('status', '==', 'PENDING').get();
+  assert.ok(pending.size >= 4);
+  const job = pending.docs[0]; let calls = 0;
+  const sender = async (payload, key) => { calls++; assert.equal(key, job.id); assert.ok(payload.to.endsWith('@example.test')); };
+  await Promise.all([processNotification(job.id, sender), processNotification(job.id, sender)]);
+  assert.equal(calls, 1); assert.equal((await job.ref.get()).data().status, 'DELIVERED');
+  await processNotification(job.id, sender); assert.equal(calls, 1);
+});
+test('Notification failures retry without exposing provider details', async () => {
+  const ref = db.collection('notification_jobs').doc('delivery-failure');
+  await ref.set({ to: 'alice@example.test', subject: 'x', text: 'x', status: 'PENDING', attempts: 0 });
+  assert.equal(await processNotification(ref.id, async () => { throw new Error('secret provider token'); }), false);
+  const data = (await ref.get()).data();
+  assert.equal(data.status, 'PENDING'); assert.equal(data.attempts, 1); assert.ok(data.nextAttemptAt.toMillis() > Date.now());
+  assert.ok(!data.lastError.includes('secret'));
+});
+test('Uncertain sends outside dedupe window require review; delivery is opt-in', async () => {
+  const ref = db.collection('notification_jobs').doc('uncertain-delivery');
+  await ref.set({ to: 'alice@example.test', subject: 'x', text: 'x', status: 'PROCESSING', leaseExpiresAt: 1, firstAttemptAt: new Date(Date.now() - 24 * 3600000) });
+  let calls = 0;
+  await processNotification(ref.id, async () => { calls++; });
+  assert.equal(calls, 0); assert.equal((await ref.get()).data().status, 'REVIEW');
+  delete process.env.EMAIL_NOTIFICATIONS_ENABLED;
+  assert.equal((await call('organizer', 'processNotifications')).data.enabled, false);
 });

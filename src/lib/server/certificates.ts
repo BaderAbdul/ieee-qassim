@@ -5,10 +5,12 @@ import path from 'node:path';
 import { ApiError } from './errors';
 import { documentId } from './lifecycle';
 import { privateDownload, uploadAsset } from './cloudinary';
+import { queueNotification } from './notifications';
 
 export async function assignCertificate(actor: string, eventId: string, userId: string, externalUrl?: string) {
   const db = getFirestore();
   const id = `certificate_${documentId(eventId, 'eventId')}_${documentId(userId, 'userId')}`;
+  const notificationKey = randomUUID();
   let url: URL | undefined;
   if (externalUrl !== undefined) {
     try { url = new URL(externalUrl); } catch { throw new ApiError('invalid-argument', 'Invalid certificate URL.'); }
@@ -35,6 +37,7 @@ export async function assignCertificate(actor: string, eventId: string, userId: 
       createdAt: previous.data()?.createdAt || FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
       issuedBy: actor, attemptCount: 0,
     });
+    if (url && previous.data()?.externalUrl !== url.href) queueNotification(tx, notificationKey, user.data()?.email, 'شهادتك متاحة في ملفك الشخصي. / Your certificate is available in your profile.', event.data()?.title);
     return { id, queued: !url };
   });
 }
@@ -64,7 +67,7 @@ const escape = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, c => 
 export async function renderCertificate(id: string) {
   const db = getFirestore(); const ref = db.collection('certificates').doc(documentId(id, 'certificateId'));
   const lease = randomUUID();
-  const data = await db.runTransaction(async tx => {
+  const data: FirebaseFirestore.DocumentData | null = await db.runTransaction(async tx => {
     const snap = await tx.get(ref); const data = snap.data();
     if (!data || data.status !== 'Generating') return null;
     if (data.leaseExpiresAt > Date.now()) return null;
@@ -73,7 +76,7 @@ export async function renderCertificate(id: string) {
     ]);
     if (event.data()?.state !== 'Completed' || !event.data()?.hasCertificate || !attendance.exists || !user.exists || user.data()?.isRestricted) throw new ApiError('failed-precondition', 'Certificate eligibility changed.');
     tx.update(ref, { lease, leaseExpiresAt: Date.now() + 5 * 60000, updatedAt: FieldValue.serverTimestamp() });
-    return data;
+    return { ...data, recipientEmail: user.data()?.email };
   });
   if (!data) return { processed: false };
   let browser: Awaited<ReturnType<typeof import('puppeteer-core')['default']['launch']>> | undefined;
@@ -99,6 +102,7 @@ export async function renderCertificate(id: string) {
       const current = (await tx.get(ref)).data();
       if (current?.status !== 'Generating' || current.lease !== lease) return;
       tx.update(ref, { status: 'Available', cloudinaryPublicId: asset.publicId, issueDate: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), attemptCount: FieldValue.increment(1), lease: FieldValue.delete(), leaseExpiresAt: FieldValue.delete() });
+      queueNotification(tx, `certificate_${id}_${lease}`, data.recipientEmail, 'شهادتك متاحة في ملفك الشخصي. / Your certificate is available in your profile.', data.eventTitle);
     });
     return { processed: true };
   } catch (error) {
