@@ -1,6 +1,6 @@
-import { FieldValue } from 'firebase-admin/firestore';
-import * as functions from 'firebase-functions';
-import * as admin from 'firebase-admin';
+import { getStorage } from 'firebase-admin/storage';
+import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import * as functions from 'firebase-functions/v1';
 import { verifyAuth, verifyAdmin } from './utils/auth';
 import { throwFailedPrecondition } from './utils/errors';
 
@@ -18,7 +18,7 @@ export const revokeCertificate = functions.https.onCall(async (data, context) =>
     throwFailedPrecondition('Missing or invalid certificateId.');
   }
 
-  const db = admin.firestore();
+  const db = getFirestore();
   
   await db.runTransaction(async (transaction) => {
     const certRef = db.collection('certificates').doc(certificateId);
@@ -51,7 +51,7 @@ export const revokeCertificate = functions.https.onCall(async (data, context) =>
     const certSnap = await certRef.get();
     const certData = certSnap.data();
     if (certData?.storagePath) {
-      const bucket = admin.storage().bucket();
+      const bucket = getStorage().bucket();
       const file = bucket.file(certData.storagePath);
       const [exists] = await file.exists();
       if (exists) {

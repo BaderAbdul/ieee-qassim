@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from '@/i18n/routing';
-import { useEffect, useState } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { Link } from '@/i18n/routing';
 import { 
   LayoutDashboard, 
@@ -11,8 +11,6 @@ import {
   QrCode, 
   LogOut, 
   Lightbulb, 
-  PanelLeftClose, 
-  PanelLeftOpen, 
   ChevronLeft, 
   ChevronRight,
   ShieldAlert,
@@ -21,6 +19,19 @@ import {
 import { usePathname } from 'next/navigation';
 import { useLocale } from 'next-intl';
 
+const subscribeSidebar = (notify: () => void) => {
+  window.addEventListener('storage', notify);
+  window.addEventListener('ieee-sidebar', notify);
+  return () => {
+    window.removeEventListener('storage', notify);
+    window.removeEventListener('ieee-sidebar', notify);
+  };
+};
+const getSidebarSnapshot = () => {
+  try { return localStorage.getItem('admin_sidebar_collapsed') === 'true'; }
+  catch { return false; }
+};
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, userData, loading } = useAuth();
   const router = useRouter();
@@ -28,21 +39,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const locale = useLocale();
   const isAr = locale === 'ar';
 
-  const [isCollapsed, setIsCollapsed] = useState(false);
-
-  useEffect(() => {
-    const saved = localStorage.getItem('admin_sidebar_collapsed');
-    if (saved !== null) {
-      setIsCollapsed(saved === 'true');
-    }
-  }, []);
-
+  const isCollapsed = useSyncExternalStore(subscribeSidebar, getSidebarSnapshot, () => false);
   const toggleSidebar = () => {
-    setIsCollapsed(prev => {
-      const next = !prev;
-      localStorage.setItem('admin_sidebar_collapsed', String(next));
-      return next;
-    });
+    try { localStorage.setItem('admin_sidebar_collapsed', String(!isCollapsed)); }
+    catch { return; }
+    window.dispatchEvent(new Event('ieee-sidebar'));
   };
 
   useEffect(() => {

@@ -26,7 +26,7 @@ const ERROR_BOUNDARY_ROUTES = [
   'src/app/[locale]/events/[id]/error.tsx',
   'src/app/[locale]/leaderboard/error.tsx',
   'src/app/[locale]/profile/error.tsx',
-  'src/app/[locale]/check-in/[eventId]/error.tsx',
+  'src/app/[locale]/events/[id]/checkin/error.tsx',
 ];
 
 test('UX Resilience: All 7 segment error boundaries comply with Next.js App Router contract', () => {
@@ -147,7 +147,7 @@ const LOADING_FALLBACK_ROUTES = [
   { path: 'src/app/[locale]/admin/loading.tsx', skeleton: 'AdminStatsSkeleton' },
   { path: 'src/app/[locale]/admin/events/loading.tsx', skeleton: 'AdminTableSkeleton' },
   { path: 'src/app/[locale]/admin/events/[id]/registrations/loading.tsx', skeleton: 'RegistrationDeskSkeleton' },
-  { path: 'src/app/[locale]/check-in/[eventId]/loading.tsx', skeleton: 'CheckInSkeleton' },
+  { path: 'src/app/[locale]/events/[id]/checkin/loading.tsx', skeleton: 'CheckInSkeleton' },
   { path: 'src/app/[locale]/leaderboard/loading.tsx', skeleton: 'LeaderboardSkeleton' },
   { path: 'src/app/[locale]/profile/loading.tsx', skeleton: 'ProfileSkeleton' },
 ];
@@ -169,17 +169,10 @@ test('CLS Defense: Event Details Skeleton geometry strictly matches Event Detail
   const pageSource = readSource('src/app/[locale]/events/[id]/page.tsx');
   const skeletonSource = readSource('src/components/skeletons/EventDetailsSkeleton.tsx');
 
-  // Both must share identical hero banner heights
-  assert.ok(pageSource.includes('h-72 sm:h-96'), 'Page hero banner must be h-72 sm:h-96');
-  assert.ok(skeletonSource.includes('h-72 sm:h-96'), 'Skeleton hero banner must match h-72 sm:h-96');
-
-  // Both must share identical grid layout
-  assert.ok(pageSource.includes('grid-cols-1 lg:grid-cols-3 gap-10'), 'Page grid must be 3-cols');
-  assert.ok(skeletonSource.includes('grid-cols-1 lg:grid-cols-3 gap-10'), 'Skeleton grid must match 3-cols');
-
-  // Both must share 2-col main and 1-col sidebar distribution
-  assert.ok(pageSource.includes('lg:col-span-2'), 'Page main section is lg:col-span-2');
-  assert.ok(skeletonSource.includes('lg:col-span-2'), 'Skeleton main section is lg:col-span-2');
+  for (const geometry of ['aspect-[3/4]', 'grid-cols-1 lg:grid-cols-12', 'lg:col-span-5', 'lg:col-span-7']) {
+    assert.ok(pageSource.includes(geometry), `Page geometry missing: ${geometry}`);
+    assert.ok(skeletonSource.includes(geometry), `Skeleton geometry mismatch: ${geometry}`);
+  }
 });
 
 // ============================================================================

@@ -1,6 +1,5 @@
-import { FieldValue } from 'firebase-admin/firestore';
-import * as functions from 'firebase-functions';
-import * as admin from 'firebase-admin';
+import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import * as functions from 'firebase-functions/v1';
 import { verifyAuth, verifyAdmin } from './utils/auth';
 import { throwFailedPrecondition } from './utils/errors';
 
@@ -12,17 +11,18 @@ export const issueCertificates = functions.https.onCall(async (data, context) =>
     throwFailedPrecondition('Insufficient permissions. Only Organizers or Super Admins can issue certificates.');
   }
 
-  const { eventId, userIds } = data;
+  const { eventId } = data;
+  const userIds = Array.isArray(data?.userIds) ? [...new Set<string>(data.userIds)] : [];
 
   if (!eventId || typeof eventId !== 'string') {
     throwFailedPrecondition('Missing or invalid eventId.');
   }
 
-  if (!Array.isArray(userIds) || userIds.length === 0) {
+  if (userIds.length === 0 || userIds.length > 300 || userIds.some(uid => typeof uid !== 'string' || !uid || uid.includes('/'))) {
     throwFailedPrecondition('Missing or invalid userIds array.');
   }
 
-  const db = admin.firestore();
+  const db = getFirestore();
   
   // 1. Verify Event is Completed
   const eventRef = db.collection('events').doc(eventId);
@@ -33,7 +33,7 @@ export const issueCertificates = functions.https.onCall(async (data, context) =>
   }
   
   const eventData = eventSnap.data();
-  if (eventData?.state !== 'Completed') {
+  if (eventData?.state !== 'Completed' || eventData.hasCertificate !== true) {
     throwFailedPrecondition('Certificates can only be issued for Completed events.');
   }
 
@@ -49,6 +49,8 @@ export const issueCertificates = functions.https.onCall(async (data, context) =>
     const chunk = userIds.slice(i, i + BATCH_SIZE);
 
     const chunkCount = await db.runTransaction(async (transaction) => {
+      const currentEvent = await transaction.get(eventRef);
+      if (currentEvent.data()?.state !== 'Completed') throwFailedPrecondition('Event must remain Completed.');
       let count = 0;
       
       // Phase 1: All Reads
@@ -83,12 +85,13 @@ export const issueCertificates = functions.https.onCall(async (data, context) =>
         
         if (data.certSnap.exists) {
           const currentStatus = data.certSnap.data()?.status;
-          if (currentStatus === 'Available' || currentStatus === 'Generating') {
+          if (currentStatus === 'Available' || currentStatus === 'Generating' || currentStatus === 'Revoked') {
             continue; // Already processed
           }
         }
         
-        const studentName = data.userSnap.data()?.displayName || 'Student';
+        if (!data.userSnap.exists) continue;
+        const studentName = data.userSnap.data()?.arabicFullName || data.userSnap.data()?.displayName || 'Student';
 
         // Create or overwrite as Generating
         transaction.set(data.certRef, {

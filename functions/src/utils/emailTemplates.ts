@@ -1,7 +1,9 @@
 import { EmailTemplate } from './email';
 
 export function getEmailHtml(template: EmailTemplate, data: Record<string, any>): string {
-  const content = getTemplateContent(template, data);
+  const escaped = Object.fromEntries(Object.entries(data).map(([key, value]) => [key, typeof value === 'string'
+    ? value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]!)) : value]));
+  const content = getTemplateContent(template, escaped);
 
   return `
     <!DOCTYPE html>
@@ -179,11 +181,11 @@ function getTemplateContent(template: EmailTemplate, data: Record<string, any>) 
       return {
         ar: {
           title: 'الشهادة متاحة الآن',
-          body: `مرحباً، شهادة حضورك لفعالية <strong>${eventName}</strong> متاحة الآن للتحميل عبر حسابك في المنصة.<br><br><a href="https://ieee-qu.com/my-activity" class="button">عرض الشهادة</a>`,
+          body: `مرحباً، شهادة حضورك لفعالية <strong>${eventName}</strong> متاحة الآن للتحميل عبر حسابك في المنصة.<br><br><a href="https://ieeequ.org/ar/profile" class="button">عرض الشهادة</a>`,
         },
         en: {
           title: 'Certificate Available',
-          body: `Hello, your attendance certificate for <strong>${eventName}</strong> is now available to download from your account.<br><br><a href="https://ieee-qu.com/my-activity" class="button">View Certificate</a>`,
+          body: `Hello, your attendance certificate for <strong>${eventName}</strong> is now available to download from your account.<br><br><a href="https://ieeequ.org/en/profile" class="button">View Certificate</a>`,
         }
       };
     case 'CERTIFICATE_REVOKED':

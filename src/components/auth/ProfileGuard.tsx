@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter, usePathname } from '@/i18n/routing';
 
 export default function ProfileGuard({ children }: { children: React.ReactNode }) {
-  const { user, userData, loading } = useAuth();
+  const { user, userData, loading, error, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -30,6 +30,17 @@ export default function ProfileGuard({ children }: { children: React.ReactNode }
       }
     }
   }, [user, userData, loading, pathname, router]);
+
+  if (error || userData?.isRestricted) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 text-center" role="alert">
+        <p>{error || 'حسابك مقيد. تواصل مع الإدارة. / Your account is restricted. Contact the organizer.'}</p>
+        <button className="rounded-xl bg-blue-600 px-5 py-3 text-white" onClick={() => error ? window.location.reload() : void logout()}>
+          {error ? 'إعادة المحاولة / Retry' : 'تسجيل الخروج / Sign out'}
+        </button>
+      </div>
+    );
+  }
 
   // Prevent flashing of unauthorized content
   if (!loading && user && userData && userData.role !== 'super_admin' && userData?.profileCompleted === false && !pathname.includes('/complete-profile')) {

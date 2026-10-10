@@ -1,11 +1,12 @@
 'use client';
+import Image from 'next/image';
 
 import { useState } from 'react';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { useRouter } from '@/i18n/routing';
 import { EventType, RegistrationMode, EventState, CustomQuestion } from '@/lib/types';
-import { ArrowRight, Save, Plus, Trash2, HelpCircle } from 'lucide-react';
+import { ArrowRight, Save, Plus, Trash2 } from 'lucide-react';
 import { Link } from '@/i18n/routing';
 
 export default function CreateEventPage() {
@@ -61,7 +62,7 @@ export default function CreateEventPage() {
     setFeedbackQuestions(prev => prev.filter(q => q.id !== id));
   };
 
-  const updateFeedbackQuestion = (id: string, field: keyof CustomQuestion, value: any) => {
+  const updateFeedbackQuestion = (id: string, field: keyof CustomQuestion, value: CustomQuestion[keyof CustomQuestion]) => {
     setFeedbackQuestions(prev => prev.map(q => q.id === id ? { ...q, [field]: value } : q));
   };
 
@@ -195,7 +196,7 @@ export default function CreateEventPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">صورة الغلاف (Cover Image)</label>
               {formData.coverUrl && (
                 <div className="mb-2 rounded-lg overflow-hidden border border-gray-200">
-                  <img src={formData.coverUrl} alt="Cover Preview" className="w-full h-32 object-cover" />
+                  <Image src={formData.coverUrl} alt="Cover Preview" width={600} height={128} unoptimized className="w-full h-32 object-cover" />
                 </div>
               )}
               <div className="relative">
@@ -272,7 +273,7 @@ export default function CreateEventPage() {
                   <div className="flex items-center">
                     <input type="checkbox" id="hideExactCapacity" name="hideExactCapacity" checked={formData.hideExactCapacity} onChange={handleChange} className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded" />
                     <label htmlFor="hideExactCapacity" className="ms-2 block text-sm font-medium text-gray-700">
-                      إخفاء السعة للعامة (عرض "مقاعد محدودة" فقط)
+                      إخفاء السعة للعامة (عرض &quot;مقاعد محدودة&quot; فقط)
                     </label>
                   </div>
                 )}

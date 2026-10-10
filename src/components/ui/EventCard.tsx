@@ -4,7 +4,7 @@ import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
 import { ar, enUS } from 'date-fns/locale';
 import { useLocale, useTranslations } from 'next-intl';
-import { MapPin, Calendar, Clock, Users, ArrowRight, UserCheck, Pin } from 'lucide-react';
+import { MapPin, Calendar, Clock, Users, ArrowRight, Pin } from 'lucide-react';
 import { formatDateSafe } from '@/lib/dateUtils';
 
 interface EventCardProps {

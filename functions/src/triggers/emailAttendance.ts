@@ -1,5 +1,5 @@
+import { getFirestore } from 'firebase-admin/firestore';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
-import * as admin from 'firebase-admin';
 import { enqueueEmail } from '../utils/email';
 
 export const emailAttendance = onDocumentCreated('attendance_logs/{logId}', async (event) => {
@@ -12,7 +12,7 @@ export const emailAttendance = onDocumentCreated('attendance_logs/{logId}', asyn
 
   if (!eventId || !userId) return;
 
-  const db = admin.firestore();
+  const db = getFirestore();
   
   const [userDoc, eventDoc] = await Promise.all([
     db.collection('users').doc(userId).get(),

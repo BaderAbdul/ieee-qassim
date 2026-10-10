@@ -2,7 +2,6 @@ import React from 'react';
 import { PlatformEvent } from '@/lib/types';
 import { getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/routing';
-import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import { Calendar, Trophy, ArrowRight, UserCircle, Users } from 'lucide-react';
 
@@ -64,10 +63,12 @@ export default async function HomePage({ params }: PageProps) {
       });
       eventsList = evs.slice(0, 3);
 
+      latestEvent = evs[0] || null;
       const featuredId = stats.featuredEventId;
       if (featuredId) {
+        try {
         const evDoc = await adminDb.collection('events').doc(featuredId).get();
-        if (evDoc.exists) {
+        if (evDoc.exists && validStates.includes(evDoc.data()?.state)) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const data = evDoc.data() as any;
           latestEvent = {  
@@ -77,11 +78,8 @@ export default async function HomePage({ params }: PageProps) {
             createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
             updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt
           } as PlatformEvent;
-        } else if (evs.length > 0) {
-          latestEvent = evs[0];
         }
-      } else if (evs.length > 0) {
-        latestEvent = evs[0];
+        } catch (error) { console.warn('Featured event unavailable', error); }
       }
     }
   } catch (error) {
@@ -114,11 +112,13 @@ export default async function HomePage({ params }: PageProps) {
 
       const sortedEvs = sortEventsByClosestDate(evs);
       eventsList = sortedEvs.slice(0, 3);
+      latestEvent = sortedEvs[0] || null;
 
       const featuredId = stats.featuredEventId;
       if (featuredId) {
+        try {
         const evDoc = await getDoc(doc(db, 'events', featuredId));
-        if (evDoc.exists()) {
+        if (evDoc.exists() && validStates.includes(evDoc.data().state)) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const data = evDoc.data() as any;
           latestEvent = {  
@@ -128,14 +128,12 @@ export default async function HomePage({ params }: PageProps) {
             createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
             updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt
           } as PlatformEvent;
-        } else if (sortedEvs.length > 0) {
-          latestEvent = sortedEvs[0];
         }
-      } else if (sortedEvs.length > 0) {
-        latestEvent = sortedEvs[0];
+        } catch (error) { console.warn('Featured event unavailable', error); }
       }
     } catch (fallbackError) {
       console.error("Fallback Client SDK also failed:", fallbackError);
+      throw fallbackError;
     }
   }
 

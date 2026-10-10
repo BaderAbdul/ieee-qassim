@@ -34,9 +34,9 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.revokeCertificate = void 0;
+const storage_1 = require("firebase-admin/storage");
 const firestore_1 = require("firebase-admin/firestore");
-const functions = __importStar(require("firebase-functions"));
-const admin = __importStar(require("firebase-admin"));
+const functions = __importStar(require("firebase-functions/v1"));
 const auth_1 = require("./utils/auth");
 const errors_1 = require("./utils/errors");
 exports.revokeCertificate = functions.https.onCall(async (data, context) => {
@@ -49,7 +49,7 @@ exports.revokeCertificate = functions.https.onCall(async (data, context) => {
     if (!certificateId || typeof certificateId !== 'string') {
         (0, errors_1.throwFailedPrecondition)('Missing or invalid certificateId.');
     }
-    const db = admin.firestore();
+    const db = (0, firestore_1.getFirestore)();
     await db.runTransaction(async (transaction) => {
         const certRef = db.collection('certificates').doc(certificateId);
         const certSnap = await transaction.get(certRef);
@@ -75,7 +75,7 @@ exports.revokeCertificate = functions.https.onCall(async (data, context) => {
         const certSnap = await certRef.get();
         const certData = certSnap.data();
         if (certData === null || certData === void 0 ? void 0 : certData.storagePath) {
-            const bucket = admin.storage().bucket();
+            const bucket = (0, storage_1.getStorage)().bucket();
             const file = bucket.file(certData.storagePath);
             const [exists] = await file.exists();
             if (exists) {

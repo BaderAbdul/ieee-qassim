@@ -2,14 +2,15 @@
 
 import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
+import { PlatformEvent } from '@/lib/types';
+import { toJsDate } from '@/lib/dateUtils';
 import { useAuth } from '@/context/AuthContext';
 import { Trophy, UserCircle, Pin } from 'lucide-react';
 import { useLocale } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
 
 interface HeroUserCardsProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  latestEvent: any | null;
+  latestEvent: (Omit<PlatformEvent, 'date'> & { date: unknown; imageUrl?: string; image?: string }) | null;
 }
 
 export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
@@ -35,7 +36,7 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
           if (regDoc.exists()) {
             setLatestEventRegStatus(regDoc.data().status);
           }
-        } catch(e) {}
+        } catch (error) { console.warn('Could not load featured registration', error); }
       }
       fetchRegStatus();
     }
@@ -52,7 +53,7 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
           const certQ = query(
             collection(db, 'certificates'),
             where('userId', '==', user.uid),
-            orderBy('issuedAt', 'desc'),
+            orderBy('issueDate', 'desc'),
             limit(1)
           );
           
@@ -83,7 +84,7 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
             const pts = Number(userData?.totalPoints) || 0;
             if (pts > 0) {
               const rankQuery = query(
-                collection(db, 'users'),
+                collection(db, 'public_profiles'),
                 where('totalPoints', '>', pts)
               );
               try {
@@ -108,8 +109,6 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
         }
       };
       fetchActivityAndRank();
-    } else {
-      setLoadingData(false);
     }
   }, [user, userData, isAr]);
 
@@ -151,7 +150,7 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
             )}
           </div>
           <div className="bg-slate-100/90 text-slate-600 text-[10px] font-bold px-2 py-1 rounded-md">
-            {latestEvent ? (latestEvent.date as any)?.toDate?.()?.toLocaleDateString(isAr ? 'ar-SA' : 'en-US') || new Date(latestEvent.date as any).toLocaleDateString(isAr ? 'ar-SA' : 'en-US') : '---'}
+            {latestEvent ? toJsDate(latestEvent.date)?.toLocaleDateString(isAr ? 'ar-SA' : 'en-US') || '---' : '---'}
           </div>
         </div>
 
@@ -204,7 +203,7 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
           </div>
           <div className="flex-1">
             <div className="text-[9px] lg:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{isAr ? 'نقاطك' : 'Your Points'}</div>
-            {loadingData ? (
+            {user && loadingData ? (
               <div className="h-8 w-16 bg-slate-200 animate-pulse rounded-md mt-1 mb-2"></div>
             ) : (
               <div className="text-lg lg:text-2xl font-black text-slate-800 font-cairo flex items-baseline gap-1">
@@ -258,7 +257,7 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
             </svg>
           </div>
           <div className="truncate">
-            {loadingData ? (
+            {user && loadingData ? (
               <>
                 <div className="h-3 w-24 bg-white/20 animate-pulse rounded mb-1.5"></div>
                 <div className="h-2 w-16 bg-white/10 animate-pulse rounded"></div>

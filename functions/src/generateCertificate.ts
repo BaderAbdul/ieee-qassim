@@ -1,6 +1,6 @@
-import { FieldValue } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
+import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
-import * as admin from 'firebase-admin';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 import * as fs from 'fs';
@@ -11,22 +11,26 @@ export const generateCertificate = onDocumentWritten(
     document: 'certificates/{certificateId}',
     memory: '1GiB',
     timeoutSeconds: 120,
+    concurrency: 1,
+    maxInstances: 5,
+    retry: true,
   },
   async (event) => {
     const snap = event.data?.after;
     if (!snap || !snap.exists) return; // Document deleted
 
     const data = snap.data() || {};
-    if (data.status !== 'Generating') {
+    if (data.status !== 'Generating' || event.data?.before.data()?.status === 'Generating') {
       return; // Only process when status is Generating
     }
 
     const eventId = data.eventId;
     const userId = data.userId;
-    const studentName = data.studentName;
-    const eventTitle = data.eventTitle;
+    const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]!));
+    const studentName = escapeHtml(data.studentName);
+    const eventTitle = escapeHtml(data.eventTitle);
     const storagePath = data.storagePath;
-    const db = admin.firestore();
+    const db = getFirestore();
     const certRef = db.collection('certificates').doc(event.params.certificateId);
 
     // Safe helper to resolve font path across both development and compiled runtime environments
@@ -52,6 +56,7 @@ export const generateCertificate = onDocumentWritten(
       return null;
     };
 
+    let browser: Awaited<ReturnType<typeof puppeteer.launch>> | undefined;
     try {
       // Load fonts as base64 if available
       const cairoRegularBase64 = resolveFontBase64('Cairo-Regular.ttf');
@@ -118,21 +123,22 @@ export const generateCertificate = onDocumentWritten(
             <h2>${studentName}</h2>
             <p>قد حضر/ت فعالية</p>
             <h2 style="color: #0f172a;">${eventTitle}</h2>
-            <div class="cert-id">رقم الشهادة: ${event.params.certificateId}</div>
+            <div class="cert-id">رقم الشهادة: ${escapeHtml(event.params.certificateId)}</div>
           </div>
         </body>
         </html>
       `;
 
       // 2. Launch Puppeteer
-      const browser = await puppeteer.launch({
+      browser = await puppeteer.launch({
         args: chromium.args,
         executablePath: await chromium.executablePath(),
         headless: true,
       });
 
       const page = await browser.newPage();
-      await page.setContent(htmlContent, { waitUntil: 'networkidle0' as any });
+      await page.setContent(htmlContent, { waitUntil: 'domcontentloaded' });
+      await page.evaluate(() => document.fonts.ready);
 
       // 3. Generate PDF
       const pdfBuffer = await page.pdf({
@@ -144,7 +150,7 @@ export const generateCertificate = onDocumentWritten(
       await browser.close();
 
       // 4. Upload to Firebase Storage
-      const bucket = admin.storage().bucket();
+      const bucket = getStorage().bucket();
       const file = bucket.file(storagePath);
       
       await file.save(pdfBuffer, {
@@ -159,22 +165,28 @@ export const generateCertificate = onDocumentWritten(
       });
 
       // 5. Update Status
-      await certRef.update({
-        status: 'Available',
-        issueDate: FieldValue.serverTimestamp(),
-        attemptCount: FieldValue.increment(1),
+      await db.runTransaction(async tx => {
+        const current = await tx.get(certRef);
+        if (current.data()?.status !== 'Generating') return;
+        tx.update(certRef, {
+          status: 'Available', issueDate: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(), attemptCount: FieldValue.increment(1),
+        });
       });
 
       console.log(`Certificate ${event.params.certificateId} generated successfully.`);
-    } catch (error: any) {
+    } catch (error) {
       console.error(`Error generating certificate ${event.params.certificateId}:`, error);
       
       // Update status to Failed
-      await certRef.update({
-        status: 'Failed',
-        lastError: error.message || 'Unknown error during PDF generation',
-        attemptCount: FieldValue.increment(1),
+      await db.runTransaction(async tx => {
+        const current = await tx.get(certRef);
+        if (current.data()?.status !== 'Generating') return;
+        tx.update(certRef, {
+          status: 'Failed', lastError: error instanceof Error ? error.message : 'PDF generation failed',
+          updatedAt: FieldValue.serverTimestamp(), attemptCount: FieldValue.increment(1),
+        });
       });
-    }
+    } finally { await browser?.close().catch(console.error); }
   }
 );

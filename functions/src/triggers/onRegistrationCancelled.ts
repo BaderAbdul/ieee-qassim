@@ -1,6 +1,5 @@
-import * as functions from 'firebase-functions';
-import * as admin from 'firebase-admin';
-import { FieldValue } from 'firebase-admin/firestore';
+import * as functions from 'firebase-functions/v1';
+import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 
 export const onRegistrationCancelled = functions.firestore
   .document('registrations/{registrationId}')
@@ -16,7 +15,7 @@ export const onRegistrationCancelled = functions.firestore
       const eventId = after.eventId;
       if (!eventId) return null;
 
-      const db = admin.firestore();
+      const db = getFirestore();
 
       await db.runTransaction(async (transaction) => {
         // 1. Read event doc to check mode and capacity
@@ -25,11 +24,12 @@ export const onRegistrationCancelled = functions.firestore
         if (!eventDoc.exists) return null;
 
         const eventData = eventDoc.data() || {};
+        if (eventData.state !== 'Registration Open') return null;
         const capacity = typeof eventData.capacity === 'number' ? eventData.capacity : 0;
         const currentCount = typeof eventData.registeredCount === 'number' ? eventData.registeredCount : 0;
 
         // If capacity is defined (> 0) and already at or above capacity, do not promote to avoid oversubscribing
-        if (capacity > 0 && currentCount >= capacity) {
+        if (!eventData.isUnlimitedCapacity && currentCount >= capacity) {
           console.warn(`Capacity full for event ${eventId} (${currentCount}/${capacity}). Skipping waitlist promotion.`);
           return null;
         }
@@ -70,4 +70,3 @@ export const onRegistrationCancelled = functions.firestore
 
     return null;
   });
-

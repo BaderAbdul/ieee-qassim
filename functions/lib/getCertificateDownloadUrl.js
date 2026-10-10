@@ -34,8 +34,9 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getCertificateDownloadUrl = void 0;
-const functions = __importStar(require("firebase-functions"));
-const admin = __importStar(require("firebase-admin"));
+const storage_1 = require("firebase-admin/storage");
+const firestore_1 = require("firebase-admin/firestore");
+const functions = __importStar(require("firebase-functions/v1"));
 const auth_1 = require("./utils/auth");
 const errors_1 = require("./utils/errors");
 exports.getCertificateDownloadUrl = functions.https.onCall(async (data, context) => {
@@ -45,7 +46,7 @@ exports.getCertificateDownloadUrl = functions.https.onCall(async (data, context)
     if (!certificateId || typeof certificateId !== 'string') {
         (0, errors_1.throwFailedPrecondition)('Missing or invalid certificateId.');
     }
-    const db = admin.firestore();
+    const db = (0, firestore_1.getFirestore)();
     const certRef = db.collection('certificates').doc(certificateId);
     const certSnap = await certRef.get();
     if (!certSnap.exists) {
@@ -54,7 +55,7 @@ exports.getCertificateDownloadUrl = functions.https.onCall(async (data, context)
     const certData = certSnap.data();
     // Verify ownership or admin role (roles are stored in Firestore, not JWT custom claims)
     let isAdmin = false;
-    const userSnap = await admin.firestore().collection('users').doc(uid).get();
+    const userSnap = await (0, firestore_1.getFirestore)().collection('users').doc(uid).get();
     const role = (_a = userSnap.data()) === null || _a === void 0 ? void 0 : _a.role;
     if (role === 'super_admin' || role === 'event_organizer') {
         isAdmin = true;
@@ -66,11 +67,14 @@ exports.getCertificateDownloadUrl = functions.https.onCall(async (data, context)
         (0, errors_1.throwFailedPrecondition)(`Certificate is not available. Current status: ${certData === null || certData === void 0 ? void 0 : certData.status}`);
     }
     const storagePath = certData.storagePath;
+    if (typeof (certData === null || certData === void 0 ? void 0 : certData.externalUrl) === 'string' && certData.externalUrl.startsWith('https://')) {
+        return { status: 'success', url: certData.externalUrl };
+    }
     if (!storagePath) {
         (0, errors_1.throwFailedPrecondition)('Certificate storage path is missing.');
     }
     try {
-        const bucket = admin.storage().bucket();
+        const bucket = (0, storage_1.getStorage)().bucket();
         const file = bucket.file(storagePath);
         // Check if file exists in storage
         const [exists] = await file.exists();

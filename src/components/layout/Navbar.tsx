@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
-import { Link, usePathname, useRouter } from '@/i18n/routing';
+import { Link, usePathname } from '@/i18n/routing';
 import { useAuth } from '@/context/AuthContext';
 import Image from 'next/image';
 import { 
@@ -10,10 +10,7 @@ import {
   Trophy, 
   UserCircle, 
   Globe, 
-  Menu, 
-  X, 
   ShieldCheck, 
-  LogOut, 
   LogIn, 
   Sparkles,
   Users
@@ -24,8 +21,7 @@ export default function Navbar() {
   const locale = useLocale();
   const isAr = locale === 'ar';
   const pathname = usePathname();
-  const { user, userData, login, logout } = useAuth();
-  const [isOpen, setIsOpen] = useState(false);
+  const { user, userData, login } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {

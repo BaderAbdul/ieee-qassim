@@ -1,5 +1,5 @@
+import { getFirestore } from 'firebase-admin/firestore';
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
-import * as admin from 'firebase-admin';
 import { enqueueEmail, EmailTemplate } from '../utils/email';
 
 export const emailCertificates = onDocumentWritten('certificates/{certificateId}', async (event) => {
@@ -29,7 +29,7 @@ export const emailCertificates = onDocumentWritten('certificates/{certificateId}
   }
 
   const certificateId = event.params.certificateId;
-  const db = admin.firestore();
+  const db = getFirestore();
   
   const [userDoc, eventDoc] = await Promise.all([
     db.collection('users').doc(userId).get(),

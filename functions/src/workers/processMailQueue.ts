@@ -1,17 +1,8 @@
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
-import * as admin from 'firebase-admin';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { Resend } from 'resend';
 import { getEmailHtml } from '../utils/emailTemplates';
 import { EmailTemplate } from '../utils/email';
-
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
-// Allow mock in emulator, fail loudly in production
-if (!RESEND_API_KEY && process.env.FUNCTIONS_EMULATOR !== 'true') {
-  throw new Error('RESEND_API_KEY is not configured. Set it as a Firebase Secret.');
-}
-const resend = new Resend(RESEND_API_KEY || 're_mock_key_emulator_only');
-const SENDER_EMAIL = process.env.SENDER_EMAIL || 'IEEE QU <noreply@ieee-qu.com>';
 
 function getSubject(template: EmailTemplate): string {
   switch (template) {
@@ -38,7 +29,7 @@ function calculateNextAttempt(attemptCount: number): Date {
 
 export const processMailQueue = onDocumentWritten({
   document: 'mail/{mailId}',
-  secrets: ['RESEND_API_KEY', 'SENDER_EMAIL'] // Assume these will be configured in Secret Manager
+  secrets: ['RESEND_API_KEY']
 }, async (event) => {
   const after = event.data?.after;
   if (!after || !after.exists) return; // Document deleted
@@ -51,7 +42,7 @@ export const processMailQueue = onDocumentWritten({
     return;
   }
 
-  const db = admin.firestore();
+  const db = getFirestore();
   const mailRef = after.ref;
 
   // Use a transaction to grab the email safely and avoid duplicate execution
@@ -90,12 +81,14 @@ export const processMailQueue = onDocumentWritten({
       response = { data: { id: 'mock_id' }, error: null };
     } else {
       // Call Resend API
+      if (!process.env.RESEND_API_KEY || !process.env.SENDER_EMAIL) throw new Error('Email credentials and sender must be configured.');
+      const resend = new Resend(process.env.RESEND_API_KEY);
       response = await resend.emails.send({
-        from: SENDER_EMAIL,
+        from: process.env.SENDER_EMAIL,
         to: data.to,
         subject: subject,
         html: html,
-      });
+      }, { idempotencyKey: mailRef.id });
     }
 
     if (response.error) {

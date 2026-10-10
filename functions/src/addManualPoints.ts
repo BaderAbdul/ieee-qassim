@@ -1,20 +1,21 @@
-import { FieldValue } from 'firebase-admin/firestore';
-import * as functions from 'firebase-functions';
-import * as admin from 'firebase-admin';
+import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import * as functions from 'firebase-functions/v1';
 import { verifyAuth, verifyAdmin } from './utils/auth';
 import { throwFailedPrecondition } from './utils/errors';
+import { documentId } from './utils/eventLifecycle';
 
 export const addManualPoints = functions.https.onCall(async (data, context) => {
   const adminUid = verifyAuth(context);
   await verifyAdmin(adminUid); // Only admins can do manual adjustments
 
   const { studentUid, amount, reason } = data;
+  documentId(studentUid, 'studentUid');
 
   if (!studentUid || typeof studentUid !== 'string') {
     throwFailedPrecondition('Invalid or missing studentUid.');
   }
   
-  if (typeof amount !== 'number' || amount === 0) {
+  if (!Number.isSafeInteger(amount) || amount === 0 || Math.abs(amount) > 100000) {
     throwFailedPrecondition('Invalid amount. Must be a non-zero number.');
   }
 
@@ -22,7 +23,10 @@ export const addManualPoints = functions.https.onCall(async (data, context) => {
     throwFailedPrecondition('Reason is required for manual point adjustments.');
   }
 
-  const db = admin.firestore();
+  const db = getFirestore();
+  if (!(await db.collection('users').doc(studentUid).get()).exists) {
+    throwFailedPrecondition('Student profile not found.');
+  }
   
   // Create a new point transaction
   // Using auto-ID since manual adjustments can happen multiple times for a student

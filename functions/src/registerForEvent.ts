@@ -1,69 +1,16 @@
-import { FieldValue } from 'firebase-admin/firestore';
-import * as functions from 'firebase-functions';
-import * as admin from 'firebase-admin';
-import { verifyAuth } from './utils/auth';
-import { throwNotFound, throwFailedPrecondition } from './utils/errors';
+import * as functions from 'firebase-functions/v1';
+import { verifyAuth, verifyAdmin } from './utils/auth';
+import { changeRegistration, documentId } from './utils/eventLifecycle';
 
-export const registerForEvent = functions.https.onCall(async (data, context) => {
+export const registerForEvent = functions.https.onCall((data, context) =>
+  changeRegistration(verifyAuth(context), documentId(data?.eventId, 'eventId'), 'register'));
+
+export const cancelRegistration = functions.https.onCall((data, context) =>
+  changeRegistration(verifyAuth(context), documentId(data?.eventId, 'eventId'), 'cancel'));
+
+export const manageRegistration = functions.https.onCall(async (data, context) => {
   const uid = verifyAuth(context);
-  const { eventId } = data;
-
-  if (!eventId || typeof eventId !== 'string') {
-    throwFailedPrecondition('Invalid eventId.');
-  }
-
-  const db = admin.firestore();
-  const eventRef = db.collection('events').doc(eventId);
-  const regId = `${eventId}_${uid}`;
-  const regRef = db.collection('registrations').doc(regId);
-
-  return db.runTransaction(async (transaction) => {
-    // 1. Read event and existing registration
-    const eventSnap = await transaction.get(eventRef);
-    if (!eventSnap.exists) {
-      throwNotFound('Event not found.');
-    }
-
-    const eventData = eventSnap.data()!;
-    if (eventData.state !== 'Registration Open' && eventData.state !== 'Published') {
-      throwFailedPrecondition('Registration is not open for this event.');
-    }
-
-    const regSnap = await transaction.get(regRef);
-    if (regSnap.exists) {
-      const currentStatus = regSnap.data()?.status;
-      if (currentStatus !== 'cancelled') {
-        throwFailedPrecondition('You are already registered or pending for this event.');
-      }
-    }
-
-    // 2. Count active attendees securely to avoid phantom reads (Race Condition)
-    // We rely on a counter stored directly on the event document to ensure the transaction locks correctly.
-    let attendeeCount = eventData.registeredCount || 0;
-
-    // 3. Determine status
-    let status = 'approved';
-    if (eventData.registrationMode === 'Manual') {
-      status = 'pending';
-    } else if (attendeeCount >= eventData.capacity) {
-      status = 'waitlisted';
-    }
-
-    // 4. Write the registration
-    const regData = {
-      userId: uid,
-      eventId: eventId,
-      status: status,
-      timestamp: FieldValue.serverTimestamp(),
-    };
-
-    transaction.set(regRef, regData);
-    
-    // 5. Update the event document's registeredCount to ensure strict serialization
-    transaction.update(eventRef, {
-      registeredCount: attendeeCount + 1
-    });
-
-    return { status, attendeeCount: attendeeCount + 1 };
-  });
+  await verifyAdmin(uid);
+  if (!['approve', 'reject', 'cancel'].includes(data?.action)) throw new functions.https.HttpsError('invalid-argument', 'Invalid action.');
+  return changeRegistration(documentId(data?.userId, 'userId'), documentId(data?.eventId, 'eventId'), data.action, uid);
 });

@@ -1,4 +1,4 @@
-import * as functions from 'firebase-functions';
+import * as functions from 'firebase-functions/v1';
 
 export const throwUnauthenticated = (message = 'The function must be called while authenticated.') => {
   throw new functions.https.HttpsError('unauthenticated', message);

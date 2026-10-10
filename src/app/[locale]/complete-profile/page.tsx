@@ -4,15 +4,16 @@ import React, { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
 import { useAuth } from '@/context/AuthContext';
-import { db } from '@/lib/firebase/client';
-import { doc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { db, functions } from '@/lib/firebase/client';
+import { httpsCallable } from 'firebase/functions';
+import { doc, updateDoc } from 'firebase/firestore';
 
 export default function CompleteProfilePage() {
   const t = useTranslations('Onboarding');
   const locale = useLocale();
   const isAr = locale === 'ar';
   const router = useRouter();
-  const { user, userData } = useAuth();
+  const { user } = useAuth();
   
   const [isStudent, setIsStudent] = useState<boolean | null>(null);
   
@@ -59,13 +60,14 @@ export default function CompleteProfilePage() {
       } else {
         // Check uniqueness in Firestore
         try {
-          const q = query(collection(db, 'users'), where('universityId', '==', uidNorm));
-          const snapshot = await getDocs(q);
-          if (!snapshot.empty) {
+          const check = httpsCallable<{ universityId: string }, { available: boolean }>(functions, 'checkUniversityId');
+          const { data } = await check({ universityId: uidNorm });
+          if (!data.available) {
             newErrors.universityId = t('errors.idTaken');
           }
         } catch (e) {
           console.error("Error checking ID uniqueness:", e);
+          newErrors.universityId = t('errors.general');
         }
       }
 

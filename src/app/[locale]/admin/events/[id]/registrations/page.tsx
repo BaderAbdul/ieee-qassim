@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState, use } from 'react';
-import { collection, query, where, getDocs, doc, getDoc, updateDoc, setDoc, serverTimestamp, increment, addDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
+import { collection, query, where, getDocs, doc, getDoc, limit, orderBy, documentId, startAfter, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import { db, functions } from '@/lib/firebase/client';
+import { httpsCallable } from 'firebase/functions';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
-import { ArrowRight, Download, Users, Check, X, Clock, UserCheck, CheckSquare, Square, Trophy, Link as LinkIcon, QrCode } from 'lucide-react';
+import { ArrowRight, Download, Users, Check, X, Clock, UserCheck, CheckSquare, Square, Trophy, QrCode } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -36,8 +37,13 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
   const [event, setEvent] = useState<PlatformEvent | null>(null);
   const [registrations, setRegistrations] = useState<RegistrationData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<Error | null>(null);
+  const [pageCursor, setPageCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [nextCursor, setNextCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [hasMore, setHasMore] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isUpdatingBulk, setIsUpdatingBulk] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Points Awarding Modal State
   const [showPointsModal, setShowPointsModal] = useState(false);
@@ -57,7 +63,7 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
           setEvent({ id: eventSnap.id, ...eventSnap.data() } as PlatformEvent);
         }
 
-        const q = query(collection(db, 'registrations'), where('eventId', '==', eventId));
+        const q = query(collection(db, 'registrations'), where('eventId', '==', eventId), orderBy(documentId()), ...(pageCursor ? [startAfter(pageCursor)] : []), limit(50));
         const snap = await getDocs(q);
         
         // Parallelize user fetching using Promise.all & cache to eliminate N+1 sequential waterfall
@@ -107,9 +113,14 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
           return tA - tB; // Earliest first
         });
         
-        if (active) setRegistrations(regs);
+        if (active) {
+          setRegistrations(previous => pageCursor ? [...previous.filter(item => !regs.some(next => next.id === item.id)), ...regs] : regs);
+          setNextCursor(snap.docs.at(-1) || null);
+          setHasMore(snap.size === 50);
+        }
       } catch (error) {
         console.error("Error fetching registrations", error);
+        if (active) setLoadError(error instanceof Error ? error : new Error('Unable to load registrations'));
       } finally {
         if (active) {
           setLoading(false);
@@ -122,116 +133,56 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
     return () => {
       active = false;
     };
-  }, [eventId]);
+  }, [eventId, reloadKey, pageCursor]);
 
-  const handleUpdateStatus = async (regId: string, newStatus: string) => {
-    try {
-      const reg = registrations.find(r => r.id === regId);
-      const userId = reg?.userId || (regId.includes('_') ? regId.slice(eventId.length + 1) : null);
+  if (loadError) throw loadError;
 
-      const promises: Promise<unknown>[] = [
-        updateDoc(doc(db, 'registrations', regId), {
-          status: newStatus
-        })
-      ];
-
-      if (newStatus === 'attended' && userId) {
-        promises.push(
-          setDoc(doc(db, 'attendance_logs', `${eventId}_${userId}`), {
-            eventId,
-            userId,
-            timestamp: serverTimestamp()
-          }, { merge: true })
-        );
-      }
-
-      await Promise.all(promises);
-      setRegistrations(prev => prev.map(r => r.id === regId ? { ...r, status: newStatus } : r));
-    } catch (error) {
-      console.error("Error updating status", error);
-      alert("حدث خطأ أثناء تحديث حالة التسجيل");
+  const updateRegistration = async (regId: string, newStatus: string) => {
+    const reg = registrations.find(r => r.id === regId);
+    if (!reg) throw new Error('Registration not found');
+    if (newStatus === 'attended') {
+      await httpsCallable(functions, 'submitCheckIn')({ eventId, targetUserId: reg.userId });
+    } else {
+      const action = newStatus === 'approved' ? 'approve' : newStatus === 'cancelled' ? 'cancel' : 'reject';
+      await httpsCallable(functions, 'manageRegistration')({ eventId, userId: reg.userId, action });
     }
   };
 
+  const handleUpdateStatus = async (regId: string, newStatus: string) => {
+    setIsUpdatingBulk(true);
+    try { await updateRegistration(regId, newStatus); }
+    catch (error) { alert(error instanceof Error ? error.message : 'تعذر تحديث التسجيل'); }
+    finally { setPageCursor(null); setReloadKey(key => key + 1); setIsUpdatingBulk(false); }
+  };
+
   const handleBulkUpdateStatus = async (newStatus: string) => {
-    if (selectedIds.length === 0) return;
-    if (!confirm(`هل أنت متأكد من تغيير حالة ${selectedIds.length} مسجل إلى "${newStatus}"؟`)) return;
-    
+    if (!selectedIds.length || !confirm(`تحديث ${selectedIds.length} تسجيل؟`)) return;
     setIsUpdatingBulk(true);
     try {
-      const promises = selectedIds.flatMap(id => {
-        const updatePromise = updateDoc(doc(db, 'registrations', id), { status: newStatus });
-        if (newStatus === 'attended') {
-          const reg = registrations.find(r => r.id === id);
-          const userId = reg?.userId || (id.includes('_') ? id.slice(eventId.length + 1) : null);
-          if (userId) {
-            const logPromise = setDoc(doc(db, 'attendance_logs', `${eventId}_${userId}`), {
-              eventId,
-              userId,
-              timestamp: serverTimestamp()
-            }, { merge: true });
-            return [updatePromise, logPromise];
-          }
-        }
-        return [updatePromise];
-      });
-      await Promise.all(promises);
-      setRegistrations(prev => prev.map(r => selectedIds.includes(r.id) ? { ...r, status: newStatus } : r));
+      // Sequential updates avoid contention on the same capacity document.
+      for (const id of selectedIds) await updateRegistration(id, newStatus);
       setSelectedIds([]);
-    } catch (error) {
-      console.error("Error updating bulk status", error);
-      alert("حدث خطأ أثناء تحديث الحالات");
-    } finally {
-      setIsUpdatingBulk(false);
-    }
+    } catch (error) { alert(error instanceof Error ? error.message : 'تعذر تحديث التسجيلات'); }
+    finally { setPageCursor(null); setReloadKey(key => key + 1); setIsUpdatingBulk(false); }
   };
 
   const handleAwardPoints = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedIds.length === 0 || !pointsAmount) return;
-    
+    if (!selectedIds.length || !pointsAmount) return;
     setIsAwarding(true);
     try {
-      const promises = selectedIds.map(async (id) => {
+      for (const id of selectedIds) {
         const reg = registrations.find(r => r.id === id);
-        if (!reg) return;
-        const userId = reg.userId || (id.includes('_') ? id.slice(eventId.length + 1) : null);
-        if (!userId) return;
-
-        // 1. Update user totalPoints
-        const userRef = doc(db, 'users', userId);
-        const updatePromise = updateDoc(userRef, {
-          totalPoints: increment(pointsAmount)
+        if (reg) await httpsCallable(functions, 'addManualPoints')({
+          studentUid: reg.userId, amount: pointsAmount, reason: pointsDesc.trim() || 'مشاركة في الفعالية',
         });
-
-        // 2. Add transaction record
-        const transPromise = addDoc(collection(db, 'point_transactions'), {
-          userId,
-          eventId,
-          points: pointsAmount,
-          amount: pointsAmount,
-          source: 'attendance',
-          type: 'earned',
-          createdBy: 'admin',
-          description: pointsDesc || 'مشاركة في الفعالية',
-          createdAt: serverTimestamp(),
-          timestamp: serverTimestamp()
-        });
-
-        return Promise.all([updatePromise, transPromise]);
-      });
-
-      await Promise.all(promises);
-      alert(`تم رصد ${pointsAmount} نقاط لـ ${selectedIds.length} مستخدم بنجاح!`);
+      }
+      alert('تم رصد النقاط بنجاح');
       setShowPointsModal(false);
       setSelectedIds([]);
       setPointsDesc('');
-    } catch (error) {
-      console.error("Error awarding points:", error);
-      alert("حدث خطأ أثناء رصد النقاط");
-    } finally {
-      setIsAwarding(false);
-    }
+    } catch (error) { alert(error instanceof Error ? error.message : 'تعذر رصد النقاط'); }
+    finally { setIsAwarding(false); }
   };
 
   const toggleSelectAll = () => {
@@ -538,6 +489,8 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
           </div>
         </div>
       )}
+
+      {hasMore && <button disabled={loading} onClick={() => { setLoading(true); setPageCursor(nextCursor); }} className="mt-6 rounded-xl bg-slate-100 px-5 py-3 font-bold disabled:opacity-50">تحميل المزيد / Load more</button>}
 
     </div>
   );

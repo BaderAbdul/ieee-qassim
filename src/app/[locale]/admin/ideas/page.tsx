@@ -16,7 +16,7 @@ type Idea = {
   status: string;
   isPublic?: boolean;
   votesCount?: number;
-  createdAt: any;
+  createdAt: { toDate: () => Date };
 };
 
 export default function AdminIdeasPage() {
@@ -24,24 +24,15 @@ export default function AdminIdeasPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchIdeas();
+    const fetchIdeas = async () => {
+      try {
+        const snapshot = await getDocs(query(collection(db, 'ideas'), orderBy('createdAt', 'desc')));
+        setIdeas(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Idea[]);
+      } catch (error) { console.error('Error fetching ideas:', error); }
+      finally { setLoading(false); }
+    };
+    void fetchIdeas();
   }, []);
-
-  const fetchIdeas = async () => {
-    try {
-      const q = query(collection(db, 'ideas'), orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-      const ideasData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Idea[];
-      setIdeas(ideasData);
-    } catch (error) {
-      console.error('Error fetching ideas:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const updateStatus = async (id: string, newStatus: string) => {
     try {
@@ -58,7 +49,7 @@ export default function AdminIdeasPage() {
   const togglePublic = async (id: string, currentIsPublic: boolean | undefined) => {
     try {
       const newIsPublic = !currentIsPublic;
-      const updates: any = { isPublic: newIsPublic };
+      const updates: { isPublic: boolean; votesCount?: number; voters?: string[] } = { isPublic: newIsPublic };
       if (newIsPublic && currentIsPublic === undefined) {
         updates.votesCount = 0;
         updates.voters = [];

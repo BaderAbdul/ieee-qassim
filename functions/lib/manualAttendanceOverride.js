@@ -34,76 +34,12 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.manualAttendanceOverride = void 0;
-const firestore_1 = require("firebase-admin/firestore");
-const functions = __importStar(require("firebase-functions"));
-const admin = __importStar(require("firebase-admin"));
+const functions = __importStar(require("firebase-functions/v1"));
 const auth_1 = require("./utils/auth");
-const errors_1 = require("./utils/errors");
+const eventLifecycle_1 = require("./utils/eventLifecycle");
 exports.manualAttendanceOverride = functions.https.onCall(async (data, context) => {
-    const adminUid = (0, auth_1.verifyAuth)(context);
-    await (0, auth_1.verifyAdmin)(adminUid); // Only admins can do manual overrides
-    const { studentUid, eventId } = data;
-    if (!studentUid || typeof studentUid !== 'string') {
-        (0, errors_1.throwFailedPrecondition)('Invalid or missing studentUid.');
-    }
-    if (!eventId || typeof eventId !== 'string') {
-        (0, errors_1.throwFailedPrecondition)('Invalid or missing eventId.');
-    }
-    const db = admin.firestore();
-    // Use a transaction to ensure idempotency and verify state securely
-    return db.runTransaction(async (transaction) => {
-        var _a;
-        // 1. Verify Event Exists
-        const eventRef = db.collection('events').doc(eventId);
-        const eventSnap = await transaction.get(eventRef);
-        if (!eventSnap.exists) {
-            (0, errors_1.throwFailedPrecondition)('Event not found.');
-        }
-        // We don't enforce 'Ongoing' for manual override because admins might correct attendance after the fact.
-        // 2. Verify User Registration
-        const regId = `${eventId}_${studentUid}`;
-        const regRef = db.collection('registrations').doc(regId);
-        const regSnap = await transaction.get(regRef);
-        if (!regSnap.exists) {
-            (0, errors_1.throwFailedPrecondition)('Student is not registered for this event.');
-        }
-        if (((_a = regSnap.data()) === null || _a === void 0 ? void 0 : _a.status) !== 'approved') {
-            (0, errors_1.throwFailedPrecondition)('Student registration is not approved.');
-        }
-        // 3. Check for existing attendance (Idempotency)
-        const logId = `${eventId}_${studentUid}`;
-        const logRef = db.collection('attendance_logs').doc(logId);
-        const logSnap = await transaction.get(logRef);
-        if (logSnap.exists) {
-            return { status: 'already_checked_in' };
-        }
-        // 4. Write attendance log
-        transaction.set(logRef, {
-            userId: studentUid,
-            eventId: eventId,
-            timestamp: firestore_1.FieldValue.serverTimestamp(),
-            verifiedByQR: false,
-            manualOverride: true,
-            overriddenBy: adminUid,
-            overrideTimestamp: firestore_1.FieldValue.serverTimestamp(),
-        });
-        // 5. Award Points Atomically
-        const eventData = eventSnap.data();
-        const pointsToAward = typeof (eventData === null || eventData === void 0 ? void 0 : eventData.points) === 'number' ? eventData.points : 0;
-        if (pointsToAward > 0) {
-            const pointTxId = `attendance_${eventId}_${studentUid}`;
-            const pointTxRef = db.collection('point_transactions').doc(pointTxId);
-            transaction.set(pointTxRef, {
-                userId: studentUid,
-                amount: pointsToAward,
-                source: 'attendance_override',
-                reason: `Manual attendance for event: ${(eventData === null || eventData === void 0 ? void 0 : eventData.title) || 'Unknown'}`,
-                sourceEventId: eventId,
-                createdBy: adminUid,
-                createdAt: firestore_1.FieldValue.serverTimestamp(),
-            });
-        }
-        return { status: 'success' };
-    });
+    const uid = (0, auth_1.verifyAuth)(context);
+    await (0, auth_1.verifyAdmin)(uid);
+    return (0, eventLifecycle_1.recordAttendance)({ eventId: (0, eventLifecycle_1.documentId)(data === null || data === void 0 ? void 0 : data.eventId, 'eventId'), userId: (0, eventLifecycle_1.documentId)(data === null || data === void 0 ? void 0 : data.studentUid, 'studentUid'), actorUid: uid, admin: true });
 });
 //# sourceMappingURL=manualAttendanceOverride.js.map

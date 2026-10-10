@@ -34,7 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.throwFailedPrecondition = exports.throwNotFound = exports.throwUnauthorized = exports.throwUnauthenticated = void 0;
-const functions = __importStar(require("firebase-functions"));
+const functions = __importStar(require("firebase-functions/v1"));
 const throwUnauthenticated = (message = 'The function must be called while authenticated.') => {
     throw new functions.https.HttpsError('unauthenticated', message);
 };

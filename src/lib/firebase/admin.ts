@@ -1,3 +1,4 @@
+import 'server-only';
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
@@ -12,12 +13,14 @@ if (!getApps().length) {
           privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
         }),
       });
+    } else if (process.env.FIRESTORE_EMULATOR_HOST) {
+      initializeApp({ projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID });
     } else {
-      // Fallback for build time where env vars might not be available
-      initializeApp({ projectId: 'dummy-project-id' });
+      throw new Error('Firebase Admin credentials are not configured.');
     }
   } catch (error) {
     console.error("Firebase admin initialization error", error);
+    throw error;
   }
 }
 

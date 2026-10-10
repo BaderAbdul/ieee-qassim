@@ -35,8 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.retryCertificate = void 0;
 const firestore_1 = require("firebase-admin/firestore");
-const functions = __importStar(require("firebase-functions"));
-const admin = __importStar(require("firebase-admin"));
+const functions = __importStar(require("firebase-functions/v1"));
 const auth_1 = require("./utils/auth");
 const errors_1 = require("./utils/errors");
 exports.retryCertificate = functions.https.onCall(async (data, context) => {
@@ -49,7 +48,7 @@ exports.retryCertificate = functions.https.onCall(async (data, context) => {
     if (!certificateId || typeof certificateId !== 'string') {
         (0, errors_1.throwFailedPrecondition)('Missing or invalid certificateId.');
     }
-    const db = admin.firestore();
+    const db = (0, firestore_1.getFirestore)();
     await db.runTransaction(async (transaction) => {
         const certRef = db.collection('certificates').doc(certificateId);
         const certSnap = await transaction.get(certRef);

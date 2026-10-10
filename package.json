@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node --experimental-strip-types tests/runner.ts",
-    "test:raw": "node --test --experimental-strip-types \"tests/**/*.test.ts\""
+    "test:raw": "node --test --test-reporter=spec --experimental-strip-types tests/*.test.ts tests/tier*/*.test.ts",
+    "test:firebase": "npm run build --prefix functions && firebase emulators:exec --project demo-ieee-qu --only firestore,storage \"node --test --test-reporter=spec tests/firebase/lifecycle.test.mjs\""
   },
   "dependencies": {
     "@vercel/analytics": "^1.2.2",
@@ -17,9 +18,9 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "firebase": "^12.19.0",
-    "firebase-admin": "^14.4.0",
+    "firebase-admin": "^14.5.0",
     "lucide-react": "^1.45.0",
-    "next": "16.3.5",
+    "next": "16.3.8",
     "next-intl": "^4.14.4",
     "qrcode.react": "^4.2.0",
     "react": "19.2.8",
@@ -28,13 +29,21 @@
     "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.3.5",
+    "eslint-config-next": "16.3.8",
+    "firebase-tools": "^15.33.0",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.14.6",
+    "sharp": "^0.35.5",
+    "source-map-js": "^1.2.2",
+    "brace-expansion@^2.0.1": "^2.1.7"
   }
 }

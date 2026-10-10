@@ -35,6 +35,7 @@ export default async function EventsPage() {
     events = sortEventsByClosestDate(fetchedEvents);
   } catch (error) {
     console.error("Error fetching events", error);
+    throw error;
   }
 
   return (

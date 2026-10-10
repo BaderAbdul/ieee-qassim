@@ -1,5 +1,4 @@
-import { FieldValue } from 'firebase-admin/firestore';
-import * as admin from 'firebase-admin';
+import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 
 export type EmailTemplate = 
   | 'REGISTRATION_RECEIVED'
@@ -24,7 +23,7 @@ export interface EmailData {
  * Uses `dedupeKey` as the document ID to guarantee idempotency.
  */
 export async function enqueueEmail(payload: EmailData) {
-  const db = admin.firestore();
+  const db = getFirestore();
   
   const mailRef = db.collection('mail').doc(payload.dedupeKey);
   

@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { Trophy, Medal, Award, Sparkles } from 'lucide-react';
-import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
 import { useLocale } from 'next-intl';
 

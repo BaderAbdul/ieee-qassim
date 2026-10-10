@@ -30,7 +30,6 @@ export default function IdeaFloatingButton() {
       await addDoc(collection(db, 'ideas'), {
         userId: user.uid,
         userName: userData?.arabicFullName || user.displayName || 'Unknown',
-        userEmail: user.email,
         type,
         title,
         description,

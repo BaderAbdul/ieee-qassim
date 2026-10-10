@@ -15,11 +15,12 @@ export default function LeaderboardPage() {
   
   const [topUsers, setTopUsers] = useState<LeaderboardUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<Error | null>(null);
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        const q = query(collection(db, 'users'), orderBy('totalPoints', 'desc'), limit(50));
+        const q = query(collection(db, 'public_profiles'), orderBy('totalPoints', 'desc'), limit(50));
         const snap = await getDocs(q);
           
         const users = snap.docs.map(d => {
@@ -36,6 +37,7 @@ export default function LeaderboardPage() {
         setTopUsers(users);
       } catch (error) {
         console.error("Error fetching leaderboard", error);
+        setLoadError(error instanceof Error ? error : new Error('Unable to load leaderboard'));
       } finally {
         setLoading(false);
       }
@@ -43,6 +45,8 @@ export default function LeaderboardPage() {
     
     fetchLeaderboard();
   }, [isAr]);
+
+  if (loadError) throw loadError;
 
   if (loading) {
     return <LeaderboardSkeleton />;

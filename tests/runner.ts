@@ -7,6 +7,7 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { globSync } from 'node:fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -50,6 +51,12 @@ const TIERS: TierConfig[] = [
     pattern: 'tests/verify_*.test.ts',
     threshold: 15,
   },
+  {
+    tierId: 'Tier 6',
+    name: 'Challenger regression coverage',
+    pattern: 'tests/challenger_*.test.ts',
+    threshold: 1,
+  },
 ];
 
 interface TierResult {
@@ -65,8 +72,10 @@ interface TierResult {
 async function runTier(tier: TierConfig): Promise<TierResult> {
   const startTime = Date.now();
   return new Promise<TierResult>((resolve) => {
-    const args = ['--test', '--experimental-strip-types', tier.pattern];
-    const proc = spawn('node', args, { cwd: rootDir, env: process.env });
+    const files = globSync(tier.pattern, { cwd: rootDir }).sort();
+    if (!files.length) throw new Error(`No test files matched ${tier.pattern}`);
+    const args = ['--test', '--test-reporter=spec', '--experimental-strip-types', ...files];
+    const proc = spawn(process.execPath, args, { cwd: rootDir, env: process.env });
 
     let stdout = '';
     let stderrOutput = '';
@@ -89,8 +98,10 @@ async function runTier(tier: TierConfig): Promise<TierResult> {
       const totalMatch = stdout.match(/ℹ tests (\d+)/);
 
       const passed = passMatch ? parseInt(passMatch[1], 10) : 0;
-      const failed = failMatch ? parseInt(failMatch[1], 10) : (code === 0 ? 0 : 1);
+      let failed = failMatch ? parseInt(failMatch[1], 10) : (code === 0 ? 0 : 1);
       const total = totalMatch ? parseInt(totalMatch[1], 10) : passed + failed;
+      if (code !== 0) process.stderr.write(stdout);
+      if (passed < tier.threshold && failed === 0) failed = 1;
 
       resolve({
         tierId: tier.tierId,
@@ -149,14 +160,14 @@ async function main() {
   }
 
   console.log('----------------------------------------------------------------------');
-  console.log(` TOTALS | All 4 Tiers Combined (${grandTotal} Tests)   | >=82| ${String(grandPassed).padStart(4)} | ${String(grandFailed).padStart(4)} | ${grandFailed === 0 ? 'ALL PASS' : 'FAILED'}`);
+  console.log(` TOTALS | All Tiers (${grandTotal} Tests) | ${grandPassed} passed | ${grandFailed} failed`);
   console.log('======================================================================\n');
 
   if (grandFailed > 0) {
     console.error('Test run failed with ' + grandFailed + ' failing tests.');
     process.exit(1);
   } else {
-    console.log('✔ All 4 test tiers passed requirements and integrity thresholds.');
+    console.log('✔ All test tiers passed their coverage thresholds.');
     process.exit(0);
   }
 }

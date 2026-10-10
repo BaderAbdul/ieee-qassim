@@ -34,40 +34,24 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateCheckInToken = void 0;
-const functions = __importStar(require("firebase-functions"));
-const admin = __importStar(require("firebase-admin"));
-const jwt = __importStar(require("jsonwebtoken"));
+const firestore_1 = require("firebase-admin/firestore");
+const functions = __importStar(require("firebase-functions/v1"));
+const node_crypto_1 = require("node:crypto");
 const auth_1 = require("./utils/auth");
-const errors_1 = require("./utils/errors");
+const eventLifecycle_1 = require("./utils/eventLifecycle");
+// Tokens stay out of public event documents and expire after 15 minutes.
 exports.generateCheckInToken = functions.https.onCall(async (data, context) => {
-    var _a;
-    const uid = (0, auth_1.verifyAuth)(context);
-    await (0, auth_1.verifyAdmin)(uid); // Only admins can generate QR tokens
-    const { eventId } = data;
-    if (!eventId || typeof eventId !== 'string') {
-        (0, errors_1.throwFailedPrecondition)('Invalid eventId.');
-    }
-    const db = admin.firestore();
-    const eventSnap = await db.collection('events').doc(eventId).get();
-    if (!eventSnap.exists) {
-        (0, errors_1.throwFailedPrecondition)('Event not found.');
-    }
-    const eventData = eventSnap.data();
-    if (eventData.state !== 'Ongoing') {
-        (0, errors_1.throwFailedPrecondition)('Event must be Ongoing to generate tokens.');
-    }
-    // Get the secret from environment config (firebase functions:config:set or dotenv)
-    // For V1, we'll use a strong fallback if env var is missing, but in production, this should be set in Secrets Manager.
-    const JWT_SECRET = process.env.JWT_SECRET || ((_a = functions.config().jwt) === null || _a === void 0 ? void 0 : _a.secret);
-    if (!JWT_SECRET) {
-        throw new functions.https.HttpsError('internal', 'JWT_SECRET is not configured. Please set it in Firebase Secret Manager.');
-    }
-    // Create a payload with a nonce to prevent replay attacks and limit lifespan to 60 seconds
-    const payload = {
-        eventId,
-        nonce: Date.now() + Math.random().toString(36).substring(2),
-    };
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '60s' });
-    return { token };
+    await (0, auth_1.verifyAdmin)((0, auth_1.verifyAuth)(context));
+    const eventId = (0, eventLifecycle_1.documentId)(data === null || data === void 0 ? void 0 : data.eventId, 'eventId');
+    const token = (0, node_crypto_1.randomBytes)(32).toString('hex');
+    const expiresAt = firestore_1.Timestamp.fromMillis(Date.now() + 15 * 60 * 1000);
+    await (0, firestore_1.getFirestore)().runTransaction(async (tx) => {
+        var _a;
+        const event = await tx.get((0, firestore_1.getFirestore)().collection('events').doc(eventId));
+        if (!event.exists || ((_a = event.data()) === null || _a === void 0 ? void 0 : _a.state) !== 'Ongoing')
+            throw new functions.https.HttpsError('failed-precondition', 'Event must be Ongoing.');
+        tx.set((0, firestore_1.getFirestore)().collection('event_secrets').doc(eventId), { token, expiresAt });
+    });
+    return { token, expiresAt: expiresAt.toMillis() };
 });
 //# sourceMappingURL=generateCheckInToken.js.map

@@ -56,7 +56,7 @@ export interface EventFeedbackResponse {
   userName?: string;
   rating: number; // 1 to 5 stars
   answers?: Record<string, string>; // questionId -> answer
-  createdAt: Timestamp | Date | any;
+  createdAt: unknown;
 }
 
 export type PointTransactionSource = 'attendance' | 'attendance_override' | 'manual_adjustment';

@@ -35,8 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.issueCertificates = void 0;
 const firestore_1 = require("firebase-admin/firestore");
-const functions = __importStar(require("firebase-functions"));
-const admin = __importStar(require("firebase-admin"));
+const functions = __importStar(require("firebase-functions/v1"));
 const auth_1 = require("./utils/auth");
 const errors_1 = require("./utils/errors");
 exports.issueCertificates = functions.https.onCall(async (data, context) => {
@@ -45,14 +44,15 @@ exports.issueCertificates = functions.https.onCall(async (data, context) => {
     if (role !== 'super_admin' && role !== 'event_organizer') {
         (0, errors_1.throwFailedPrecondition)('Insufficient permissions. Only Organizers or Super Admins can issue certificates.');
     }
-    const { eventId, userIds } = data;
+    const { eventId } = data;
+    const userIds = Array.isArray(data === null || data === void 0 ? void 0 : data.userIds) ? [...new Set(data.userIds)] : [];
     if (!eventId || typeof eventId !== 'string') {
         (0, errors_1.throwFailedPrecondition)('Missing or invalid eventId.');
     }
-    if (!Array.isArray(userIds) || userIds.length === 0) {
+    if (userIds.length === 0 || userIds.length > 300 || userIds.some(uid => typeof uid !== 'string' || !uid || uid.includes('/'))) {
         (0, errors_1.throwFailedPrecondition)('Missing or invalid userIds array.');
     }
-    const db = admin.firestore();
+    const db = (0, firestore_1.getFirestore)();
     // 1. Verify Event is Completed
     const eventRef = db.collection('events').doc(eventId);
     const eventSnap = await eventRef.get();
@@ -60,7 +60,7 @@ exports.issueCertificates = functions.https.onCall(async (data, context) => {
         (0, errors_1.throwFailedPrecondition)('Event not found.');
     }
     const eventData = eventSnap.data();
-    if ((eventData === null || eventData === void 0 ? void 0 : eventData.state) !== 'Completed') {
+    if ((eventData === null || eventData === void 0 ? void 0 : eventData.state) !== 'Completed' || eventData.hasCertificate !== true) {
         (0, errors_1.throwFailedPrecondition)('Certificates can only be issued for Completed events.');
     }
     // Determine queue service to call to trigger background worker.
@@ -72,7 +72,10 @@ exports.issueCertificates = functions.https.onCall(async (data, context) => {
     for (let i = 0; i < userIds.length; i += BATCH_SIZE) {
         const chunk = userIds.slice(i, i + BATCH_SIZE);
         const chunkCount = await db.runTransaction(async (transaction) => {
-            var _a, _b, _c;
+            var _a, _b, _c, _d, _e;
+            const currentEvent = await transaction.get(eventRef);
+            if (((_a = currentEvent.data()) === null || _a === void 0 ? void 0 : _a.state) !== 'Completed')
+                (0, errors_1.throwFailedPrecondition)('Event must remain Completed.');
             let count = 0;
             // Phase 1: All Reads
             const readResults = [];
@@ -101,12 +104,14 @@ exports.issueCertificates = functions.https.onCall(async (data, context) => {
                     continue; // Skip, no attendance found
                 }
                 if (data.certSnap.exists) {
-                    const currentStatus = (_a = data.certSnap.data()) === null || _a === void 0 ? void 0 : _a.status;
-                    if (currentStatus === 'Available' || currentStatus === 'Generating') {
+                    const currentStatus = (_b = data.certSnap.data()) === null || _b === void 0 ? void 0 : _b.status;
+                    if (currentStatus === 'Available' || currentStatus === 'Generating' || currentStatus === 'Revoked') {
                         continue; // Already processed
                     }
                 }
-                const studentName = ((_b = data.userSnap.data()) === null || _b === void 0 ? void 0 : _b.displayName) || 'Student';
+                if (!data.userSnap.exists)
+                    continue;
+                const studentName = ((_c = data.userSnap.data()) === null || _c === void 0 ? void 0 : _c.arabicFullName) || ((_d = data.userSnap.data()) === null || _d === void 0 ? void 0 : _d.displayName) || 'Student';
                 // Create or overwrite as Generating
                 transaction.set(data.certRef, {
                     id: data.certificateId,
@@ -117,7 +122,7 @@ exports.issueCertificates = functions.https.onCall(async (data, context) => {
                     studentName,
                     eventTitle: eventData.title,
                     eventType: eventData.type,
-                    attendanceDate: ((_c = data.logSnap.data()) === null || _c === void 0 ? void 0 : _c.timestamp) || eventData.date,
+                    attendanceDate: ((_e = data.logSnap.data()) === null || _e === void 0 ? void 0 : _e.timestamp) || eventData.date,
                     createdAt: firestore_1.FieldValue.serverTimestamp(),
                     updatedAt: firestore_1.FieldValue.serverTimestamp(),
                     attemptCount: 0,

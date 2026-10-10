@@ -33,64 +33,17 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.registerForEvent = void 0;
-const firestore_1 = require("firebase-admin/firestore");
-const functions = __importStar(require("firebase-functions"));
-const admin = __importStar(require("firebase-admin"));
+exports.manageRegistration = exports.cancelRegistration = exports.registerForEvent = void 0;
+const functions = __importStar(require("firebase-functions/v1"));
 const auth_1 = require("./utils/auth");
-const errors_1 = require("./utils/errors");
-exports.registerForEvent = functions.https.onCall(async (data, context) => {
+const eventLifecycle_1 = require("./utils/eventLifecycle");
+exports.registerForEvent = functions.https.onCall((data, context) => (0, eventLifecycle_1.changeRegistration)((0, auth_1.verifyAuth)(context), (0, eventLifecycle_1.documentId)(data === null || data === void 0 ? void 0 : data.eventId, 'eventId'), 'register'));
+exports.cancelRegistration = functions.https.onCall((data, context) => (0, eventLifecycle_1.changeRegistration)((0, auth_1.verifyAuth)(context), (0, eventLifecycle_1.documentId)(data === null || data === void 0 ? void 0 : data.eventId, 'eventId'), 'cancel'));
+exports.manageRegistration = functions.https.onCall(async (data, context) => {
     const uid = (0, auth_1.verifyAuth)(context);
-    const { eventId } = data;
-    if (!eventId || typeof eventId !== 'string') {
-        (0, errors_1.throwFailedPrecondition)('Invalid eventId.');
-    }
-    const db = admin.firestore();
-    const eventRef = db.collection('events').doc(eventId);
-    const regId = `${eventId}_${uid}`;
-    const regRef = db.collection('registrations').doc(regId);
-    return db.runTransaction(async (transaction) => {
-        var _a;
-        // 1. Read event and existing registration
-        const eventSnap = await transaction.get(eventRef);
-        if (!eventSnap.exists) {
-            (0, errors_1.throwNotFound)('Event not found.');
-        }
-        const eventData = eventSnap.data();
-        if (eventData.state !== 'Registration Open' && eventData.state !== 'Published') {
-            (0, errors_1.throwFailedPrecondition)('Registration is not open for this event.');
-        }
-        const regSnap = await transaction.get(regRef);
-        if (regSnap.exists) {
-            const currentStatus = (_a = regSnap.data()) === null || _a === void 0 ? void 0 : _a.status;
-            if (currentStatus !== 'cancelled') {
-                (0, errors_1.throwFailedPrecondition)('You are already registered or pending for this event.');
-            }
-        }
-        // 2. Count active attendees securely to avoid phantom reads (Race Condition)
-        // We rely on a counter stored directly on the event document to ensure the transaction locks correctly.
-        let attendeeCount = eventData.registeredCount || 0;
-        // 3. Determine status
-        let status = 'approved';
-        if (eventData.registrationMode === 'Manual') {
-            status = 'pending';
-        }
-        else if (attendeeCount >= eventData.capacity) {
-            status = 'waitlisted';
-        }
-        // 4. Write the registration
-        const regData = {
-            userId: uid,
-            eventId: eventId,
-            status: status,
-            timestamp: firestore_1.FieldValue.serverTimestamp(),
-        };
-        transaction.set(regRef, regData);
-        // 5. Update the event document's registeredCount to ensure strict serialization
-        transaction.update(eventRef, {
-            registeredCount: attendeeCount + 1
-        });
-        return { status, attendeeCount: attendeeCount + 1 };
-    });
+    await (0, auth_1.verifyAdmin)(uid);
+    if (!['approve', 'reject', 'cancel'].includes(data === null || data === void 0 ? void 0 : data.action))
+        throw new functions.https.HttpsError('invalid-argument', 'Invalid action.');
+    return (0, eventLifecycle_1.changeRegistration)((0, eventLifecycle_1.documentId)(data === null || data === void 0 ? void 0 : data.userId, 'userId'), (0, eventLifecycle_1.documentId)(data === null || data === void 0 ? void 0 : data.eventId, 'eventId'), data.action, uid);
 });
 //# sourceMappingURL=registerForEvent.js.map

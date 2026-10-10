@@ -2,19 +2,9 @@
 
 import React, { useEffect, useState, use } from 'react';
 import Image from 'next/image';
-import { 
-  doc, 
-  getDoc, 
-  serverTimestamp, 
-  collection, 
-  query, 
-  where, 
-  getDocs, 
-  runTransaction, 
-  increment,
-  DocumentReference
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '@/lib/firebase/client';
 import { PlatformEvent } from '@/lib/types';
 import { useAuth } from '@/context/AuthContext';
 import { useLocale, useTranslations } from 'next-intl';
@@ -44,10 +34,11 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
   const isAr = locale === 'ar';
   const dateLocale = isAr ? ar : enUS;
   
-  const { user, userData, login } = useAuth();
+  const { user, login } = useAuth();
   
   const [event, setEvent] = useState<PlatformEvent | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<Error | null>(null);
   
   const [registrationStatus, setRegistrationStatus] = useState<string | null>(null);
   const [isRegistering, setIsRegistering] = useState(false);
@@ -72,6 +63,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
         }
       } catch (error) {
         console.error("Error fetching event details", error);
+        if (active) setLoadError(error instanceof Error ? error : new Error('Unable to load event'));
       } finally {
         if (active) setLoading(false);
       }
@@ -85,161 +77,41 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
   }, [eventId]);
 
   useEffect(() => {
-    let active = true;
-
-    const checkRegistration = async () => {
-      if (!user || !event) return;
-      try {
-        const regId = `${eventId}_${user.uid}`;
-        const regRef = doc(db, 'registrations', regId);
-        const regSnap = await getDoc(regRef);
-        
-        if (active) {
-          if (regSnap.exists()) {
-            setRegistrationStatus(regSnap.data().status);
-          } else {
-            setRegistrationStatus(null);
-          }
-        }
-      } catch (error) {
-        console.error("Error checking registration", error);
-      }
-    };
-    
-    checkRegistration();
-
-    return () => {
-      active = false;
-    };
-  }, [user, event, eventId]);
+    if (!user) return;
+    return onSnapshot(doc(db, 'registrations', `${eventId}_${user.uid}`), snapshot => {
+      setRegistrationStatus(snapshot.exists() ? snapshot.data().status : null);
+    }, error => console.error('Registration subscription failed', error));
+  }, [user, eventId]);
 
   const handleRegister = async () => {
-    if (!user) {
-      login();
-      return;
-    }
-    
-    if (!event) return;
-    
+    if (!user) { await login(); return; }
+    if (!event || isRegistering) return;
     setIsRegistering(true);
     try {
-      const regId = `${eventId}_${user.uid}`;
-      const regRef = doc(db, 'registrations', regId);
-      const eventRef = doc(db, 'events', eventId);
-
-      const result = await runTransaction(db, async (transaction) => {
-        const eventSnap = await transaction.get(eventRef);
-        if (!eventSnap.exists()) {
-          throw new Error(isAr ? 'الفعالية غير موجودة' : 'Event not found.');
-        }
-
-        const eventData = eventSnap.data() as PlatformEvent;
-        if (eventData.state !== 'Registration Open') {
-          throw new Error(isAr ? 'التسجيل مغلق لهذه الفعالية' : 'Registration is not open for this event.');
-        }
-
-        const regSnap = await transaction.get(regRef);
-        if (regSnap.exists()) {
-          const currentStatus = regSnap.data().status;
-          if (currentStatus !== 'cancelled') {
-            throw new Error(isAr ? 'أنت مسجل بالفعل في هذه الفعالية' : 'You are already registered or pending for this event.');
-          }
-        }
-
-        const currentAttendeeCount = eventData.registeredCount || 0;
-        let newStatus = 'approved';
-        if (eventData.registrationMode === 'Manual') {
-          newStatus = 'pending';
-        } else if (currentAttendeeCount >= (eventData.capacity || 0)) {
-          newStatus = 'waitlisted';
-        }
-
-        const regData: Record<string, unknown> = {
-          userId: user.uid,
-          eventId: eventId,
-          status: newStatus,
-          timestamp: serverTimestamp(),
-          userName: userData?.arabicFullName || userData?.displayName || user.displayName || 'Student',
-          userEmail: userData?.email || user.email || '',
-        };
-        if (userData?.universityId) {
-          regData.universityId = userData.universityId;
-        }
-
-        transaction.set(regRef, regData);
-        
-        if (newStatus !== 'waitlisted') {
-          transaction.update(eventRef, {
-            registeredCount: increment(1)
-          });
-        }
-
-        return { 
-          status: newStatus, 
-          attendeeCount: newStatus !== 'waitlisted' ? currentAttendeeCount + 1 : currentAttendeeCount 
-        };
-      });
-      
-      setRegistrationStatus(result.status);
-      setAttendeeCount(result.attendeeCount);
-    } catch (error: unknown) {
-      console.error("Error registering", error);
-      const msg = error instanceof Error ? error.message : (isAr ? "حدث خطأ أثناء التسجيل. حاول مرة أخرى." : "Registration failed. Try again.");
-      alert(msg);
-    } finally {
-      setIsRegistering(false);
-    }
+      const register = httpsCallable<{ eventId: string }, { status: string; attendeeCount: number }>(functions, 'registerForEvent');
+      const { data } = await register({ eventId });
+      setRegistrationStatus(data.status);
+      setAttendeeCount(data.attendeeCount);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : (isAr ? 'تعذر التسجيل. حاول مرة أخرى.' : 'Registration failed. Please retry.'));
+    } finally { setIsRegistering(false); }
   };
 
   const handleCancelRegistration = async () => {
-    if (!user || !event) return;
-    if (!confirm(isAr ? 'هل أنت تأكد من رغبتك في إلغاء التسجيل في هذه الفعالية؟' : 'Are you sure you want to cancel your registration?')) return;
-    
+    if (!user || !event || isRegistering) return;
+    if (!confirm(isAr ? 'هل تريد إلغاء التسجيل؟' : 'Cancel your registration?')) return;
     setIsRegistering(true);
     try {
-      const regId = `${eventId}_${user.uid}`;
-      const regRef = doc(db, 'registrations', regId);
-      const eventRef = doc(db, 'events', eventId);
-
-      await runTransaction(db, async (transaction) => {
-        // 1. All reads MUST come before any writes in Firestore transactions
-        const regDoc = await transaction.get(regRef);
-        const eventDoc = await transaction.get(eventRef);
-
-        const prevStatus = regDoc.exists() ? regDoc.data().status : null;
-        if (prevStatus === 'attended') {
-          throw new Error(isAr ? 'لا يمكن إلغاء التسجيل بعد أن تم تسجيل حضورك الفعلي في الفعالية' : 'Cannot cancel registration after attendance has been recorded.');
-        }
-
-        const wasApprovedOrPending = prevStatus === 'approved' || prevStatus === 'pending';
-
-        // 2. All writes executed after reads
-        transaction.set(regRef, {
-          status: 'cancelled',
-          cancelledAt: serverTimestamp()
-        }, { merge: true });
-
-        if (wasApprovedOrPending && eventDoc.exists()) {
-          const currentCount = (eventDoc.data() as PlatformEvent).registeredCount || 0;
-          if (currentCount > 0) {
-            transaction.update(eventRef, {
-              registeredCount: increment(-1)
-            });
-          }
-        }
-      });
-      
-      setRegistrationStatus('cancelled');
-      setAttendeeCount(prev => Math.max(0, prev - 1));
-      alert(isAr ? 'تم إلغاء التسجيل بنجاح.' : 'Registration cancelled successfully.');
-    } catch (error: unknown) {
-      console.error("Error cancelling registration", error);
-      const msg = error instanceof Error ? error.message : (isAr ? 'حدث خطأ أثناء إلغاء التسجيل.' : 'Error cancelling registration.');
-      alert(msg);
-    } finally {
-      setIsRegistering(false);
-    }
+      const cancel = httpsCallable<{ eventId: string }, { status: string; attendeeCount: number }>(functions, 'cancelRegistration');
+      const { data } = await cancel({ eventId });
+      setRegistrationStatus(data.status);
+      setAttendeeCount(data.attendeeCount);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : (isAr ? 'تعذر إلغاء التسجيل.' : 'Cancellation failed.'));
+    } finally { setIsRegistering(false); }
   };
+
+  if (loadError) throw loadError;
 
   if (loading) {
     return <EventDetailsSkeleton />;
@@ -263,7 +135,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
     );
   }
 
-  const isFull = attendeeCount >= event.capacity;
+  const isFull = !event.isUnlimitedCapacity && attendeeCount >= event.capacity;
   const isRegistrationOpen = event.state === 'Registration Open';
   const eventDate = event.date;
   

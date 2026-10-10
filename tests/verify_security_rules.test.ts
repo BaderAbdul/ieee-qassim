@@ -11,64 +11,27 @@ const firestoreRulesContent = readFileSync(join(rootDir, 'firestore.rules'), 'ut
 // PART 1: STATIC & SYNTACTIC RULE INTEGRITY AUDIT
 // ============================================================================
 
-test('Security Rules Audit: Registrations must NEVER contain public "|| true;" read leak', () => {
-  assert.equal(
-    firestoreRulesContent.includes('|| true;'),
-    false,
-    'CRITICAL: firestore.rules must not contain "|| true;" under registrations or anywhere else'
-  );
+test('Security Rules: student documents are private', () => {
+  assert.ok(firestoreRulesContent.includes('allow get: if owner(uid) || organizer()'));
+  assert.ok(firestoreRulesContent.includes('allow list: if organizer()'));
 });
-
-test('Security Rules Audit: Registrations create must enforce key whitelisting and forbid "attended"', () => {
-  assert.ok(
-    firestoreRulesContent.includes("!('attended' in request.resource.data)"),
-    'CRITICAL: Client creation of registrations must explicitly forbid "attended" field'
-  );
-  assert.ok(
-    firestoreRulesContent.includes("hasOnly(['userId', 'eventId', 'status', 'timestamp', 'userName', 'userEmail', 'universityId'])"),
-    'CRITICAL: Registration creation must enforce strict whitelist of allowed keys'
-  );
+test('Security Rules: registrations are backend-only', () => {
+  const section = firestoreRulesContent.split('match /registrations/')[1].split('match /attendance_logs/')[0];
+  assert.ok(section.includes('allow write: if false'));
 });
-
-test('Security Rules Audit: User document updates must block organizer role escalation', () => {
-  // Organizer can ONLY touch totalPoints, NOT role or isAdmin
-  assert.ok(
-    firestoreRulesContent.includes("affectedKeys().hasOnly(['totalPoints'])"),
-    'CRITICAL: Event organizers must only be permitted to modify totalPoints'
-  );
-  assert.ok(
-    firestoreRulesContent.includes("!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'totalPoints', 'badges', 'isAdmin'])"),
-    'CRITICAL: Normal users/owners must be forbidden from changing role, totalPoints, badges, or isAdmin'
-  );
+test('Security Rules: owners update a profile whitelist', () => {
+  assert.ok(firestoreRulesContent.includes('affectedKeys().hasOnly(['));
+  const section = firestoreRulesContent.split('allow update: if superAdmin()')[1].split('allow delete:')[0];
+  assert.equal(section.includes("'totalPoints'"), false);
+  assert.equal(section.includes("'role'"), false);
 });
-
-test('Security Rules Audit: User document updates must block organizer self-points inflation (VULN-02)', () => {
-  assert.ok(
-    firestoreRulesContent.includes("request.auth.uid != userId"),
-    'CRITICAL: Event organizers must be prevented from modifying totalPoints on their own user document'
-  );
+test('Security Rules: ledger writes are backend-only', () => {
+  const section = firestoreRulesContent.split('match /point_transactions/')[1].split('match /pending_checkins/')[0];
+  assert.ok(section.includes('allow write: if false'));
 });
-
-test('Security Rules Audit: Point transactions schema alignment allows points/amount and timestamp/createdAt (VULN-04)', () => {
-  assert.ok(
-    firestoreRulesContent.includes("request.resource.data.keys().hasAny(['timestamp', 'createdAt'])"),
-    'CRITICAL: point_transactions creation must accommodate both timestamp and createdAt'
-  );
-  assert.ok(
-    firestoreRulesContent.includes("points is int") && firestoreRulesContent.includes("amount is int"),
-    'CRITICAL: point_transactions creation must accommodate both points and amount'
-  );
-});
-
-test('Security Rules Audit: Event registeredCount counter updates must be bounded', () => {
-  assert.ok(
-    firestoreRulesContent.includes("resource.data.state == 'Registration Open'"),
-    'Events counter updates by authenticated users must require Registration Open state'
-  );
-  assert.ok(
-    firestoreRulesContent.includes("affectedKeys().hasOnly(['registeredCount'])"),
-    'Events counter updates must restrict modified keys strictly to registeredCount'
-  );
+test('Security Rules: attendance is backend-only', () => {
+  const section = firestoreRulesContent.split('match /attendance_logs/')[1].split('match /point_transactions/')[0];
+  assert.ok(section.includes('allow write: if false'));
 });
 
 // ============================================================================

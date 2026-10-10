@@ -49,9 +49,7 @@ export default function StructureAccordion({ committees, isAr }: StructureAccord
   useEffect(() => {
     let active = true;
     if (selectedMember && selectedMember.userId) {
-      setIsLoadingProfile(true);
-      setRichProfile(null);
-      getDoc(doc(db, 'users', selectedMember.userId))
+      getDoc(doc(db, 'public_profiles', selectedMember.userId))
         .then((snap) => {
           if (active && snap.exists()) {
             const data = snap.data();
@@ -69,9 +67,6 @@ export default function StructureAccordion({ committees, isAr }: StructureAccord
   }, [selectedMember]);
 
   useEffect(() => {
-    if (committees.length > 0 && !activeTabId) {
-      setActiveTabId(committees[0].id);
-    }
     
     const observerOptions = {
       root: null,
@@ -128,7 +123,7 @@ export default function StructureAccordion({ committees, isAr }: StructureAccord
       <div className="sticky top-16 sm:top-20 z-40 bg-gray-50/95 backdrop-blur-md py-4 border-b border-slate-200/50 -mx-4 px-4 sm:mx-0 sm:px-0">
         <div className="flex items-center gap-2 overflow-x-auto pb-2 px-1 sm:justify-center sm:flex-wrap snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {committees.map((committee) => {
-            const isActive = committee.id === activeTabId;
+            const isActive = committee.id === (activeTabId || committees[0]?.id);
             return (
               <button
                 key={committee.id}
@@ -190,7 +185,7 @@ export default function StructureAccordion({ committees, isAr }: StructureAccord
                     return (
                       <div 
                         key={member.userId || member.name} 
-                        onClick={() => setSelectedMember(member)}
+                        onClick={() => { setRichProfile(null); setIsLoadingProfile(Boolean(member.userId)); setSelectedMember(member); }}
                         className="group bg-white rounded-2xl p-3 sm:p-4 text-center border border-slate-100 hover:border-blue-200 hover:shadow-md hover:bg-slate-50/50 transition-all cursor-pointer flex flex-col items-center"
                       >
                         <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-slate-100 text-slate-400 mb-3 flex items-center justify-center overflow-hidden border border-slate-200">

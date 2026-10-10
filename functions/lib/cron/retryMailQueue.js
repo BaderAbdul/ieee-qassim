@@ -1,48 +1,26 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.retryMailQueue = void 0;
 const scheduler_1 = require("firebase-functions/v2/scheduler");
-const admin = __importStar(require("firebase-admin"));
 const firestore_1 = require("firebase-admin/firestore");
 exports.retryMailQueue = (0, scheduler_1.onSchedule)('every 5 minutes', async (event) => {
-    const db = admin.firestore();
+    const db = (0, firestore_1.getFirestore)();
+    const staleBefore = firestore_1.Timestamp.fromMillis(Date.now() - 10 * 60 * 1000);
+    const stale = await db.collection('mail').where('status', '==', 'PROCESSING')
+        .where('updatedAt', '<=', staleBefore).limit(100).get();
+    for (const candidate of stale.docs) {
+        await db.runTransaction(async (tx) => {
+            var _a, _b, _c;
+            const current = await tx.get(candidate.ref);
+            if (((_a = current.data()) === null || _a === void 0 ? void 0 : _a.status) === 'PROCESSING' && ((_c = (_b = current.data()) === null || _b === void 0 ? void 0 : _b.updatedAt) === null || _c === void 0 ? void 0 : _c.toMillis()) <= staleBefore.toMillis()) {
+                tx.update(candidate.ref, { status: 'PENDING', nextAttemptAt: firestore_1.Timestamp.now(), updatedAt: firestore_1.FieldValue.serverTimestamp() });
+            }
+        });
+    }
     // Find PENDING emails where nextAttemptAt is in the past
     const snapshot = await db.collection('mail')
         .where('status', '==', 'PENDING')
-        .where('nextAttemptAt', '<=', admin.firestore.Timestamp.now())
+        .where('nextAttemptAt', '<=', firestore_1.Timestamp.now())
         .limit(100)
         .get();
     if (snapshot.empty) {

@@ -11,8 +11,6 @@ import {
   getDocs, 
   doc, 
   getDoc,
-  orderBy,
-  limit,
   updateDoc,
   getCountFromServer
 } from 'firebase/firestore';
@@ -31,11 +29,8 @@ import {
   Lock, 
   Sparkles, 
   UserCheck, 
-  Building2, 
   GraduationCap, 
   ExternalLink, 
-  ArrowRight,
-  ShieldCheck,
   AlertCircle,
   RefreshCw,
   Clock,
@@ -43,7 +38,6 @@ import {
   Edit2,
   X,
   Save,
-  LogOut
 } from 'lucide-react';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import DigitalMemberCard from '@/components/ui/DigitalMemberCard';
@@ -134,7 +128,6 @@ export default function EngineeringProfilePage() {
   const t = useTranslations('Profile');
   const tActivity = useTranslations('Activity');
   const tCommon = useTranslations('Common');
-  const tOnboard = useTranslations('Onboarding');
   const locale = useLocale();
   const isAr = locale === 'ar';
   const dateLocale = isAr ? ar : enUS;
@@ -221,6 +214,9 @@ export default function EngineeringProfilePage() {
       let avatarUrl = editingPublicProfile.avatar;
       
       if (avatarFile) {
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(avatarFile.type) || avatarFile.size > 5 * 1024 * 1024) {
+          throw new Error(isAr ? 'اختر صورة JPG أو PNG أو WebP أصغر من 5 ميغابايت.' : 'Choose a JPG, PNG, or WebP image under 5 MB.');
+        }
         const fileRef = ref(storage, `avatars/${user.uid}/${Date.now()}_${avatarFile.name}`);
         await uploadBytes(fileRef, avatarFile);
         avatarUrl = await getDownloadURL(fileRef);
@@ -303,7 +299,7 @@ export default function EngineeringProfilePage() {
         // 4. Compute Community Rank accurately via O(1) aggregation
         const myPoints = userData?.totalPoints || 0;
         const higherPointsQuery = query(
-          collection(db, 'users'),
+          collection(db, 'public_profiles'),
           where('totalPoints', '>', myPoints)
         );
         const rankCountSnap = await getCountFromServer(higherPointsQuery);
@@ -336,13 +332,9 @@ export default function EngineeringProfilePage() {
     return () => {
       active = false;
     };
-  }, [user, authLoading, isAr, reloadKey]);
+  }, [user, authLoading, isAr, reloadKey, userData?.totalPoints]);
 
-  const handleDownloadCertificate = async (certificateId: string, externalUrl?: string) => {
-    if (externalUrl) {
-      window.open(externalUrl, '_blank');
-      return;
-    }
+  const handleDownloadCertificate = async (certificateId: string) => {
     setDownloadingCert(certificateId);
     try {
       const getCertUrl = httpsCallable(functions, 'getCertificateDownloadUrl');
@@ -350,7 +342,7 @@ export default function EngineeringProfilePage() {
       const data = res.data as { downloadUrl?: string; url?: string };
       const targetUrl = data?.downloadUrl || data?.url;
       if (targetUrl) {
-        window.open(targetUrl, '_blank');
+        window.open(targetUrl, '_blank', 'noopener,noreferrer');
       } else {
         alert(isAr ? 'الشهادة قيد التجهيز من قبل المنظمين.' : 'Certificate is being prepared.');
       }
@@ -431,29 +423,8 @@ export default function EngineeringProfilePage() {
     );
   }
 
-  const getFirstAndLastName = (fullName?: string, fallback?: string | null) => {
-    return fullName || fallback || 'Student';
-  };
-
-  const displayName = getFirstAndLastName(userData?.arabicFullName, user?.displayName);
-  
-  const getLabel = (type: 'colleges' | 'majors' | 'levels', val?: string | null) => {
-    if (!val) return '';
-    const key = `${type}.${val}`;
-    const result = tOnboard(key);
-    return result === key || result.includes('Onboarding') ? val : result;
-  };
-
-  const departmentStr = userData?.isQassimStudent 
-    ? [getLabel('colleges', userData.college), getLabel('majors', userData.major)].filter(Boolean).join(' - ')
-    : (isAr ? 'عضو مجتمع التقنية' : 'Tech Community Member');
-    
-  const academicLevel = userData?.academicLevel ? getLabel('levels', userData.academicLevel) : '';
-  const isQassimStudent = userData?.isQassimStudent;
-  const universityId = isQassimStudent && userData?.universityId ? `***${userData.universityId.slice(-4)}` : null;
-
   const totalPoints = userData?.totalPoints ?? 0;
-  const attendedCount = registrations.filter(r => r.status === 'attended' || r.status === 'approved').length;
+  const attendedCount = registrations.filter(r => r.status === 'attended').length;
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 lg:px-8 mt-16">
@@ -842,7 +813,7 @@ export default function EngineeringProfilePage() {
                                 <span>{isAr ? 'شهادة الحضور معتمدة' : 'Verified Certificate Available'}</span>
                               </span>
                               <button
-                                onClick={() => handleDownloadCertificate(reg.certificate!.id, reg.certificate!.externalUrl)}
+                                onClick={() => handleDownloadCertificate(reg.certificate!.id)}
                                 disabled={downloadingCert === reg.certificate!.id}
                                 className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800"
                               >
@@ -935,7 +906,7 @@ export default function EngineeringProfilePage() {
                           </div>
 
                           <button
-                            onClick={() => handleDownloadCertificate(cert.id, cert.externalUrl)}
+                            onClick={() => handleDownloadCertificate(cert.id)}
                             disabled={downloadingCert === cert.id}
                             className="bg-emerald-500 hover:bg-emerald-600 text-white p-2.5 sm:p-3 rounded-xl sm:rounded-2xl shadow-md transition-colors disabled:opacity-70 disabled:cursor-not-allowed group"
                           >

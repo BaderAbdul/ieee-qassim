@@ -1,6 +1,5 @@
-import { FieldValue } from 'firebase-admin/firestore';
-import * as functions from 'firebase-functions';
-import * as admin from 'firebase-admin';
+import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import * as functions from 'firebase-functions/v1';
 import { verifyAuth, verifyAdmin } from './utils/auth';
 import { throwFailedPrecondition } from './utils/errors';
 
@@ -18,7 +17,7 @@ export const retryCertificate = functions.https.onCall(async (data, context) => 
     throwFailedPrecondition('Missing or invalid certificateId.');
   }
 
-  const db = admin.firestore();
+  const db = getFirestore();
   
   await db.runTransaction(async (transaction) => {
     const certRef = db.collection('certificates').doc(certificateId);

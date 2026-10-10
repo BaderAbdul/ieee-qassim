@@ -34,8 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.onRegistrationCancelled = void 0;
-const functions = __importStar(require("firebase-functions"));
-const admin = __importStar(require("firebase-admin"));
+const functions = __importStar(require("firebase-functions/v1"));
 const firestore_1 = require("firebase-admin/firestore");
 exports.onRegistrationCancelled = functions.firestore
     .document('registrations/{registrationId}')
@@ -48,7 +47,7 @@ exports.onRegistrationCancelled = functions.firestore
         const eventId = after.eventId;
         if (!eventId)
             return null;
-        const db = admin.firestore();
+        const db = (0, firestore_1.getFirestore)();
         await db.runTransaction(async (transaction) => {
             var _a;
             // 1. Read event doc to check mode and capacity
@@ -57,10 +56,12 @@ exports.onRegistrationCancelled = functions.firestore
             if (!eventDoc.exists)
                 return null;
             const eventData = eventDoc.data() || {};
+            if (eventData.state !== 'Registration Open')
+                return null;
             const capacity = typeof eventData.capacity === 'number' ? eventData.capacity : 0;
             const currentCount = typeof eventData.registeredCount === 'number' ? eventData.registeredCount : 0;
             // If capacity is defined (> 0) and already at or above capacity, do not promote to avoid oversubscribing
-            if (capacity > 0 && currentCount >= capacity) {
+            if (!eventData.isUnlimitedCapacity && currentCount >= capacity) {
                 console.warn(`Capacity full for event ${eventId} (${currentCount}/${capacity}). Skipping waitlist promotion.`);
                 return null;
             }

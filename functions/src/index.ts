@@ -1,18 +1,20 @@
-import * as admin from 'firebase-admin';
+import { initializeApp } from 'firebase-admin/app';
 
 // Initialize the Firebase Admin SDK
-admin.initializeApp();
+initializeApp();
 
 // Export the Cloud Functions
 export * from './registerForEvent';
+export { onUserProfileWritten } from './publicProfiles';
+export * from './checkUniversityId';
 export * from './generateCheckInToken';
 export * from './processCheckIn';
 export * from './submitCheckIn';
 export * from './manualAttendanceOverride';
 export * from './addManualPoints';
 export * from './onPointTransactionCreated';
-export * from './authBlocking';
 export * from './issueCertificates';
+export * from './saveExternalCertificate';
 export * from './generateCertificate';
 export * from './getCertificateDownloadUrl';
 export * from './retryCertificate';

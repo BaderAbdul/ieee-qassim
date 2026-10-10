@@ -1,303 +1,143 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // ============================================================================
-    // HELPER FUNCTIONS & AUTHENTICATION UTILITIES
-    // ============================================================================
-
-    function isAuthenticated() {
-      return request.auth != null;
+    function authenticated() { return request.auth != null; }
+    function owner(uid) { return authenticated() && request.auth.uid == uid; }
+    function user() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function active() { return authenticated() && user().get('isRestricted', false) == false; }
+    function superAdmin() { return active() && user().role == 'super_admin'; }
+    function organizer() { return active() && user().role in ['event_organizer', 'super_admin']; }
+    function text(value, max) { return value is string && value.size() <= max; }
+    function optionalText(data, key, max) {
+      return !(key in data) || data[key] == null || text(data[key], max);
+    }
+    function optionalUrl(data, key) {
+      return !(key in data) || data[key] == null || data[key] == ''
+        || (text(data[key], 2000) && data[key].matches('https://.*'));
+    }
+    function eventValid(data) {
+      return data.capacity is int && data.capacity >= 0
+        && data.points is int && data.points >= 0 && data.points <= 100000
+        && data.registrationMode in ['Auto', 'Manual']
+        && data.state in ['Draft', 'Published', 'Registration Open', 'Registration Closed', 'Ongoing', 'Completed', 'Archived'];
+    }
+    function profileValid(data) {
+      return optionalText(data, 'displayName', 100)
+        && optionalText(data, 'arabicFullName', 150)
+        && optionalText(data, 'firstName', 100)
+        && optionalText(data, 'fatherName', 100)
+        && optionalText(data, 'familyName', 100)
+        && optionalText(data, 'universityId', 20)
+        && optionalText(data, 'college', 150)
+        && optionalText(data, 'major', 150)
+        && optionalText(data, 'academicLevel', 100)
+        && optionalText(data, 'photoURL', 2000)
+        && (!('profileCompleted' in data) || data.profileCompleted is bool)
+        && (!('isQassimStudent' in data) || data.isQassimStudent is bool)
+        && (!('publicProfile' in data) || (data.publicProfile is map
+          && data.publicProfile.keys().hasOnly(['avatar', 'linkedin', 'bio'])
+          && optionalText(data.publicProfile, 'avatar', 2000)
+          && optionalText(data.publicProfile, 'linkedin', 500)
+          && optionalUrl(data.publicProfile, 'avatar')
+          && optionalUrl(data.publicProfile, 'linkedin')
+          && optionalText(data.publicProfile, 'bio', 2000)))
+        && (!('cardPreferences' in data) || (data.cardPreferences is map
+          && data.cardPreferences.keys().hasOnly(['theme', 'pattern'])
+          && optionalText(data.cardPreferences, 'theme', 40)
+          && optionalText(data.cardPreferences, 'pattern', 40)));
     }
 
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-
-    function hasUserDoc() {
-      return isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
-    }
-
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-
-    function isSuperAdmin() {
-      return isAuthenticated() && (
-        (request.auth.token.email_verified == true && request.auth.token.email in ['admin@ieeequ.org', 'bader@ieeequ.org']) ||
-        (hasUserDoc() && getUserData().role == 'super_admin')
-      );
-    }
-
-    function isEventOrganizer() {
-      return isAuthenticated() && (
-        isSuperAdmin() ||
-        (hasUserDoc() && getUserData().role == 'event_organizer')
-      );
-    }
-
-    function isStringWithMax(val, maxLen) {
-      return val is string && val.size() <= maxLen;
-    }
-
-    function isPositiveInt(val) {
-      return val is int && val >= 0;
-    }
-
-    // ============================================================================
-    // USERS COLLECTION
-    // ============================================================================
-    match /users/{userId} {
-      // Authenticated users can read public profile fields for leaderboard & engineering profile
-      allow read: if isAuthenticated();
-
-      // Prevent self-escalation on create: role must default to 'student', totalPoints must be 0
-      allow create: if isSuperAdmin() || (
-        isOwner(userId)
+    // A user document is private. Safe public fields are projected by the backend.
+    match /users/{uid} {
+      allow get: if owner(uid) || organizer();
+      allow list: if organizer();
+      allow create: if owner(uid)
         && request.resource.data.role == 'student'
         && request.resource.data.totalPoints == 0
-        && (!('email' in request.resource.data) || request.resource.data.email == request.auth.token.email)
-        && request.resource.data.keys().hasOnly([
-          'role', 'totalPoints', 'email', 'displayName', 'photoURL', 'createdAt',
-          'profileCompleted', 'firstName', 'fatherName', 'familyName', 'arabicFullName',
-          'universityId', 'college', 'major', 'academicLevel', 'isQassimStudent', 'profileCompletedAt'
-        ])
-        && (!('displayName' in request.resource.data) || isStringWithMax(request.resource.data.displayName, 100))
-        && (!('arabicFullName' in request.resource.data) || isStringWithMax(request.resource.data.arabicFullName, 150))
-        && (!('universityId' in request.resource.data) || isStringWithMax(request.resource.data.universityId, 20))
-      );
-
-      // Updates:
-      // 1. Super Admin has unrestricted write access.
-      // 2. Event Organizers can ONLY update totalPoints on other users (cannot self-inflate points or alter profile/role).
-      // 3. Owners can update their profile fields, but CANNOT touch role, totalPoints, badges, or isAdmin.
-      allow update: if isSuperAdmin() || (
-        isEventOrganizer()
-        && request.auth.uid != userId
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalPoints'])
-        && isPositiveInt(request.resource.data.totalPoints)
-      ) || (
-        // Allow self-update of profile fields only (no role/points escalation)
-        isOwner(userId)
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'badges', 'isAdmin'])
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['totalPoints'])
-        && (!('displayName' in request.resource.data) || isStringWithMax(request.resource.data.displayName, 100))
-        && (!('arabicFullName' in request.resource.data) || isStringWithMax(request.resource.data.arabicFullName, 150))
-        && (!('universityId' in request.resource.data) || isStringWithMax(request.resource.data.universityId, 20))
-      ) || (
-        // Allow self-increment of totalPoints field ONLY via attendance self-check-in
-        isOwner(userId)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalPoints'])
-        && request.resource.data.get('totalPoints', 0) >= resource.data.get('totalPoints', 0)
-      );
-
-      allow delete: if isSuperAdmin();
-
-      // Private contact information
-      match /private/{docId} {
-        allow read, write: if isOwner(userId) || isEventOrganizer();
-      }
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.profileCompleted == false
+        && request.resource.data.keys().hasOnly(['role', 'totalPoints', 'email', 'displayName', 'photoURL', 'createdAt', 'profileCompleted'])
+        && profileValid(request.resource.data);
+      allow update: if superAdmin() || (owner(uid) && active()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'displayName', 'photoURL', 'firstName', 'fatherName', 'familyName', 'arabicFullName',
+          'universityId', 'college', 'major', 'academicLevel', 'isQassimStudent',
+          'profileCompleted', 'profileCompletedAt', 'publicProfile', 'cardPreferences'
+        ]) && profileValid(request.resource.data));
+      allow delete: if superAdmin();
+      match /private/{id} { allow read, write: if owner(uid) || organizer(); }
     }
-
-    // ============================================================================
-    // EVENTS COLLECTION
-    // ============================================================================
-    match /events/{eventId} {
-      // Anyone can read published events; organizers can see drafts
-      allow read: if resource.data.state != 'Draft' || isEventOrganizer();
-
-      // Organizers manage events; authenticated users can only increment/decrement registeredCount or attendanceCount
-      allow update: if isEventOrganizer() || (
-        isAuthenticated()
-        && resource.data.state == 'Registration Open'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registeredCount'])
-        && (
-           request.resource.data.registeredCount == resource.data.registeredCount + 1 ||
-           request.resource.data.registeredCount == resource.data.registeredCount - 1
-        )
-        && request.resource.data.registeredCount >= 0
-      ) || (
-        // Allow self-check-in to increment attendanceCount during active event states
-        isAuthenticated()
-        && resource.data.state in ['Registration Open', 'Registration Closed', 'Ongoing']
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['attendanceCount'])
-        && request.resource.data.attendanceCount == resource.data.get('attendanceCount', 0) + 1
-      );
-
-      allow create, delete: if isEventOrganizer();
-    }
-
-    // ============================================================================
-    // REGISTRATIONS COLLECTION
-    // ============================================================================
-    match /registrations/{registrationId} {
-      // SECURED READS: Public read leakage eliminated. Only organizers and registration owners.
-      allow get: if isAuthenticated() && (
-        isEventOrganizer() ||
-        resource == null ||
-        resource.data.userId == request.auth.uid ||
-        registrationId.matches('^.+_' + request.auth.uid + '$')
-      );
-
-      allow list: if isEventOrganizer() || (
-        isAuthenticated() && resource.data.userId == request.auth.uid
-      );
-
-      // SECURED CREATION:
-      // Enforce userId match, deterministic ID format, valid initial status, key whitelisting, no attended forgery
-      allow create: if isAuthenticated()
-        && request.resource.data.userId == request.auth.uid
-        && registrationId == (request.resource.data.eventId + '_' + request.auth.uid)
-        && request.resource.data.status in ['approved', 'waitlisted', 'pending']
-        && !('attended' in request.resource.data)
-        && request.resource.data.keys().hasAll(['userId', 'eventId', 'status', 'timestamp'])
-        && request.resource.data.keys().hasOnly(['userId', 'eventId', 'status', 'timestamp', 'userName', 'userEmail', 'universityId']);
-
-      // SECURED UPDATES:
-      // 1. Organizers can update status, mark attendance, etc.
-      // 2. Students can cancel their own registrations.
-      // 3. Students can re-register after cancellation without permission denied.
-      allow update: if isEventOrganizer() || (
-        isOwner(resource.data.userId)
-        && request.resource.data.status == 'cancelled'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt'])
-      ) || (
-        isOwner(resource.data.userId)
-        && resource.data.status == 'cancelled'
-        && request.resource.data.status in ['approved', 'waitlisted', 'pending']
-        && !('attended' in request.resource.data)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'timestamp', 'userName', 'userEmail', 'universityId', 'cancelledAt'])
-      );
-
-      allow delete: if isEventOrganizer();
-    }
-
-    // ============================================================================
-    // ATTENDANCE LOGS
-    // ============================================================================
-    match /attendance_logs/{logId} {
-      allow read: if isOwner(resource.data.userId) || isEventOrganizer();
-      // Allow self-check-in: student can write their own attendance log (ID must be eventId_userId)
-      allow create: if isEventOrganizer() || (
-        isAuthenticated()
-        && request.resource.data.userId == request.auth.uid
-        && logId.matches('^.+_' + request.auth.uid + '$')
-        && request.resource.data.keys().hasAll(['eventId', 'userId', 'timestamp'])
-        && request.resource.data.keys().hasOnly(['eventId', 'userId', 'timestamp', 'verifiedByAdmin'])
-      );
-      allow update, delete: if isSuperAdmin();
-    }
-
-    // ============================================================================
-    // PENDING CHECK-INS (Dynamic QR Verification)
-    // ============================================================================
-    match /pending_checkins/{checkInId} {
-      allow create: if isAuthenticated()
-        && request.resource.data.userId == request.auth.uid
-        && request.resource.data.status == 'pending'
-        && request.resource.data.keys().hasOnly(['eventId', 'userId', 'token', 'status', 'timestamp'])
-        && isStringWithMax(request.resource.data.token, 32)
-        && isStringWithMax(request.resource.data.eventId, 100);
-
-      allow read: if isOwner(resource.data.userId) || isEventOrganizer();
-      allow update, delete: if isEventOrganizer();
-    }
-
-    // ============================================================================
-    // POINT TRANSACTIONS (Immutable Ledger)
-    // ============================================================================
-    match /point_transactions/{transactionId} {
-      allow read: if isOwner(resource.data.userId) || isEventOrganizer();
-      allow create: if isEventOrganizer() || (
-        // Allow self attendance point transaction: student records their own earned points
-        isAuthenticated()
-        && request.resource.data.userId == request.auth.uid
-        && request.resource.data.source == 'attendance'
-        && request.resource.data.type == 'earned'
-        && request.resource.data.createdBy == 'system'
-        && transactionId.matches('^attendance_.+_' + request.auth.uid + '$')
-        && (
-          (('points' in request.resource.data) && request.resource.data.points is int && request.resource.data.points >= 0) ||
-          (('amount' in request.resource.data) && request.resource.data.amount is int && request.resource.data.amount >= 0)
-        )
-        && request.resource.data.keys().hasAll(['userId', 'source', 'type', 'createdBy', 'createdAt'])
-        && request.resource.data.keys().hasOnly(['userId', 'amount', 'source', 'reason', 'sourceEventId', 'createdBy', 'createdAt', 'type', 'points', 'description', 'timestamp'])
-      );
-      allow update, delete: if false; // Strict immutability
-    }
-
-    // ============================================================================
-    // CERTIFICATES
-    // ============================================================================
-    match /certificates/{certificateId} {
-      allow read: if isOwner(resource.data.userId)
-        || isEventOrganizer()
-        || (resource != null && resource.data.status == 'Available');
-      allow create, update, delete: if isEventOrganizer();
-    }
-
-    // ============================================================================
-    // SETTINGS
-    // ============================================================================
-    match /settings/{docId} {
+    match /public_profiles/{uid} {
       allow read: if true;
-      allow write: if isSuperAdmin() || (isEventOrganizer() && docId == 'homepage');
+      allow write: if false;
     }
-
-    // ============================================================================
-    // IDEAS & PROPOSALS
-    // ============================================================================
-    match /ideas/{ideaId} {
-      allow create: if isAuthenticated()
-        && request.resource.data.userId == request.auth.uid
-        && isStringWithMax(request.resource.data.title, 200)
-        && isStringWithMax(request.resource.data.description, 3000);
-
-      allow read: if isAuthenticated() && (
-        isOwner(resource.data.userId) ||
-        isEventOrganizer() ||
-        resource.data.isPublic == true
-      );
-
-      allow update: if isEventOrganizer() || (
-        isAuthenticated()
-        && resource.data.isPublic == true
+    match /events/{eventId} {
+      allow read: if resource.data.state in ['Published', 'Registration Open', 'Registration Closed', 'Ongoing', 'Completed', 'Archived'] || organizer();
+      allow create: if organizer()
+        && eventValid(request.resource.data)
+        && request.resource.data.get('registeredCount', 0) == 0
+        && request.resource.data.get('attendanceCount', 0) == 0;
+      allow update: if organizer() && eventValid(request.resource.data)
+        && (request.resource.data.get('isUnlimitedCapacity', false) == true || request.resource.data.capacity >= resource.data.get('registeredCount', 0))
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['registeredCount', 'attendanceCount', 'checkinToken']);
+      allow delete: if superAdmin();
+    }
+    match /event_secrets/{eventId} {
+      allow read: if organizer();
+      allow write: if false;
+    }
+    match /registrations/{registrationId} {
+      allow get: if organizer() || (authenticated() && registrationId.matches('^.+_' + request.auth.uid + '$'));
+      allow list: if organizer() || (authenticated() && resource.data.userId == request.auth.uid);
+      allow write: if false;
+    }
+    match /attendance_logs/{id} {
+      allow read: if organizer() || owner(resource.data.userId);
+      allow write: if false;
+    }
+    match /point_transactions/{id} {
+      allow read: if organizer() || owner(resource.data.userId);
+      allow write: if false;
+    }
+    match /pending_checkins/{id} {
+      allow read: if organizer() || owner(resource.data.userId);
+      allow write: if false;
+    }
+    match /certificates/{id} {
+      allow read: if organizer() || owner(resource.data.userId);
+      allow write: if false;
+    }
+    match /settings/{id} {
+      allow read: if true;
+      allow write: if superAdmin() || (organizer() && id == 'homepage');
+    }
+    match /ideas/{id} {
+      allow create: if active() && request.resource.data.userId == request.auth.uid
+        && request.resource.data.keys().hasOnly(['userId', 'userName', 'type', 'title', 'description', 'createdAt', 'status', 'isPublic', 'votesCount', 'voters'])
+        && text(request.resource.data.title, 200) && text(request.resource.data.description, 3000)
+        && request.resource.data.get('isPublic', false) == false
+        && request.resource.data.get('votesCount', 0) == 0
+        && request.resource.data.get('voters', []).size() == 0;
+      allow read: if organizer() || owner(resource.data.userId) || resource.data.isPublic == true;
+      allow update: if organizer() || (active() && resource.data.isPublic == true
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votesCount', 'voters'])
-        && (
-          (request.resource.data.voters.hasAll(resource.data.get('voters', []))
-           && request.resource.data.voters.size() == resource.data.get('voters', []).size() + 1
-           && request.resource.data.voters.hasAll([request.auth.uid])
-           && request.resource.data.votesCount == resource.data.get('votesCount', 0) + 1)
-          ||
-          (resource.data.get('voters', []).hasAll(request.resource.data.voters)
-           && request.resource.data.voters.size() == resource.data.get('voters', []).size() - 1
-           && !request.resource.data.voters.hasAny([request.auth.uid])
-           && request.resource.data.votesCount == resource.data.get('votesCount', 0) - 1)
-        )
-      );
-
-      allow delete: if isEventOrganizer();
+        && request.resource.data.votesCount >= 0
+        && ((!(request.auth.uid in resource.data.get('voters', []))
+          && request.resource.data.voters == resource.data.get('voters', []).concat([request.auth.uid])
+          && request.resource.data.votesCount == resource.data.get('votesCount', 0) + 1)
+          || ((request.auth.uid in resource.data.get('voters', []))
+          && request.resource.data.voters == resource.data.get('voters', []).removeAll([request.auth.uid])
+          && request.resource.data.votesCount == resource.data.get('votesCount', 0) - 1)));
+      allow delete: if organizer();
     }
-
-    // ============================================================================
-    // EVENT FEEDBACK
-    // ============================================================================
-    match /event_feedback/{feedbackId} {
-      allow read: if isEventOrganizer() || isOwner(resource.data.userId);
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isEventOrganizer();
+    match /event_feedback/{id} {
+      allow read: if organizer() || owner(resource.data.userId);
+      allow write: if false;
     }
-
-    // ============================================================================
-    // MAIL QUEUE & AUDIT LOGS
-    // ============================================================================
-    match /mail/{mailId} {
-      allow read, write: if false; // Cloud Functions exclusively
-    }
-
-    match /audit_logs/{logId} {
-      allow read: if isSuperAdmin();
-      allow write: if false; // Cloud Functions / Admin SDK exclusively
+    match /mail/{id} { allow read, write: if false; }
+    match /audit_logs/{id} {
+      allow read: if superAdmin();
+      allow write: if false;
     }
   }
 }

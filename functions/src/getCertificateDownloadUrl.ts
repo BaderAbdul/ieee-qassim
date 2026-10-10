@@ -1,5 +1,6 @@
-import * as functions from 'firebase-functions';
-import * as admin from 'firebase-admin';
+import { getStorage } from 'firebase-admin/storage';
+import { getFirestore } from 'firebase-admin/firestore';
+import * as functions from 'firebase-functions/v1';
 import { verifyAuth } from './utils/auth';
 import { throwFailedPrecondition, throwNotFound } from './utils/errors';
 
@@ -11,7 +12,7 @@ export const getCertificateDownloadUrl = functions.https.onCall(async (data, con
     throwFailedPrecondition('Missing or invalid certificateId.');
   }
 
-  const db = admin.firestore();
+  const db = getFirestore();
   const certRef = db.collection('certificates').doc(certificateId);
   const certSnap = await certRef.get();
 
@@ -23,7 +24,7 @@ export const getCertificateDownloadUrl = functions.https.onCall(async (data, con
 
   // Verify ownership or admin role (roles are stored in Firestore, not JWT custom claims)
   let isAdmin = false;
-  const userSnap = await admin.firestore().collection('users').doc(uid).get();
+  const userSnap = await getFirestore().collection('users').doc(uid).get();
   const role = userSnap.data()?.role;
   if (role === 'super_admin' || role === 'event_organizer') {
     isAdmin = true;
@@ -38,12 +39,15 @@ export const getCertificateDownloadUrl = functions.https.onCall(async (data, con
   }
 
   const storagePath = certData!.storagePath;
+  if (typeof certData?.externalUrl === 'string' && certData.externalUrl.startsWith('https://')) {
+    return { status: 'success', url: certData.externalUrl };
+  }
   if (!storagePath) {
     throwFailedPrecondition('Certificate storage path is missing.');
   }
 
   try {
-    const bucket = admin.storage().bucket();
+    const bucket = getStorage().bucket();
     const file = bucket.file(storagePath);
     
     // Check if file exists in storage

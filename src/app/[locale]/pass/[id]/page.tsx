@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useTranslations, useLocale } from 'next-intl';
+import { useLocale } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import { doc, getDoc, collection, query, where, getCountFromServer } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
@@ -9,6 +9,8 @@ import DigitalMemberCard from '@/components/ui/DigitalMemberCard';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { AlertCircle } from 'lucide-react';
 import { User } from 'firebase/auth';
+import { UserData } from '@/context/AuthContext';
+import { toJsDate } from '@/lib/dateUtils';
 
 export default function PublicPassPage({ params }: { params: Promise<{ id: string, locale: string }> }) {
   const [userId, setUserId] = useState<string | null>(null);
@@ -23,7 +25,7 @@ export default function PublicPassPage({ params }: { params: Promise<{ id: strin
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  const [userData, setUserData] = useState<any>(null);
+  const [userData, setUserData] = useState<(UserData & { name?: string }) | null>(null);
   const [userRank, setUserRank] = useState<number | null>(null);
   
   useEffect(() => {
@@ -34,7 +36,7 @@ export default function PublicPassPage({ params }: { params: Promise<{ id: strin
         setLoading(true);
         setError(null);
         
-        const userDocRef = doc(db, 'users', userId);
+        const userDocRef = doc(db, 'public_profiles', userId);
         const userDoc = await getDoc(userDocRef);
         
         if (!userDoc.exists()) {
@@ -44,12 +46,12 @@ export default function PublicPassPage({ params }: { params: Promise<{ id: strin
         }
 
         const data = userDoc.data();
-        setUserData(data);
+        setUserData(data as UserData);
 
         // Fetch rank
         const myPoints = data?.totalPoints || 0;
         const higherPointsQuery = query(
-          collection(db, 'users'),
+          collection(db, 'public_profiles'),
           where('totalPoints', '>', myPoints)
         );
         const rankCountSnap = await getCountFromServer(higherPointsQuery);
@@ -96,7 +98,7 @@ export default function PublicPassPage({ params }: { params: Promise<{ id: strin
     photoURL: userData.publicProfile?.avatar || null,
     displayName: userData.arabicFullName || userData.name || '',
     metadata: {
-      creationTime: userData.createdAt?.toDate ? userData.createdAt.toDate().toISOString() : new Date().toISOString()
+      creationTime: toJsDate(userData.createdAt)?.toISOString() || new Date().toISOString()
     }
   } as User;
 

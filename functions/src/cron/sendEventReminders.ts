@@ -1,19 +1,19 @@
+import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import * as admin from 'firebase-admin';
 import { enqueueEmail } from '../utils/email';
 
 export const sendEventReminders = onSchedule('every 1 hours', async (event) => {
-  const db = admin.firestore();
+  const db = getFirestore();
   
-  const now = admin.firestore.Timestamp.now();
+  const now = Timestamp.now();
   const nowMs = now.toMillis();
   
   // Calculate window: events starting between 23h30m and 24h30m from now
   const windowStartMs = nowMs + (23.5 * 60 * 60 * 1000);
   const windowEndMs = nowMs + (24.5 * 60 * 60 * 1000);
   
-  const windowStart = admin.firestore.Timestamp.fromMillis(windowStartMs);
-  const windowEnd = admin.firestore.Timestamp.fromMillis(windowEndMs);
+  const windowStart = Timestamp.fromMillis(windowStartMs);
+  const windowEnd = Timestamp.fromMillis(windowEndMs);
 
   // Query events happening in this window
   // Assume events have a `date` field (Timestamp)

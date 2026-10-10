@@ -35,24 +35,28 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.addManualPoints = void 0;
 const firestore_1 = require("firebase-admin/firestore");
-const functions = __importStar(require("firebase-functions"));
-const admin = __importStar(require("firebase-admin"));
+const functions = __importStar(require("firebase-functions/v1"));
 const auth_1 = require("./utils/auth");
 const errors_1 = require("./utils/errors");
+const eventLifecycle_1 = require("./utils/eventLifecycle");
 exports.addManualPoints = functions.https.onCall(async (data, context) => {
     const adminUid = (0, auth_1.verifyAuth)(context);
     await (0, auth_1.verifyAdmin)(adminUid); // Only admins can do manual adjustments
     const { studentUid, amount, reason } = data;
+    (0, eventLifecycle_1.documentId)(studentUid, 'studentUid');
     if (!studentUid || typeof studentUid !== 'string') {
         (0, errors_1.throwFailedPrecondition)('Invalid or missing studentUid.');
     }
-    if (typeof amount !== 'number' || amount === 0) {
+    if (!Number.isSafeInteger(amount) || amount === 0 || Math.abs(amount) > 100000) {
         (0, errors_1.throwFailedPrecondition)('Invalid amount. Must be a non-zero number.');
     }
     if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
         (0, errors_1.throwFailedPrecondition)('Reason is required for manual point adjustments.');
     }
-    const db = admin.firestore();
+    const db = (0, firestore_1.getFirestore)();
+    if (!(await db.collection('users').doc(studentUid).get()).exists) {
+        (0, errors_1.throwFailedPrecondition)('Student profile not found.');
+    }
     // Create a new point transaction
     // Using auto-ID since manual adjustments can happen multiple times for a student
     const pointTxRef = db.collection('point_transactions').doc();

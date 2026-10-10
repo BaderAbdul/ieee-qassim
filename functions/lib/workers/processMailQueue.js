@@ -1,51 +1,10 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.processMailQueue = void 0;
 const firestore_1 = require("firebase-functions/v2/firestore");
-const admin = __importStar(require("firebase-admin"));
 const firestore_2 = require("firebase-admin/firestore");
 const resend_1 = require("resend");
 const emailTemplates_1 = require("../utils/emailTemplates");
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
-// Allow mock in emulator, fail loudly in production
-if (!RESEND_API_KEY && process.env.FUNCTIONS_EMULATOR !== 'true') {
-    throw new Error('RESEND_API_KEY is not configured. Set it as a Firebase Secret.');
-}
-const resend = new resend_1.Resend(RESEND_API_KEY || 're_mock_key_emulator_only');
-const SENDER_EMAIL = process.env.SENDER_EMAIL || 'IEEE QU <noreply@ieee-qu.com>';
 function getSubject(template) {
     switch (template) {
         case 'REGISTRATION_RECEIVED': return 'Registration Received - IEEE QU';
@@ -69,7 +28,7 @@ function calculateNextAttempt(attemptCount) {
 }
 exports.processMailQueue = (0, firestore_1.onDocumentWritten)({
     document: 'mail/{mailId}',
-    secrets: ['RESEND_API_KEY', 'SENDER_EMAIL'] // Assume these will be configured in Secret Manager
+    secrets: ['RESEND_API_KEY']
 }, async (event) => {
     var _a, _b;
     const after = (_a = event.data) === null || _a === void 0 ? void 0 : _a.after;
@@ -82,7 +41,7 @@ exports.processMailQueue = (0, firestore_1.onDocumentWritten)({
     if (data.nextAttemptAt && data.nextAttemptAt.toDate() > new Date()) {
         return;
     }
-    const db = admin.firestore();
+    const db = (0, firestore_2.getFirestore)();
     const mailRef = after.ref;
     // Use a transaction to grab the email safely and avoid duplicate execution
     const grabbed = await db.runTransaction(async (transaction) => {
@@ -117,12 +76,15 @@ exports.processMailQueue = (0, firestore_1.onDocumentWritten)({
         }
         else {
             // Call Resend API
+            if (!process.env.RESEND_API_KEY || !process.env.SENDER_EMAIL)
+                throw new Error('Email credentials and sender must be configured.');
+            const resend = new resend_1.Resend(process.env.RESEND_API_KEY);
             response = await resend.emails.send({
-                from: SENDER_EMAIL,
+                from: process.env.SENDER_EMAIL,
                 to: data.to,
                 subject: subject,
                 html: html,
-            });
+            }, { idempotencyKey: mailRef.id });
         }
         if (response.error) {
             throw new Error(response.error.message);

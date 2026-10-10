@@ -37,9 +37,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateCertificate = void 0;
+const storage_1 = require("firebase-admin/storage");
 const firestore_1 = require("firebase-admin/firestore");
 const firestore_2 = require("firebase-functions/v2/firestore");
-const admin = __importStar(require("firebase-admin"));
 const puppeteer_core_1 = __importDefault(require("puppeteer-core"));
 const chromium_1 = __importDefault(require("@sparticuz/chromium"));
 const fs = __importStar(require("fs"));
@@ -48,21 +48,25 @@ exports.generateCertificate = (0, firestore_2.onDocumentWritten)({
     document: 'certificates/{certificateId}',
     memory: '1GiB',
     timeoutSeconds: 120,
+    concurrency: 1,
+    maxInstances: 5,
+    retry: true,
 }, async (event) => {
-    var _a;
+    var _a, _b, _c;
     const snap = (_a = event.data) === null || _a === void 0 ? void 0 : _a.after;
     if (!snap || !snap.exists)
         return; // Document deleted
     const data = snap.data() || {};
-    if (data.status !== 'Generating') {
+    if (data.status !== 'Generating' || ((_c = (_b = event.data) === null || _b === void 0 ? void 0 : _b.before.data()) === null || _c === void 0 ? void 0 : _c.status) === 'Generating') {
         return; // Only process when status is Generating
     }
     const eventId = data.eventId;
     const userId = data.userId;
-    const studentName = data.studentName;
-    const eventTitle = data.eventTitle;
+    const escapeHtml = (value) => String(value !== null && value !== void 0 ? value : '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+    const studentName = escapeHtml(data.studentName);
+    const eventTitle = escapeHtml(data.eventTitle);
     const storagePath = data.storagePath;
-    const db = admin.firestore();
+    const db = (0, firestore_1.getFirestore)();
     const certRef = db.collection('certificates').doc(event.params.certificateId);
     // Safe helper to resolve font path across both development and compiled runtime environments
     const resolveFontBase64 = (fontFileName) => {
@@ -86,6 +90,7 @@ exports.generateCertificate = (0, firestore_2.onDocumentWritten)({
         console.warn(`[generateCertificate] Font file ${fontFileName} not found at any candidate path. Using fallback typography.`);
         return null;
     };
+    let browser;
     try {
         // Load fonts as base64 if available
         const cairoRegularBase64 = resolveFontBase64('Cairo-Regular.ttf');
@@ -150,19 +155,20 @@ exports.generateCertificate = (0, firestore_2.onDocumentWritten)({
             <h2>${studentName}</h2>
             <p>قد حضر/ت فعالية</p>
             <h2 style="color: #0f172a;">${eventTitle}</h2>
-            <div class="cert-id">رقم الشهادة: ${event.params.certificateId}</div>
+            <div class="cert-id">رقم الشهادة: ${escapeHtml(event.params.certificateId)}</div>
           </div>
         </body>
         </html>
       `;
         // 2. Launch Puppeteer
-        const browser = await puppeteer_core_1.default.launch({
+        browser = await puppeteer_core_1.default.launch({
             args: chromium_1.default.args,
             executablePath: await chromium_1.default.executablePath(),
             headless: true,
         });
         const page = await browser.newPage();
-        await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+        await page.setContent(htmlContent, { waitUntil: 'domcontentloaded' });
+        await page.evaluate(() => document.fonts.ready);
         // 3. Generate PDF
         const pdfBuffer = await page.pdf({
             format: 'A4',
@@ -171,7 +177,7 @@ exports.generateCertificate = (0, firestore_2.onDocumentWritten)({
         });
         await browser.close();
         // 4. Upload to Firebase Storage
-        const bucket = admin.storage().bucket();
+        const bucket = (0, storage_1.getStorage)().bucket();
         const file = bucket.file(storagePath);
         await file.save(pdfBuffer, {
             metadata: {
@@ -184,21 +190,34 @@ exports.generateCertificate = (0, firestore_2.onDocumentWritten)({
             }
         });
         // 5. Update Status
-        await certRef.update({
-            status: 'Available',
-            issueDate: firestore_1.FieldValue.serverTimestamp(),
-            attemptCount: firestore_1.FieldValue.increment(1),
+        await db.runTransaction(async (tx) => {
+            var _a;
+            const current = await tx.get(certRef);
+            if (((_a = current.data()) === null || _a === void 0 ? void 0 : _a.status) !== 'Generating')
+                return;
+            tx.update(certRef, {
+                status: 'Available', issueDate: firestore_1.FieldValue.serverTimestamp(),
+                updatedAt: firestore_1.FieldValue.serverTimestamp(), attemptCount: firestore_1.FieldValue.increment(1),
+            });
         });
         console.log(`Certificate ${event.params.certificateId} generated successfully.`);
     }
     catch (error) {
         console.error(`Error generating certificate ${event.params.certificateId}:`, error);
         // Update status to Failed
-        await certRef.update({
-            status: 'Failed',
-            lastError: error.message || 'Unknown error during PDF generation',
-            attemptCount: firestore_1.FieldValue.increment(1),
+        await db.runTransaction(async (tx) => {
+            var _a;
+            const current = await tx.get(certRef);
+            if (((_a = current.data()) === null || _a === void 0 ? void 0 : _a.status) !== 'Generating')
+                return;
+            tx.update(certRef, {
+                status: 'Failed', lastError: error instanceof Error ? error.message : 'PDF generation failed',
+                updatedAt: firestore_1.FieldValue.serverTimestamp(), attemptCount: firestore_1.FieldValue.increment(1),
+            });
         });
+    }
+    finally {
+        await (browser === null || browser === void 0 ? void 0 : browser.close().catch(console.error));
     }
 });
 //# sourceMappingURL=generateCertificate.js.map

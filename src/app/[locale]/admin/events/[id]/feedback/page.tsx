@@ -8,14 +8,9 @@ import { Link } from '@/i18n/routing';
 import { Star, Download, ArrowRight, Loader2, MessageSquare, BarChart3, Users, Award } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { toJsDate } from '@/lib/dateUtils';
 
-const getMillis = (dateVal: any): number => {
-  if (!dateVal) return 0;
-  if (typeof dateVal?.toDate === 'function') return dateVal.toDate().getTime();
-  if (typeof dateVal?.seconds === 'number') return dateVal.seconds * 1000;
-  if (dateVal instanceof Date) return dateVal.getTime();
-  return new Date(dateVal).getTime() || 0;
-};
+const getMillis = (value: unknown): number => toJsDate(value)?.getTime() || 0;
 
 export default function EventFeedbackDashboardPage({ params }: { params: Promise<{ id: string; locale: string }> }) {
   const { id: eventId, locale } = use(params);

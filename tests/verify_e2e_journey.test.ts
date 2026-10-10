@@ -14,38 +14,24 @@ function readSource(relPath: string): string {
 // PART 1: CODE INTEGRITY VERIFICATION (FATAL BUG ELIMINATION)
 // ============================================================================
 
-test('E2E Integrity: QR Host uses deterministic attendance log doc ID matching Cloud Function', () => {
-  const qrSource = readSource('src/app/[locale]/admin/events/[id]/qr/page.tsx');
-  
-  // Must NOT use random doc ID doc(collection(db, 'attendance_logs'))
-  assert.equal(
-    qrSource.includes("doc(collection(db, 'attendance_logs'))"),
-    false,
-    'FATAL BUG CHECK: QR page must NOT use auto-generated random doc ID for attendance logs'
-  );
-
-  // Must use deterministic ID `${eventId}_${userId}`
-  assert.ok(
-    qrSource.includes("doc(db, 'attendance_logs', `${eventId}_${userId}`)"),
-    'QR page must create attendance log with deterministic document ID `${eventId}_${userId}`'
-  );
+test('Attendance desks use the authenticated backend and have no direct transaction fallback', () => {
+  for (const route of ['src/app/[locale]/admin/events/[id]/checkin-desk/page.tsx', 'src/app/[locale]/events/[id]/checkin/page.tsx']) {
+    const source = readSource(route);
+    assert.ok(source.includes("'submitCheckIn'"));
+    assert.equal(source.includes('runTransaction'), false);
+    assert.equal(source.includes('increment('), false);
+  }
 });
 
-test('E2E Integrity: QR Host updates registration status to "attended"', () => {
-  const qrSource = readSource('src/app/[locale]/admin/events/[id]/qr/page.tsx');
-  assert.ok(
-    qrSource.includes("status: 'attended'"),
-    'QR check-in must update registration status to "attended"'
-  );
+test('Shared attendance service updates registration and uses deterministic ledger IDs', () => {
+  const source = readSource('functions/src/utils/eventLifecycle.ts');
+  assert.ok(source.includes('attendance_${eventId}_${userId}'));
+  assert.ok(source.includes("status: 'attended'"));
 });
 
-test('E2E Integrity: QR Host does not create unmanaged duplicate certificates', () => {
-  const qrSource = readSource('src/app/[locale]/admin/events/[id]/qr/page.tsx');
-  assert.equal(
-    qrSource.includes("doc(collection(db, 'certificates'))"),
-    false,
-    'QR page must not create unmanaged duplicate certificates'
-  );
+test('Attendance desks cannot generate unmanaged certificates', () => {
+  const source = readSource('src/app/[locale]/admin/events/[id]/checkin-desk/page.tsx');
+  assert.equal(source.includes('setDoc'), false);
 });
 
 // ============================================================================

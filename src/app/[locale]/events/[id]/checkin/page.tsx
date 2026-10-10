@@ -4,11 +4,11 @@ import { useEffect, useState, use } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { db, functions } from '@/lib/firebase/client';
 import { httpsCallable } from 'firebase/functions';
-import { doc, getDoc, runTransaction, serverTimestamp, increment } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { useSearchParams } from 'next/navigation';
 import { Link } from '@/i18n/routing';
 import { CheckCircle, XCircle, Loader2, Star, Sparkles, Award, Send } from 'lucide-react';
-import { PlatformEvent, CustomQuestion } from '@/lib/types';
+import { PlatformEvent } from '@/lib/types';
 
 export default function SelfCheckinPage({ params }: { params: Promise<{ id: string; locale: string }> }) {
   const { id: eventId, locale } = use(params);
@@ -102,124 +102,15 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
       if (result.status === 'already_checked_in') {
         setStatus('already_attended');
       } else {
-        setAwardedPoints(result.awardedPoints || event?.points || 0);
+        setAwardedPoints(result.awardedPoints ?? 0);
         setStatus('success');
       }
-    } catch (cfError: any) {
-      console.warn("Cloud function unavailable or returned error, attempting client fallback:", cfError);
-
-      try {
-        // Fallback: Perform check-in directly using Firestore Client SDK Transaction
-        const points = event?.points || 0;
-        const regId = `${eventId}_${user.uid}`;
-        const logId = `${eventId}_${user.uid}`;
-        const feedbackId = `${eventId}_${user.uid}`;
-        const pointTxId = `attendance_${eventId}_${user.uid}`;
-
-        const isAlreadyCheckedIn = await runTransaction(db, async (tx) => {
-          // Verify Event state & token
-          const evRef = doc(db, 'events', eventId);
-          const evSnap = await tx.get(evRef);
-          if (!evSnap.exists()) {
-            throw new Error(isAr ? 'الفعالية غير موجودة' : 'Event not found');
-          }
-          const evData = evSnap.data();
-          if (evData.checkinToken !== token) {
-            throw new Error(isAr ? 'رابط التحضير غير صالح أو منتهي الصلاحية' : 'Invalid or expired check-in token');
-          }
-
-          // Validate event state — reject completed/archived events
-          const validStates = ['Registration Open', 'Registration Closed', 'Ongoing'];
-          if (!validStates.includes(evData.state)) {
-            throw new Error(isAr ? 'لا يمكن التحضير — الفعالية منتهية أو غير نشطة' : 'Cannot check in — event is not active');
-          }
-
-          // Check if log exists (idempotency guard)
-          const logRef = doc(db, 'attendance_logs', logId);
-          const logSnap = await tx.get(logRef);
-          if (logSnap.exists()) {
-            return true; // already checked in
-          }
-
-          // Check registration (read before writes)
-          const regRef = doc(db, 'registrations', regId);
-          const regSnap = await tx.get(regRef);
-
-          // --- WRITES START HERE ---
-
-          // Write attendance log (ID format: eventId_userId — matches security rule pattern)
-          tx.set(logRef, {
-            userId: user.uid,
-            eventId: eventId,
-            timestamp: serverTimestamp(),
-            verifiedByAdmin: false,
-          });
-
-          // Update registration status if exists
-          if (regSnap.exists() && regSnap.data().status !== 'attended') {
-            tx.update(regRef, {
-              status: 'attended',
-              attended: true,
-              attendedAt: serverTimestamp(),
-            });
-          }
-
-          // Increment event attendanceCount (allowed for 'Ongoing' events)
-          tx.update(evRef, {
-            attendanceCount: increment(1)
-          });
-
-          // Write feedback
-          const feedbackRef = doc(db, 'event_feedback', feedbackId);
-          tx.set(feedbackRef, {
-            id: feedbackId,
-            eventId,
-            userId: user.uid,
-            userEmail: user.email || '',
-            rating,
-            answers,
-            createdAt: serverTimestamp()
-          }, { merge: true });
-
-          // Write point transaction & update user 'points' field
-          // (Security rules allow self-write of attendance point_transactions with id pattern attendance_*_uid)
-          if (points > 0) {
-            const pointTxRef = doc(db, 'point_transactions', pointTxId);
-            tx.set(pointTxRef, {
-              userId: user.uid,
-              amount: points,
-              points: points,
-              source: 'attendance',
-              type: 'earned',
-              createdBy: 'system',
-              reason: `حضور فعالية: ${evData.title || ''}`,
-              description: `حضور فعالية: ${evData.title || ''}`,
-              sourceEventId: eventId,
-              createdAt: serverTimestamp(),
-              timestamp: serverTimestamp()
-            });
-
-            // Update user 'totalPoints' field (rules allow self-increment of 'totalPoints' field)
-            const userRef = doc(db, 'users', user.uid);
-            tx.update(userRef, {
-              totalPoints: increment(points)
-            });
-          }
-
-          return false;
-        });
-
-        if (isAlreadyCheckedIn) {
-          setStatus('already_attended');
-        } else {
-          setAwardedPoints(points);
-          setStatus('success');
-        }
-      } catch (fallbackError: any) {
-        console.error("Fallback check-in failed:", fallbackError);
-        setStatus('error');
-        setErrorMessage(fallbackError.message || (isAr ? 'حدث خطأ أثناء التحضير' : 'Error during check-in'));
-      }
+    } catch (error) {
+      console.error('Check-in failed', error);
+      setStatus('error');
+      setErrorMessage(isAr
+        ? 'تعذر تسجيل الحضور. تأكد من قبول تسجيلك وصلاحية الرابط ثم أعد المحاولة أو تواصل مع المنظم.'
+        : 'Check-in failed. Check your approval and link, then retry or contact the organizer.');
     } finally {
       setIsSubmitting(false);
     }

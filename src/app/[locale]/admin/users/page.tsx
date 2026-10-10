@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, getDocs, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, deleteDoc, doc, query, orderBy, documentId, limit, startAfter, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase/client';
 import { httpsCallable } from 'firebase/functions';
 import { useAuth } from '@/context/AuthContext';
-import { Search, Trophy, Shield, ShieldAlert, AlertOctagon, Trash2, Edit3, Lock, Unlock, MoreVertical } from 'lucide-react';
+import { Search, Trophy, Shield, ShieldAlert, Trash2, Edit3, Lock, Unlock } from 'lucide-react';
 
 interface AdminUserItem {
   id: string;
@@ -21,6 +21,10 @@ export default function AdminUsersPage() {
   const { userData, loading: authLoading } = useAuth();
   const [users, setUsers] = useState<AdminUserItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<Error | null>(null);
+  const [pageCursor, setPageCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [nextCursor, setNextCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [hasMore, setHasMore] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
   // Adjust Points Modal State
@@ -31,8 +35,9 @@ export default function AdminUsersPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const role = userData?.role;
   useEffect(() => {
-    if (!userData || (userData.role !== 'super_admin' && userData.role !== 'event_organizer')) {
+    if (role !== 'super_admin' && role !== 'event_organizer') {
       return;
     }
 
@@ -40,12 +45,16 @@ export default function AdminUsersPage() {
 
     const fetchUsers = async () => {
       try {
-        const snap = await getDocs(collection(db, 'users'));
+        const snap = await getDocs(query(collection(db, 'users'), orderBy(documentId()), ...(pageCursor ? [startAfter(pageCursor)] : []), limit(50)));
         if (active) {
-          setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() } as AdminUserItem)));
+          const page = snap.docs.map(d => ({ id: d.id, ...d.data() } as AdminUserItem));
+          setUsers(previous => pageCursor ? [...previous.filter(item => !page.some(next => next.id === item.id)), ...page] : page);
+          setNextCursor(snap.docs.at(-1) || null);
+          setHasMore(snap.size === 50);
         }
       } catch (err) {
         console.error('Error fetching users', err);
+        if (active) setLoadError(err instanceof Error ? err : new Error('Unable to load users'));
       } finally {
         if (active) {
           setLoading(false);
@@ -58,7 +67,9 @@ export default function AdminUsersPage() {
     return () => {
       active = false;
     };
-  }, [userData]);
+  }, [role, pageCursor]);
+
+  if (loadError) throw loadError;
 
   const handleAdjustPoints = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,7 +92,7 @@ export default function AdminUsersPage() {
       // Update local state to reflect change (cache update simulation)
       setUsers(users.map(u => 
         u.id === selectedUser.id 
-          ? { ...u, totalPoints: (u.totalPoints || 0) + amount } 
+          ? { ...u, totalPoints: Math.max(0, (u.totalPoints || 0) + amount) }
           : u
       ));
       
@@ -321,6 +332,8 @@ export default function AdminUsersPage() {
           </div>
         </div>
       )}
+      {hasMore && <button disabled={loading} onClick={() => { setLoading(true); setPageCursor(nextCursor); }} className="mt-6 rounded-xl bg-slate-100 px-5 py-3 font-bold disabled:opacity-50">تحميل المزيد / Load more</button>}
+
     </div>
   );
 }

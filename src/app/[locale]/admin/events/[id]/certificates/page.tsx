@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { collection, query, where, getDocs, getDoc, doc, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase/client';
 import { httpsCallable } from 'firebase/functions';
 import { useAuth } from '@/context/AuthContext';
@@ -173,27 +173,11 @@ export default function CertificatesManagementPage() {
     }
     setProcessing(true);
     try {
-      const certId = `certificate_${eventId}_${attendee.userId}`;
-      const certRef = doc(db, 'certificates', certId);
-      await setDoc(certRef, {
-        id: certId,
-        eventId,
-        userId: attendee.userId,
-        status: 'Available',
-        externalUrl: url,
-        studentName: attendee.name,
-        eventTitle: event?.title || '',
-        eventType: event?.type || 'Workshop',
-        attendanceDate: new Date(),
-        issueDate: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        attemptCount: 1
-      });
+      await httpsCallable(functions, 'saveExternalCertificate')({ eventId, userId: attendee.userId, url });
       alert('تم رفع الشهادة بنجاح');
       setReloadKey(k => k + 1);
-    } catch (err: any) {
-      alert('خطأ في حفظ الرابط: ' + err.message);
+    } catch (err) {
+      alert('خطأ في حفظ الرابط: ' + (err instanceof Error ? err.message : 'أعد المحاولة'));
     } finally {
       setProcessing(false);
     }
@@ -253,24 +237,7 @@ export default function CertificatesManagementPage() {
           if (email && url && url.startsWith('http')) {
             const attendee = attendees.find(a => a.email.toLowerCase() === email.toLowerCase());
             if (attendee) {
-              const certId = `certificate_${eventId}_${attendee.userId}`;
-              const certRef = doc(db, 'certificates', certId);
-              
-              await setDoc(certRef, {
-                id: certId,
-                eventId,
-                userId: attendee.userId,
-                status: 'Available',
-                externalUrl: url,
-                studentName: attendee.name,
-                eventTitle: event?.title || '',
-                eventType: event?.type || 'Workshop',
-                attendanceDate: new Date(),
-                issueDate: new Date(),
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                attemptCount: 1
-              });
+              await httpsCallable(functions, 'saveExternalCertificate')({ eventId, userId: attendee.userId, url });
               successCount++;
             }
           }
@@ -278,8 +245,8 @@ export default function CertificatesManagementPage() {
         
         alert(`تم بنجاح ربط ${successCount} شهادة بالحضور.`);
         setReloadKey(k => k + 1);
-      } catch (err: any) {
-        setError(err.message || 'خطأ في معالجة الملف');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'خطأ في معالجة الملف');
       } finally {
         setUploadingCSV(false);
         if (fileInputRef.current) fileInputRef.current.value = '';

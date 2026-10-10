@@ -34,99 +34,12 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.processCheckIn = void 0;
-const firestore_1 = require("firebase-admin/firestore");
-const functions = __importStar(require("firebase-functions"));
-const admin = __importStar(require("firebase-admin"));
-const jwt = __importStar(require("jsonwebtoken"));
+const functions = __importStar(require("firebase-functions/v1"));
 const auth_1 = require("./utils/auth");
-const errors_1 = require("./utils/errors");
-exports.processCheckIn = functions.https.onCall(async (data, context) => {
-    var _a;
+const eventLifecycle_1 = require("./utils/eventLifecycle");
+// Compatibility endpoint shares the same attendance transaction as submitCheckIn.
+exports.processCheckIn = functions.https.onCall((data, context) => {
     const uid = (0, auth_1.verifyAuth)(context);
-    const { token, eventId } = data;
-    if (!token || typeof token !== 'string') {
-        (0, errors_1.throwFailedPrecondition)('Invalid or missing token.');
-    }
-    if (!eventId || typeof eventId !== 'string') {
-        (0, errors_1.throwFailedPrecondition)('Invalid or missing eventId.');
-    }
-    const JWT_SECRET = process.env.JWT_SECRET || ((_a = functions.config().jwt) === null || _a === void 0 ? void 0 : _a.secret);
-    if (!JWT_SECRET) {
-        (0, errors_1.throwFailedPrecondition)('JWT_SECRET is not configured. Please set it in Firebase Secret Manager.');
-    }
-    let decodedToken;
-    try {
-        decodedToken = jwt.verify(token, JWT_SECRET);
-    }
-    catch (error) {
-        (0, errors_1.throwFailedPrecondition)('Token is invalid or expired.');
-    }
-    // Verify the token belongs to the event being checked into
-    if (decodedToken.eventId !== eventId) {
-        (0, errors_1.throwFailedPrecondition)('Token does not match the event.');
-    }
-    const db = admin.firestore();
-    // Use a transaction to ensure idempotency and verify state securely
-    return db.runTransaction(async (transaction) => {
-        var _a, _b;
-        // 1. Verify Event State
-        const eventRef = db.collection('events').doc(eventId);
-        const eventSnap = await transaction.get(eventRef);
-        if (!eventSnap.exists) {
-            (0, errors_1.throwFailedPrecondition)('Event not found.');
-        }
-        if (((_a = eventSnap.data()) === null || _a === void 0 ? void 0 : _a.state) !== 'Ongoing') {
-            (0, errors_1.throwFailedPrecondition)('Event is not currently accepting attendance.');
-        }
-        // 2. Verify User Registration
-        const regId = `${eventId}_${uid}`;
-        const regRef = db.collection('registrations').doc(regId);
-        const regSnap = await transaction.get(regRef);
-        if (!regSnap.exists) {
-            (0, errors_1.throwFailedPrecondition)('You are not registered for this event.');
-        }
-        const currentRegStatus = (_b = regSnap.data()) === null || _b === void 0 ? void 0 : _b.status;
-        if (currentRegStatus !== 'approved' && currentRegStatus !== 'attended') {
-            (0, errors_1.throwFailedPrecondition)('Your registration is not approved.');
-        }
-        // 3. Check for existing attendance (Idempotency)
-        const logId = `${eventId}_${uid}`;
-        const logRef = db.collection('attendance_logs').doc(logId);
-        const logSnap = await transaction.get(logRef);
-        if (logSnap.exists) {
-            // Already checked in. Return success without writing again.
-            return { status: 'already_checked_in' };
-        }
-        // 4. Write attendance log
-        transaction.set(logRef, {
-            userId: uid,
-            eventId: eventId,
-            timestamp: firestore_1.FieldValue.serverTimestamp(),
-            verifiedByQR: true,
-            tokenNonce: decodedToken.nonce,
-        });
-        // 4b. Update registration status to attended
-        transaction.update(regRef, {
-            status: 'attended',
-            attendedAt: firestore_1.FieldValue.serverTimestamp(),
-        });
-        // 5. Award Points Atomically
-        const eventData = eventSnap.data();
-        const pointsToAward = typeof (eventData === null || eventData === void 0 ? void 0 : eventData.points) === 'number' ? eventData.points : 0;
-        if (pointsToAward > 0) {
-            const pointTxId = `attendance_${eventId}_${uid}`;
-            const pointTxRef = db.collection('point_transactions').doc(pointTxId);
-            transaction.set(pointTxRef, {
-                userId: uid,
-                amount: pointsToAward,
-                source: 'attendance',
-                reason: `Attended event: ${(eventData === null || eventData === void 0 ? void 0 : eventData.title) || 'Unknown'}`,
-                sourceEventId: eventId,
-                createdBy: 'system',
-                createdAt: firestore_1.FieldValue.serverTimestamp(),
-            });
-        }
-        return { status: 'success' };
-    });
+    return (0, eventLifecycle_1.recordAttendance)({ eventId: (0, eventLifecycle_1.documentId)(data === null || data === void 0 ? void 0 : data.eventId, 'eventId'), userId: uid, actorUid: uid, admin: false, token: data === null || data === void 0 ? void 0 : data.token });
 });
 //# sourceMappingURL=processCheckIn.js.map
