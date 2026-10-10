@@ -1,4 +1,6 @@
 'use client';
+
+import { uploadImage } from '@/lib/backend';
 import Image from 'next/image';
 
 import { useState } from 'react';
@@ -80,21 +82,9 @@ export default function CreateEventPage() {
     if (!file) return;
 
     setIsUploading(true);
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', 'Ieee_events');
-
     try {
-      const res = await fetch('https://api.cloudinary.com/v1_1/jhjhfrnr/image/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      const data = await res.json();
-      if (data.secure_url) {
-        setFormData(prev => ({ ...prev, coverUrl: data.secure_url }));
-      } else {
-        throw new Error('Upload failed');
-      }
+      const url = await uploadImage(file, 'event');
+      setFormData(prev => ({ ...prev, coverUrl: url }));
     } catch (error) {
       console.error('Error uploading image:', error);
       alert('حدث خطأ أثناء رفع الصورة');

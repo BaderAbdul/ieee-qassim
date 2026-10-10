@@ -12,6 +12,7 @@ node_modules/
 
 # testing
 /coverage
+/.spark-test/
 
 # next.js
 /.next/

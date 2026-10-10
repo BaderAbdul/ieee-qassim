@@ -1,6 +1,6 @@
 # IEEE Qassim community platform
 
-Arabic-first student event platform with English support. Built with Next.js 16.3.8, React 19, next-intl, Tailwind 4, and Firebase Authentication/Firestore/Storage/Cloud Functions.
+Arabic-first student event platform with English support. Built with Next.js 16.3.8, React 19, next-intl, Tailwind 4, Firebase Authentication/Firestore on Spark, Vercel server endpoints, and Cloudinary media storage. Historical Firebase Functions sources remain for reference and emulator regression tests; they are not needed for the migrated core flows.
 
 Students discover events, register, attend, earn points and receive certificates. Organizers manage events, approvals, attendance, feedback and members.
 
@@ -22,6 +22,7 @@ npm run build
 npx tsc --noEmit
 npm test
 npm run test:firebase
+npm run test:spark
 ```
 
 npm test runs domain simulations and source contracts. test:firebase exercises actual rules, backend handlers and PDF rendering on a demo project; it never connects test writes to production. Java 21 and Node 24 are used for local testing. Deployed Functions target Node 22.
@@ -32,6 +33,7 @@ npm test runs domain simulations and source contracts. test:firebase exercises a
 - src/context/AuthContext.tsx: Google sign-in and private user profile subscription
 - src/i18n and messages: Arabic/English routing and translations
 - functions/src: authoritative registration, attendance, points, certificates and email
+- src/app/api and src/lib/server: Spark-compatible Vercel registration, attendance, points, member projection and certificates
 - firestore.rules / storage.rules: data access boundaries
 - firestore.indexes.json: query indexes
 - tests/firebase: real local integration/security tests
@@ -39,6 +41,6 @@ npm test runs domain simulations and source contracts. test:firebase exercises a
 
 ## Release status
 
-The owner has chosen to keep Firebase on Spark. The live website is hosted on Vercel, and Cloudinary already handles event cover uploads. Migration of protected operations from Firebase Functions to authenticated Vercel endpoints, plus avatar/private certificate storage migration to Cloudinary, is **not implemented yet**. Preserve external certificate link support during that migration. Do not merge this engineering checkpoint into the production branch as a completed Spark-compatible release.
+The owner has chosen to keep Firebase on Spark. Core operations now use authenticated same-origin Vercel endpoints. Event/avatar images use server-validated Cloudinary uploads, and generated PDFs use authenticated Cloudinary assets with short-lived downloads. External certificate links remain supported. Certificate generation is driven one-at-a-time by the open organizer certificate page, not a Firebase trigger. Automatic email/reminder jobs have not been ported. Read SPARK_RELEASE_REPORT.md before merging or deploying; the Cloud Functions report below is historical.
 
-Read FINAL_PRODUCTION_RELEASE_REPORT.md before deployment. The local candidate is verified, but a read-only production check found no deployed functions. Rules, indexes, existing-data preparation, functions and frontend must be released together. The historical TEST_READY.md claim covers tests, not production deployment.
+Read SPARK_RELEASE_REPORT.md before deployment. It records the current Vercel candidate, required preparation/preview checks and remaining mail/reminder limitations. FINAL_PRODUCTION_RELEASE_REPORT.md and CLOUD_FUNCTIONS_REPORT.md describe the earlier architecture; their Firebase Functions deployment steps do not apply to the Spark candidate. Passing local tests does not confirm a live deployment.

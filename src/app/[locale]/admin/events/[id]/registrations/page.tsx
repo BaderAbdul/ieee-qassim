@@ -3,7 +3,7 @@
 import { useEffect, useState, use } from 'react';
 import { collection, query, where, getDocs, doc, getDoc, limit, orderBy, documentId, startAfter, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase/client';
-import { httpsCallable } from 'firebase/functions';
+import { httpsCallable } from '@/lib/backend';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
 import { ArrowRight, Download, Users, Check, X, Clock, UserCheck, CheckSquare, Square, Trophy, QrCode } from 'lucide-react';

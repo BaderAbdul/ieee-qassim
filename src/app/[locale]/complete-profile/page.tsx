@@ -5,7 +5,7 @@ import { useTranslations, useLocale } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
 import { useAuth } from '@/context/AuthContext';
 import { db, functions } from '@/lib/firebase/client';
-import { httpsCallable } from 'firebase/functions';
+import { httpsCallable } from '@/lib/backend';
 import { doc, updateDoc } from 'firebase/firestore';
 
 export default function CompleteProfilePage() {

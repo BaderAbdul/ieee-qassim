@@ -3,7 +3,7 @@
 import React, { useEffect, useState, use } from 'react';
 import Image from 'next/image';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
+import { httpsCallable } from '@/lib/backend';
 import { db, functions } from '@/lib/firebase/client';
 import { PlatformEvent } from '@/lib/types';
 import { useAuth } from '@/context/AuthContext';

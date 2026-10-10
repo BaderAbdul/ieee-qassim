@@ -3,7 +3,7 @@
 import { useEffect, useState, use } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { db, functions } from '@/lib/firebase/client';
-import { httpsCallable } from 'firebase/functions';
+import { httpsCallable } from '@/lib/backend';
 import { doc, getDoc } from 'firebase/firestore';
 import { useSearchParams } from 'next/navigation';
 import { Link } from '@/i18n/routing';

@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, getDocs, updateDoc, deleteDoc, doc, query, orderBy, documentId, limit, startAfter, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, documentId, limit, startAfter, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase/client';
-import { httpsCallable } from 'firebase/functions';
+import { httpsCallable } from '@/lib/backend';
 import { useAuth } from '@/context/AuthContext';
 import { Search, Trophy, Shield, ShieldAlert, Trash2, Edit3, Lock, Unlock } from 'lucide-react';
 
@@ -111,7 +111,7 @@ export default function AdminUsersPage() {
     if (userData?.role !== 'super_admin') return alert('غير مصرح لك بتغيير الصلاحيات');
     if (!confirm('هل أنت متأكد من تغيير صلاحية هذا المستخدم؟')) return;
     try {
-      await updateDoc(doc(db, 'users', userId), { role: newRole });
+      await httpsCallable(functions, 'manageUser')({ userId, change: 'role', role: newRole });
       setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
     } catch (err) {
       console.error(err);
@@ -124,7 +124,7 @@ export default function AdminUsersPage() {
     const actionStr = currentRestricted ? 'فك التقييد عن' : 'تقييد';
     if (!confirm(`هل أنت متأكد من ${actionStr} هذا المستخدم؟`)) return;
     try {
-      await updateDoc(doc(db, 'users', userId), { isRestricted: !currentRestricted });
+      await httpsCallable(functions, 'manageUser')({ userId, change: 'restriction', isRestricted: !currentRestricted });
       setUsers(users.map(u => u.id === userId ? { ...u, isRestricted: !currentRestricted } : u));
     } catch (err) {
       console.error(err);
@@ -136,7 +136,7 @@ export default function AdminUsersPage() {
     if (userData?.role !== 'super_admin') return alert('غير مصرح لك بحذف الحسابات');
     if (!confirm('هل أنت متأكد من حذف هذا المستخدم بشكل نهائي من قاعدة البيانات؟ (لا يمكن التراجع عن هذا الإجراء)')) return;
     try {
-      await deleteDoc(doc(db, 'users', userId));
+      await httpsCallable(functions, 'manageUser')({ userId, change: 'delete' });
       setUsers(users.filter(u => u.id !== userId));
     } catch (err) {
       console.error(err);

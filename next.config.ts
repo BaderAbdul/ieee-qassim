@@ -9,6 +9,10 @@ if (process.env.MOCK_FONTS === 'true') {
 const withNextIntl = createNextIntlPlugin();
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ['@sparticuz/chromium', 'puppeteer-core'],
+  outputFileTracingIncludes: {
+    '/api/platform/\\[action\\]': ['./functions/src/assets/fonts/*.ttf', './node_modules/@sparticuz/chromium/bin/**'],
+  },
   images: {
     remotePatterns: [
       {

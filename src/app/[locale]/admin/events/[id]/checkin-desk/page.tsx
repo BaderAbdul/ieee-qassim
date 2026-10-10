@@ -4,7 +4,7 @@ import React, { useEffect, useState, use } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase/client';
-import { httpsCallable } from 'firebase/functions';
+import { httpsCallable } from '@/lib/backend';
 import { QRCodeSVG } from 'qrcode.react';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';

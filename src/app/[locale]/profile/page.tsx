@@ -14,10 +14,10 @@ import {
   updateDoc,
   getCountFromServer
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, functions, storage } from '@/lib/firebase/client';
+import { db, functions } from '@/lib/firebase/client';
+import { uploadImage } from '@/lib/backend';
 import ProfileSkeleton from '@/components/skeletons/ProfileSkeleton';
-import { httpsCallable } from 'firebase/functions';
+import { httpsCallable } from '@/lib/backend';
 import { PlatformEvent, Certificate, PointTransaction } from '@/lib/types';
 import { formatDateSafe, toJsDate } from '@/lib/dateUtils';
 import { ar, enUS } from 'date-fns/locale';
@@ -214,12 +214,10 @@ export default function EngineeringProfilePage() {
       let avatarUrl = editingPublicProfile.avatar;
       
       if (avatarFile) {
-        if (!['image/jpeg', 'image/png', 'image/webp'].includes(avatarFile.type) || avatarFile.size > 5 * 1024 * 1024) {
-          throw new Error(isAr ? 'اختر صورة JPG أو PNG أو WebP أصغر من 5 ميغابايت.' : 'Choose a JPG, PNG, or WebP image under 5 MB.');
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(avatarFile.type) || avatarFile.size > 3 * 1024 * 1024) {
+          throw new Error(isAr ? 'اختر صورة JPG أو PNG أو WebP أصغر من 3 ميغابايت.' : 'Choose a JPG, PNG, or WebP image under 3 MB.');
         }
-        const fileRef = ref(storage, `avatars/${user.uid}/${Date.now()}_${avatarFile.name}`);
-        await uploadBytes(fileRef, avatarFile);
-        avatarUrl = await getDownloadURL(fileRef);
+        avatarUrl = await uploadImage(avatarFile, 'avatar');
       }
 
       await updateDoc(doc(db, 'users', user.uid), {

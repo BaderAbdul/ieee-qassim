@@ -1,5 +1,7 @@
 # Cloud Functions and release operations
 
+**Historical architecture:** the owner chose Spark. Core browser operations now target Vercel endpoints instead of these Firebase Functions. Follow SPARK_RELEASE_REPORT.md for the current candidate. Do not run the Blaze/functions deployment commands below for the Spark release. Email/reminder triggers remain historical, not active Spark features.
+
 Updated 10 October 2026. See FINAL_PRODUCTION_RELEASE_REPORT.md for evidence and limitations.
 
 ## Production status

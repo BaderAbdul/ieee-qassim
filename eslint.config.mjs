@@ -15,6 +15,7 @@ const eslintConfig = defineConfig([
     "functions/**",
     "tests/**",
     ".agents/**",
+    ".spark-test/**",
   ]),
 ]);
 

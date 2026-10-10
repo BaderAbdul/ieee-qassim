@@ -85,6 +85,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             if (userSnap.exists()) {
               setUserData(userSnap.data() as UserData);
               setLoading(false);
+              // Spark has no Firestore projection trigger. Refresh the safe public copy.
+              void import('@/lib/backend').then(({ httpsCallable }) => httpsCallable(null, 'syncPublicProfile')({})).catch(() => {
+                console.warn('Public profile synchronization is pending.');
+              });
               return;
             }
             // Do not overwrite a profile created or promoted during sign-in.

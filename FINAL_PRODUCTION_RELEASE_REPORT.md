@@ -1,6 +1,8 @@
 # IEEE Qassim — production release report
 Date: 10 October 2026 (Asia/Riyadh)
 
+**Historical checkpoint:** this report describes the earlier Firebase Functions implementation. The subsequent Spark/Vercel/Cloudinary migration and its verification are documented in SPARK_RELEASE_REPORT.md. It is not yet a verified live deployment.
+
 ## Release classification: NOT READY
 
 The local release candidate now builds and passes its verification gates. Production is not ready because the read-only Firebase check returned **zero deployed Cloud Functions in ieeeqassim**. The secured frontend depends on those functions. New rules, public profile preparation, and indexes must be deployed together before students use this release.

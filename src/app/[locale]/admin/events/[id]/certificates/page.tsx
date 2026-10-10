@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase/client';
-import { httpsCallable } from 'firebase/functions';
+import { httpsCallable } from '@/lib/backend';
 import { useAuth } from '@/context/AuthContext';
 import { useParams } from 'next/navigation';
 import { FileText, CheckCircle, Clock, XCircle, AlertCircle, RefreshCw, XOctagon, Download, Upload } from 'lucide-react';
@@ -31,6 +31,27 @@ export default function CertificatesManagementPage() {
   const [manualLinks, setManualLinks] = useState<Record<string, string>>({});
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const rendering = useRef(false);
+
+  // Hobby/Spark: work is awaited in bounded requests, never left running after a response.
+  // Keeping this organizer page open drains queued certificates one at a time.
+  useEffect(() => {
+    const pending = attendees.find(a => a.certificate?.status === 'Generating');
+    if (!pending?.certificate || rendering.current || processing) return;
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      rendering.current = true;
+      try {
+        await httpsCallable(functions, 'renderCertificate')({ certificateId: pending.certificate!.id });
+      } catch (reason) {
+        if (active) setError(reason instanceof Error ? reason.message : 'Certificate generation failed.');
+      } finally {
+        rendering.current = false;
+        if (active) setReloadKey(key => key + 1);
+      }
+    }, 2000);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [attendees, processing]);
 
   useEffect(() => {
     if (!userData || (userData.role !== 'super_admin' && userData.role !== 'event_organizer')) {
@@ -268,6 +289,7 @@ export default function CertificatesManagementPage() {
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold font-cairo">إدارة الشهادات</h1>
+          <p className="mt-2 text-sm text-slate-500">اترك هذه الصفحة مفتوحة أثناء توليد الشهادات؛ تتم معالجتها واحدة تلو الأخرى. ويمكنك أيضًا إرفاق روابط شهادات خارجية.</p>
           <p className="text-gray-500">{event?.title} ({event?.state})</p>
         </div>
         
