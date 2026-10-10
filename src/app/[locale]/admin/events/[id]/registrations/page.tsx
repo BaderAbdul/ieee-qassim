@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
-import { collection, query, where, getDocs, doc, getDoc, limit, orderBy, documentId, startAfter, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import { useEffect, useState, use, useRef } from 'react';
+import { collection, query, where, getDocs, doc, getDoc, getCountFromServer, limit, orderBy, documentId, startAfter, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import { downloadCSV } from '@/lib/csv';
+import { registrationAction, runOperations, type OperationResult } from '@/lib/admin-operations';
 import { db, functions } from '@/lib/firebase/client';
 import { httpsCallable } from '@/lib/backend';
 import { PlatformEvent } from '@/lib/types';
@@ -41,6 +43,11 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
   const [pageCursor, setPageCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [nextCursor, setNextCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [hasMore, setHasMore] = useState(false);
+  const [totals, setTotals] = useState({ all: 0, approved: 0, waiting: 0 });
+  const [exporting, setExporting] = useState(false);
+  const [results, setResults] = useState<OperationResult[]>([]);
+  const [retryJob, setRetryJob] = useState<{ status?: string; points?: { amount: number; reason: string; operationIds: Record<string, string> }; items: RegistrationData[] } | null>(null);
+  const pointsBatch = useRef<{ key: string; operationIds: Record<string, string> } | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isUpdatingBulk, setIsUpdatingBulk] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -50,6 +57,23 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
   const [pointsAmount, setPointsAmount] = useState<number>(5);
   const [pointsDesc, setPointsDesc] = useState('');
   const [isAwarding, setIsAwarding] = useState(false);
+  const pointsDialog = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showPointsModal) return;
+    const previous = document.activeElement as HTMLElement | null;
+    pointsDialog.current?.querySelector<HTMLInputElement>('input')?.focus();
+    const keyboard = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !isAwarding) setShowPointsModal(false);
+      if (event.key !== 'Tab') return;
+      const controls = Array.from(pointsDialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled)') || []);
+      const first = controls[0], last = controls.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener('keydown', keyboard);
+    return () => { document.removeEventListener('keydown', keyboard); previous?.focus(); };
+  }, [showPointsModal, isAwarding]);
 
 
 
@@ -63,7 +87,10 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
           setEvent({ id: eventSnap.id, ...eventSnap.data() } as PlatformEvent);
         }
 
-        const q = query(collection(db, 'registrations'), where('eventId', '==', eventId), orderBy(documentId()), ...(pageCursor ? [startAfter(pageCursor)] : []), limit(50));
+        const base = query(collection(db, 'registrations'), where('eventId', '==', eventId));
+        const counts = await Promise.all([getCountFromServer(base), getCountFromServer(query(base, where('status', '==', 'approved'))), getCountFromServer(query(base, where('status', 'in', ['pending', 'waitlisted'])))]);
+        if (active) setTotals({ all: counts[0].data().count, approved: counts[1].data().count, waiting: counts[2].data().count });
+        const q = query(base, orderBy('timestamp', 'asc'), orderBy(documentId()), ...(pageCursor ? [startAfter(pageCursor)] : []), limit(50));
         const snap = await getDocs(q);
         
         // Parallelize user fetching using Promise.all & cache to eliminate N+1 sequential waterfall
@@ -137,52 +164,47 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
 
   if (loadError) throw loadError;
 
-  const updateRegistration = async (regId: string, newStatus: string) => {
-    const reg = registrations.find(r => r.id === regId);
-    if (!reg) throw new Error('Registration not found');
-    if (newStatus === 'attended') {
-      await httpsCallable(functions, 'submitCheckIn')({ eventId, targetUserId: reg.userId });
-    } else {
-      const action = newStatus === 'approved' ? 'approve' : newStatus === 'cancelled' ? 'cancel' : 'reject';
-      await httpsCallable(functions, 'manageRegistration')({ eventId, userId: reg.userId, action });
-    }
-  };
-
   const handleUpdateStatus = async (regId: string, newStatus: string) => {
-    setIsUpdatingBulk(true);
-    try { await updateRegistration(regId, newStatus); }
-    catch (error) { alert(error instanceof Error ? error.message : 'تعذر تحديث التسجيل'); }
-    finally { setPageCursor(null); setReloadKey(key => key + 1); setIsUpdatingBulk(false); }
+    const reg = registrations.find(item => item.id === regId);
+    if (reg) await performJob({ status: newStatus, items: [reg] });
   };
 
   const handleBulkUpdateStatus = async (newStatus: string) => {
     if (!selectedIds.length || !confirm(`تحديث ${selectedIds.length} تسجيل؟`)) return;
+    await performJob({ status: newStatus, items: registrations.filter(item => selectedIds.includes(item.id)) });
+  };
+
+  const performJob = async (job: NonNullable<typeof retryJob>) => {
     setIsUpdatingBulk(true);
     try {
-      // Sequential updates avoid contention on the same capacity document.
-      for (const id of selectedIds) await updateRegistration(id, newStatus);
+      const outcome = await runOperations(job.items.map(item => ({ ...item, name: item.userName })), async item => {
+        if (job.points) await httpsCallable(functions, 'addManualPoints')({ studentUid: item.userId, amount: job.points.amount, reason: job.points.reason, operationId: job.points.operationIds[item.id] });
+        else {
+          if (job.status === 'attended') await httpsCallable(functions, 'submitCheckIn')({ eventId, targetUserId: item.userId });
+          else await httpsCallable(functions, 'manageRegistration')({ eventId, userId: item.userId, action: registrationAction(job.status || '') });
+        }
+      });
+      setResults(outcome);
+      const failedIds = outcome.filter(item => !item.success).map(item => item.id);
+      setRetryJob(failedIds.length ? { ...job, items: job.items.filter(item => failedIds.includes(item.id)) } : null);
       setSelectedIds([]);
-    } catch (error) { alert(error instanceof Error ? error.message : 'تعذر تحديث التسجيلات'); }
-    finally { setPageCursor(null); setReloadKey(key => key + 1); setIsUpdatingBulk(false); }
+      if (job.points && !failedIds.length) pointsBatch.current = null;
+    } finally { setPageCursor(null); setReloadKey(key => key + 1); setIsUpdatingBulk(false); }
   };
 
   const handleAwardPoints = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedIds.length || !pointsAmount) return;
+    if (!selectedIds.length || !Number.isSafeInteger(pointsAmount) || pointsAmount <= 0 || !pointsDesc.trim()) return;
     setIsAwarding(true);
     try {
-      for (const id of selectedIds) {
-        const reg = registrations.find(r => r.id === id);
-        if (reg) await httpsCallable(functions, 'addManualPoints')({
-          studentUid: reg.userId, amount: pointsAmount, reason: pointsDesc.trim() || 'مشاركة في الفعالية',
-        });
-      }
-      alert('تم رصد النقاط بنجاح');
+      const items = registrations.filter(item => selectedIds.includes(item.id));
+      const key = JSON.stringify([items.map(item => item.id).sort(), pointsAmount, pointsDesc.trim()]);
+      if (pointsBatch.current?.key !== key) pointsBatch.current = { key, operationIds: Object.fromEntries(items.map(item => [item.id, crypto.randomUUID()])) };
+      await performJob({ items, points: { amount: pointsAmount, reason: pointsDesc.trim(), operationIds: pointsBatch.current.operationIds } });
       setShowPointsModal(false);
       setSelectedIds([]);
       setPointsDesc('');
-    } catch (error) { alert(error instanceof Error ? error.message : 'تعذر رصد النقاط'); }
-    finally { setIsAwarding(false); }
+    } finally { setIsAwarding(false); }
   };
 
   const toggleSelectAll = () => {
@@ -197,36 +219,41 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
-  const exportCSV = () => {
+  const exportCSV = async () => {
     if (!event) return;
-    
-    const headers = ['Name', 'Email', 'University ID', 'College', 'Major', 'Academic Level', 'Qassim Student?', 'Status', 'Date'];
-    const rows = registrations.map(r => {
+    setExporting(true);
+    try {
+    const all: RegistrationData[] = [];
+    let cursor: QueryDocumentSnapshot<DocumentData> | undefined;
+    do {
+      const snap = await getDocs(query(collection(db, 'registrations'), where('eventId', '==', eventId), orderBy('timestamp', 'asc'), orderBy(documentId()), ...(cursor ? [startAfter(cursor)] : []), limit(200)));
+      const page = snap.docs.map(item => ({ id: item.id, ...item.data() } as RegistrationData));
+      // Bounded enrichment preserves all exported columns without loading every user at once.
+      for (let offset = 0; offset < page.length; offset += 25) {
+        await Promise.all(page.slice(offset, offset + 25).map(async item => {
+          const profile = await getDoc(doc(db, 'users', item.userId));
+          if (profile.exists()) {
+            const user = profile.data();
+            Object.assign(item, { userName: item.userName || user.arabicFullName || user.displayName, userEmail: item.userEmail || user.email, universityId: user.universityId || item.universityId, college: user.college || '', major: user.major || '', academicLevel: user.academicLevel || '', isQassimStudent: user.isQassimStudent === true });
+          }
+        }));
+      }
+      all.push(...page);
+      cursor = snap.size === 200 ? snap.docs.at(-1) : undefined;
+    } while (cursor);
+    const headers = ['Name', 'Email', 'University ID', 'College', 'Major', 'Academic Level', 'Qassim Student?', 'Status', 'Date (UTC)'];
+    const rows = all.map(r => {
       const d = toDate(r.timestamp);
       return [
-        `"${r.userName}"`,
-        `"${r.userEmail}"`,
-        `"${r.universityId || ''}"`,
-        `"${r.college || ''}"`,
-        `"${r.major || ''}"`,
-        `"${r.academicLevel || ''}"`,
-        `"${r.isQassimStudent ? 'Yes' : 'No'}"`,
+        r.userName, r.userEmail, r.universityId || '', r.college || '', r.major || '', r.academicLevel || '', r.isQassimStudent ? 'Yes' : 'No',
         r.status,
-        d ? format(d, 'yyyy-MM-dd HH:mm:ss') : ''
+        d ? d.toISOString() : ''
       ];
     });
     
-    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" 
-      + headers.join(',') + '\n' 
-      + rows.map(e => e.join(',')).join('\n');
-      
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `registrations_${event.title.replace(/\s+/g, '_')}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCSV(`registrations_${event.title}.csv`, [headers, ...rows]);
+    } catch (error) { setResults([{ id: 'export', name: 'تصدير جميع التسجيلات', success: false, message: error instanceof Error ? error.message : 'تعذر التصدير' }]); }
+    finally { setExporting(false); }
   };
 
 
@@ -239,7 +266,7 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
     return <div className="text-center py-20 text-gray-500">الفعالية غير موجودة.</div>;
   }
 
-  const approvedCount = registrations.filter(r => r.status === 'approved').length;
+  const approvedCount = totals.approved;
 
   return (
     <div>
@@ -255,13 +282,15 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
         </div>
         
         <div className="flex gap-2">
-          <button onClick={exportCSV} className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center shadow-sm">
+          <button onClick={exportCSV} disabled={exporting} className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center shadow-sm disabled:opacity-50">
             <Download size={18} className="me-2" />
-            تصدير (CSV)
+            {exporting ? 'جارٍ تصدير الكل…' : 'تصدير جميع التسجيلات (CSV)'}
           </button>
         </div>
       </div>
 
+      {results.length > 0 && <section className="mb-6 rounded-xl border p-4 bg-white" aria-live="polite"><p>نجح {results.filter(item => item.success).length} / {results.length}. فشل {results.filter(item => !item.success).length}.</p>{results.filter(item => !item.success).map(item => <p key={item.id} className="text-red-700">{item.name}: {item.message}</p>)}{retryJob && <button disabled={isUpdatingBulk} onClick={() => performJob(retryJob)} className="mt-3 rounded-lg bg-blue-600 text-white px-4 py-2">إعادة محاولة الفاشل فقط</button>}</section>}
+      <p className="mb-4 text-sm text-gray-500">المحمّل {registrations.length} من {totals.all}. التحديد يشمل الصفوف المحمّلة فقط؛ التصدير يشمل الجميع.</p>
       {/* Check-in Desk Link Section */}
       <div className="bg-gradient-to-r from-blue-900 to-indigo-900 rounded-2xl p-6 mb-6 shadow-sm text-white flex flex-col md:flex-row items-center justify-between gap-6">
         <div>
@@ -289,7 +318,8 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
           </div>
           <div className="flex flex-wrap gap-2">
             <button 
-              onClick={() => setShowPointsModal(true)}
+              disabled={isUpdatingBulk || isAwarding}
+              onClick={() => { pointsBatch.current = null; setShowPointsModal(true); }}
               className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition-colors"
             >
               <Trophy size={16} /> رصد نقاط
@@ -333,7 +363,7 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
           </div>
           <div>
             <p className="text-sm font-medium text-gray-500 mb-1">إجمالي المسجلين</p>
-            <h3 className="text-2xl font-bold text-gray-900">{registrations.length}</h3>
+            <h3 className="text-2xl font-bold text-gray-900">{totals.all}</h3>
           </div>
         </div>
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex items-center">
@@ -351,7 +381,7 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
           </div>
           <div>
             <p className="text-sm font-medium text-gray-500 mb-1">قائمة الانتظار / معلق</p>
-            <h3 className="text-2xl font-bold text-gray-900">{registrations.filter(r => r.status === 'waitlisted' || r.status === 'pending').length}</h3>
+            <h3 className="text-2xl font-bold text-gray-900">{totals.waiting}</h3>
           </div>
         </div>
       </div>
@@ -365,7 +395,7 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
                   <th className="px-6 py-4 text-start">
-                    <button onClick={toggleSelectAll} className="text-gray-400 hover:text-blue-600 transition-colors">
+                    <button disabled={isUpdatingBulk || isAwarding} aria-label="تحديد جميع الصفوف المحمّلة" onClick={toggleSelectAll} className="text-gray-400 hover:text-blue-600 transition-colors">
                       {selectedIds.length === registrations.length && registrations.length > 0 ? <CheckSquare size={20} className="text-blue-600" /> : <Square size={20} />}
                     </button>
                   </th>
@@ -379,7 +409,7 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
                 {registrations.map((reg) => (
                   <tr key={reg.id} className={`hover:bg-gray-50 ${selectedIds.includes(reg.id) ? 'bg-blue-50/50' : ''}`}>
                     <td className="px-6 py-4">
-                      <button onClick={() => toggleSelect(reg.id)} className="text-gray-400 hover:text-blue-600 transition-colors">
+                      <button disabled={isUpdatingBulk || isAwarding} aria-label={`تحديد ${reg.userName}`} onClick={() => toggleSelect(reg.id)} className="text-gray-400 hover:text-blue-600 transition-colors">
                         {selectedIds.includes(reg.id) ? <CheckSquare size={20} className="text-blue-600" /> : <Square size={20} />}
                       </button>
                     </td>
@@ -404,22 +434,22 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
                     <td className="px-6 py-4 whitespace-nowrap text-start text-sm font-medium">
                       <div className="flex items-center gap-2">
                         {reg.status !== 'approved' && reg.status !== 'attended' && (
-                          <button onClick={() => handleUpdateStatus(reg.id, 'approved')} className="text-green-600 hover:bg-green-50 p-1.5 rounded" title="قبول">
+                          <button disabled={isUpdatingBulk || isAwarding} aria-label={`قبول ${reg.userName}`} onClick={() => handleUpdateStatus(reg.id, 'approved')} className="text-green-600 hover:bg-green-50 p-2.5 rounded" title="قبول">
                             <Check size={18} />
                           </button>
                         )}
-                        {reg.status !== 'attended' && (
-                          <button onClick={() => handleUpdateStatus(reg.id, 'attended')} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded" title="تحضير (حضر الفعالية)">
+                        {reg.status === 'approved' && ['Ongoing', 'Completed'].includes(event.state) && (
+                          <button disabled={isUpdatingBulk || isAwarding} aria-label={`تحضير ${reg.userName}`} onClick={() => handleUpdateStatus(reg.id, 'attended')} className="text-blue-600 hover:bg-blue-50 p-2.5 rounded" title="تحضير (حضر الفعالية)">
                             <UserCheck size={18} />
                           </button>
                         )}
-                        {reg.status !== 'waitlisted' && (
-                          <button onClick={() => handleUpdateStatus(reg.id, 'waitlisted')} className="text-yellow-600 hover:bg-yellow-50 p-1.5 rounded" title="وضع في قائمة الانتظار">
+                        {reg.status !== 'waitlisted' && reg.status !== 'attended' && (
+                          <button disabled={isUpdatingBulk || isAwarding} aria-label={`نقل ${reg.userName} إلى الانتظار`} onClick={() => handleUpdateStatus(reg.id, 'waitlisted')} className="text-yellow-600 hover:bg-yellow-50 p-2.5 rounded" title="وضع في قائمة الانتظار">
                             <Clock size={18} />
                           </button>
                         )}
-                        {reg.status !== 'rejected' && reg.status !== 'cancelled' && (
-                          <button onClick={() => handleUpdateStatus(reg.id, 'rejected')} className="text-red-600 hover:bg-red-50 p-1.5 rounded" title="رفض">
+                        {reg.status !== 'rejected' && reg.status !== 'cancelled' && reg.status !== 'attended' && (
+                          <button disabled={isUpdatingBulk || isAwarding} aria-label={`رفض ${reg.userName}`} onClick={() => handleUpdateStatus(reg.id, 'rejected')} className="text-red-600 hover:bg-red-50 p-2.5 rounded" title="رفض">
                             <X size={18} />
                           </button>
                         )}
@@ -436,13 +466,13 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
       {/* Points Modal */}
       {showPointsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
+          <div ref={pointsDialog} role="dialog" aria-modal="true" aria-labelledby="points-dialog-title" className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
             <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 p-4 flex justify-between items-center text-white">
-              <h3 className="text-xl font-bold font-cairo flex items-center gap-2">
+              <h3 id="points-dialog-title" className="text-xl font-bold font-cairo flex items-center gap-2">
                 <Trophy size={20} />
                 رصد نقاط للمسجلين ({selectedIds.length})
               </h3>
-              <button onClick={() => setShowPointsModal(false)} className="hover:bg-white/20 p-1 rounded-lg transition-colors">
+              <button disabled={isAwarding} aria-label="إغلاق نافذة النقاط" onClick={() => setShowPointsModal(false)} className="hover:bg-white/20 p-1 rounded-lg transition-colors">
                 <X size={20} />
               </button>
             </div>
@@ -479,6 +509,7 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
                 </button>
                 <button 
                   type="button"
+                  disabled={isAwarding}
                   onClick={() => setShowPointsModal(false)}
                   className="px-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 rounded-xl transition-colors"
                 >

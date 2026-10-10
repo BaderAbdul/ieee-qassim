@@ -28,7 +28,7 @@ export default function LeaderboardPage() {
             name: data.arabicFullName || data.displayName || (isAr ? 'عضو' : 'Member'),
             points: data.totalPoints || 0,
             photoUrl: data.photoURL || data.photoUrl,
-            department: data.department
+            department: data.major || data.department
           };
         }).filter(u => u.points > 0);
         
@@ -62,8 +62,8 @@ export default function LeaderboardPage() {
           </h1>
           <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
             {isAr 
-              ? 'تعرّف على الأعضاء الأكثر تميزاً وتفاعلاً في فعاليات وأنشطة مجتمع IEEE هذا الفصل.' 
-              : 'Recognizing the most active and distinguished members in IEEE community events this semester.'}
+              ? 'أعلى 50 عضوًا حسب مجموع نقاط المشاركة. أصحاب النقاط المتساوية يشتركون في الترتيب؛ وليست هذه لوحة فصلية.'
+              : 'The top 50 members by lifetime participation points. Equal scores share a rank; this is not a semester-only board.'}
           </p>
         </div>
 

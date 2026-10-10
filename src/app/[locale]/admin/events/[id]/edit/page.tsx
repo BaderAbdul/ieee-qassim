@@ -1,10 +1,12 @@
 'use client';
 
-import { uploadImage } from '@/lib/backend';
+import { formatDateSafe, parseRiyadhInput, toJsDate } from '@/lib/dateUtils';
+
+import { uploadImage, httpsCallable } from '@/lib/backend';
 import Image from 'next/image';
 
 import { useState, useEffect, use } from 'react';
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { useRouter } from '@/i18n/routing';
 import { EventType, RegistrationMode, CustomQuestion } from '@/lib/types';
@@ -16,6 +18,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [eventRevision, setEventRevision] = useState(0);
   
   const resolvedParams = use(params);
   const eventId = resolvedParams.id;
@@ -75,6 +78,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         if (docSnap.exists()) {
           const data = docSnap.data();
           const eventDate = data.date?.toDate ? data.date.toDate() : new Date(data.date);
+          setEventRevision(toJsDate(data.updatedAt)?.getTime() || 0);
           
           setFormData({
             title: data.title || '',
@@ -82,17 +86,17 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
             description: data.description || '',
             descriptionEn: data.descriptionEn || '',
             type: data.type || 'Workshop',
-            date: eventDate.toISOString().split('T')[0],
-            time: eventDate.toTimeString().slice(0, 5),
+            date: formatDateSafe(eventDate, 'yyyy-MM-dd'),
+            time: formatDateSafe(eventDate, 'HH:mm'),
             location: data.location || '',
             locationEn: data.locationEn || '',
             durationHours: data.durationHours || 2,
-            capacity: data.capacity || 50,
+            capacity: data.capacity ?? 50,
             isUnlimitedCapacity: data.isUnlimitedCapacity || false,
             hideExactCapacity: data.hideExactCapacity || false,
             registeredCount: data.registeredCount || 0,
             attendanceCount: data.attendanceCount || 0,
-            points: data.points || 10,
+            points: data.points ?? 10,
             hasCertificate: data.hasCertificate || false,
             registrationMode: data.registrationMode || 'Auto',
             gains: data.gains ? data.gains.join('\n') : '',
@@ -145,7 +149,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
 
     try {
       // Combine date and time
-      const eventDate = new Date(`${formData.date}T${formData.time}`);
+      const eventDate = parseRiyadhInput(formData.date, formData.time);
       
       const updatedEvent = {
         title: formData.title,
@@ -160,8 +164,6 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         capacity: formData.capacity,
         isUnlimitedCapacity: formData.isUnlimitedCapacity,
         hideExactCapacity: formData.hideExactCapacity,
-        registeredCount: formData.registeredCount,
-        attendanceCount: formData.attendanceCount,
         points: formData.points,
         hasCertificate: formData.hasCertificate,
         registrationMode: formData.registrationMode,
@@ -173,11 +175,11 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         updatedAt: serverTimestamp(),
       };
 
-      await updateDoc(doc(db, 'events', eventId), updatedEvent);
+      await httpsCallable(null, 'saveEvent')({ eventId, expectedUpdatedAt: eventRevision, ...updatedEvent });
       router.push('/admin/events');
     } catch (error) {
       console.error("Error updating event", error);
-      alert("حدث خطأ أثناء تحديث الفعالية");
+      alert(error instanceof Error ? error.message : "حدث خطأ أثناء تحديث الفعالية");
     } finally {
       setLoading(false);
     }
@@ -357,11 +359,11 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">عدد المسجلين (للتعديل اليدوي)</label>
-              <input type="number" name="registeredCount" value={formData.registeredCount} onChange={handleChange} className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500" />
+              <input type="number" name="registeredCount" value={formData.registeredCount} readOnly aria-label="إجمالي الحجوزات — محسوب تلقائيًا" className="w-full border-gray-300 bg-gray-100 rounded-lg shadow-sm" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">عدد الحضور الفعلي (بعد انتهاء الفعالية)</label>
-              <input type="number" name="attendanceCount" value={formData.attendanceCount} onChange={handleChange} className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500" />
+              <input type="number" name="attendanceCount" value={formData.attendanceCount} readOnly aria-label="إجمالي الحضور — محسوب تلقائيًا" className="w-full border-gray-300 bg-gray-100 rounded-lg shadow-sm" />
             </div>
           </div>
         </div>

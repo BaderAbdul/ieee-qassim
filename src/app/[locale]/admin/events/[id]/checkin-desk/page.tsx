@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, use } from 'react';
+import React, { useEffect, useState, use, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase/client';
@@ -37,20 +37,32 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
   const [scanResult, setScanResult] = useState<{ status: 'success' | 'error' | 'already_checked_in' | null, message: string }>({ status: null, message: '' });
   const [showCamera, setShowCamera] = useState(false);
   const [isGeneratingToken, setIsGeneratingToken] = useState(false);
+  const [tokenExpiry, setTokenExpiry] = useState<number | null>(null);
+  const [now, setNow] = useState(0);
+  const [message, setMessage] = useState('');
+  const [recent, setRecent] = useState<{ id: string; message: string }[]>([]);
+  const submitting = useRef(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Self Check-in Link
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-  const selfCheckinUrl = event?.checkinToken ? `${baseUrl}/${locale}/events/${eventId}/checkin?token=${event.checkinToken}` : '';
+  const secondsLeft = tokenExpiry ? Math.max(0, Math.ceil((tokenExpiry - now) / 1000)) : 0;
+  const selfCheckinUrl = event?.checkinToken && secondsLeft > 0 ? `${baseUrl}/${locale}/events/${eventId}/checkin?token=${event.checkinToken}` : '';
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const handleGenerateToken = async () => {
     setIsGeneratingToken(true);
     try {
-      const generate = httpsCallable<{ eventId: string }, { token: string }>(functions, 'generateCheckInToken');
+      const generate = httpsCallable<{ eventId: string }, { token: string; expiresAt: number }>(functions, 'generateCheckInToken');
       const { data } = await generate({ eventId });
       setEvent(prev => prev ? { ...prev, checkinToken: data.token } : null);
+      setTokenExpiry(data.expiresAt); setNow(Date.now()); setMessage('تم توليد رمز صالح لمدة 15 دقيقة.');
     } catch (error) {
       console.error("Error generating check-in token:", error);
-      alert("حدث خطأ أثناء توليد رمز التحضير");
+      setMessage(error instanceof Error ? error.message : 'تعذر توليد رمز التحضير');
     } finally {
       setIsGeneratingToken(false);
     }
@@ -87,7 +99,8 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
       targetUserId = targetUserId.replace('ieee-qu-user:', '');
     }
     
-    if (!targetUserId) return;
+    if (!targetUserId || submitting.current) return;
+    submitting.current = true;
 
     setIsSubmitting(true);
     setScanResult({ status: null, message: '' });
@@ -103,6 +116,7 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
       if (result.status === 'success') {
         setScanResult({ status: 'success', message: `تم تحضير الطالب بنجاح! النقاط المكتسبة: ${result.awardedPoints || 0}` });
         setManualInput('');
+        setRecent(previous => [{ id: crypto.randomUUID(), message: `${targetUserId}: تم التحضير (+${result.awardedPoints || 0})` }, ...previous].slice(0, 10));
       } else if (result.status === 'already_checked_in') {
         setScanResult({ status: 'already_checked_in', message: 'الطالب محضر مسبقاً.' });
         setManualInput('');
@@ -111,9 +125,9 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
       console.error('Manual check-in failed', error);
       setScanResult({ status: 'error', message: error instanceof Error ? error.message : 'تعذر التحضير. أعد المحاولة.' });
     } finally {
+      submitting.current = false;
       setIsSubmitting(false);
-      // Auto clear success message after 5 seconds
-      setTimeout(() => setScanResult({ status: null, message: '' }), 5000);
+      window.requestAnimationFrame(() => inputRef.current?.focus());
     }
   };
 
@@ -170,15 +184,18 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
             <p className="text-blue-100 text-lg opacity-90">افتح الكاميرا وقم بتوجيهها نحو الرمز لتسجيل حضورك في {event.title}</p>
           </div>
           
-          <div className="p-12 flex flex-col items-center bg-slate-50 relative">
+          <div className="p-4 sm:p-12 flex flex-col items-center bg-slate-50 relative">
+            {message && <p role="status" className="mb-4 text-sm text-slate-700">{message}</p>}
+            {selfCheckinUrl && <p className="mb-4 font-bold" aria-live="off">ينتهي الرمز خلال {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}</p>}
             {selfCheckinUrl ? (
               <>
-                <div className="bg-white p-6 rounded-3xl shadow-xl mb-8 border border-slate-100 relative group">
+                <div className="bg-white p-4 sm:p-6 rounded-3xl shadow-xl mb-8 border border-slate-100 relative group max-w-full">
                   <div className="absolute inset-0 bg-blue-500 rounded-3xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity"></div>
                   <div className="relative">
                     <QRCodeSVG 
                       value={selfCheckinUrl} 
                       size={280}
+                      className="max-w-full h-auto"
                       bgColor={"#ffffff"}
                       fgColor={"#0f172a"}
                       level={"H"}
@@ -199,9 +216,9 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
                     />
                   </div>
                   <button 
-                    onClick={() => {
-                      navigator.clipboard.writeText(selfCheckinUrl);
-                      alert('تم نسخ الرابط!');
+                    onClick={async () => {
+                      try { await navigator.clipboard.writeText(selfCheckinUrl); setMessage('تم نسخ الرابط'); }
+                      catch { setMessage('تعذر النسخ؛ حدّد الرابط وانسخه يدويًا'); }
                     }}
                     className="shrink-0 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-colors flex items-center shadow-sm w-full sm:w-auto justify-center"
                   >
@@ -227,15 +244,15 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
                 <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
                   <QrCode className="w-8 h-8" />
                 </div>
-                <h3 className="text-lg font-bold text-slate-800 mb-2 font-cairo">لم يتم إنشاء رمز تحضير لهذه الفعالية بعد</h3>
+                <h3 className="text-lg font-bold text-slate-800 mb-2 font-cairo">{tokenExpiry ? 'انتهت صلاحية الرمز — ولّد رمزًا جديدًا' : 'لم يتم إنشاء رمز تحضير لهذه الفعالية بعد'}</h3>
                 <p className="text-sm text-slate-500 mb-6">قم بتوليد رمز التحضير الذاتي ليتمكن الحضور من مسح رمز QR أو استخدام رابط التحضير المباشر.</p>
                 <button
                   onClick={handleGenerateToken}
-                  disabled={isGeneratingToken}
+                  disabled={isGeneratingToken || event.state !== 'Ongoing'}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold text-sm transition-colors shadow-md shadow-blue-600/20 flex items-center mx-auto disabled:opacity-50"
                 >
                   <RefreshCw className={`w-4 h-4 me-2 ${isGeneratingToken ? 'animate-spin' : ''}`} />
-                  {isGeneratingToken ? 'جاري توليد الرمز...' : 'توليد رمز التحضير الآن'}
+                  {event.state !== 'Ongoing' ? 'ابدأ الفعالية لتوليد الرمز' : isGeneratingToken ? 'جاري توليد الرمز...' : 'توليد رمز التحضير الآن'}
                 </button>
               </div>
             )}
@@ -291,6 +308,8 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
             <div className="relative">
               <input
                 type="text"
+                ref={inputRef}
+                aria-label="معرّف الطالب أو رابط البطاقة الرقمية"
                 autoFocus
                 placeholder="امسح الـ QR أو اكتب معرّف الطالب (ID)"
                 value={manualInput}
@@ -336,11 +355,11 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
           </form>
           
           <div className="mt-8 pt-8 border-t border-slate-100 text-xs font-bold text-slate-400">
-            تلميحة: مؤشر الفأرة (Focus) سيعود تلقائياً للحقل بعد كل عملية مسح.
+            يعود التركيز لحقل المعرف بعد كل عملية تحضير.
           </div>
         </div>
       )}
-
+      {recent.length > 0 && <section className="mt-6 rounded-xl bg-white border p-4"><h2 className="font-bold mb-2">آخر عمليات هذه الجلسة — ليست بديلًا لسجل الحضور الكامل</h2>{recent.map(item => <p key={item.id} className="py-1 text-sm text-emerald-800">{item.message}</p>)}</section>}
     </div>
   );
 }

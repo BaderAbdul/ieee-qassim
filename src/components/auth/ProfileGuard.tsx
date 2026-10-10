@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, usePathname } from '@/i18n/routing';
+import { safeReturnTo } from '@/lib/studentExperience';
 
 export default function ProfileGuard({ children }: { children: React.ReactNode }) {
   const { user, userData, loading, error, logout } = useAuth();
@@ -21,12 +22,13 @@ export default function ProfileGuard({ children }: { children: React.ReactNode }
 
       // If profile is not completed and they are not on the complete-profile page
       if (userData.profileCompleted === false && !pathname.includes('/complete-profile')) {
-        router.replace('/complete-profile');
+        const destination = safeReturnTo(`${pathname}${window.location.search}${window.location.hash}`);
+        router.replace(`/complete-profile?returnTo=${encodeURIComponent(destination)}`);
       }
       
       // If profile is completed and they try to go to the onboarding page
       if (userData.profileCompleted === true && pathname.includes('/complete-profile')) {
-        router.replace('/');
+        router.replace(safeReturnTo(new URLSearchParams(window.location.search).get('returnTo')));
       }
     }
   }, [user, userData, loading, pathname, router]);

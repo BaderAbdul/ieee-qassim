@@ -2,6 +2,7 @@
 import { useLocale } from 'next-intl';
 import React from 'react';
 import { Shield } from 'lucide-react';
+import { Link } from '@/i18n/routing';
 
 export default function PrivacyPolicy() {
   const locale = useLocale();
@@ -54,6 +55,13 @@ export default function PrivacyPolicy() {
             </>
           )}
         </div>
+        <section className="mt-8 space-y-4 border-t border-slate-200 pt-6 text-slate-600">
+          <h2 className="text-lg font-bold text-slate-900">{isAr ? 'العرض العام والخدمات المستخدمة' : 'Public display and service providers'}</h2>
+          <p>{isAr ? 'تُعرض بيانات العضوية العامة مثل الاسم والصورة والكلية والتخصص والنقاط والأوسمة في لوحة الشرف والبطاقة العامة. البريد الإلكتروني والرقم الجامعي ليسا ضمن النسخة العامة للملف. قد تُعرض النبذة وروابط الملف التي يضيفها العضو.' : 'Public membership details such as name, photo, college, major, points and badges may appear in the leaderboard and public pass. Email and student ID are not part of the public profile projection. Member-provided bio and profile links may also appear.'}</p>
+          <p>{isAr ? 'تستخدم المنصة Firebase لتسجيل الدخول والبيانات، وVercel لتشغيل الموقع، وCloudinary للصور والشهادات المولدة، وخدمة البريد عند تفعيلها لإرسال إشعارات الحساب. روابط الشهادات الخارجية تخضع لصلاحيات وسياسات الجهة المستضيفة.' : 'The platform uses Firebase for sign-in and data, Vercel for hosting, Cloudinary for media and generated certificates, and an email provider when notifications are enabled. External certificate links follow their hosting service’s access policies.'}</p>
+          <p>{isAr ? 'أرشفة الحساب تمنع استخدام المنصة وتحفظ السجلات السابقة؛ وهي ليست حذفًا نهائيًا للبيانات. لطلبات الخصوصية أو تصحيح السجلات تواصل مع إدارة النادي عبر قناة التواصل الرسمية.' : 'Archiving an account blocks platform access and retains prior records; it is not permanent data deletion. Contact the club administration through its official channel for privacy requests or record corrections.'}</p>
+          <Link href="/help" className="inline-block font-bold text-blue-700 underline">{isAr ? 'المساعدة والتواصل مع النادي' : 'Help and contact the club'}</Link>
+        </section>
       </div>
     </div>
   );

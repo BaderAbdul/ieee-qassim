@@ -5,7 +5,11 @@ import { getFirestore } from "firebase-admin/firestore";
 
 if (!getApps().length) {
   try {
-    if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
+    if (process.env.FIRESTORE_EMULATOR_HOST) {
+      const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+      if (!projectId?.startsWith('demo-') || !/^(127\.0\.0\.1|localhost):\d+$/.test(process.env.FIRESTORE_EMULATOR_HOST)) throw new Error('Local emulators require a demo project.');
+      initializeApp({ projectId });
+    } else if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
       initializeApp({
         credential: cert({
           projectId: process.env.FIREBASE_PROJECT_ID,
@@ -13,8 +17,6 @@ if (!getApps().length) {
           privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\\\n/g, "\n").replace(/\\n/g, "\n"),
         }),
       });
-    } else if (process.env.FIRESTORE_EMULATOR_HOST) {
-      initializeApp({ projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID });
     } else {
       throw new Error('Firebase Admin credentials are not configured.');
     }

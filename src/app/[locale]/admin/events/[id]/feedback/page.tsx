@@ -9,6 +9,7 @@ import { Star, Download, ArrowRight, Loader2, MessageSquare, BarChart3, Users, A
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toJsDate } from '@/lib/dateUtils';
+import { downloadCSV } from '@/lib/csv';
 
 const getMillis = (value: unknown): number => toJsDate(value)?.getTime() || 0;
 
@@ -19,6 +20,7 @@ export default function EventFeedbackDashboardPage({ params }: { params: Promise
   const [event, setEvent] = useState<PlatformEvent | null>(null);
   const [feedbacks, setFeedbacks] = useState<EventFeedbackResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<Error | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -43,6 +45,7 @@ export default function EventFeedbackDashboardPage({ params }: { params: Promise
         setFeedbacks(list);
       } catch (err) {
         console.error("Error fetching event feedback analytics:", err);
+        setLoadError(err instanceof Error ? err : new Error('تعذر تحميل التقييمات'));
       } finally {
         setLoading(false);
       }
@@ -53,11 +56,12 @@ export default function EventFeedbackDashboardPage({ params }: { params: Promise
 
   // Statistics calculation
   const totalCount = feedbacks.length;
-  const avgRating = totalCount > 0 ? (feedbacks.reduce((acc, f) => acc + (f.rating || 5), 0) / totalCount).toFixed(1) : '0.0';
+  const rated = feedbacks.filter(item => Number.isInteger(item.rating) && item.rating >= 1 && item.rating <= 5);
+  const avgRating = rated.length > 0 ? (rated.reduce((acc, f) => acc + f.rating, 0) / rated.length).toFixed(1) : '—';
 
   const ratingCounts: Record<number, number> = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-  feedbacks.forEach((f) => {
-    const r = Math.min(5, Math.max(1, f.rating || 5));
+  rated.forEach((f) => {
+    const r = f.rating;
     ratingCounts[r] = (ratingCounts[r] || 0) + 1;
   });
 
@@ -69,37 +73,29 @@ export default function EventFeedbackDashboardPage({ params }: { params: Promise
     
     // Add custom question headers if configured
     const customQuestions = event?.feedbackQuestions || [];
-    customQuestions.forEach((q) => headers.push(`"${q.title.replace(/"/g, '""')}"`));
+    customQuestions.forEach((q) => headers.push(q.title));
 
     const rows = feedbacks.map((f) => {
       const millis = getMillis(f.createdAt);
-      const createdAtStr = millis > 0 ? new Date(millis).toISOString() : new Date().toISOString();
+      const createdAtStr = millis > 0 ? new Date(millis).toISOString() : '';
 
       const base = [
-        `"${f.id}"`,
-        `"${f.userId}"`,
-        `"${f.userEmail || ''}"`,
-        f.rating || 5,
-        `"${createdAtStr}"`,
+        f.id, f.userId, f.userEmail || '',
+        Number.isInteger(f.rating) && f.rating >= 1 && f.rating <= 5 ? f.rating : '', createdAtStr,
       ];
 
       customQuestions.forEach((q) => {
         const ans = f.answers?.[q.id] || '';
-        base.push(`"${ans.replace(/"/g, '""')}"`);
+        base.push(ans);
       });
 
-      return base.join(',');
+      return base;
     });
 
-    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Event_Feedback_${event?.title || eventId}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCSV(`Event_Feedback_${event?.title || eventId}.csv`, [headers, ...rows]);
   };
+
+  if (loadError) throw loadError;
 
   if (loading) {
     return (
@@ -164,7 +160,7 @@ export default function EventFeedbackDashboardPage({ params }: { params: Promise
 
         <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm flex items-center justify-between">
           <div>
-            <div className="text-slate-500 text-xs font-bold mb-1">{isAr ? 'إجمالي المحضرين والتقييمات' : 'Total Submissions'}</div>
+            <div className="text-slate-500 text-xs font-bold mb-1">{isAr ? 'إجمالي استجابات التقييم' : 'Total Feedback Submissions'}</div>
             <div className="text-4xl font-black text-slate-900">{totalCount}</div>
             <div className="text-xs text-emerald-600 font-bold mt-2 flex items-center gap-1">
               <Users className="w-3.5 h-3.5" />
@@ -180,7 +176,7 @@ export default function EventFeedbackDashboardPage({ params }: { params: Promise
           <div>
             <div className="text-slate-500 text-xs font-bold mb-1">{isAr ? 'نسبة الرضا الممتاز (5 نجوم)' : '5-Star Satisfaction Rate'}</div>
             <div className="text-4xl font-black text-slate-900">
-              {totalCount > 0 ? `${Math.round((ratingCounts[5] / totalCount) * 100)}%` : '0%'}
+              {rated.length > 0 ? `${Math.round((ratingCounts[5] / rated.length) * 100)}%` : '—'}
             </div>
             <div className="text-xs text-slate-500 font-medium mt-2">
               {ratingCounts[5]} {isAr ? 'مشارك قيم بـ 5 نجوم' : '5-star reviews'}
@@ -202,7 +198,7 @@ export default function EventFeedbackDashboardPage({ params }: { params: Promise
         <div className="space-y-3">
           {[5, 4, 3, 2, 1].map((stars) => {
             const count = ratingCounts[stars] || 0;
-            const percentage = totalCount > 0 ? Math.round((count / totalCount) * 100) : 0;
+            const percentage = rated.length > 0 ? Math.round((count / rated.length) * 100) : 0;
             return (
               <div key={stars} className="flex items-center gap-4 text-xs font-bold text-slate-700">
                 <div className="w-20 flex items-center gap-1">
@@ -256,7 +252,7 @@ export default function EventFeedbackDashboardPage({ params }: { params: Promise
                     </div>
 
                     <div className="flex items-center gap-1 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
-                      <span className="text-xs font-black text-amber-700">{item.rating || 5}</span>
+                      <span className="text-xs font-black text-amber-700">{Number.isInteger(item.rating) && item.rating >= 1 && item.rating <= 5 ? item.rating : '—'}</span>
                       <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
                     </div>
                   </div>

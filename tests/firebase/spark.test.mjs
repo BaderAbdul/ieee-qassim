@@ -5,6 +5,9 @@ import path from 'node:path';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
+import { readFileSync } from 'node:fs';
+import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
+import { doc as clientDoc, updateDoc as clientUpdate, deleteDoc as clientDelete } from 'firebase/firestore';
 
 if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST) throw new Error('Demo Firestore/Auth emulators required.');
 process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID = 'demo-ieee-qu';
@@ -52,7 +55,7 @@ globalThis.fetch = async (url, options) => {
 };
 const tokens = {};
 before(async () => {
-  for (const [uid, role] of [['alice', 'student'], ['bob', 'student'], ['organizer', 'event_organizer']]) {
+  for (const [uid, role] of [['alice', 'student'], ['bob', 'student'], ['organizer', 'event_organizer'], ['carol', 'student'], ['dan', 'student']]) {
     await getAuth().createUser({ uid, email: `${uid}@example.test`, password: 'test-password-123' });
     await db.collection('users').doc(uid).set({ role, email: `${uid}@example.test`, displayName: uid, arabicFullName: 'طالب تجريبي', totalPoints: 0, profileCompleted: true });
     const r = await fetch(`http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: `${uid}@example.test`, password: 'test-password-123', returnSecureToken: true }) });
@@ -96,11 +99,14 @@ test('Token rotation, invalid attendance, duplicate check-ins and atomic points'
   assert.equal((await db.collection('public_profiles').doc('alice').get()).data().totalPoints, 20);
   assert.ok((await db.collection('point_transactions').doc('attendance_attendance_alice').get()).data().aggregatedAt);
 });
-test('Manual deductions are atomic and never make total points negative', async () => {
-  const r = await call('organizer', 'addManualPoints', { studentUid: 'alice', amount: -200, reason: 'Correction' });
+test('Manual deductions reject excess amounts and preserve ledger/balance equality', async () => {
+  const excess = await call('organizer', 'addManualPoints', { studentUid: 'alice', amount: -200, reason: 'Correction', operationId: 'deduction-excess' });
+  assert.equal(excess.status, 409);
+  assert.equal((await db.collection('users').doc('alice').get()).data().totalPoints, 20);
+  const r = await call('organizer', 'addManualPoints', { studentUid: 'alice', amount: -20, reason: 'Correction', operationId: 'deduction-correct' });
   assert.equal(r.status, 200);
   assert.equal((await db.collection('users').doc('alice').get()).data().totalPoints, 0);
-  assert.equal((await call('organizer', 'addManualPoints', { studentUid: 'missing', amount: 1, reason: 'x' })).status, 404);
+  assert.equal((await call('organizer', 'addManualPoints', { studentUid: 'missing', amount: 1, reason: 'x', operationId: 'missing-student' })).status, 404);
 });
 test('External certificate links require attendance, HTTPS, organizer and ownership', async () => {
   await db.collection('events').doc('attendance').update({ state: 'Completed' });
@@ -155,7 +161,7 @@ test('HTTP endpoint rejects cross-origin, invalid and oversized JSON requests', 
     assert.equal((await POST(new Request('https://example.test/api/platform/syncPublicProfile', { method: 'POST', headers, body }), context)).status, 400);
   }
 });
-test('Only super admin can manage members; role/restriction/deletion update projections', async () => {
+test('Only super admin can manage members; roles/restrictions/archive preserve records', async () => {
   assert.equal((await call('organizer', 'manageUser', { userId: 'bob', change: 'role', role: 'super_admin' })).status, 403);
   await db.collection('users').doc('organizer').update({ role: 'super_admin' });
   assert.equal((await call('organizer', 'manageUser', { userId: 'bob', change: 'restriction', isRestricted: false })).status, 200);
@@ -164,6 +170,8 @@ test('Only super admin can manage members; role/restriction/deletion update proj
   assert.equal((await db.collection('public_profiles').doc('bob').get()).data().role, 'event_organizer');
   assert.equal((await call('organizer', 'manageUser', { userId: 'bob', change: 'delete' })).status, 200);
   assert.equal((await db.collection('public_profiles').doc('bob').get()).exists, false);
+  assert.equal((await db.collection('users').doc('bob').get()).data().isRestricted, true);
+  assert.ok((await db.collection('users').doc('bob').get()).data().archivedAt);
 });
 test('Valid avatar uploads are signed; request limits return 429', async () => {
   const bytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j9S8AAAAASUVORK5CYII=', 'base64');
@@ -198,4 +206,157 @@ test('Uncertain sends outside dedupe window require review; delivery is opt-in',
   assert.equal(calls, 0); assert.equal((await ref.get()).data().status, 'REVIEW');
   delete process.env.EMAIL_NOTIFICATIONS_ENABLED;
   assert.equal((await call('organizer', 'processNotifications')).data.enabled, false);
+});
+
+test('Explicit waitlisting is not rejection and releases only one reserved seat', async () => {
+  await db.collection('events').doc('explicit-waitlist').set(event('Registration Open', 1));
+  await db.collection('events').doc('explicit-waitlist').update({ registeredCount: 1 });
+  await db.collection('registrations').doc('explicit-waitlist_carol').set({ eventId: 'explicit-waitlist', userId: 'carol', status: 'approved', timestamp: new Date(1) });
+  await db.collection('registrations').doc('explicit-waitlist_dan').set({ eventId: 'explicit-waitlist', userId: 'dan', status: 'waitlisted', timestamp: new Date(2) });
+  const result = await call('organizer', 'manageRegistration', { eventId: 'explicit-waitlist', userId: 'carol', action: 'waitlist' });
+  assert.equal(result.status, 200);
+  assert.equal((await db.collection('registrations').doc('explicit-waitlist_carol').get()).data().status, 'waitlisted');
+  assert.equal((await db.collection('registrations').doc('explicit-waitlist_dan').get()).data().status, 'approved');
+  assert.equal((await db.collection('events').doc('explicit-waitlist').get()).data().registeredCount, 1);
+});
+
+test('Manual awards are idempotent across concurrent requests; changed payload cannot reuse key', async () => {
+  const input = { studentUid: 'carol', amount: 12, reason: 'Volunteer work', operationId: 'volunteer-operation-001' };
+  const results = await Promise.all([call('organizer', 'addManualPoints', input), call('organizer', 'addManualPoints', input)]);
+  assert.ok(results.every(result => result.status === 200), JSON.stringify(results));
+  assert.equal((await db.collection('users').doc('carol').get()).data().totalPoints, 12);
+  const ledger = await db.collection('point_transactions').where('userId', '==', 'carol').get();
+  assert.equal(ledger.size, 1);
+  assert.equal(ledger.docs[0].data().balanceAfter - ledger.docs[0].data().balanceBefore, ledger.docs[0].data().amount);
+  assert.equal((await call('organizer', 'addManualPoints', { ...input, amount: 15 })).status, 409);
+});
+
+test('Concurrent profile completion atomically claims university IDs and normalizes Arabic digits', async () => {
+  const input = { firstName: 'بدر', fatherName: 'عبدالله', familyName: 'الدخيل', isQassimStudent: true, universityId: '١٢٣٤٥٦٧٨٩', college: 'الهندسة', major: 'كهرباء', academicLevel: 'المستوى الأول' };
+  const results = await Promise.all([call('carol', 'saveProfile', input), call('dan', 'saveProfile', input)]);
+  assert.deepEqual(results.map(result => result.status).sort(), [200, 409]);
+  const winner = results[0].status === 200 ? 'carol' : 'dan';
+  const profile = (await db.collection('users').doc(winner).get()).data();
+  assert.equal(profile.universityId, '123456789');
+  assert.equal((await db.collection('university_ids').doc('123456789').get()).data().userId, winner);
+  assert.equal((await db.collection('public_profiles').doc(winner).get()).data().universityId, undefined);
+  assert.equal((await call(winner, 'saveProfile', { firstName: '' })).status, 400);
+});
+
+test('Feedback can be edited without a check-in token or duplicate attendance/points', async () => {
+  const before = (await db.collection('users').doc('carol').get()).data().totalPoints;
+  await db.collection('events').doc('feedback-only').set(event('Completed', 20));
+  await db.collection('attendance_logs').doc('feedback-only_carol').set({ eventId: 'feedback-only', userId: 'carol', timestamp: new Date() });
+  assert.equal((await call('dan', 'submitEventFeedback', { eventId: 'feedback-only', feedbackData: { rating: 5 } })).status, 409);
+  assert.equal((await call('carol', 'submitEventFeedback', { eventId: 'feedback-only', feedbackData: { rating: 0 } })).status, 400);
+  assert.equal((await call('carol', 'submitEventFeedback', { eventId: 'feedback-only', feedbackData: { rating: 2 } })).status, 200);
+  assert.equal((await call('carol', 'submitEventFeedback', { eventId: 'feedback-only', feedbackData: { rating: 4 } })).status, 200);
+  assert.equal((await db.collection('event_feedback').doc('feedback-only_carol').get()).data().rating, 4);
+  assert.equal((await db.collection('users').doc('carol').get()).data().totalPoints, before);
+});
+
+test('Event lifecycle rejects incomplete publication and invalid jumps; admin APIs fail closed', async () => {
+  await db.collection('events').doc('workflow').set(event('Draft', 10));
+  assert.equal((await call('organizer', 'changeEventState', { eventId: 'workflow', state: 'Completed' })).status, 409);
+  assert.equal((await call('organizer', 'changeEventState', { eventId: 'workflow', state: 'Published' })).status, 409);
+  await db.collection('events').doc('workflow').update({ description: 'وصف', location: 'الجامعة', date: new Date(), durationHours: 1 });
+  assert.equal((await call('organizer', 'changeEventState', { eventId: 'workflow', state: 'Published' })).status, 200);
+  assert.equal((await call('organizer', 'changeEventState', { eventId: 'workflow', state: 'Registration Open' })).status, 200);
+  assert.equal((await call('carol', 'getAdminOverview')).status, 403);
+  const result = await call('organizer', 'getAdminOverview');
+  assert.equal(result.status, 200, JSON.stringify(result));
+  assert.equal(result.data.counts.availableCertificates, (await db.collection('certificates').where('status', '==', 'Available').get()).size);
+  assert.equal((await call('organizer', 'getEventReport', { eventId: 'feedback-only' })).data.feedback.averageRating, 4);
+});
+
+test('Member search finds beyond the first page and excludes arbitrary private fields', async () => {
+  const batch = db.batch();
+  for (let i = 0; i < 65; i++) batch.set(db.collection('users').doc(`search-${String(i).padStart(3, '0')}`), { displayName: `Member ${i}`, email: `search-${i}@example.test`, role: 'student', totalPoints: 0, privateToken: 'not-public' });
+  await batch.commit();
+  const first = await call('organizer', 'searchMembers');
+  assert.equal(first.data.users.length, 50); assert.ok(first.data.nextCursor);
+  const results = await call('organizer', 'searchMembers', { query: 'Member 64' });
+  assert.ok(results.data.users.some(user => user.id === 'search-064'));
+  assert.equal(results.data.users[0].privateToken, undefined);
+});
+
+test('Last super admin cannot be archived or demoted and audit is restricted', async () => {
+  assert.equal((await call('organizer', 'manageUser', { userId: 'organizer', change: 'delete' })).status, 409);
+  assert.equal((await call('organizer', 'manageUser', { userId: 'organizer', change: 'role', role: 'student' })).status, 409);
+  assert.equal((await call('carol', 'getAuditLog')).status, 403);
+  const audit = await call('organizer', 'getAuditLog');
+  assert.equal(audit.status, 200); assert.ok(audit.data.entries.some(entry => entry.action === 'points.adjust'));
+  assert.ok(!JSON.stringify(audit.data).includes('test-secret'));
+});
+
+test('Certificate batch reports partial failure rather than pretending all recipients succeeded', async () => {
+  await db.collection('events').doc('partial-certs').set(event('Completed', 20));
+  await db.collection('attendance_logs').doc('partial-certs_carol').set({ eventId: 'partial-certs', userId: 'carol', timestamp: new Date() });
+  const result = await call('organizer', 'issueCertificates', { eventId: 'partial-certs', userIds: ['carol', 'dan'] });
+  assert.equal(result.status, 200); assert.equal(result.data.queuedCount, 1); assert.equal(result.data.failedCount, 1);
+  assert.deepEqual(result.data.results.map(item => item.status), ['queued', 'failed']);
+});
+
+test('Content saves are audited and stale structure writes cannot overwrite another organizer', async () => {
+  const input = { committees: [{ id: 'engineering', name: 'الهندسة', description: '', iconName: 'Users', members: [] }], expectedStructureRevision: 0 };
+  assert.equal((await call('carol', 'saveHomepage', { heroTitle: 'forged' })).status, 403);
+  assert.equal((await call('organizer', 'saveHomepage', input)).status, 200);
+  assert.equal((await call('organizer', 'saveHomepage', input)).status, 409);
+  assert.equal((await call('organizer', 'saveHomepage', { heroTitle: 'IEEE Qassim' })).status, 200);
+  assert.equal((await db.collection('settings').doc('homepage').get()).data().committees.length, 1);
+});
+
+test('Actual Firestore rules reject identity/role/points and lifecycle bypasses, allow safe owner edits', async () => {
+  const testEnv = await initializeTestEnvironment({ projectId: 'demo-ieee-qu', firestore: { host: '127.0.0.1', port: 8080, rules: readFileSync('firestore.rules', 'utf8') } });
+  try {
+    const student = testEnv.authenticatedContext('carol').firestore();
+    const admin = testEnv.authenticatedContext('organizer').firestore();
+    await assertFails(clientUpdate(clientDoc(student, 'users', 'carol'), { universityId: '999999999', profileCompleted: true }));
+    await assertFails(clientUpdate(clientDoc(student, 'users', 'carol'), { totalPoints: 1000000 }));
+    await assertFails(clientUpdate(clientDoc(admin, 'users', 'carol'), { role: 'super_admin' }));
+    await assertSucceeds(clientUpdate(clientDoc(student, 'users', 'carol'), { photoURL: 'https://example.test/avatar.png' }));
+    await assertFails(clientUpdate(clientDoc(admin, 'events', 'workflow'), { state: 'Completed' }));
+    await assertFails(clientUpdate(clientDoc(admin, 'events', 'workflow'), { title: 'عنوان معدل' }));
+    await assertFails(clientDelete(clientDoc(admin, 'events', 'workflow')));
+    await assertFails(clientUpdate(clientDoc(admin, 'settings', 'homepage'), { heroTitle: 'bypass' }));
+  } finally { await testEnv.cleanup(); }
+});
+
+test('Invalid waitlist accounts are skipped without consuming a freed seat', async () => {
+  await db.collection('events').doc('restricted-queue').set({ ...event('Registration Open', 1), registeredCount: 1 });
+  await db.collection('registrations').doc('restricted-queue_carol').set({ eventId: 'restricted-queue', userId: 'carol', status: 'approved', timestamp: new Date(1) });
+  await db.collection('registrations').doc('restricted-queue_bob').set({ eventId: 'restricted-queue', userId: 'bob', status: 'waitlisted', timestamp: new Date(2) });
+  await db.collection('registrations').doc('restricted-queue_dan').set({ eventId: 'restricted-queue', userId: 'dan', status: 'waitlisted', timestamp: new Date(3) });
+  assert.equal((await call('carol', 'cancelRegistration', { eventId: 'restricted-queue' })).status, 200);
+  assert.equal((await db.collection('registrations').doc('restricted-queue_dan').get()).data().status, 'approved');
+  assert.equal((await db.collection('registrations').doc('restricted-queue_bob').get()).data().status, 'cancelled');
+  assert.equal((await db.collection('events').doc('restricted-queue').get()).data().registeredCount, 1);
+});
+
+test('A certificate that loses eligibility leaves the queue with an actionable failure', async () => {
+  await db.collection('events').doc('eligibility-loss').set(event('Completed', 20));
+  await db.collection('attendance_logs').doc('eligibility-loss_carol').set({ eventId: 'eligibility-loss', userId: 'carol', timestamp: new Date() });
+  await call('organizer', 'issueCertificates', { eventId: 'eligibility-loss', userIds: ['carol'] });
+  await db.collection('events').doc('eligibility-loss').update({ state: 'Archived' });
+  const result = await call('organizer', 'renderCertificate', { certificateId: 'certificate_eligibility-loss_carol' });
+  assert.equal(result.status, 200);
+  assert.equal((await db.collection('certificates').doc('certificate_eligibility-loss_carol').get()).data().status, 'Failed');
+});
+
+test('Event content saves create audited drafts and cannot overwrite counters or stale edits', async () => {
+  const input = { title: 'فعالية آمنة', titleEn: 'Safe event', description: 'وصف', descriptionEn: '', location: 'جامعة القصيم', locationEn: '', type: 'Workshop', date: '2026-11-10T10:00:00.000Z', durationHours: 2, capacity: 10, points: 0, registrationMode: 'Auto', hasCertificate: true, gains: [], gainsEn: [], speakers: [], state: 'Completed' };
+  assert.equal((await call('carol', 'saveEvent', input)).status, 403);
+  const created = await call('organizer', 'saveEvent', input);
+  assert.equal(created.status, 200, JSON.stringify(created));
+  const id = created.data.eventId;
+  const ref = db.collection('events').doc(id);
+  const before = (await ref.get()).data();
+  assert.equal(before.state, 'Draft'); assert.equal(before.registeredCount, 0); assert.equal(before.points, 0);
+  const expectedUpdatedAt = before.updatedAt.toDate().getTime();
+  await ref.update({ registeredCount: 5 });
+  assert.equal((await call('organizer', 'saveEvent', { eventId: id, title: 'تعديل مع تسجيل متزامن', expectedUpdatedAt })).status, 200);
+  assert.equal((await ref.get()).data().registeredCount, 5);
+  assert.equal((await call('organizer', 'saveEvent', { eventId: id, registeredCount: 0 })).status, 400);
+  assert.equal((await call('organizer', 'saveEvent', { eventId: id, capacity: 2 })).status, 409);
+  assert.equal((await call('organizer', 'saveEvent', { eventId: id, title: 'تعديل قديم', expectedUpdatedAt })).status, 409);
 });

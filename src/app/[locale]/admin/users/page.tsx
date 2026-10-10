@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { collection, getDocs, query, orderBy, documentId, limit, startAfter, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
-import { db, functions } from '@/lib/firebase/client';
+import { useEffect, useRef, useState } from 'react';
+import { functions } from '@/lib/firebase/client';
 import { httpsCallable } from '@/lib/backend';
 import { useAuth } from '@/context/AuthContext';
 import { Search, Trophy, Shield, ShieldAlert, Trash2, Edit3, Lock, Unlock } from 'lucide-react';
+import type { MemberSearchResult } from '@/lib/adminTypes';
+import { AdminError } from '@/components/admin/AdminData';
 
 interface AdminUserItem {
   id: string;
@@ -22,10 +23,13 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<AdminUserItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<Error | null>(null);
-  const [pageCursor, setPageCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
-  const [nextCursor, setNextCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [pageCursor, setPageCursor] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [revision, setRevision] = useState(0);
+  const [truncated, setTruncated] = useState(false);
+  const pointOperation = useRef<{ key: string; id: string } | null>(null);
   
   // Adjust Points Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -44,13 +48,15 @@ export default function AdminUsersPage() {
     let active = true;
 
     const fetchUsers = async () => {
+      setLoading(true); setLoadError(null);
       try {
-        const snap = await getDocs(query(collection(db, 'users'), orderBy(documentId()), ...(pageCursor ? [startAfter(pageCursor)] : []), limit(50)));
+        const result = await httpsCallable<unknown, MemberSearchResult>(null, 'searchMembers')({ query: searchTerm.trim(), ...(pageCursor ? { cursor: pageCursor } : {}) });
         if (active) {
-          const page = snap.docs.map(d => ({ id: d.id, ...d.data() } as AdminUserItem));
+          const page = result.data.users;
           setUsers(previous => pageCursor ? [...previous.filter(item => !page.some(next => next.id === item.id)), ...page] : page);
-          setNextCursor(snap.docs.at(-1) || null);
-          setHasMore(snap.size === 50);
+          setNextCursor(result.data.nextCursor);
+          setHasMore(!!result.data.nextCursor);
+          setTruncated(!!result.data.truncated);
         }
       } catch (err) {
         console.error('Error fetching users', err);
@@ -62,14 +68,13 @@ export default function AdminUsersPage() {
       }
     };
 
-    fetchUsers();
+    const timer = window.setTimeout(() => { void fetchUsers(); }, searchTerm.trim() ? 300 : 0);
 
     return () => {
       active = false;
+      window.clearTimeout(timer);
     };
-  }, [role, pageCursor]);
-
-  if (loadError) throw loadError;
+  }, [role, pageCursor, searchTerm, revision]);
 
   const handleAdjustPoints = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,22 +88,27 @@ export default function AdminUsersPage() {
 
     try {
       const addManualPoints = httpsCallable(functions, 'addManualPoints');
-      await addManualPoints({
+      const key = JSON.stringify([selectedUser.id, amount, reason.trim()]);
+      if (pointOperation.current?.key !== key) pointOperation.current = { key, id: crypto.randomUUID() };
+      const response = await addManualPoints({
         studentUid: selectedUser.id,
         amount,
-        reason: reason.trim()
+        reason: reason.trim(),
+        operationId: pointOperation.current.id,
       });
+      const result = response.data as { totalPoints: number };
       
       // Update local state to reflect change (cache update simulation)
       setUsers(users.map(u => 
         u.id === selectedUser.id 
-          ? { ...u, totalPoints: Math.max(0, (u.totalPoints || 0) + amount) }
+          ? { ...u, totalPoints: result.totalPoints }
           : u
       ));
       
       setIsModalOpen(false);
       setAmount('');
       setReason('');
+      pointOperation.current = null;
     } catch (err: unknown) {
       console.error(err);
       setError(err instanceof Error ? err.message : 'An error occurred.');
@@ -134,24 +144,21 @@ export default function AdminUsersPage() {
 
   const handleDeleteUser = async (userId: string) => {
     if (userData?.role !== 'super_admin') return alert('غير مصرح لك بحذف الحسابات');
-    if (!confirm('هل أنت متأكد من حذف هذا المستخدم بشكل نهائي من قاعدة البيانات؟ (لا يمكن التراجع عن هذا الإجراء)')) return;
+    if (!confirm('أرشفة هذا الحساب ومنعه من استخدام المنصة؟ ستُحفظ سجلاته السابقة ويمكن فك التقييد لاحقًا.')) return;
     try {
       await httpsCallable(functions, 'manageUser')({ userId, change: 'delete' });
-      setUsers(users.filter(u => u.id !== userId));
+      setUsers(users.map(u => u.id === userId ? { ...u, isRestricted: true } : u));
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء حذف المستخدم.');
+      alert(err instanceof Error ? err.message : 'حدث خطأ أثناء أرشفة الحساب.');
     }
   };
 
-  const filteredUsers = users.filter(u => 
-    (u.arabicFullName || u.displayName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (u.email || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredUsers = users;
 
   const isAuthorized = userData && (userData.role === 'super_admin' || userData.role === 'event_organizer');
 
-  if (authLoading || (isAuthorized && loading)) {
+  if (authLoading || (isAuthorized && loading && !users.length && !searchTerm)) {
     return <div className="py-20 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div></div>;
   }
 
@@ -168,18 +175,22 @@ export default function AdminUsersPage() {
         </div>
       </div>
 
+      {loadError && <AdminError message={loadError.message} retry={() => setRevision(value => value + 1)} />}
+
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-4 border-b border-gray-100">
           <div className="relative">
             <Search className="absolute end-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input 
               type="text" 
-              placeholder="ابحث بالاسم أو البريد الإلكتروني..." 
+              placeholder="بداية الاسم أو البريد، أو الرقم الجامعي/معرف الحساب…"
+              aria-label="البحث في الأعضاء"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setPageCursor(null); setUsers([]); }}
               className="w-full ps-4 pe-10 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-600 focus:border-transparent outline-none"
             />
           </div>
+          <p className="mt-2 text-xs text-slate-500" role="status">{loading ? 'جارٍ البحث…' : truncated ? 'نتائج محدودة؛ اكتب عبارة أدق. البحث من بداية الاسم أو البريد، أو رقم جامعي/معرف مطابق.' : 'البحث من بداية الاسم أو البريد، أو رقم جامعي/معرف مطابق.'}</p>
         </div>
 
         <div className="overflow-x-auto">

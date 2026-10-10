@@ -902,11 +902,14 @@ test('PERFORMANCE BOUNDS: Admin Dashboard O(1) Aggregations with 300+ Students',
   assert.equal(regsCount, 300);
   assert.equal(certsCount, 300);
 
-  // Check admin/page.tsx code ensures getCountFromServer is used for all 3 collections
+  // Counts now live behind the authenticated Vercel API, not in the client page.
   const adminPageContent = readFileSync(join(rootDir, 'src/app/[locale]/admin/page.tsx'), 'utf-8');
-  assert.ok(adminPageContent.includes("getCountFromServer(collection(db, 'users'))"));
-  assert.ok(adminPageContent.includes("getCountFromServer(collection(db, 'registrations'))"));
-  assert.ok(adminPageContent.includes("getCountFromServer(collection(db, 'certificates'))"));
+  const operationsContent = readFileSync(join(rootDir, 'src/lib/server/operations.ts'), 'utf-8');
+  assert.ok(adminPageContent.includes("'getAdminOverview'"));
+  assert.ok(operationsContent.includes('query.count().get()'));
+  assert.ok(operationsContent.includes("count(db.collection('users'))"));
+  assert.ok(operationsContent.includes("count(db.collection('registrations'))"));
+  assert.ok(operationsContent.includes("where('status', '==', 'Available')"));
 });
 
 test('PERFORMANCE & INDEX COMPLIANCE: firestore.indexes.json Composite Index Coverage', () => {

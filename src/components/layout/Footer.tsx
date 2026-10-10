@@ -81,6 +81,7 @@ export default function Footer() {
 
           {/* Local Policy Links */}
           <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-2 text-xs text-slate-400 pt-2 border-t border-slate-800/60 w-full max-w-4xl text-center">
+            <Link href="/help" className="hover:text-slate-200 transition-colors">{isAr ? 'المساعدة والتواصل' : 'Help and contact'}</Link>
             <Link href="/privacy" className="hover:text-slate-200 transition-colors">
               {isAr ? 'سياسة الخصوصية' : 'Privacy Policy'}
             </Link>

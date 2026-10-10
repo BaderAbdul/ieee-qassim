@@ -28,10 +28,25 @@ export function formatDateSafe(date: unknown, formatStr: string, options?: Param
   const d = toJsDate(date);
   if (!d) return '';
   try {
-    return format(d, formatStr, options);
+    // Display Riyadh wall-clock time consistently in SSR and every browser.
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Riyadh', year: 'numeric', month: 'numeric', day: 'numeric',
+      hour: 'numeric', minute: 'numeric', second: 'numeric', hourCycle: 'h23',
+    }).formatToParts(d);
+    const part = (name: Intl.DateTimeFormatPartTypes) => Number(parts.find(p => p.type === name)?.value);
+    const wallClock = new Date(part('year'), part('month') - 1, part('day'), part('hour'), part('minute'), part('second'), d.getMilliseconds());
+    return format(wallClock, formatStr, options);
   } catch {
     return '';
   }
+}
+
+/** Event editors always mean Riyadh wall time, regardless of the organizer's device. */
+export function parseRiyadhInput(date: string, time: string): Date {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) throw new Error('أدخل موعدًا صحيحًا بتوقيت الرياض. / Enter a valid Riyadh date and time.');
+  const result = new Date(`${date}T${time}:00+03:00`);
+  if (!Number.isFinite(result.getTime()) || formatDateSafe(result, 'yyyy-MM-dd') !== date || formatDateSafe(result, 'HH:mm') !== time) throw new Error('موعد الفعالية غير صالح. / Invalid event date.');
+  return result;
 }
 
 /**

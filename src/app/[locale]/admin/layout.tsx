@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from '@/i18n/routing';
-import { useEffect, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Link } from '@/i18n/routing';
 import { 
   LayoutDashboard, 
@@ -14,7 +14,11 @@ import {
   ChevronLeft, 
   ChevronRight,
   ShieldAlert,
-  Home
+  Home,
+  Settings,
+  Activity,
+  BarChart3,
+  ClipboardList
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useLocale } from 'next-intl';
@@ -39,6 +43,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const locale = useLocale();
   const isAr = locale === 'ar';
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const isCollapsed = useSyncExternalStore(subscribeSidebar, getSidebarSnapshot, () => false);
   const toggleSidebar = () => {
@@ -78,7 +83,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-all"
         >
           <Home className="w-4 h-4" />
-          <span>{isAr ? 'العودة للمنعش الرئيسي' : 'Return to Home'}</span>
+          <span>{isAr ? 'العودة للمنصة الرئيسية' : 'Return to Home'}</span>
         </Link>
       </div>
     );
@@ -92,12 +97,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
 
   const navItems = [
-    { name: isAr ? 'نظرة عامة' : 'Overview', href: '/admin', icon: <LayoutDashboard size={20} /> },
+    { name: isAr ? 'مركز العمل' : 'Command center', href: '/admin', icon: <LayoutDashboard size={20} /> },
     { name: isAr ? 'إدارة الفعاليات' : 'Events', href: '/admin/events', icon: <Calendar size={20} /> },
     { name: isAr ? 'المسجلون والطلاب' : 'Users & Members', href: '/admin/users', icon: <Users size={20} /> },
     { name: isAr ? 'تسجيل الحضور (QR)' : 'Check-In Desk', href: '/admin/check-in', icon: <QrCode size={20} /> },
     { name: isAr ? 'الأفكار والمبادرات' : 'Ideas & Proposals', href: '/admin/ideas', icon: <Lightbulb size={20} /> },
     { name: isAr ? 'الهيكلة والتنظيم' : 'Structure Management', href: '/admin/structure', icon: <Users size={20} /> },
+    { name: isAr ? 'محتوى الموقع' : 'Site content', href: '/admin/content', icon: <Settings size={20} /> },
+    { name: isAr ? 'مركز المهام' : 'Operations', href: '/admin/operations', icon: <Activity size={20} /> },
+    { name: isAr ? 'التقارير' : 'Reports', href: '/admin/reports', icon: <BarChart3 size={20} /> },
+    ...(userData.role === 'super_admin' ? [{ name: isAr ? 'سجل الإجراءات' : 'Audit log', href: '/admin/audit', icon: <ClipboardList size={20} /> }] : []),
   ];
 
   return (
@@ -110,8 +119,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       >
         {/* Header & Toggle Button */}
         <div className="p-4 sm:p-5 border-b border-slate-800/80 flex items-center justify-between">
-          {!isCollapsed && (
-            <div className="truncate">
+            <div className={`truncate ${isCollapsed ? 'md:hidden' : ''}`}>
               <h2 className="text-lg font-black font-cairo text-purple-400 tracking-wide">
                 {isAr ? 'لوحة الإدارة' : 'Admin Portal'}
               </h2>
@@ -119,11 +127,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 IEEE Qassim
               </p>
             </div>
-          )}
+          <button type="button" aria-controls="admin-navigation-panel" aria-expanded={mobileOpen} onClick={() => setMobileOpen(value => !value)} className="md:hidden rounded-xl bg-slate-800 px-3 py-2 text-sm font-bold">{mobileOpen ? (isAr ? 'إغلاق القائمة' : 'Close menu') : (isAr ? 'القائمة' : 'Menu')}</button>
           
           <button
             onClick={toggleSidebar}
-            className={`p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all ${
+            aria-label={isCollapsed ? (isAr ? 'توسيع القائمة' : 'Expand sidebar') : (isAr ? 'طي القائمة' : 'Collapse sidebar')}
+            aria-expanded={!isCollapsed}
+            className={`hidden md:block p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all ${
               isCollapsed ? 'mx-auto' : ''
             }`}
             title={isCollapsed ? (isAr ? 'توسيع القائمة' : 'Expand Sidebar') : (isAr ? 'طَيّ القائمة (أيقونات فقط)' : 'Collapse Sidebar')}
@@ -137,13 +147,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
         
         {/* Navigation Links */}
-        <nav className="flex-1 p-3 space-y-1.5 overflow-y-auto">
+        <div id="admin-navigation-panel" className={`${mobileOpen ? 'flex' : 'hidden'} md:flex flex-1 flex-col`}>
+        <nav aria-label={isAr ? 'التنقل الإداري' : 'Admin navigation'} className="flex-1 p-3 space-y-1.5 overflow-y-auto">
           {navItems.map((item) => {
             const active = isCurrentPath(item.href);
             return (
               <Link 
                 key={item.href} 
                 href={item.href}
+                onClick={() => setMobileOpen(false)}
+                aria-label={item.name}
+                aria-current={active ? 'page' : undefined}
                 title={isCollapsed ? item.name : undefined}
                 className={`flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all ${
                   isCollapsed ? 'justify-center' : ''
@@ -154,9 +168,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 }`}
               >
                 <div className="flex-shrink-0">{item.icon}</div>
-                {!isCollapsed && (
-                  <span className="text-sm truncate leading-none">{item.name}</span>
-                )}
+                  <span className={`text-sm truncate leading-none ${isCollapsed ? 'md:hidden' : ''}`}>{item.name}</span>
               </Link>
             );
           })}
@@ -178,14 +190,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             )}
           </Link>
         </div>
+        </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+      <div className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
         <div className="max-w-6xl mx-auto">
           {children}
         </div>
-      </main>
+      </div>
     </div>
   );
 }

@@ -4,6 +4,8 @@ import { useEffect, useState, useRef } from 'react';
 import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase/client';
 import { httpsCallable } from '@/lib/backend';
+import { downloadCSV, parseCSV, secureCertificateURL } from '@/lib/csv';
+import { runOperations, type OperationResult } from '@/lib/admin-operations';
 import { useAuth } from '@/context/AuthContext';
 import { useParams } from 'next/navigation';
 import { FileText, CheckCircle, Clock, XCircle, AlertCircle, RefreshCw, XOctagon, Download, Upload } from 'lucide-react';
@@ -13,6 +15,7 @@ interface Attendee {
   userId: string;
   name: string;
   email: string;
+  eligible: boolean;
   certificate?: Certificate;
 }
 
@@ -29,6 +32,12 @@ export default function CertificatesManagementPage() {
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [manualLinks, setManualLinks] = useState<Record<string, string>>({});
+  const [importRows, setImportRows] = useState<{ id: string; name: string; email: string; userId?: string; url?: string; problem?: string }[]>([]);
+  const [results, setResults] = useState<OperationResult[]>([]);
+  const [retryRows, setRetryRows] = useState<typeof importRows>([]);
+  const [issueRetryIds, setIssueRetryIds] = useState<string[]>([]);
+  const role = userData?.role;
+  const canIssue = event?.state === 'Completed' && event?.hasCertificate === true;
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rendering = useRef(false);
@@ -47,14 +56,19 @@ export default function CertificatesManagementPage() {
         if (active) setError(reason instanceof Error ? reason.message : 'Certificate generation failed.');
       } finally {
         rendering.current = false;
-        if (active) setReloadKey(key => key + 1);
+        if (active) {
+          try {
+            const snapshot = await getDoc(doc(db, 'certificates', pending.certificate!.id));
+            if (active && snapshot.exists()) setAttendees(previous => previous.map(item => item.userId === pending.userId ? { ...item, certificate: { id: snapshot.id, ...snapshot.data() } as Certificate } : item));
+          } catch (reason) { if (active) setError(reason instanceof Error ? reason.message : 'تعذر تحديث الشهادة'); }
+        }
       }
     }, 2000);
     return () => { active = false; window.clearTimeout(timer); };
   }, [attendees, processing]);
 
   useEffect(() => {
-    if (!userData || (userData.role !== 'super_admin' && userData.role !== 'event_organizer')) {
+    if (role !== 'super_admin' && role !== 'event_organizer') {
       return;
     }
 
@@ -79,16 +93,16 @@ export default function CertificatesManagementPage() {
 
         // Parallelize attendee user fetches using Promise.all
         const uniqueUids = Array.from(new Set(userIds));
-        const userDocs = await Promise.all(
-          uniqueUids.map(uid => getDoc(doc(db, 'users', uid)))
-        );
-        const usersData: Record<string, { displayName?: string; email?: string }> = {};
+        const userDocs = [];
+        for (let index = 0; index < uniqueUids.length; index += 25) userDocs.push(...await Promise.all(uniqueUids.slice(index, index + 25).map(uid => getDoc(doc(db, 'users', uid)))));
+        const usersData: Record<string, { displayName?: string; email?: string; eligible: boolean }> = {};
         userDocs.forEach(uDoc => {
           if (uDoc.exists()) {
             const uData = uDoc.data();
             usersData[uDoc.id] = {
               displayName: uData.arabicFullName || uData.displayName,
               email: uData.email,
+              eligible: uData.isRestricted !== true && !uData.archivedAt,
             };
           }
         });
@@ -101,10 +115,11 @@ export default function CertificatesManagementPage() {
           certsByUserId[c.userId] = c;
         });
 
-        const combined: Attendee[] = userIds.map(uid => ({
+        const combined: Attendee[] = uniqueUids.map(uid => ({
           userId: uid,
           name: usersData[uid]?.displayName || 'Unknown',
           email: usersData[uid]?.email || 'No email',
+          eligible: usersData[uid]?.eligible === true,
           certificate: certsByUserId[uid]
         }));
 
@@ -126,16 +141,16 @@ export default function CertificatesManagementPage() {
     return () => {
       active = false;
     };
-  }, [userData, eventId, reloadKey]);
+  }, [role, eventId, reloadKey]);
 
-  const handleIssueCertificates = async () => {
-    if (!event || event.state !== 'Completed') {
+  const handleIssueCertificates = async (retryIds?: string[]) => {
+    if (!canIssue) {
       setError('Certificates can only be issued for Completed events.');
       return;
     }
     
     const eligibleUserIds = attendees
-      .filter(a => !a.certificate || a.certificate.status === 'Failed' || a.certificate.status === 'Revoked')
+      .filter(a => a.eligible && (!a.certificate || a.certificate.status === 'Failed') && (!retryIds || retryIds.includes(a.userId)))
       .map(a => a.userId);
 
     if (eligibleUserIds.length === 0) {
@@ -146,8 +161,21 @@ export default function CertificatesManagementPage() {
     setProcessing(true);
     setError(null);
     try {
-      const issueFn = httpsCallable(functions, 'issueCertificates');
-      await issueFn({ eventId, userIds: eligibleUserIds });
+      const issueFn = httpsCallable<unknown, { results: { userId: string; status: 'queued' | 'skipped' | 'failed'; message?: string }[] }>(functions, 'issueCertificates');
+      const outcome: OperationResult[] = [];
+      for (let index = 0; index < eligibleUserIds.length; index += 100) {
+        const batch = eligibleUserIds.slice(index, index + 100);
+        try {
+          const response = await issueFn({ eventId, userIds: batch });
+          outcome.push(...batch.map(id => {
+            const result = response.data.results.find(item => item.userId === id);
+            return { id, name: attendees.find(a => a.userId === id)?.name || id, success: !!result && result.status !== 'failed', message: result?.message || (!result ? 'لم يؤكد الخادم نتيجة هذا المستفيد' : undefined) };
+          }));
+        }
+        catch (reason) { outcome.push(...batch.map(id => ({ id, name: attendees.find(a => a.userId === id)?.name || id, success: false, message: reason instanceof Error ? reason.message : 'تعذر إصدار الدفعة' }))); }
+      }
+      setResults(outcome);
+      setIssueRetryIds(outcome.filter(row => !row.success).map(row => row.id));
       setReloadKey(k => k + 1);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error issuing certificates';
@@ -188,14 +216,12 @@ export default function CertificatesManagementPage() {
 
   const saveManualLink = async (attendee: Attendee) => {
     const url = manualLinks[attendee.userId];
-    if (!url || !url.startsWith('http')) {
-      alert('يجب إدخال رابط صحيح يبدأ بـ http أو https');
-      return;
-    }
+    let safeURL: string;
+    try { safeURL = secureCertificateURL(url || ''); } catch { setError('يجب إدخال رابط HTTPS صحيح'); return; }
     setProcessing(true);
     try {
-      await httpsCallable(functions, 'saveExternalCertificate')({ eventId, userId: attendee.userId, url });
-      alert('تم رفع الشهادة بنجاح');
+      await httpsCallable(functions, 'saveExternalCertificate')({ eventId, userId: attendee.userId, url: safeURL });
+      setResults([{ id: attendee.userId, name: attendee.name, success: true }]);
       setReloadKey(k => k + 1);
     } catch (err) {
       alert('خطأ في حفظ الرابط: ' + (err instanceof Error ? err.message : 'أعد المحاولة'));
@@ -206,40 +232,24 @@ export default function CertificatesManagementPage() {
 
   const handleExportCSV = () => {
     const header = ['Name', 'Email', 'Status', 'Certificate URL'];
-    const csvContent = [
-      header.join(','),
-      ...attendees.map(a => [
-        `"${a.name.replace(/"/g, '""')}"`,
-        `"${a.email}"`,
+    downloadCSV(`attendees_${event?.title}.csv`, [header, ...attendees.map(a => [
+        a.name, a.email,
         a.certificate ? a.certificate.status : 'Not Issued',
-        a.certificate?.externalUrl || a.certificate?.storagePath || ''
-      ].join(','))
-    ].join('\n');
-
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `attendees_${event?.title}_${new Date().toLocaleDateString()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+        a.certificate?.externalUrl || ''
+      ])]);
   };
 
-  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setUploadingCSV(true);
     setError(null);
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
       try {
-        const text = evt.target?.result as string;
-        const lines = text.split('\n').filter(l => l.trim().length > 0);
-        if (lines.length < 2) throw new Error('CSV must have headers and at least one row');
-        
-        const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/"/g, ''));
+        if (file.size > 2 * 1024 * 1024) throw new Error('الحد الأقصى للملف 2MB');
+        const rows = parseCSV(await file.text());
+        if (rows.length < 2 || rows.length > 5001) throw new Error('يلزم عنوان أعمدة و1 إلى 5000 صف');
+        const headers = rows[0].map(h => h.trim().toLowerCase());
         const emailIdx = headers.findIndex(h => h.includes('email') || h.includes('بريد'));
         const urlIdx = headers.findIndex(h => h.includes('url') || h.includes('link') || h.includes('رابط'));
         
@@ -247,33 +257,35 @@ export default function CertificatesManagementPage() {
           throw new Error('CSV must contain an Email column and a URL/Link column');
         }
 
-        let successCount = 0;
-        
-        for (let i = 1; i < lines.length; i++) {
-          const rowText = lines[i];
-          const cols = rowText.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
-          const email = cols[emailIdx];
-          const url = cols[urlIdx];
-          
-          if (email && url && url.startsWith('http')) {
-            const attendee = attendees.find(a => a.email.toLowerCase() === email.toLowerCase());
-            if (attendee) {
-              await httpsCallable(functions, 'saveExternalCertificate')({ eventId, userId: attendee.userId, url });
-              successCount++;
-            }
-          }
-        }
-        
-        alert(`تم بنجاح ربط ${successCount} شهادة بالحضور.`);
-        setReloadKey(k => k + 1);
+        const seen = new Set<string>();
+        setImportRows(rows.slice(1).map((cols, index) => {
+          const email = (cols[emailIdx] || '').trim().toLowerCase();
+          const attendee = attendees.find(a => a.email.toLowerCase() === email);
+          let problem = !email || !attendee ? 'لا يوجد حاضر بهذا البريد' : !attendee.eligible ? 'الحساب غير مؤهل' : ['Generating', 'Revoked'].includes(attendee.certificate?.status || '') ? 'الشهادة مولّدة حاليًا أو ملغاة' : undefined;
+          if (seen.has(email)) problem = 'بريد مكرر في الملف';
+          seen.add(email);
+          let url: string | undefined;
+          try { url = secureCertificateURL(cols[urlIdx] || ''); } catch { problem = 'رابط HTTPS غير صحيح'; }
+          return { id: String(index + 2), name: attendee?.name || email, email, userId: attendee?.userId, url, problem };
+        }));
+        setResults([]); setRetryRows([]);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'خطأ في معالجة الملف');
       } finally {
         setUploadingCSV(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
-    };
-    reader.readAsText(file);
+  };
+
+  const applyImport = async (rows: typeof importRows) => {
+    setUploadingCSV(true);
+    try {
+      const outcome = await runOperations(rows.filter(row => !row.problem), row => httpsCallable(functions, 'saveExternalCertificate')({ eventId, userId: row.userId, url: row.url }));
+      setResults(outcome);
+      const failed = new Set(outcome.filter(row => !row.success).map(row => row.id));
+      setRetryRows(rows.filter(row => failed.has(row.id)));
+      setImportRows([]); setReloadKey(key => key + 1);
+    } finally { setUploadingCSV(false); }
   };
 
   const isAuthorized = userData && (userData.role === 'super_admin' || userData.role === 'event_organizer');
@@ -309,20 +321,21 @@ export default function CertificatesManagementPage() {
               onChange={handleImportCSV} 
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               ref={fileInputRef}
-              disabled={uploadingCSV}
+              disabled={uploadingCSV || !canIssue || processing}
+              aria-label="اختيار ملف CSV لمعاينة روابط الشهادات"
             />
             <button
-              disabled={uploadingCSV}
+              disabled={uploadingCSV || !canIssue || processing}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold disabled:opacity-50 transition-colors flex items-center gap-2 shadow-sm"
             >
               <Upload className="h-4 w-4" />
-              {uploadingCSV ? 'جاري الرفع...' : 'رفع شهادات CSV'}
+              {uploadingCSV ? 'جاري المعالجة...' : 'معاينة روابط CSV'}
             </button>
           </div>
           
           <button
-            onClick={handleIssueCertificates}
-            disabled={processing || event?.state !== 'Completed'}
+            onClick={() => handleIssueCertificates()}
+            disabled={processing || !canIssue || uploadingCSV}
             className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-xl font-bold disabled:opacity-50 transition-colors flex items-center gap-2 shadow-sm"
           >
             <FileText className="h-5 w-5" />
@@ -332,15 +345,18 @@ export default function CertificatesManagementPage() {
       </div>
 
       {error && <div className="bg-red-50 text-red-600 p-4 rounded-xl">{error}</div>}
+      {issueRetryIds.length > 0 && <button disabled={processing || !canIssue} onClick={() => handleIssueCertificates(issueRetryIds)} className="rounded-xl bg-purple-600 px-4 py-3 text-white disabled:opacity-50">إعادة إرسال دفعات الإصدار المتعثرة فقط</button>}
+      {results.length > 0 && <section className="rounded-xl border bg-white p-4" aria-live="polite"><p>نجح {results.filter(row => row.success).length} / {results.length}.</p>{results.filter(row => !row.success).map(row => <p key={row.id} className="text-red-700">{row.name}: {row.message}</p>)}<button className="mt-2 underline" onClick={() => downloadCSV('certificate-operation-results.csv', [['Name', 'Success', 'Message'], ...results.map(row => [row.name, row.success, row.message || ''])])}>تنزيل تقرير النتائج</button>{retryRows.length > 0 && <button disabled={uploadingCSV} className="ms-4 rounded bg-blue-600 px-4 py-2 text-white" onClick={() => applyImport(retryRows)}>إعادة محاولة الفاشل فقط ({retryRows.length})</button>}</section>}
+      {importRows.length > 0 && <section className="rounded-xl border bg-blue-50 p-4"><h2 className="font-bold">معاينة قبل الحفظ — لم يُطبّق أي رابط بعد</h2><p>صالح {importRows.filter(row => !row.problem).length}، يحتاج مراجعة {importRows.filter(row => row.problem).length}.</p><div className="max-h-64 overflow-auto mt-3">{importRows.map(row => <p key={row.id} className={row.problem ? 'text-red-700' : 'text-green-800'}>صف {row.id}: {row.email} — {row.problem || 'جاهز للربط'}</p>)}</div><button disabled={uploadingCSV || !canIssue || !importRows.some(row => !row.problem)} onClick={() => applyImport(importRows)} className="mt-3 rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-50">تطبيق الصفوف الصالحة فقط</button><button disabled={uploadingCSV} onClick={() => setImportRows([])} className="ms-3 underline">إلغاء الاستيراد</button></section>}
       
-      {event?.state !== 'Completed' && (
+      {!canIssue && (
         <div className="bg-yellow-50 text-yellow-800 p-4 rounded-xl flex items-center gap-3">
           <AlertCircle className="h-5 w-5" />
-          الفعالية لم تكتمل بعد. لا يمكن إصدار الشهادات الآلية إلا للفعاليات المكتملة.
+          يلزم اكتمال الفعالية وتفعيل الشهادات قبل إصدار PDF أو ربط شهادات خارجية.
         </div>
       )}
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
         <table className="w-full text-start">
           <thead className="bg-gray-50 text-gray-500 border-b border-gray-100">
             <tr>
@@ -389,18 +405,19 @@ export default function CertificatesManagementPage() {
                       إلغاء الشهادة
                     </button>
                   )}
-                  {(!attendee.certificate || attendee.certificate.status !== 'Available') && (
+                  {canIssue && attendee.eligible && (!attendee.certificate || attendee.certificate.status === 'Failed') && (
                     <div className="flex gap-2 items-center mt-2">
                       <input 
                         type="url" 
-                        placeholder="رابط الشهادة..." 
+                        placeholder="https://…"
+                        aria-label={`رابط شهادة ${attendee.name}`}
                         value={manualLinks[attendee.userId] || ''}
                         onChange={(e) => setManualLinks(prev => ({ ...prev, [attendee.userId]: e.target.value }))}
                         className="p-2 border rounded-lg text-sm flex-1 outline-none focus:ring-1 focus:ring-blue-500 dir-ltr text-left"
                       />
                       <button 
                         onClick={() => saveManualLink(attendee)}
-                        disabled={processing || !manualLinks[attendee.userId]}
+                        disabled={processing || uploadingCSV || !manualLinks[attendee.userId]}
                         className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 disabled:opacity-50"
                       >
                         رفع

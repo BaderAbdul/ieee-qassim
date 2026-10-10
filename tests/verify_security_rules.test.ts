@@ -21,9 +21,11 @@ test('Security Rules: registrations are backend-only', () => {
 });
 test('Security Rules: owners update a profile whitelist', () => {
   assert.ok(firestoreRulesContent.includes('affectedKeys().hasOnly(['));
-  const section = firestoreRulesContent.split('allow update: if superAdmin()')[1].split('allow delete:')[0];
+  const section = firestoreRulesContent.split('allow update: if owner(uid)')[1].split('allow delete:')[0];
   assert.equal(section.includes("'totalPoints'"), false);
   assert.equal(section.includes("'role'"), false);
+  assert.equal(section.includes("'universityId'"), false);
+  assert.equal(section.includes("'profileCompleted'"), false);
 });
 test('Security Rules: ledger writes are backend-only', () => {
   const section = firestoreRulesContent.split('match /point_transactions/')[1].split('match /pending_checkins/')[0];

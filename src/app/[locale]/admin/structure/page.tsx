@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { doc, getDoc, setDoc, collection, getDocs, query, limit } from 'firebase/firestore';
+import { useEffect, useRef, useState } from 'react';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { Plus, Trash2, Edit2, Save, X, Search, ArrowUp, ArrowDown } from 'lucide-react';
+import { httpsCallable } from '@/lib/backend';
+import type { MemberSearchResult } from '@/lib/adminTypes';
 
 interface CommitteeMember {
   userId: string;
@@ -28,6 +30,11 @@ export default function AdminStructurePage() {
   const [committees, setCommittees] = useState<Committee[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [revision, setRevision] = useState(0);
+  const structureRevision = useRef(0);
+  const busy = useRef(false);
   
   // Modal states
   const [showCommitteeModal, setShowCommitteeModal] = useState(false);
@@ -52,9 +59,13 @@ export default function AdminStructurePage() {
   const [searching, setSearching] = useState(false);
 
   useEffect(() => {
+    let active = true;
     const fetchData = async () => {
+      setLoading(true); setError('');
       try {
         const docSnap = await getDoc(doc(db, 'settings', 'homepage'));
+        if (!active) return;
+        structureRevision.current = Number(docSnap.data()?.structureRevision || 0);
         if (docSnap.exists() && docSnap.data().committees) {
           setCommittees(docSnap.data().committees);
         } else {
@@ -62,33 +73,43 @@ export default function AdminStructurePage() {
         }
       } catch (e) {
         console.error(e);
+        if (active) setError('تعذر تحميل الهيكلة. أعد المحاولة.');
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
     fetchData();
-  }, []);
+    return () => { active = false; };
+  }, [revision]);
 
   const updateCommitteesInDB = async (newCommittees: Committee[]) => {
+    if (busy.current) return false;
+    busy.current = true;
     setSaving(true);
+    setError(''); setMessage('');
     try {
       // Firestore does not accept 'undefined' values. We must deep clone and remove undefined keys.
       const cleanCommittees = JSON.parse(JSON.stringify(newCommittees));
-      await setDoc(doc(db, 'settings', 'homepage'), { committees: cleanCommittees }, { merge: true });
+      const result = await httpsCallable<unknown, { structureRevision: number }>(null, 'saveHomepage')({ committees: cleanCommittees, expectedStructureRevision: structureRevision.current });
+      structureRevision.current = result.data.structureRevision;
+      setCommittees(cleanCommittees);
+      setMessage('تم حفظ الهيكلة بنجاح.');
+      return true;
     } catch (e) {
       console.error(e);
-      alert('حدث خطأ أثناء حفظ الهيكلة في قاعدة البيانات');
+      setError(e instanceof Error ? e.message : 'حدث خطأ أثناء حفظ الهيكلة. لم تتغير البيانات المحفوظة.');
+      return false;
     } finally {
       setSaving(false);
+      busy.current = false;
     }
   };
 
   const handleSave = async () => {
     await updateCommitteesInDB(committees);
-    alert('تم الحفظ بنجاح');
   };
 
-  const handleAddCommittee = (e: React.FormEvent) => {
+  const handleAddCommittee = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentCommittee) return;
     
@@ -96,18 +117,15 @@ export default function AdminStructurePage() {
     if (currentCommittee.id) {
       updated = committees.map(c => c.id === currentCommittee.id ? currentCommittee : c);
     } else {
-      updated = [...committees, { ...currentCommittee, id: Date.now().toString(), members: [] }];
+      updated = [...committees, { ...currentCommittee, id: crypto.randomUUID(), members: [] }];
     }
-    setCommittees(updated);
-    updateCommitteesInDB(updated);
-    setShowCommitteeModal(false);
+    if (await updateCommitteesInDB(updated)) setShowCommitteeModal(false);
   };
 
-  const handleDeleteCommittee = (id: string) => {
+  const handleDeleteCommittee = async (id: string) => {
     if(confirm('هل أنت متأكد من حذف هذه اللجنة؟')) {
       const updated = committees.filter(c => c.id !== id);
-      setCommittees(updated);
-      updateCommitteesInDB(updated);
+      await updateCommitteesInDB(updated);
     }
   };
 
@@ -115,24 +133,18 @@ export default function AdminStructurePage() {
     if (!searchQuery) return;
     setSearching(true);
     try {
-      const q = query(collection(db, 'users'), limit(50));
-      const snap = await getDocs(q);
-      const res = snap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .filter((u: SearchResultUser) => 
-          (u.arabicFullName && u.arabicFullName.includes(searchQuery)) || 
-          (u.email && u.email.includes(searchQuery)) || 
-          (u.displayName && u.displayName.includes(searchQuery))
-        );
-      setSearchResults(res as SearchResultUser[]);
+      const result = await httpsCallable<unknown, MemberSearchResult>(null, 'searchMembers')({ query: searchQuery.trim() });
+      setSearchResults(result.data.users);
+      if (result.data.truncated) setMessage('نتائج البحث محدودة؛ اكتب بداية اسم أو بريد أدق أو رقمًا جامعيًا مطابقًا.');
     } catch (e) {
       console.error(e);
+      setError(e instanceof Error ? e.message : 'تعذر البحث في الأعضاء.');
     } finally {
       setSearching(false);
     }
   };
 
-  const handleAddMember = (user: SearchResultUser) => {
+  const handleAddMember = async (user: SearchResultUser) => {
     if (!showMemberModal) return;
     const { committeeId } = showMemberModal;
     
@@ -156,8 +168,7 @@ export default function AdminStructurePage() {
       return c;
     });
     
-    setCommittees(updated);
-    updateCommitteesInDB(updated);
+    if (!await updateCommitteesInDB(updated)) return;
     
     setShowMemberModal(null);
     setSearchQuery('');
@@ -168,7 +179,7 @@ export default function AdminStructurePage() {
     setMemberEnglishName('');
   };
 
-  const handleRemoveMember = (committeeId: string, userId: string) => {
+  const handleRemoveMember = async (committeeId: string, userId: string) => {
     if(confirm('هل أنت متأكد من إزالة هذا العضو؟')) {
       const updated = committees.map(c => {
         if (c.id === committeeId) {
@@ -176,11 +187,10 @@ export default function AdminStructurePage() {
         }
         return c;
       });
-      setCommittees(updated);
-      updateCommitteesInDB(updated);
+      await updateCommitteesInDB(updated);
     }
   };
-  const moveCommittee = (index: number, direction: 'up' | 'down') => {
+  const moveCommittee = async (index: number, direction: 'up' | 'down') => {
     if (
       (direction === 'up' && index === 0) || 
       (direction === 'down' && index === committees.length - 1)
@@ -190,8 +200,7 @@ export default function AdminStructurePage() {
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     [updated[index], updated[targetIndex]] = [updated[targetIndex], updated[index]];
     
-    setCommittees(updated);
-    updateCommitteesInDB(updated);
+    await updateCommitteesInDB(updated);
   };
 
 
@@ -201,6 +210,8 @@ export default function AdminStructurePage() {
 
   return (
     <div>
+      {error && <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">{error}<button type="button" disabled={saving} onClick={() => setRevision(value => value + 1)} className="ms-3 underline">إعادة تحميل المحفوظ</button></div>}
+      {message && <p role="status" className="mb-4 rounded-xl border border-green-200 bg-green-50 p-4 text-green-800">{message}</p>}
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-gray-900 font-cairo">هيكلة النادي والتنظيم</h1>
         <div className="flex gap-3">

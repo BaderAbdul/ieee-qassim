@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getAuth, GoogleAuthProvider, connectAuthEmulator } from "firebase/auth";
+import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -17,6 +17,12 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+// Opt-in local testing can never be pointed at a real Firebase project.
+if (process.env.NEXT_PUBLIC_FIREBASE_EMULATORS === 'true') {
+  if (!firebaseConfig.projectId?.startsWith('demo-')) throw new Error('Emulators require a demo Firebase project.');
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+  connectFirestoreEmulator(db, '127.0.0.1', 8080);
+}
 // Kept as a compatibility argument for the same-origin backend client.
 export const functions = null;
 export const storage = getStorage(app);

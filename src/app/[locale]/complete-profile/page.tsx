@@ -4,9 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
 import { useAuth } from '@/context/AuthContext';
-import { db, functions } from '@/lib/firebase/client';
+import { functions } from '@/lib/firebase/client';
 import { httpsCallable } from '@/lib/backend';
-import { doc, updateDoc } from 'firebase/firestore';
+import { normalizeStudentId, safeReturnTo } from '@/lib/studentExperience';
 
 export default function CompleteProfilePage() {
   const t = useTranslations('Onboarding');
@@ -98,15 +98,11 @@ export default function CompleteProfilePage() {
     }
 
     try {
-      const userRef = doc(db, 'users', user.uid);
       const updateData: Record<string, string | boolean | null> = {
         firstName: firstName.trim(),
         fatherName: fatherName.trim(),
         familyName: familyName.trim(),
-        arabicFullName: `${firstName.trim()} ${fatherName.trim()} ${familyName.trim()}`,
         isQassimStudent: isStudent,
-        profileCompleted: true,
-        profileCompletedAt: new Date().toISOString(),
       };
 
       if (isStudent) {
@@ -116,12 +112,13 @@ export default function CompleteProfilePage() {
         updateData.academicLevel = academicLevel;
       }
 
-      await updateDoc(userRef, updateData);
+      // The server owns identity validation and the unique student-ID claim.
+      await httpsCallable(functions, 'saveProfile')(updateData);
       
       setSuccess(true);
       // Brief pause to show success state before redirecting
       setTimeout(() => {
-        router.replace('/'); 
+        router.replace(safeReturnTo(new URLSearchParams(window.location.search).get('returnTo')));
       }, 1500);
       
     } catch (error) {
@@ -204,6 +201,10 @@ export default function CompleteProfilePage() {
                   <label className="block text-sm font-bold text-slate-700 mb-1">{isAr ? 'الاسم الأول' : 'First Name'}</label>
                   <input
                     type="text"
+                    id="first-name"
+                    autoComplete="given-name"
+                    aria-label={isAr ? 'الاسم الأول بالعربية' : 'First name in Arabic'}
+                    aria-invalid={Boolean(errors.firstName)}
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                     placeholder={isAr ? 'الاسم الأول' : 'First'}
@@ -215,6 +216,8 @@ export default function CompleteProfilePage() {
                   <label className="block text-sm font-bold text-slate-700 mb-1">{isAr ? 'اسم الأب' : 'Father Name'}</label>
                   <input
                     type="text"
+                    aria-label={isAr ? 'اسم الأب بالعربية' : 'Father name in Arabic'}
+                    aria-invalid={Boolean(errors.fatherName)}
                     value={fatherName}
                     onChange={(e) => setFatherName(e.target.value)}
                     placeholder={isAr ? 'اسم الأب' : 'Father'}
@@ -226,6 +229,9 @@ export default function CompleteProfilePage() {
                   <label className="block text-sm font-bold text-slate-700 mb-1">{isAr ? 'العائلة' : 'Family Name'}</label>
                   <input
                     type="text"
+                    autoComplete="family-name"
+                    aria-label={isAr ? 'العائلة بالعربية' : 'Family name in Arabic'}
+                    aria-invalid={Boolean(errors.familyName)}
                     value={familyName}
                     onChange={(e) => setFamilyName(e.target.value)}
                     placeholder={isAr ? 'العائلة' : 'Family'}
@@ -243,10 +249,13 @@ export default function CompleteProfilePage() {
                     <input
                       type="text"
                       dir="ltr"
+                      inputMode="numeric"
+                      aria-label={t('universityId')}
+                      aria-invalid={Boolean(errors.universityId)}
                       value={universityId}
                       onChange={(e) => {
                         // Keep only digits
-                        const val = e.target.value.replace(/\D/g, '');
+                        const val = normalizeStudentId(e.target.value);
                         if (val.length <= 9) setUniversityId(val);
                       }}
                       placeholder={t('universityIdPlaceholder')}

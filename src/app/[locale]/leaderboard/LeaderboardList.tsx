@@ -4,6 +4,7 @@ import React from 'react';
 import { Trophy, Medal, Award, Sparkles } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useLocale } from 'next-intl';
+import { competitionRanks } from '@/lib/studentExperience';
 
 export interface LeaderboardUser {
   id: string;
@@ -29,6 +30,7 @@ export default function LeaderboardList({ users }: { users: LeaderboardUser[] })
 
   const top3 = users.slice(0, 3);
   const remaining = users.slice(3);
+  const ranks = competitionRanks(users.map(user => user.points));
 
   // Rearrange top3 for podium: 2nd place (idx 1), 1st place (idx 0), 3rd place (idx 2)
   const first = top3[0];
@@ -46,7 +48,7 @@ export default function LeaderboardList({ users }: { users: LeaderboardUser[] })
           <div className="order-2 sm:order-1 bg-gradient-to-b from-slate-50 to-slate-100/80 rounded-3xl border border-slate-200/80 p-6 flex flex-col items-center text-center relative shadow-sm hover:shadow-md transition-all">
             <div className="absolute -top-4 bg-slate-300 text-slate-800 text-xs font-black px-3 py-1 rounded-full shadow-xs flex items-center gap-1">
               <Medal className="h-3.5 w-3.5 text-slate-600" />
-              <span>#2</span>
+              <span>#{ranks[1]}</span>
             </div>
             <div className="mt-4 mb-2"></div>
             <h3 className="font-bold text-slate-900 text-base max-w-full truncate">{second.name}</h3>
@@ -63,7 +65,7 @@ export default function LeaderboardList({ users }: { users: LeaderboardUser[] })
           <div className="order-1 sm:order-2 bg-gradient-to-b from-amber-50 to-amber-100/80 rounded-3xl border-2 border-amber-300 p-7 flex flex-col items-center text-center relative shadow-md hover:shadow-xl transition-all sm:-translate-y-3">
             <div className="absolute -top-5 bg-gradient-to-r from-amber-500 to-yellow-500 text-white text-xs font-black px-4 py-1.5 rounded-full shadow-md flex items-center gap-1.5 uppercase tracking-wide">
               <Trophy className="h-4 w-4" />
-              <span>{isAr ? 'البطل #1' : 'Champion #1'}</span>
+              <span>{isAr ? `المتصدر #${ranks[0]}` : `Leader #${ranks[0]}`}</span>
             </div>
             <div className="mt-4 mb-2"></div>
             <h3 className="font-black text-slate-900 text-lg max-w-full truncate">{first.name}</h3>
@@ -80,7 +82,7 @@ export default function LeaderboardList({ users }: { users: LeaderboardUser[] })
           <div className="order-3 bg-gradient-to-b from-amber-900/5 to-amber-900/10 rounded-3xl border border-amber-800/20 p-6 flex flex-col items-center text-center relative shadow-sm hover:shadow-md transition-all">
             <div className="absolute -top-4 bg-amber-800 text-amber-100 text-xs font-black px-3 py-1 rounded-full shadow-xs flex items-center gap-1">
               <Medal className="h-3.5 w-3.5 text-amber-300" />
-              <span>#3</span>
+              <span>#{ranks[2]}</span>
             </div>
             <div className="mt-4 mb-2"></div>
             <h3 className="font-bold text-slate-900 text-base max-w-full truncate">{third.name}</h3>
@@ -99,7 +101,7 @@ export default function LeaderboardList({ users }: { users: LeaderboardUser[] })
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <ul className="divide-y divide-gray-100">
             {remaining.map((u, idx) => {
-              const rank = idx + 4;
+              const rank = ranks[idx + 3];
               const isCurrentUser = user?.uid === u.id;
               return (
                 <li 

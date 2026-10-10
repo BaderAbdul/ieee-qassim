@@ -12,7 +12,8 @@ import {
   doc, 
   getDoc,
   updateDoc,
-  getCountFromServer
+  getCountFromServer,
+  onSnapshot
 } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase/client';
 import { uploadImage } from '@/lib/backend';
@@ -41,6 +42,7 @@ import {
 } from 'lucide-react';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import DigitalMemberCard from '@/components/ui/DigitalMemberCard';
+import { certificateLabel, normalizeStudentId, registrationLabel } from '@/lib/studentExperience';
 
 interface CertificateData extends Certificate {
   eventTitle: string;
@@ -144,9 +146,21 @@ export default function EngineeringProfilePage() {
   
   const [userRank, setUserRank] = useState<number | null>(null);
   const [downloadingCert, setDownloadingCert] = useState<string | null>(null);
+  const [certificateLinks, setCertificateLinks] = useState<Record<string, { url: string; expiresAt: number }>>({});
+  const [certificateMessage, setCertificateMessage] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
   
   const [activeTab, setActiveTab] = useState<'events' | 'points' | 'certificates'>('events');
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const now = Date.now();
+      setCertificateLinks(previous => {
+        const entries = Object.entries(previous).filter(([, link]) => link.expiresAt > now);
+        return entries.length === Object.keys(previous).length ? previous : Object.fromEntries(entries);
+      });
+    }, 10000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   // Edit Name State
   const [showEditModal, setShowEditModal] = useState(false);
@@ -301,7 +315,7 @@ export default function EngineeringProfilePage() {
           where('totalPoints', '>', myPoints)
         );
         const rankCountSnap = await getCountFromServer(higherPointsQuery);
-        const userCalculatedRank = rankCountSnap.data().count + 1;
+        const userCalculatedRank = myPoints > 0 ? rankCountSnap.data().count + 1 : null;
 
         if (active) {
           setRegistrations(regsWithEvents);
@@ -332,21 +346,35 @@ export default function EngineeringProfilePage() {
     };
   }, [user, authLoading, isAr, reloadKey, userData?.totalPoints]);
 
+  useEffect(() => {
+    if (!user) return;
+    return onSnapshot(query(collection(db, 'certificates'), where('userId', '==', user.uid)), snapshot => {
+      const updated = snapshot.docs.map(item => ({ id: item.id, ...item.data() } as CertificateData));
+      setCertificates(updated.sort((a, b) => (toJsDate(b.issueDate || b.createdAt)?.getTime() ?? 0) - (toJsDate(a.issueDate || a.createdAt)?.getTime() ?? 0)));
+      // Discard links whenever certificate state changes (including revocation).
+      setCertificateLinks({});
+    }, () => setCertificateMessage(isAr ? 'تعذر تحديث حالة الشهادات. أعد تحميل الصفحة.' : 'Could not refresh certificate status. Reload the page.'));
+  }, [user, isAr]);
+
   const handleDownloadCertificate = async (certificateId: string) => {
     setDownloadingCert(certificateId);
+    setCertificateMessage('');
     try {
       const getCertUrl = httpsCallable(functions, 'getCertificateDownloadUrl');
       const res = await getCertUrl({ certificateId });
       const data = res.data as { downloadUrl?: string; url?: string };
       const targetUrl = data?.downloadUrl || data?.url;
       if (targetUrl) {
-        window.open(targetUrl, '_blank', 'noopener,noreferrer');
+        const parsed = new URL(targetUrl);
+        if (parsed.protocol !== 'https:') throw new Error('Invalid certificate URL');
+        setCertificateLinks(previous => ({ ...previous, [certificateId]: { url: parsed.href, expiresAt: Date.now() + 4 * 60 * 1000 } }));
+        setCertificateMessage(isAr ? 'الرابط جاهز. اضغط «فتح الشهادة». إذا انتهت صلاحيته جهّز رابطًا جديدًا.' : 'The link is ready. Select “Open certificate”. Generate a new link if it expires.');
       } else {
-        alert(isAr ? 'الشهادة قيد التجهيز من قبل المنظمين.' : 'Certificate is being prepared.');
+        setCertificateMessage(isAr ? 'الشهادة قيد التجهيز من قبل المنظمين.' : 'Certificate is being prepared.');
       }
     } catch (err) {
       console.error('Error downloading certificate:', err);
-      alert(isAr ? 'تعذر فتح الشهادة حالياً. يرجى المحاولة لاحقاً.' : 'Unable to download certificate.');
+      setCertificateMessage(isAr ? 'تعذر تجهيز الرابط حالياً. حاول لاحقًا أو تواصل مع المنظم.' : 'Could not prepare the link. Retry later or contact the organizer.');
     } finally {
       setDownloadingCert(null);
     }
@@ -358,8 +386,7 @@ export default function EngineeringProfilePage() {
     if (!fullName || !user) return;
     setIsSaving(true);
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        arabicFullName: fullName,
+      await httpsCallable(functions, 'saveProfile')({
         firstName: editingName.first.trim(),
         fatherName: editingName.middle.trim(),
         familyName: editingName.last.trim()
@@ -379,11 +406,12 @@ export default function EngineeringProfilePage() {
     if (!user) return;
     setIsSavingProfile(true);
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
+      await httpsCallable(functions, 'saveProfile')({
         college: editingProfile.college,
         major: editingProfile.major,
         academicLevel: editingProfile.academicLevel,
-        universityId: editingProfile.universityId
+        universityId: normalizeStudentId(editingProfile.universityId),
+        isQassimStudent: userData?.isQassimStudent === true,
       });
       setShowProfileModal(false);
       alert(isAr ? 'تم تحديث الملف الشخصي بنجاح' : 'Profile updated successfully');
@@ -603,7 +631,7 @@ export default function EngineeringProfilePage() {
                 {t('certificatesEarned')}
               </span>
               <span className="text-2xl sm:text-3xl font-black font-cairo text-slate-900">
-                {loading ? '...' : certificates.length}
+                {loading ? '...' : certificates.filter(cert => cert.status === 'Available').length}
               </span>
             </div>
           </div>
@@ -692,6 +720,7 @@ export default function EngineeringProfilePage() {
         </section>
 
         {/* 4. Activity, Points, and Certificates Tabs */}
+        {certificateMessage && <p role="status" className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">{certificateMessage}</p>}
         <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
           <div className="flex border-b border-slate-100">
             <button 
@@ -762,9 +791,11 @@ export default function EngineeringProfilePage() {
                         </Link>
                       </div>
                     ) : (
-                      registrations.map((reg, idx) => (
+                      registrations.map((reg) => {
+                        const certificate = certificates.find(cert => cert.eventId === reg.event.id);
+                        return (
                         <div 
-                          key={idx} 
+                          key={reg.id}
                           className="border border-slate-100 rounded-2xl p-5 hover:bg-slate-50/50 hover:border-blue-100 transition-all shadow-xs flex flex-col gap-4 text-start"
                         >
                           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -796,32 +827,30 @@ export default function EngineeringProfilePage() {
                                       ? 'bg-red-100 text-red-800' 
                                       : 'bg-slate-100 text-slate-700'
                               }`}>
-                                {reg.status === 'approved' ? tActivity('statusApproved') :
-                                 reg.status === 'waitlisted' ? tActivity('statusWaitlisted') :
-                                 reg.status === 'cancelled' ? tActivity('statusCancelled') :
-                                 reg.status === 'attended' ? (isAr ? 'تم الحضور' : 'Attended') : reg.status}
+                                {registrationLabel(reg.status, isAr)}
                               </span>
                             </div>
                           </div>
                           
-                          {reg.certificate && (
+                          {certificate && (
                             <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
                               <span className="text-xs font-medium text-emerald-700 flex items-center gap-1.5">
                                 <CheckCircle className="h-3.5 w-3.5" />
-                                <span>{isAr ? 'شهادة الحضور معتمدة' : 'Verified Certificate Available'}</span>
+                                <span>{certificateLabel(certificate.status, isAr)}</span>
                               </span>
                               <button
-                                onClick={() => handleDownloadCertificate(reg.certificate!.id)}
-                                disabled={downloadingCert === reg.certificate!.id}
+                                onClick={() => handleDownloadCertificate(certificate.id)}
+                                disabled={certificate.status !== 'Available' || downloadingCert === certificate.id}
                                 className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800"
                               >
                                 <ExternalLink className="h-3 w-3" />
-                                <span>{isAr ? 'عرض الشهادة' : 'View Certificate'}</span>
+                                <span>{isAr ? 'تجهيز رابط الشهادة' : 'Prepare certificate link'}</span>
                               </button>
                             </div>
                           )}
+                          {certificate && certificate.status === 'Available' && certificateLinks[certificate.id] && <a href={certificateLinks[certificate.id].url} target="_blank" rel="noopener noreferrer" className="font-bold text-blue-700 underline">{isAr ? 'فتح الشهادة' : 'Open certificate'}</a>}
                         </div>
-                      ))
+                      ); })
                     )}
                   </div>
                 )}
@@ -903,9 +932,11 @@ export default function EngineeringProfilePage() {
                             </div>
                           </div>
 
+                          <p className="text-sm font-bold text-slate-700">{certificateLabel(cert.status, isAr)}</p>
+
                           <button
                             onClick={() => handleDownloadCertificate(cert.id)}
-                            disabled={downloadingCert === cert.id}
+                            disabled={cert.status !== 'Available' || downloadingCert === cert.id}
                             className="bg-emerald-500 hover:bg-emerald-600 text-white p-2.5 sm:p-3 rounded-xl sm:rounded-2xl shadow-md transition-colors disabled:opacity-70 disabled:cursor-not-allowed group"
                           >
                             {downloadingCert === cert.id ? (
@@ -915,11 +946,12 @@ export default function EngineeringProfilePage() {
                               </>
                             ) : (
                               <>
-                                <span>{isAr ? 'عرض الشهادة المعتمدة' : 'View Accredited Certificate'}</span>
+                                <span>{isAr ? 'تجهيز رابط الشهادة' : 'Prepare certificate link'}</span>
                                 <ExternalLink className="h-3.5 w-3.5 ms-1" />
                               </>
                             )}
                           </button>
+                          {cert.status === 'Available' && certificateLinks[cert.id] && <a href={certificateLinks[cert.id].url} target="_blank" rel="noopener noreferrer" className="block text-blue-700 font-bold underline">{isAr ? 'فتح الشهادة' : 'Open certificate'}</a>}
                         </div>
                       ))
                     )}

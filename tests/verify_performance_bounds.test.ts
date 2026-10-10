@@ -27,24 +27,15 @@ test('Performance Bounds: Events catalog page enforces limit() on queries', () =
   );
 });
 
-test('Performance Bounds: Admin Dashboard uses getCountFromServer for O(1) aggregations', () => {
+test('Performance Bounds: Admin Dashboard delegates bounded server aggregate queries', () => {
   const content = readSource('src/app/[locale]/admin/page.tsx');
-  assert.ok(
-    content.includes('getCountFromServer'),
-    'Admin dashboard must use getCountFromServer for users, registrations, and certificates'
-  );
-  assert.ok(
-    content.includes("getCountFromServer(collection(db, 'users'))"),
-    'Admin dashboard must count users with getCountFromServer'
-  );
-  assert.ok(
-    content.includes("getCountFromServer(collection(db, 'registrations'))"),
-    'Admin dashboard must count registrations with getCountFromServer'
-  );
-  assert.ok(
-    content.includes("getCountFromServer(collection(db, 'certificates'))"),
-    'Admin dashboard must count certificates with getCountFromServer'
-  );
+  const service = readSource('src/lib/server/operations.ts');
+  assert.ok(content.includes("'getAdminOverview'"));
+  assert.ok(service.includes('query.count().get()'));
+  assert.ok(service.includes("count(db.collection('users'))"));
+  assert.ok(service.includes("count(db.collection('registrations'))"));
+  assert.ok(service.includes("where('status', '==', 'Available')"));
+  assert.ok(service.includes("orderBy('date', 'asc').limit(20)"));
 });
 
 test('Performance Bounds: Admin Registrations Desk eliminates sequential N+1 network waterfall', () => {

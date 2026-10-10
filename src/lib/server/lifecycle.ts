@@ -3,6 +3,7 @@ import { publicProfile } from './profiles';
 import { queueNotification } from './notifications';
 import { randomUUID } from 'node:crypto';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { audit } from './audit';
 
 export function documentId(value: unknown, label: string): string {
   if (typeof value !== 'string' || !value || value.length > 128 || value.includes('/')) {
@@ -16,7 +17,7 @@ export const hasCapacity = (event: FirebaseFirestore.DocumentData, count: number
   event.isUnlimitedCapacity === true || count < Math.max(0, Number(event.capacity) || 0);
 
 /** The event document serializes registration, cancellation, and FIFO promotion. */
-export async function changeRegistration(uid: string, eventId: string, action: 'register' | 'cancel' | 'approve' | 'reject', actorUid = uid) {
+export async function changeRegistration(uid: string, eventId: string, action: 'register' | 'cancel' | 'approve' | 'reject' | 'waitlist', actorUid = uid) {
   const db = getFirestore();
   const eventRef = db.collection('events').doc(documentId(eventId, 'eventId'));
   const regRef = db.collection('registrations').doc(`${eventId}_${documentId(uid, 'userId')}`);
@@ -53,9 +54,13 @@ export async function changeRegistration(uid: string, eventId: string, action: '
         if (before === 'cancelled') return { status: before, attendeeCount: count };
         status = 'cancelled';
       } else if (action === 'approve') {
+        if (!user || user.isRestricted || user.archivedAt) throw new ApiError('failed-precondition', 'Student account is unavailable.');
         if (!['pending', 'waitlisted', 'approved'].includes(before)) throw new ApiError('failed-precondition', 'Registration is not awaiting approval.');
         if (!reserved(before) && !hasCapacity(event, count)) throw new ApiError('resource-exhausted', 'Event is full.');
         status = 'approved';
+      } else if (action === 'waitlist') {
+        if (!['pending', 'approved', 'waitlisted'].includes(before)) throw new ApiError('failed-precondition', 'Only active requests can be waitlisted.');
+        status = 'waitlisted';
       } else {
         status = 'rejected';
       }
@@ -63,13 +68,19 @@ export async function changeRegistration(uid: string, eventId: string, action: '
     count += (reserved(status) ? 1 : 0) - (reserved(before) ? 1 : 0);
     let candidate: FirebaseFirestore.QueryDocumentSnapshot | undefined;
     let candidateEmail: unknown;
+    const unavailableCandidates: FirebaseFirestore.QueryDocumentSnapshot[] = [];
     if (reserved(before) && !reserved(status) && event.state === 'Registration Open' && hasCapacity(event, count)) {
-      const waiting = await tx.get(db.collection('registrations').where('eventId', '==', eventId).where('status', '==', 'waitlisted').orderBy('timestamp').limit(1));
-      candidate = waiting.docs[0];
-      if (candidate) {
-        const candidateUser = await tx.get(db.collection('users').doc(documentId(candidate.data().userId, 'userId')));
+      const waiting = await tx.get(db.collection('registrations').where('eventId', '==', eventId).where('status', '==', 'waitlisted').orderBy('timestamp').limit(20));
+      for (const waitingRegistration of waiting.docs) {
+        if (waitingRegistration.id === regRef.id) continue;
+        const candidateUser = await tx.get(db.collection('users').doc(documentId(waitingRegistration.data().userId, 'userId')));
+        if (!candidateUser.exists || candidateUser.data()?.isRestricted || candidateUser.data()?.archivedAt) {
+          unavailableCandidates.push(waitingRegistration);
+          continue;
+        }
+        candidate = waitingRegistration;
         candidateEmail = candidateUser.data()?.email;
-        count++;
+        count++; break;
       }
     }
     // All reads precede writes.
@@ -83,6 +94,9 @@ export async function changeRegistration(uid: string, eventId: string, action: '
       tx.update(regRef, { status, updatedBy: actorUid, ...(status === 'cancelled' ? { cancelledAt: FieldValue.serverTimestamp() } : {}) });
     }
     if (candidate) tx.update(candidate.ref, { status: event.registrationMode === 'Manual' ? 'pending' : 'approved', promotedAt: FieldValue.serverTimestamp() });
+    for (const unavailable of unavailableCandidates) tx.update(unavailable.ref, { status: 'cancelled', cancellationReason: 'account_unavailable', cancelledAt: FieldValue.serverTimestamp() });
+    if (before !== status) audit(tx, `registration.${action}`, actorUid, regRef.id, { eventId, before: before || null, after: status });
+    if (candidate) audit(tx, 'registration.promote', actorUid, candidate.id, { eventId, after: event.registrationMode === 'Manual' ? 'pending' : 'approved' });
     if (before !== status) queueNotification(tx, notificationKey, user?.email, `حالة التسجيل: ${status} / Registration status: ${status}`, event.title);
     if (candidate) queueNotification(tx, `${notificationKey}_promotion`, candidateEmail, 'توفر لك مقعد؛ راجع حالة تسجيلك. / A seat became available; check your registration.', event.title);
     if (count !== initialCount) tx.update(eventRef, { registeredCount: Math.max(0, count) });
@@ -96,6 +110,34 @@ export interface AttendanceInput {
   admin: boolean;
   token?: string;
   feedback?: { rating?: number; answers?: Record<string, string> };
+}
+
+export function validateFeedback(event: FirebaseFirestore.DocumentData, feedback: AttendanceInput['feedback']) {
+  if (!feedback || !Number.isInteger(feedback.rating) || feedback.rating! < 1 || feedback.rating! > 5) throw new ApiError('invalid-argument', 'Select a rating from 1 to 5.');
+  if (feedback.answers !== undefined && (!feedback.answers || typeof feedback.answers !== 'object' || Array.isArray(feedback.answers))) throw new ApiError('invalid-argument', 'Invalid feedback answers.');
+  for (const [key, value] of Object.entries(feedback.answers || {})) {
+    if (key.length > 128 || typeof value !== 'string' || value.length > 3000) throw new ApiError('invalid-argument', 'Invalid feedback.');
+  }
+  for (const question of event.feedbackQuestions || []) {
+    const answer = feedback.answers?.[question.id];
+    if (question.required && !answer?.trim()) throw new ApiError('invalid-argument', 'Answer the required feedback questions.');
+    if (answer && question.type === 'choice' && !question.options?.includes(answer)) throw new ApiError('invalid-argument', 'Select an available answer.');
+  }
+}
+
+/** Editing feedback never calls attendance awarding and never changes point totals. */
+export async function submitEventFeedback(uid: string, eventId: string, feedback: AttendanceInput['feedback']) {
+  const db = getFirestore();
+  return db.runTransaction(async tx => {
+    const [event, attendance, previous] = await Promise.all([
+      tx.get(db.collection('events').doc(eventId)), tx.get(db.collection('attendance_logs').doc(`${eventId}_${uid}`)),
+      tx.get(db.collection('event_feedback').doc(`${eventId}_${uid}`)),
+    ]);
+    if (!event.exists || !attendance.exists) throw new ApiError('failed-precondition', 'Verified attendance is required to leave feedback.');
+    validateFeedback(event.data()!, feedback);
+    tx.set(db.collection('event_feedback').doc(`${eventId}_${uid}`), { eventId, userId: uid, rating: feedback!.rating, answers: feedback!.answers || {}, createdAt: previous.data()?.createdAt || FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+    return { status: 'success' };
+  });
 }
 
 export async function recordAttendance(input: AttendanceInput) {
@@ -123,15 +165,7 @@ export async function recordAttendance(input: AttendanceInput) {
     if (logSnap.exists) return { status: 'already_checked_in', userId, awardedPoints: 0 };
 
     const feedback = input.feedback;
-    if (feedback) {
-      if (!Number.isFinite(feedback.rating) || feedback.rating! < 1 || feedback.rating! > 5) throw new ApiError('invalid-argument', 'Invalid rating.');
-      for (const [key, value] of Object.entries(feedback.answers || {})) {
-        if (key.length > 128 || typeof value !== 'string' || value.length > 3000) throw new ApiError('invalid-argument', 'Invalid feedback.');
-      }
-      for (const question of event.feedbackQuestions || []) {
-        if (question.required && !feedback.answers?.[question.id]?.trim()) throw new ApiError('invalid-argument', 'Answer the required feedback questions.');
-      }
-    }
+    if (feedback) validateFeedback(event, feedback);
     const points = Number.isSafeInteger(event.points) && event.points > 0 ? event.points : 0;
     const badges = ['ieee_starter'];
     if (pastAttendance.size + 1 >= 3) badges.push('active_engineer');
@@ -150,6 +184,7 @@ export async function recordAttendance(input: AttendanceInput) {
     if (feedback) tx.set(db.collection('event_feedback').doc(`${eventId}_${userId}`), { eventId, userId, userEmail: userSnap.data()?.email || '', rating: feedback.rating, answers: feedback.answers || {}, createdAt: FieldValue.serverTimestamp() });
     if (points > 0 && !pointSnap.exists) tx.create(pointRef, { userId, amount: points, source: 'attendance', reason: `Attendance: ${event.title || eventId}`, sourceEventId: eventId, createdBy: input.admin ? actorUid : 'system', createdAt: FieldValue.serverTimestamp(), aggregatedAt: FieldValue.serverTimestamp() });
     queueNotification(tx, `attendance_${eventId}_${userId}`, userData.email, `تم تأكيد حضورك، النقاط: ${awardedPoints}. / Attendance confirmed, points: ${awardedPoints}.`, event.title);
+    audit(tx, input.admin ? 'attendance.manual' : 'attendance.checkin', actorUid, logRef.id, { eventId, awardedPoints });
     return { status: 'success', userId, awardedPoints };
   }, { maxAttempts: 10 });
 }

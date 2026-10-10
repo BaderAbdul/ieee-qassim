@@ -3,9 +3,10 @@ import Image from 'next/image';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
 import { ar, enUS } from 'date-fns/locale';
-import { useLocale, useTranslations } from 'next-intl';
+import { useLocale } from 'next-intl';
 import { MapPin, Calendar, Clock, Users, ArrowRight, Pin } from 'lucide-react';
 import { formatDateSafe } from '@/lib/dateUtils';
+import { eventCapacityLabel, eventStateLabel, eventTypeLabel } from '@/lib/studentExperience';
 
 interface EventCardProps {
   event: PlatformEvent;
@@ -13,7 +14,6 @@ interface EventCardProps {
 
 export default function EventCard({ event }: EventCardProps) {
   const locale = useLocale();
-  const t = useTranslations('Events');
   const isAr = locale === 'ar';
   const dateLocale = isAr ? ar : enUS;
 
@@ -23,43 +23,25 @@ export default function EventCard({ event }: EventCardProps) {
   
   // Badge setup
   let badgeColor = 'bg-slate-100 text-slate-800 border-slate-200';
-  let badgeText: string = event.state;
+  const badgeText = eventStateLabel(event.state, isAr);
   
   if (event.state === 'Published') {
     badgeColor = 'bg-blue-100 text-blue-800 border-blue-200';
-    badgeText = t('status.Published');
   } else if (event.state === 'Registration Open') {
     badgeColor = 'bg-emerald-100 text-emerald-800 border-emerald-200';
-    badgeText = t('status.Registration Open');
   } else if (event.state === 'Registration Closed') {
     badgeColor = 'bg-orange-100 text-orange-800 border-orange-200';
-    badgeText = t('status.Registration Closed');
   } else if (event.state === 'Ongoing') {
     badgeColor = 'bg-amber-100 text-amber-800 border-amber-200';
-    badgeText = t('status.Ongoing');
   } else if (event.state === 'Completed') {
     badgeColor = 'bg-slate-100 text-slate-800 border-slate-200';
-    badgeText = t('status.Completed');
   }
 
   const title = isAr ? event.title : event.titleEn || event.title;
   const location = isAr ? event.location : event.locationEn || event.location;
 
   // Capacity logic
-  let capacityDisplay = '';
-  if (event.state === 'Completed') {
-    capacityDisplay = `${isAr ? 'الحضور:' : 'Attendance:'} ${event.attendanceCount || event.registeredCount || 0}`;
-  } else if (event.isUnlimitedCapacity) {
-    capacityDisplay = isAr ? 'تسجيل مفتوح' : 'Open Registration';
-  } else if (event.hideExactCapacity) {
-    capacityDisplay = isAr ? 'مقاعد محدودة' : 'Limited Seats';
-  } else {
-    if (event.registeredCount !== undefined) {
-      capacityDisplay = `${event.registeredCount} / ${event.capacity} ${isAr ? 'مسجل' : 'Registered'}`;
-    } else {
-      capacityDisplay = `${isAr ? 'السعة:' : 'Capacity:'} ${event.capacity}`;
-    }
-  }
+  const capacityDisplay = eventCapacityLabel(event, isAr);
 
   return (
     <div className={`group h-full bg-white rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden flex flex-col transition-all duration-500 hover:-translate-y-2 relative ${
@@ -76,7 +58,7 @@ export default function EventCard({ event }: EventCardProps) {
             fill
             quality={85}
             className="object-cover transition-transform duration-700 group-hover:scale-110"
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-blue-900 to-indigo-900">
@@ -113,7 +95,7 @@ export default function EventCard({ event }: EventCardProps) {
 
         {/* State Badge */}
         <div className="absolute top-3 sm:top-4 end-3 sm:end-4 z-10">
-          <span className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-[11px] font-bold border shadow-md backdrop-blur-md bg-white/90 ${badgeColor.replace('bg-', 'text-').replace('text-', '')}`}>
+          <span className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-bold border shadow-md ${badgeColor}`}>
             {badgeText}
           </span>
         </div>
@@ -121,7 +103,7 @@ export default function EventCard({ event }: EventCardProps) {
         {/* Category Label overlay */}
         <div className="absolute bottom-3 sm:bottom-4 start-3 sm:start-4">
           <span className="px-2.5 sm:px-3 py-1 bg-white/20 backdrop-blur-md border border-white/30 text-white text-[10px] sm:text-xs font-bold rounded-full tracking-wide">
-            {event.type}
+            {eventTypeLabel(event.type, isAr)}
           </span>
         </div>
       </div>
@@ -159,14 +141,7 @@ export default function EventCard({ event }: EventCardProps) {
 
         <div className="mt-auto flex items-center justify-between pt-2.5 sm:pt-4 border-t border-slate-100">
           <div className="flex items-center gap-1.5 sm:gap-2">
-             <div className="hidden sm:flex -space-x-2 rtl:space-x-reverse">
-                {/* Fake avatars to make it look active, or you could use actual users later */}
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="w-7 h-7 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center shrink-0">
-                    <Users className="w-3 h-3 text-slate-400" />
-                  </div>
-                ))}
-             </div>
+             <Users aria-hidden="true" className="h-4 w-4 text-slate-400" />
              <div className="text-[10px] sm:text-xs font-bold text-slate-500">
                {capacityDisplay}
              </div>

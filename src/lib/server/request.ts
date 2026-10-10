@@ -4,7 +4,27 @@ import { ApiError, statusFor } from './errors';
 
 export async function authenticate(request: Request) {
   const origin = request.headers.get('origin');
-  if (origin && origin !== new URL(request.url).origin) throw new ApiError('permission-denied', 'Invalid origin.');
+  const requestURL = new URL(request.url);
+  if (origin && origin !== requestURL.origin) {
+    let localDemoAlias = false;
+    try {
+      const originURL = new URL(origin);
+      const loopback = ['127.0.0.1', 'localhost'];
+      localDemoAlias = process.env.NODE_ENV === 'development' && !!process.env.FIRESTORE_EMULATOR_HOST
+        && process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.startsWith('demo-') === true
+        && originURL.protocol === 'http:' && requestURL.protocol === 'http:'
+        && loopback.includes(originURL.hostname) && loopback.includes(requestURL.hostname)
+        && originURL.port === requestURL.port;
+    } catch { /* Reject malformed and non-local origins. */ }
+    if (!localDemoAlias) {
+      if (process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.startsWith('demo-')) {
+        let supplied = 'invalid';
+        try { supplied = new URL(origin).origin; } catch { /* no untrusted header dump */ }
+        console.warn('Local origin validation failed', { supplied, expected: requestURL.origin });
+      }
+      throw new ApiError('permission-denied', 'Invalid origin.');
+    }
+  }
   const token = request.headers.get('authorization')?.match(/^Bearer (\S+)$/)?.[1];
   if (!token) throw new ApiError('unauthenticated', 'Sign in first.');
   // Load credentials only at request time. Missing configuration fails closed.

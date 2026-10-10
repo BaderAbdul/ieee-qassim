@@ -58,13 +58,12 @@ service cloud.firestore {
         && request.resource.data.profileCompleted == false
         && request.resource.data.keys().hasOnly(['role', 'totalPoints', 'email', 'displayName', 'photoURL', 'createdAt', 'profileCompleted'])
         && profileValid(request.resource.data);
-      allow update: if superAdmin() || (owner(uid) && active()
+      // Identity, roles, restrictions and points use audited server operations.
+      allow update: if owner(uid) && active()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'displayName', 'photoURL', 'firstName', 'fatherName', 'familyName', 'arabicFullName',
-          'universityId', 'college', 'major', 'academicLevel', 'isQassimStudent',
-          'profileCompleted', 'profileCompletedAt', 'publicProfile', 'cardPreferences'
-        ]) && profileValid(request.resource.data));
-      allow delete: if superAdmin();
+          'displayName', 'photoURL', 'publicProfile', 'cardPreferences'
+        ]) && profileValid(request.resource.data);
+      allow delete: if false;
       match /private/{id} { allow read, write: if owner(uid) || organizer(); }
     }
     match /public_profiles/{uid} {
@@ -73,14 +72,8 @@ service cloud.firestore {
     }
     match /events/{eventId} {
       allow read: if resource.data.state in ['Published', 'Registration Open', 'Registration Closed', 'Ongoing', 'Completed', 'Archived'] || organizer();
-      allow create: if organizer()
-        && eventValid(request.resource.data)
-        && request.resource.data.get('registeredCount', 0) == 0
-        && request.resource.data.get('attendanceCount', 0) == 0;
-      allow update: if organizer() && eventValid(request.resource.data)
-        && (request.resource.data.get('isUnlimitedCapacity', false) == true || request.resource.data.capacity >= resource.data.get('registeredCount', 0))
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['registeredCount', 'attendanceCount', 'checkinToken']);
-      allow delete: if superAdmin();
+      // Creation, content edits and lifecycle changes are validated and audited by Vercel.
+      allow write: if false;
     }
     match /event_secrets/{eventId} {
       allow read: if organizer();
@@ -109,7 +102,7 @@ service cloud.firestore {
     }
     match /settings/{id} {
       allow read: if true;
-      allow write: if superAdmin() || (organizer() && id == 'homepage');
+      allow write: if superAdmin() && id != 'homepage';
     }
     match /ideas/{id} {
       allow create: if active() && request.resource.data.userId == request.auth.uid

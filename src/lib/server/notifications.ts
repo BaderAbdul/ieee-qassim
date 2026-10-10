@@ -60,8 +60,8 @@ export async function processNotificationBatch() {
   if (process.env.EMAIL_NOTIFICATIONS_ENABLED !== 'true' || !process.env.RESEND_API_KEY || !process.env.SENDER_EMAIL) return { enabled: false, delivered: 0 };
   const db = getFirestore();
   const [pending, abandoned] = await Promise.all([
-    db.collection('notification_jobs').where('status', '==', 'PENDING').limit(20).get(),
-    db.collection('notification_jobs').where('status', '==', 'PROCESSING').limit(10).get(),
+    db.collection('notification_jobs').where('status', '==', 'PENDING').where('nextAttemptAt', '<=', Timestamp.now()).orderBy('nextAttemptAt').limit(3).get(),
+    db.collection('notification_jobs').where('status', '==', 'PROCESSING').where('leaseExpiresAt', '<=', Date.now()).orderBy('leaseExpiresAt').limit(3).get(),
   ]);
   const due = [...pending.docs, ...abandoned.docs].filter(doc => {
     const data = doc.data();

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, use } from 'react';
 import Image from 'next/image';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { httpsCallable } from '@/lib/backend';
 import { db, functions } from '@/lib/firebase/client';
 import { PlatformEvent } from '@/lib/types';
@@ -24,6 +24,7 @@ import {
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import EventDetailsSkeleton from '@/components/skeletons/EventDetailsSkeleton';
 import { formatDateSafe } from '@/lib/dateUtils';
+import { eventCapacityLabel, eventStateLabel, eventTypeLabel, registrationLabel } from '@/lib/studentExperience';
 
 export default function EventDetailsPage({ params }: { params: Promise<{ id: string; locale: string }> }) {
   const unwrappedParams = use(params);
@@ -43,71 +44,50 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
   const [registrationStatus, setRegistrationStatus] = useState<string | null>(null);
   const [isRegistering, setIsRegistering] = useState(false);
   const [attendeeCount, setAttendeeCount] = useState(0);
+  const [actionError, setActionError] = useState('');
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   useEffect(() => {
-    let active = true;
-
-    const fetchEvent = async () => {
-      try {
-        const docRef = doc(db, 'events', eventId);
-        const docSnap = await getDoc(docRef);
-        
-        if (docSnap.exists() && active) {
-          const evData = { id: docSnap.id, ...docSnap.data() } as PlatformEvent;
-          setEvent(evData);
-          
-          // Fetch current active registrations
-          // NOTE: We do not use '!=' 'cancelled' in a query because it requires an index. 
-          // Instead we can just read the registeredCount field from the event itself which is updated via transactions.
-          setAttendeeCount(evData.registeredCount || 0);
-        }
-      } catch (error) {
-        console.error("Error fetching event details", error);
-        if (active) setLoadError(error instanceof Error ? error : new Error('Unable to load event'));
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-    
-    fetchEvent();
-
-    return () => {
-      active = false;
-    };
+    return onSnapshot(doc(db, 'events', eventId), snapshot => {
+      const current = snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } as PlatformEvent : null;
+      setEvent(current); setAttendeeCount(current?.registeredCount ?? 0); setLoading(false);
+    }, error => { setLoadError(error); setLoading(false); });
   }, [eventId]);
 
   useEffect(() => {
     if (!user) return;
     return onSnapshot(doc(db, 'registrations', `${eventId}_${user.uid}`), snapshot => {
       setRegistrationStatus(snapshot.exists() ? snapshot.data().status : null);
-    }, error => console.error('Registration subscription failed', error));
-  }, [user, eventId]);
+    }, () => setActionError(isAr ? 'تعذر تحديث حالة التسجيل. حدّث الصفحة قبل إعادة المحاولة.' : 'Could not refresh registration status. Refresh before retrying.'));
+  }, [user, eventId, isAr]);
 
   const handleRegister = async () => {
     if (!user) { await login(); return; }
     if (!event || isRegistering) return;
     setIsRegistering(true);
+    setActionError('');
     try {
       const register = httpsCallable<{ eventId: string }, { status: string; attendeeCount: number }>(functions, 'registerForEvent');
       const { data } = await register({ eventId });
       setRegistrationStatus(data.status);
       setAttendeeCount(data.attendeeCount);
     } catch (error) {
-      alert(error instanceof Error ? error.message : (isAr ? 'تعذر التسجيل. حاول مرة أخرى.' : 'Registration failed. Please retry.'));
+      setActionError(error instanceof Error ? error.message : (isAr ? 'تعذر التسجيل. حاول مرة أخرى.' : 'Registration failed. Please retry.'));
     } finally { setIsRegistering(false); }
   };
 
   const handleCancelRegistration = async () => {
     if (!user || !event || isRegistering) return;
-    if (!confirm(isAr ? 'هل تريد إلغاء التسجيل؟' : 'Cancel your registration?')) return;
     setIsRegistering(true);
+    setActionError('');
     try {
       const cancel = httpsCallable<{ eventId: string }, { status: string; attendeeCount: number }>(functions, 'cancelRegistration');
       const { data } = await cancel({ eventId });
       setRegistrationStatus(data.status);
       setAttendeeCount(data.attendeeCount);
+      setConfirmCancel(false);
     } catch (error) {
-      alert(error instanceof Error ? error.message : (isAr ? 'تعذر إلغاء التسجيل.' : 'Cancellation failed.'));
+      setActionError(error instanceof Error ? error.message : (isAr ? 'تعذر إلغاء التسجيل.' : 'Cancellation failed.'));
     } finally { setIsRegistering(false); }
   };
 
@@ -187,7 +167,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                     rel="noreferrer"
                     className="absolute bottom-4 sm:bottom-6 start-4 sm:start-6 bg-black/60 hover:bg-black/90 backdrop-blur-md text-white px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all sm:opacity-0 sm:translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 flex items-center gap-2 shadow-lg border border-white/10"
                   >
-                    عرض البوستر بالكامل
+                    {isAr ? 'عرض البوستر بالكامل' : 'View full poster'}
                   </a>
                 )}
               </div>
@@ -201,10 +181,10 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
              <div className="bg-white rounded-[2rem] p-6 sm:p-10 shadow-sm border border-gray-100">
                 <div className="flex flex-wrap items-center gap-2.5 mb-5">
                   <span className="bg-blue-50 text-blue-600 px-3.5 py-1.5 rounded-xl text-xs font-bold border border-blue-100">
-                    {event.type}
+                    {eventTypeLabel(event.type, isAr)}
                   </span>
                   <span className="bg-slate-100 text-slate-700 px-3.5 py-1.5 rounded-xl text-xs font-bold border border-slate-200">
-                    {event.state}
+                    {eventStateLabel(event.state, isAr)}
                   </span>
                 </div>
                 
@@ -220,7 +200,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                     <div>
                       <span className="text-xs text-slate-500 font-bold block mb-0.5">{t('date')}</span>
                       <span className="text-sm font-bold text-slate-900 block">{formatDateSafe(eventDate, 'dd MMMM yyyy', { locale: dateLocale })}</span>
-                      <span className="text-xs font-semibold text-slate-500">{formatDateSafe(eventDate, 'HH:mm', { locale: dateLocale })} ({event.durationHours}h)</span>
+                      <span className="text-xs font-semibold text-slate-500">{formatDateSafe(eventDate, 'HH:mm', { locale: dateLocale })} ({event.durationHours}h) · {isAr ? 'توقيت الرياض' : 'Riyadh time'}</span>
                     </div>
                   </div>
                   
@@ -248,7 +228,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                         <Users className="w-5 h-5 text-blue-300" />
                         <div>
                           <div className="text-[10px] text-blue-200 font-bold">{t('capacity')}</div>
-                          <div className="text-sm font-bold text-white">{t('registeredCount', { count: attendeeCount, total: event.capacity })}</div>
+                          <div className="text-sm font-bold text-white">{eventCapacityLabel({ ...event, registeredCount: attendeeCount }, isAr)}</div>
                         </div>
                       </div>
                       
@@ -320,15 +300,10 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                               'bg-blue-500/20 border-blue-500/30 text-blue-50'
                             }`}>
                               <div className="font-bold text-sm mb-0.5">
-                                {registrationStatus === 'attended'
-                                  ? (isAr ? 'تم تسجيل حضورك في هذه الفعالية! 🎉' : 'Attendance Recorded! 🎉')
-                                  : registrationStatus === 'approved' 
-                                    ? ((event.state === 'Completed' || event.state === 'Archived') ? (isAr ? 'انتهت الفعالية' : 'Event Ended') : t('registeredSuccess')) :
-                                   registrationStatus === 'waitlisted' ? t('waitlistedTitle') :
-                                   ((event.state === 'Completed' || event.state === 'Archived') ? (isAr ? 'تم الانتهاء من الفعالية' : 'Event has concluded') : t('pendingTitle'))}
+                                {registrationLabel(registrationStatus, isAr)}
                               </div>
                               <div className="text-[10px] opacity-80">
-                                {registrationStatus === 'attended'
+                                {registrationStatus === 'rejected' ? (isAr ? 'تواصل مع المنظم إذا أردت الاستفسار عن القرار.' : 'Contact the organizer if you need to ask about this decision.') : registrationStatus === 'attended'
                                   ? (isAr ? 'تم احتساب نقاط الحضور وانطباعك بنجاح' : 'Attendance points & feedback recorded')
                                   : registrationStatus === 'approved' 
                                     ? ((event.state === 'Completed' || event.state === 'Archived') ? (isAr ? 'شكراً لاهتمامك بهذه الفعالية' : 'Thank you for your interest in this event') : t('registeredNotice')) :
@@ -337,17 +312,17 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                               </div>
                             </div>
                             
-                            <Link
-                              href={`/events/${event.id}/checkin`}
+                            {['approved', 'attended'].includes(registrationStatus) && <Link
+                              href={`/events/${event.id}/checkin${registrationStatus === 'attended' ? '?feedback=1' : ''}`}
                               className="w-full inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-100 text-slate-900 py-3 rounded-xl text-sm font-bold shadow-md transition-colors"
                             >
                               <QrCode className="h-4 w-4 text-blue-600" />
-                              <span>{registrationStatus === 'attended' ? (isAr ? 'تعديل انطباعك أو التحضير' : 'View Check-In / Feedback') : t('checkInCTA')}</span>
-                            </Link>
+                              <span>{registrationStatus === 'attended' ? (isAr ? 'تقييم الفعالية أو تعديل انطباعك' : 'Rate the event / Edit feedback') : (isAr ? 'تعليمات تسجيل الحضور' : 'Check-in instructions')}</span>
+                            </Link>}
                             
-                            {registrationStatus !== 'attended' && (event.state === 'Registration Open' || event.state === 'Ongoing') && (
+                            {['approved', 'pending', 'waitlisted'].includes(registrationStatus) && (event.state === 'Registration Open' || event.state === 'Ongoing') && (
                               <button 
-                                onClick={handleCancelRegistration}
+                                onClick={() => setConfirmCancel(true)}
                                 disabled={isRegistering}
                                 className="w-full text-white/60 hover:text-white bg-white/5 hover:bg-white/10 py-2.5 rounded-xl text-xs font-bold transition-colors flex items-center justify-center"
                               >
@@ -355,12 +330,17 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                                 {t('cancelRegistration')}
                               </button>
                             )}
+                            {confirmCancel && <div role="group" aria-label={isAr ? 'تأكيد إلغاء التسجيل' : 'Confirm cancellation'} className="p-3 bg-white/10 rounded-xl text-sm">
+                              <p>{isAr ? 'هل تريد إلغاء التسجيل؟ قد يُمنح مقعدك لشخص آخر.' : 'Cancel registration? Your seat may be offered to another student.'}</p>
+                              <div className="flex gap-3 mt-3"><button disabled={isRegistering} onClick={handleCancelRegistration} className="rounded-lg bg-red-600 px-3 py-2">{isAr ? 'نعم، إلغاء التسجيل' : 'Confirm cancellation'}</button><button onClick={() => setConfirmCancel(false)}>{isAr ? 'الاحتفاظ بالتسجيل' : 'Keep registration'}</button></div>
+                            </div>}
                           </div>
                         )}
                       </>
                     )}
                   </div>
                 </div>
+                {actionError && <p role="alert" className="mt-4 rounded-xl bg-red-950/40 p-3 text-sm text-red-100">{actionError}</p>}
              </div>
 
              {/* About Section */}

@@ -40,6 +40,7 @@ export default async function HomePage({ params }: PageProps) {
       const validStates = ['Published', 'Registration Open', 'Ongoing', 'Completed', 'Registration Closed'];
       const eventsSnap = await adminDb.collection('events')
         .where('state', 'in', validStates)
+        .orderBy('date', 'desc')
         .limit(20)
         .get();
 
@@ -54,16 +55,10 @@ export default async function HomePage({ params }: PageProps) {
         };
       }) as PlatformEvent[];
 
-      evs.sort((a, b) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const dateA = typeof a.date === 'string' ? new Date(a.date) : typeof (a.date as any)?.toDate === 'function' ? (a.date as any).toDate() : new Date(0);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const dateB = typeof b.date === 'string' ? new Date(b.date) : typeof (b.date as any)?.toDate === 'function' ? (b.date as any).toDate() : new Date(0);
-        return dateB.getTime() - dateA.getTime();
-      });
-      eventsList = evs.slice(0, 3);
+      const sortedEvents = sortEventsByClosestDate(evs);
+      eventsList = sortedEvents.slice(0, 3);
 
-      latestEvent = evs[0] || null;
+      latestEvent = sortedEvents[0] || null;
       const featuredId = stats.featuredEventId;
       if (featuredId) {
         try {
@@ -85,7 +80,7 @@ export default async function HomePage({ params }: PageProps) {
   } catch (error) {
     console.warn("Firebase Admin failed or threw an error. Falling back to Client SDK for homepage events.", error);
     try {
-      const { collection, getDocs, doc, getDoc, query, where, limit } = await import('firebase/firestore');
+      const { collection, getDocs, doc, getDoc, query, where, limit, orderBy } = await import('firebase/firestore');
       const { db } = await import('@/lib/firebase/client');
       
       const statsDoc = await getDoc(doc(db, 'settings', 'homepage'));
@@ -96,7 +91,7 @@ export default async function HomePage({ params }: PageProps) {
 
       const validStates = ['Published', 'Registration Open', 'Ongoing', 'Completed', 'Registration Closed'];
       const eventsSnap = await getDocs(
-        query(collection(db, 'events'), where('state', 'in', validStates), limit(20))
+        query(collection(db, 'events'), where('state', 'in', validStates), orderBy('date', 'desc'), limit(20))
       );
 
       const evs = eventsSnap.docs.map(d => {
@@ -156,14 +151,15 @@ export default async function HomePage({ params }: PageProps) {
               </div>
               
               <h1 className="text-4xl sm:text-7xl lg:text-8xl font-black mb-2 sm:mb-3 font-thmanyah text-slate-900 drop-shadow-sm uppercase tracking-tight">
-                {t('Hero.headline')}
+                {stats.heroTitle?.trim() || t('Hero.headline')}
               </h1>
               <p className="text-slate-600 font-medium text-sm sm:text-base max-w-lg mx-auto lg:mx-0 mb-2 sm:mb-4 lg:mb-6 leading-relaxed">
-                {t('Hero.description')}
+                {(isAr ? stats.heroSubtitleAr : stats.heroSubtitleEn)?.trim() || t('Hero.description')}
               </p>
             </div>
             
             <HeroActionButtons />
+            <Link href="/help" className="text-sm font-semibold text-blue-700 underline underline-offset-4">{isAr ? 'كيف أسجّل وأحصل على النقاط والشهادة؟' : 'How do registration, points and certificates work?'}</Link>
           </div>
           
           <div className="relative block w-full h-[320px] lg:h-full lg:min-h-[500px] mt-4 lg:mt-0 flex items-center justify-center lg:block">

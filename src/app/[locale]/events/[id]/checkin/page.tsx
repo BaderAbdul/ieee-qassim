@@ -9,11 +9,13 @@ import { useSearchParams } from 'next/navigation';
 import { Link } from '@/i18n/routing';
 import { CheckCircle, XCircle, Loader2, Star, Sparkles, Award, Send } from 'lucide-react';
 import { PlatformEvent } from '@/lib/types';
+import { registrationLabel } from '@/lib/studentExperience';
 
 export default function SelfCheckinPage({ params }: { params: Promise<{ id: string; locale: string }> }) {
   const { id: eventId, locale } = use(params);
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
+  const feedbackMode = searchParams.get('feedback') === '1';
   const { user, login, loading: authLoading } = useAuth();
   const isAr = locale === 'ar';
 
@@ -21,18 +23,19 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
   const [eventLoading, setEventLoading] = useState(true);
 
   // Form states
-  const [rating, setRating] = useState<number>(5);
+  const [rating, setRating] = useState<number>(0);
   const [hoverRating, setHoverRating] = useState<number>(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // View status
-  const [status, setStatus] = useState<'idle_form' | 'submitting' | 'success' | 'already_attended' | 'error'>(
-    !token ? 'error' : 'idle_form'
+  const [status, setStatus] = useState<'instructions' | 'idle_form' | 'submitting' | 'success' | 'already_attended' | 'error'>(
+    !token && !feedbackMode ? 'instructions' : 'idle_form'
   );
   const [errorMessage, setErrorMessage] = useState(
-    !token ? (isAr ? 'الرابط غير صالح أو مفقود رمزه السري' : 'Invalid link or missing token') : ''
+    ''
   );
+  const [formError, setFormError] = useState('');
   const [awardedPoints, setAwardedPoints] = useState<number>(0);
 
   // Fetch Event Details
@@ -42,15 +45,34 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
         const evSnap = await getDoc(doc(db, 'events', eventId));
         if (evSnap.exists()) {
           setEvent({ id: evSnap.id, ...evSnap.data() } as PlatformEvent);
-        }
+        } else { setStatus('error'); setErrorMessage(isAr ? 'هذه الفعالية غير متاحة.' : 'This event is unavailable.'); }
       } catch (err) {
         console.error("Error loading event for check-in", err);
+        setStatus('error'); setErrorMessage(isAr ? 'تعذر تحميل الفعالية. أعد المحاولة.' : 'Could not load the event. Please retry.');
       } finally {
         setEventLoading(false);
       }
     };
     fetchEvent();
-  }, [eventId]);
+  }, [eventId, isAr]);
+
+  useEffect(() => {
+    if (!feedbackMode || !user) return;
+    let active = true;
+    void Promise.all([
+      getDoc(doc(db, 'registrations', `${eventId}_${user.uid}`)),
+      getDoc(doc(db, 'event_feedback', `${eventId}_${user.uid}`)),
+    ]).then(([registration, feedback]) => {
+      if (!active) return;
+      if (!registration.exists() || registration.data().status !== 'attended') {
+        setStatus('error');
+        setErrorMessage(isAr ? `التقييم متاح بعد تأكيد الحضور. حالتك: ${registrationLabel(registration.data()?.status || 'pending', true)}` : 'Feedback is available after attendance is confirmed.');
+      } else if (feedback.exists()) {
+        setRating(feedback.data().rating || 0); setAnswers(feedback.data().answers || {});
+      }
+    }).catch(() => { if (active) { setStatus('error'); setErrorMessage(isAr ? 'تعذر تحميل التقييم السابق. أعد المحاولة.' : 'Could not load previous feedback. Retry.'); } });
+    return () => { active = false; };
+  }, [feedbackMode, user, eventId, isAr]);
 
   const handleSelectChoice = (questionId: string, value: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }));
@@ -70,13 +92,15 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
 
   const handleConfirmCheckin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !user || isSubmitting) return;
+    if ((!token && !feedbackMode) || !user || isSubmitting) return;
+    setFormError('');
+    if (rating < 1 || rating > 5) { setFormError(isAr ? 'اختر تقييمك من نجمة إلى خمس نجوم.' : 'Choose a rating from one to five stars.'); return; }
 
     // Validate required questions
     if (event?.feedbackQuestions) {
       for (const q of event.feedbackQuestions) {
         if (q.required && (!answers[q.id] || answers[q.id].trim().length === 0)) {
-          alert(isAr ? `يرجى الإجابة على السؤال الإجباري: "${q.title}"` : `Please answer required question: "${q.title}"`);
+          setFormError(isAr ? `يرجى الإجابة على السؤال الإجباري: "${q.title}"` : `Please answer required question: "${q.title}"`);
           return;
         }
       }
@@ -86,11 +110,10 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
     setStatus('submitting');
 
     try {
-      // 1. Try Cloud Function first
-      const submitCheckInFn = httpsCallable(functions, 'submitCheckIn');
+      const submitCheckInFn = httpsCallable(functions, feedbackMode ? 'submitEventFeedback' : 'submitCheckIn');
       const response = await submitCheckInFn({
         eventId,
-        token,
+        ...(feedbackMode ? {} : { token }),
         feedbackData: {
           rating,
           answers
@@ -111,6 +134,7 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
       setErrorMessage(isAr
         ? 'تعذر تسجيل الحضور. تأكد من قبول تسجيلك وصلاحية الرابط ثم أعد المحاولة أو تواصل مع المنظم.'
         : 'Check-in failed. Check your approval and link, then retry or contact the organizer.');
+      if (feedbackMode) setErrorMessage(isAr ? 'تعذر حفظ التقييم. أعد المحاولة أو تواصل مع المنظم.' : 'Could not save feedback. Retry or contact the organizer.');
     } finally {
       setIsSubmitting(false);
     }
@@ -130,7 +154,13 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full text-center">
-        {!user && !authLoading && (
+        {status === 'instructions' && <div className="space-y-4 text-start">
+          <h1 className="text-2xl font-bold text-slate-900">{isAr ? 'كيف تسجل حضورك؟' : 'How do you check in?'}</h1>
+          <p className="text-slate-600">{isAr ? 'يُفتح التحضير أثناء الفعالية للمقبولين. امسح رمز QR الذي يعرضه المنظم أو افتح رابط التحضير الذي يرسله لك. هذا الرابط التعريفي لا يتضمن رمز التحضير.' : 'Check-in opens during the event for approved registrations. Scan the organizer’s QR code or open their check-in link. This instruction page does not contain a check-in token.'}</p>
+          <Link href={`/events/${eventId}`} className="block rounded-xl bg-blue-600 text-white px-4 py-3 text-center font-bold">{isAr ? 'عرض الفعالية وحالة التسجيل' : 'View event and registration status'}</Link>
+          <Link href="/help" className="block text-blue-700 underline">{isAr ? 'المساعدة والأسئلة الشائعة' : 'Help and frequently asked questions'}</Link>
+        </div>}
+        {!user && !authLoading && status !== 'instructions' && (
           <div className="flex flex-col items-center justify-center py-6">
             <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4">
               <CheckCircle className="w-8 h-8 text-blue-600" />
@@ -151,17 +181,17 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
         )}
 
         {user && (status === 'idle_form' || status === 'submitting') && (
-          <form onSubmit={handleConfirmCheckin} className="text-right">
+          <form onSubmit={handleConfirmCheckin} className="text-start">
             {/* Header & Event info */}
             <div className="text-center mb-6">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 text-blue-700 text-xs font-bold mb-3 border border-blue-100">
                 <Sparkles className="w-3.5 h-3.5" />
-                {isAr ? 'التحضير السريع والانطباع' : 'Instant Check-in & Feedback'}
+                {feedbackMode ? (isAr ? 'تقييم الفعالية' : 'Event feedback') : (isAr ? 'التحضير السريع والانطباع' : 'Check-in & feedback')}
               </div>
               <h2 className="text-2xl font-black text-slate-900 font-cairo mb-1">
-                {event?.title || (isAr ? 'تحضير الفعالية' : 'Event Check-in')}
+                {(isAr ? event?.title : event?.titleEn || event?.title) || (isAr ? 'تحضير الفعالية' : 'Event Check-in')}
               </h2>
-              {event?.points ? (
+              {event?.points && !feedbackMode ? (
                 <div className="inline-flex items-center gap-1.5 text-amber-600 bg-amber-50 px-3 py-1 rounded-full text-xs font-bold border border-amber-200 mt-1">
                   <Award className="w-4 h-4" />
                   <span>+{event.points} {isAr ? 'نقطة تميز' : 'Points'}</span>
@@ -181,10 +211,12 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
                     <button
                       key={starVal}
                       type="button"
+                      aria-label={isAr ? `${starVal} من 5 نجوم` : `${starVal} out of 5 stars`}
+                      aria-pressed={rating === starVal}
                       onClick={() => setRating(starVal)}
                       onMouseEnter={() => setHoverRating(starVal)}
                       onMouseLeave={() => setHoverRating(0)}
-                      className={`p-2 transition-transform transform active:scale-95 hover:scale-110 focus:outline-none`}
+                      className="p-2 transition-transform transform active:scale-95 hover:scale-110 rounded-lg"
                     >
                       <Star
                         className={`w-8 h-8 transition-colors ${
@@ -198,6 +230,7 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
                 })}
               </div>
               <div className="text-xs font-bold text-slate-500 mt-2">
+                {rating === 0 && (isAr ? 'لم تختر تقييمًا بعد' : 'No rating selected yet')}
                 {rating === 5 && (isAr ? 'ممتازة جداً 🌟' : 'Excellent 🌟')}
                 {rating === 4 && (isAr ? 'جيدة جداً 👍' : 'Very Good 👍')}
                 {rating === 3 && (isAr ? 'جيدة 👌' : 'Good 👌')}
@@ -225,6 +258,7 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
                             <button
                               key={opt}
                               type="button"
+                              aria-pressed={selected}
                               onClick={() => handleSelectChoice(q.id, opt)}
                               className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all ${
                                 selected
@@ -244,6 +278,8 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
                       <div>
                         <textarea
                           rows={2}
+                          aria-label={q.title}
+                          aria-required={q.required}
                           value={answers[q.id] || ''}
                           onChange={(e) => handleTextAnswer(q.id, e.target.value)}
                           placeholder={q.placeholder || (isAr ? 'اكتب انطباعك أو اقتراحك...' : 'Type feedback...')}
@@ -286,10 +322,11 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
               ) : (
                 <>
                   <Send className="w-4 h-4" />
-                  <span>{isAr ? 'تأكيد التحضير والحصول على النقاط' : 'Confirm Check-In & Get Points'}</span>
+                  <span>{feedbackMode ? (isAr ? 'حفظ التقييم' : 'Save feedback') : (isAr ? 'تأكيد التحضير والحصول على النقاط' : 'Confirm check-in')}</span>
                 </>
               )}
             </button>
+            {formError && <p role="alert" className="mt-4 text-red-700 text-sm">{formError}</p>}
           </form>
         )}
 
@@ -299,17 +336,17 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
               <CheckCircle className="w-10 h-10" />
             </div>
             <h2 className="text-2xl font-black text-slate-900 font-cairo mb-2">
-              {locale === 'ar' ? 'تم تحضيرك بنجاح! 🎉' : 'Checked In Successfully! 🎉'}
+              {feedbackMode ? (isAr ? 'حُفظ تقييمك بنجاح' : 'Feedback saved successfully') : (isAr ? 'تم تحضيرك بنجاح! 🎉' : 'Checked in successfully! 🎉')}
             </h2>
             <p className="text-slate-600 text-sm mb-6">
-              {locale === 'ar'
+              {feedbackMode ? (isAr ? 'شكراً لانطباعك. تعديل التقييم لا يضيف نقاط حضور جديدة.' : 'Thank you. Editing feedback does not award attendance points again.') : locale === 'ar'
                 ? `شكراً لمشاركتك انطباعك. تم إضافة ${awardedPoints} نقطة إلى رصيدك.`
                 : `Thank you for your feedback. ${awardedPoints} points added to your balance.`}
             </p>
-            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 w-full mb-6 text-center">
+            {!feedbackMode && <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 w-full mb-6 text-center">
               <div className="text-xs font-bold text-emerald-800 mb-1">{locale === 'ar' ? 'نقاط الحضور' : 'Attendance Points'}</div>
               <div className="text-3xl font-black text-emerald-600">+{awardedPoints}</div>
-            </div>
+            </div>}
             <Link
               href={`/events/${eventId}`}
               className="w-full bg-slate-900 text-white py-3.5 px-6 rounded-xl font-bold hover:bg-slate-800 transition-colors block text-center text-sm"
@@ -350,6 +387,7 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
             <p className="text-slate-700 text-sm mb-6 font-medium">
               {errorMessage}
             </p>
+            <button onClick={() => { setStatus('idle_form'); setErrorMessage(''); }} className="mb-3 w-full rounded-xl bg-blue-600 text-white p-3 font-bold">{isAr ? 'إعادة المحاولة' : 'Retry'}</button>
             <Link
               href={`/events/${eventId}`}
               className="w-full bg-slate-100 text-slate-800 py-3 px-6 rounded-xl font-bold hover:bg-slate-200 transition-colors block text-center text-sm"

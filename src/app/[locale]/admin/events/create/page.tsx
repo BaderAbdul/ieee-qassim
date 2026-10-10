@@ -1,11 +1,12 @@
 'use client';
 
-import { uploadImage } from '@/lib/backend';
+import { parseRiyadhInput } from '@/lib/dateUtils';
+
+import { uploadImage, httpsCallable } from '@/lib/backend';
 import Image from 'next/image';
 
 import { useState } from 'react';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
+import { serverTimestamp } from 'firebase/firestore';
 import { useRouter } from '@/i18n/routing';
 import { EventType, RegistrationMode, EventState, CustomQuestion } from '@/lib/types';
 import { ArrowRight, Save, Plus, Trash2 } from 'lucide-react';
@@ -99,7 +100,7 @@ export default function CreateEventPage() {
 
     try {
       // Combine date and time
-      const eventDate = new Date(`${formData.date}T${formData.time}`);
+      const eventDate = parseRiyadhInput(formData.date, formData.time);
       
       const newEvent = {
         title: formData.title,
@@ -127,7 +128,7 @@ export default function CreateEventPage() {
         updatedAt: serverTimestamp(),
       };
 
-      await addDoc(collection(db, 'events'), newEvent);
+      await httpsCallable(null, 'saveEvent')(newEvent);
       router.push('/admin/events');
     } catch (error) {
       console.error("Error creating event", error);

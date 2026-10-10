@@ -6,6 +6,7 @@ import { ApiError } from './errors';
 import { documentId } from './lifecycle';
 import { privateDownload, uploadAsset } from './cloudinary';
 import { queueNotification } from './notifications';
+import { audit } from './audit';
 
 export async function assignCertificate(actor: string, eventId: string, userId: string, externalUrl?: string) {
   const db = getFirestore();
@@ -38,6 +39,7 @@ export async function assignCertificate(actor: string, eventId: string, userId: 
       issuedBy: actor, attemptCount: 0,
     });
     if (url && previous.data()?.externalUrl !== url.href) queueNotification(tx, notificationKey, user.data()?.email, 'شهادتك متاحة في ملفك الشخصي. / Your certificate is available in your profile.', event.data()?.title);
+    audit(tx, url ? 'certificate.external' : 'certificate.queue', actor, id, { eventId, before: previous.data()?.status || null, after: url ? 'Available' : 'Generating' });
     return { id, queued: !url };
   });
 }
@@ -74,7 +76,10 @@ export async function renderCertificate(id: string) {
     const [event, attendance, user] = await Promise.all([
       tx.get(db.collection('events').doc(data.eventId)), tx.get(db.collection('attendance_logs').doc(`${data.eventId}_${data.userId}`)), tx.get(db.collection('users').doc(data.userId)),
     ]);
-    if (event.data()?.state !== 'Completed' || !event.data()?.hasCertificate || !attendance.exists || !user.exists || user.data()?.isRestricted) throw new ApiError('failed-precondition', 'Certificate eligibility changed.');
+    if (event.data()?.state !== 'Completed' || !event.data()?.hasCertificate || !attendance.exists || !user.exists || user.data()?.isRestricted) {
+      tx.update(ref, { status: 'Failed', lastError: 'Certificate eligibility changed; review attendance and account status.', updatedAt: FieldValue.serverTimestamp(), lease: FieldValue.delete(), leaseExpiresAt: FieldValue.delete() });
+      return null;
+    }
     tx.update(ref, { lease, leaseExpiresAt: Date.now() + 5 * 60000, updatedAt: FieldValue.serverTimestamp() });
     return { ...data, recipientEmail: user.data()?.email };
   });

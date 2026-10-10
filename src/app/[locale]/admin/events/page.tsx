@@ -1,251 +1,73 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, query, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy, documentId, startAfter, limit, type QueryDocumentSnapshot, type DocumentData } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
-import { PlatformEvent, EventState } from '@/lib/types';
+import { httpsCallable } from '@/lib/backend';
+import type { PlatformEvent, EventState } from '@/lib/types';
 import { Link } from '@/i18n/routing';
-import { format } from 'date-fns';
-import { ar } from 'date-fns/locale';
-import { Plus, Users, QrCode, Award, Eye, Edit2, Star, Pin, Trash2 } from 'lucide-react';
+import { useLocale } from 'next-intl';
+import { Plus, Pin, ArrowUpRight } from 'lucide-react';
+import { AdminError, AdminLoading, formatAdminDate } from '@/components/admin/AdminData';
+import { eventStateLabel } from '@/components/admin/EventWorkspace';
 
+const transitions: Record<EventState, EventState[]> = {
+  Draft: ['Published', 'Archived'], Published: ['Draft', 'Registration Open', 'Archived'],
+  'Registration Open': ['Registration Closed', 'Ongoing', 'Archived'],
+  'Registration Closed': ['Registration Open', 'Ongoing', 'Archived'],
+  Ongoing: ['Completed'], Completed: ['Archived'], Archived: [],
+};
 export default function AdminEventsPage() {
+  const locale = useLocale(); const isAr = locale === 'ar';
   const [events, setEvents] = useState<PlatformEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchEvents = async () => {
-    try {
-      // In production, we'd paginate. For now, fetch all events sorted by date.
-      const q = query(collection(db, 'events'));
-      const snap = await getDocs(q);
-      const fetchedEvents = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as PlatformEvent[];
-      
-      // Sort client-side
-      fetchedEvents.sort((a, b) => {
-        if (a.isPinned && !b.isPinned) return -1;
-        if (!a.isPinned && b.isPinned) return 1;
-        const dateA = a.createdAt instanceof Date ? a.createdAt : (a.createdAt as { toDate?: () => Date })?.toDate?.() || new Date();
-        const dateB = b.createdAt instanceof Date ? b.createdAt : (b.createdAt as { toDate?: () => Date })?.toDate?.() || new Date();
-        return dateB.getTime() - dateA.getTime();
-      });
-      
-      setEvents(fetchedEvents);
-    } catch (error) {
-      console.error("Error fetching events", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null);
+  const [cursor, setCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [nextCursor, setNextCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [hasMore, setHasMore] = useState(false); const [revision, setRevision] = useState(0);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [filter, setFilter] = useState(''); const [search, setSearch] = useState('');
   useEffect(() => {
     let active = true;
-
-    const loadEvents = async () => {
+    const load = async () => {
+      setLoading(true); setError(null);
       try {
-        const q = query(collection(db, 'events'));
-        const snap = await getDocs(q);
+        const result = await getDocs(query(collection(db, 'events'), orderBy(documentId()), ...(cursor ? [startAfter(cursor)] : []), limit(25)));
         if (!active) return;
-        const fetchedEvents = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as PlatformEvent[];
-        
-        fetchedEvents.sort((a, b) => {
-          if (a.isPinned && !b.isPinned) return -1;
-          if (!a.isPinned && b.isPinned) return 1;
-          const dateA = a.createdAt instanceof Date ? a.createdAt : (a.createdAt as { toDate?: () => Date })?.toDate?.() || new Date();
-          const dateB = b.createdAt instanceof Date ? b.createdAt : (b.createdAt as { toDate?: () => Date })?.toDate?.() || new Date();
-          return dateB.getTime() - dateA.getTime();
-        });
-        
-        setEvents(fetchedEvents);
-      } catch (error) {
-        console.error("Error fetching events", error);
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
+        const page = result.docs.map(item => ({ id: item.id, ...item.data() } as PlatformEvent));
+        setEvents(previous => cursor ? [...previous.filter(item => !page.some(next => next.id === item.id)), ...page] : page);
+        setNextCursor(result.docs.at(-1) || null); setHasMore(result.size === 25);
+      } catch (reason) { if (active) setError(reason instanceof Error ? reason.message : 'Unable to load events'); }
+      finally { if (active) setLoading(false); }
     };
-
-    loadEvents();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const handleTogglePin = async (eventId: string, currentPinned: boolean) => {
-    try {
-      await updateDoc(doc(db, 'events', eventId), {
-        isPinned: !currentPinned,
-        updatedAt: new Date()
-      });
-      fetchEvents();
-    } catch (error) {
-      console.error("Error toggling pin state", error);
-      alert("حدث خطأ أثناء تعديل تثبيت الفعالية");
-    }
+    void load(); return () => { active = false; };
+  }, [cursor, revision]);
+  const changeState = async (event: PlatformEvent, state: EventState) => {
+    if (busy || state === event.state) return;
+    if (!window.confirm(isAr ? 'تغيير حالة «' + event.title + '» إلى «' + eventStateLabel(state, true) + '»؟' : 'Change ' + event.title + ' to ' + state + '?')) return;
+    setBusy(event.id); setError(null);
+    try { await httpsCallable(null, 'changeEventState')({ eventId: event.id, state }); setEvents(previous => previous.map(item => item.id === event.id ? { ...item, state } : item)); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to change state'); }
+    finally { setBusy(null); }
   };
-
-  const handleStateChange = async (eventId: string, newState: EventState) => {
-    try {
-      await updateDoc(doc(db, 'events', eventId), {
-        state: newState,
-        updatedAt: new Date()
-      });
-      // Refresh list
-      fetchEvents();
-    } catch (error) {
-      console.error("Error updating event state", error);
-      alert("حدث خطأ أثناء تحديث حالة الفعالية");
-    }
+  const togglePin = async (event: PlatformEvent) => {
+    if (busy) return; setBusy(event.id); setError(null);
+    try { await httpsCallable(null, 'saveEvent')({ eventId: event.id, isPinned: !event.isPinned }); setEvents(previous => previous.map(item => item.id === event.id ? { ...item, isPinned: !event.isPinned } : item)); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to update pin'); }
+    finally { setBusy(null); }
   };
-
-  const handleDeleteEvent = async (eventId: string, eventTitle: string) => {
-    if (window.confirm(`هل أنت متأكد من رغبتك في حذف الفعالية "${eventTitle}"؟ هذا الإجراء لا يمكن التراجع عنه.`)) {
-      try {
-        await deleteDoc(doc(db, 'events', eventId));
-        fetchEvents();
-      } catch (error) {
-        console.error("Error deleting event", error);
-        alert("حدث خطأ أثناء حذف الفعالية");
-      }
-    }
-  };
-
-  const getStatusColor = (state: EventState) => {
-    switch (state) {
-      case 'Draft': return 'bg-gray-100 text-gray-700';
-      case 'Published': return 'bg-blue-100 text-blue-700';
-      case 'Registration Open': return 'bg-green-100 text-green-700';
-      case 'Registration Closed': return 'bg-red-100 text-red-700';
-      case 'Ongoing': return 'bg-yellow-100 text-yellow-700';
-      case 'Completed': return 'bg-purple-100 text-purple-700';
-      case 'Archived': return 'bg-slate-100 text-slate-700';
-      default: return 'bg-gray-100 text-gray-700';
-    }
-  };
-
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 font-cairo mb-2">إدارة الفعاليات</h1>
-          <p className="text-gray-600">أضف، عدل، وقم بإدارة دورة حياة الفعاليات.</p>
-        </div>
-        <Link 
-          href="/admin/events/create" 
-          className="bg-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-purple-700 transition-colors flex items-center shadow-sm"
-        >
-          <Plus size={20} className="me-2" />
-          إضافة فعالية
-        </Link>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        {loading ? (
-          <div className="p-12 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div></div>
-        ) : events.length === 0 ? (
-          <div className="p-12 text-center text-gray-500">لا توجد فعاليات. قم بإضافة فعالية جديدة للبدء.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-start">
-              <thead className="bg-gray-50 border-b border-gray-100">
-                <tr>
-                  <th className="px-6 py-4 text-start text-xs font-semibold text-gray-500 uppercase tracking-wider">الفعالية</th>
-                  <th className="px-6 py-4 text-start text-xs font-semibold text-gray-500 uppercase tracking-wider">التاريخ</th>
-                  <th className="px-6 py-4 text-start text-xs font-semibold text-gray-500 uppercase tracking-wider">النوع</th>
-                  <th className="px-6 py-4 text-start text-xs font-semibold text-gray-500 uppercase tracking-wider">الحالة</th>
-                  <th className="px-6 py-4 text-start text-xs font-semibold text-gray-500 uppercase tracking-wider">إجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {events.map((event) => {
-                  const eventDate = event.date instanceof Date ? event.date : (event.date as { toDate?: () => Date })?.toDate?.() || new Date();
-                  
-                  return (
-                    <tr key={event.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4">
-                        <div className="font-bold text-gray-900">{event.title}</div>
-                        <div className="text-sm text-gray-500">{event.location}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{format(eventDate, 'dd MMM yyyy', { locale: ar })}</div>
-                        <div className="text-sm text-gray-500">{format(eventDate, 'HH:mm')}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-gray-700">{event.type}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusColor(event.state)}`}>
-                          {event.state}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-start text-sm font-medium">
-                        <div className="flex items-center gap-3">
-                          <Link href={`/admin/events/${event.id}/registrations`} className="text-purple-600 hover:text-purple-900 bg-purple-50 p-2 rounded-lg" title="التسجيلات">
-                            <Users size={16} />
-                          </Link>
-                          
-                          <Link href={`/admin/events/${event.id}/checkin-desk`} className="text-indigo-600 hover:text-indigo-900 bg-indigo-50 p-2 rounded-lg" title="منصة التحضير (QR)">
-                            <QrCode size={16} />
-                          </Link>
-
-                          <Link href={`/admin/events/${event.id}/certificates`} className="text-emerald-600 hover:text-emerald-900 bg-emerald-50 p-2 rounded-lg" title="الشهادات">
-                            <Award size={16} />
-                          </Link>
-
-                          <Link href={`/admin/events/${event.id}/feedback`} className="text-amber-600 hover:text-amber-900 bg-amber-50 p-2 rounded-lg" title="التقييمات والانطباعات">
-                            <Star size={16} />
-                          </Link>
-
-                          <Link href={`/events/${event.id}`} className="text-blue-600 hover:text-blue-900 bg-blue-50 p-2 rounded-lg" title="عرض الفعالية">
-                            <Eye size={16} />
-                          </Link>
-                          
-                          <button
-                            onClick={() => handleTogglePin(event.id, !!event.isPinned)}
-                            className={`p-2 rounded-lg transition-colors ${
-                              event.isPinned ? 'text-amber-600 bg-amber-100 hover:bg-amber-200' : 'text-gray-400 bg-gray-50 hover:bg-gray-100'
-                            }`}
-                            title={event.isPinned ? 'إلغاء التثبيت' : 'تثبيت الفعالية بالبداية'}
-                          >
-                            <Pin size={16} className={event.isPinned ? 'fill-current' : ''} />
-                          </button>
-
-                          <Link href={`/admin/events/${event.id}/edit`} className="text-amber-600 hover:text-amber-900 bg-amber-50 p-2 rounded-lg" title="تعديل الفعالية">
-                            <Edit2 size={16} />
-                          </Link>
-
-                          <button
-                            onClick={() => handleDeleteEvent(event.id, event.title)}
-                            className="text-red-600 hover:text-red-900 bg-red-50 p-2 rounded-lg transition-colors"
-                            title="حذف الفعالية"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                          
-                          <select 
-                            value={event.state} 
-                            onChange={(e) => handleStateChange(event.id, e.target.value as EventState)}
-                            className="bg-gray-50 border border-gray-200 text-gray-700 text-xs rounded-lg focus:ring-purple-500 focus:border-purple-500 block p-2"
-                          >
-                            <option value="Draft">Draft</option>
-                            <option value="Published">Published</option>
-                            <option value="Registration Open">Registration Open</option>
-                            <option value="Registration Closed">Registration Closed</option>
-                            <option value="Ongoing">Ongoing</option>
-                            <option value="Completed">Completed</option>
-                            <option value="Archived">Archived</option>
-                          </select>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  const visible = events.filter(event => (!filter || event.state === filter) && (event.title + ' ' + (event.titleEn || '')).toLocaleLowerCase().includes(search.toLocaleLowerCase()));
+  return <div className="space-y-5">
+    <header className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-3xl font-black font-cairo">{isAr ? 'إدارة الفعاليات' : 'Event management'}</h1><p className="mt-2 text-sm text-slate-500">{isAr ? 'افتح مساحة الفعالية لإدارة التسجيل والحضور والشهادات. الأرشفة تحفظ السجلات بدل حذفها.' : 'Open an event workspace to manage registration, attendance and certificates. Archiving preserves its records.'}</p></div><Link href="/admin/events/create" className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-3 font-bold text-white"><Plus size={18} />{isAr ? 'إنشاء فعالية' : 'Create event'}</Link></header>
+    <div className="flex flex-wrap gap-3"><input aria-label={isAr ? 'بحث في الفعاليات المحملة' : 'Search loaded events'} value={search} onChange={e => setSearch(e.target.value)} placeholder={isAr ? 'بحث في الفعاليات المحملة…' : 'Search loaded events…'} className="min-w-0 flex-1 rounded-xl border bg-white px-4 py-2" /><select aria-label={isAr ? 'تصفية الحالة' : 'Filter status'} value={filter} onChange={e => setFilter(e.target.value)} className="rounded-xl border bg-white px-3 py-2"><option value="">{isAr ? 'كل الحالات' : 'All statuses'}</option>{Object.keys(transitions).map(state => <option key={state} value={state}>{eventStateLabel(state as EventState, isAr)}</option>)}</select><button onClick={() => { setCursor(null); setRevision(value => value + 1); }} disabled={loading || busy !== null} className="rounded-xl border bg-white px-4 py-2 disabled:opacity-50">{isAr ? 'تحديث' : 'Refresh'}</button></div>
+    {error && <AdminError message={error} retry={() => setRevision(value => value + 1)} />}
+    {!events.length && loading ? <AdminLoading /> : <div className="grid gap-4 lg:grid-cols-2">{visible.map(event => {
+      const date = event.date instanceof Date ? event.date : event.date?.toDate?.();
+      return <article key={event.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-start justify-between gap-3"><Link href={'/admin/events/' + event.id} className="min-w-0"><h2 className="text-lg font-bold text-slate-900">{!isAr && event.titleEn ? event.titleEn : event.title}</h2><p className="mt-1 text-xs text-slate-500">{formatAdminDate(date?.toISOString(), locale)}</p></Link><button disabled={busy !== null} onClick={() => void togglePin(event)} aria-label={event.isPinned ? (isAr ? 'إلغاء التثبيت' : 'Unpin event') : (isAr ? 'تثبيت الفعالية' : 'Pin event')} aria-pressed={!!event.isPinned} className="rounded-lg bg-slate-50 p-2 text-amber-600 disabled:opacity-50"><Pin size={18} className={event.isPinned ? 'fill-current' : ''} /></button></div>
+        <p className="mt-4 text-sm text-purple-700">{eventStateLabel(event.state, isAr)}</p><p className="mt-2 text-sm text-slate-500">{isAr ? 'المسجلون:' : 'Registered:'} {event.registeredCount || 0} / {event.isUnlimitedCapacity ? '∞' : event.capacity} · {isAr ? 'الحضور:' : 'Attended:'} {event.attendanceCount || 0}</p>
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t pt-4"><Link href={'/admin/events/' + event.id} className="inline-flex items-center gap-2 text-sm font-bold text-purple-600">{isAr ? 'فتح مساحة العمل' : 'Open workspace'}<ArrowUpRight size={16} /></Link>{transitions[event.state]?.length ? <select aria-label={isAr ? 'تغيير حالة ' + event.title : 'Change event state'} value={event.state} disabled={busy !== null} onChange={e => void changeState(event, e.target.value as EventState)} className="max-w-full rounded-lg border px-3 py-2 text-xs disabled:opacity-50"><option value={event.state}>{eventStateLabel(event.state, isAr)}</option>{transitions[event.state].map(state => <option key={state} value={state}>{eventStateLabel(state, isAr)}</option>)}</select> : <span className="text-xs text-slate-400">{isAr ? 'السجلات محفوظة في الأرشيف' : 'Records retained in archive'}</span>}</div>
+      </article>;
+    })}</div>}
+    {!loading && !error && !visible.length && <p className="rounded-xl border bg-white p-6 text-slate-500">{isAr ? 'لا توجد نتائج ضمن الفعاليات المحملة. غيّر المرشح أو حمّل المزيد.' : 'No matching loaded events. Change filters or load more.'}</p>}
+    <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-slate-500">{isAr ? 'عدد الفعاليات المحملة:' : 'Loaded events:'} {events.length} · {isAr ? 'البحث والتصفية في المحمل فقط' : 'Search and filters apply to loaded events only'}</p>{hasMore && <button disabled={loading} onClick={() => setCursor(nextCursor)} className="rounded-xl border bg-white px-4 py-2 disabled:opacity-50">{isAr ? 'تحميل المزيد' : 'Load more'}</button>}</div>
+  </div>;
 }

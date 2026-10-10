@@ -1,37 +1,33 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
 import { QrCode } from 'lucide-react';
-import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { formatDateSafe } from '@/lib/dateUtils';
+import { AdminError } from '@/components/admin/AdminData';
 
 export default function AdminCheckInDashboard() {
   const [events, setEvents] = useState<PlatformEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [revision, setRevision] = useState(0);
 
   useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        const q = query(collection(db, 'events'), where('state', '==', 'Ongoing'));
-        const snap = await getDocs(q);
+        const q = query(collection(db, 'events'), where('state', '==', 'Ongoing'), limit(50));
+        return onSnapshot(q, snap => {
         const fetchedEvents = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as PlatformEvent[];
-        setEvents(fetchedEvents);
-      } catch (error) {
-        console.error("Error fetching ongoing events", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchEvents();
-  }, []);
+        setEvents(fetchedEvents); setError(''); setLoading(false);
+        }, reason => { setError(reason.message); setLoading(false); });
+  }, [revision]);
 
   if (loading) {
     return <div className="py-20 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div></div>;
   }
+  if (error) return <AdminError message={error} retry={() => { setLoading(true); setRevision(value => value + 1); }} />;
 
   return (
     <div>
@@ -55,7 +51,6 @@ export default function AdminCheckInDashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {events.map(event => {
-              const eventDate = event.date instanceof Date ? event.date : (event.date as { toDate?: () => Date })?.toDate?.() || new Date();
               return (
                 <div key={event.id} className="border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
                   <div className="flex justify-between items-start mb-4">
@@ -63,7 +58,7 @@ export default function AdminCheckInDashboard() {
                     <span className="bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-1 rounded">جارية</span>
                   </div>
                   <p className="text-sm text-gray-500 mb-6">
-                    {format(eventDate, 'dd MMM yyyy', { locale: ar })}
+                    {formatDateSafe(event.date, 'dd MMM yyyy HH:mm', { locale: ar })} · توقيت الرياض
                   </p>
                   <Link 
                     href={`/admin/events/${event.id}/checkin-desk`}

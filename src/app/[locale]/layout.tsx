@@ -38,7 +38,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://ieeequ.org'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://www.ieeequ.online'),
   title: "IEEE Qassim Tech Community",
   description: "The Official IEEE Qassim Technology Community Platform",
   openGraph: {
@@ -83,8 +83,9 @@ export default async function RootLayout({
           <AuthProvider>
             <ProfileGuard>
               <div className="flex flex-col min-h-screen">
+                <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:start-3 focus:z-[100] focus:rounded-xl focus:bg-blue-600 focus:px-4 focus:py-3 focus:text-white">{locale === 'ar' ? 'تجاوز إلى المحتوى' : 'Skip to content'}</a>
                 <Navbar />
-                <main className="flex-grow">
+                <main id="main-content" tabIndex={-1} className="flex-grow min-w-0">
                   {children}
                 </main>
                 <Footer />
