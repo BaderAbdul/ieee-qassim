@@ -9,6 +9,8 @@ interface CommitteeMember {
   userId: string;
   name: string;
   role: string;
+  englishRole?: string;
+  englishName?: string;
   avatar?: string;
   linkedin?: string;
 }
@@ -33,6 +35,8 @@ export default function AdminStructurePage() {
   
   const [showMemberModal, setShowMemberModal] = useState<{ committeeId: string } | null>(null);
   const [memberRole, setMemberRole] = useState('عضو');
+  const [memberEnglishRole, setMemberEnglishRole] = useState('Member');
+  const [memberEnglishName, setMemberEnglishName] = useState('');
   const [memberLinkedin, setMemberLinkedin] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -141,7 +145,9 @@ export default function AdminStructurePage() {
           members: [...c.members, {
             userId: user.id,
             name: user.arabicFullName || user.displayName || 'بدون اسم',
+            englishName: memberEnglishName || user.displayName || undefined,
             role: memberRole,
+            englishRole: memberEnglishRole || undefined,
             linkedin: memberLinkedin || undefined,
             avatar: user.photoURL
           }]
@@ -158,6 +164,8 @@ export default function AdminStructurePage() {
     setSearchResults([]);
     setMemberLinkedin('');
     setMemberRole('عضو');
+    setMemberEnglishRole('Member');
+    setMemberEnglishName('');
   };
 
   const handleRemoveMember = (committeeId: string, userId: string) => {
@@ -254,8 +262,8 @@ export default function AdminStructurePage() {
                         {member.avatar ? <img src={member.avatar} alt={member.name} className="h-full w-full object-cover" /> : member.name.charAt(0)}
                       </div>
                       <div>
-                        <div className="text-sm font-bold text-gray-900">{member.name}</div>
-                        <div className="text-xs text-gray-500">{member.role}</div>
+                        <div className="text-sm font-bold text-gray-900">{member.name} {member.englishName ? `(${member.englishName})` : ''}</div>
+                        <div className="text-xs text-gray-500">{member.role} {member.englishRole ? `- ${member.englishRole}` : ''}</div>
                       </div>
                     </div>
                     <button onClick={() => handleRemoveMember(committee.id, member.userId)} className="text-red-400 hover:text-red-600 p-1"><X size={14} /></button>
@@ -312,8 +320,19 @@ export default function AdminStructurePage() {
             
             <div className="mb-4 space-y-3">
               <div>
-                <label className="block text-sm font-medium mb-1">صفة العضو (المنصب)</label>
-                <input type="text" value={memberRole} onChange={e => setMemberRole(e.target.value)} className="w-full border rounded-lg p-2" placeholder="مثال: رئيس اللجنة، نائب، عضو..." />
+                <label className="block text-sm font-medium mb-1">الاسم بالإنجليزي (English Name)</label>
+                <input type="text" value={memberEnglishName} onChange={e => setMemberEnglishName(e.target.value)} className="w-full border rounded-lg p-2" placeholder="Ex: Bader" dir="ltr" />
+                <p className="text-xs text-gray-500 mt-1">يترك فارغاً لاستخدام اسم الحساب الافتراضي</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">صفة العضو (عربي)</label>
+                  <input type="text" value={memberRole} onChange={e => setMemberRole(e.target.value)} className="w-full border rounded-lg p-2" placeholder="مثال: رئيس اللجنة..." />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">صفة العضو (English)</label>
+                  <input type="text" value={memberEnglishRole} onChange={e => setMemberEnglishRole(e.target.value)} className="w-full border rounded-lg p-2" placeholder="Ex: Chair..." dir="ltr" />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">رابط لينكد إن (اختياري)</label>

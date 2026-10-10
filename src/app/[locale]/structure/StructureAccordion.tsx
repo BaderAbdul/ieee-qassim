@@ -10,6 +10,8 @@ export interface CommitteeMember {
   userId: string;
   name: string;
   role: string;
+  englishRole?: string;
+  englishName?: string;
   avatar?: string;
   linkedin?: string;
 }
@@ -17,6 +19,7 @@ export interface CommitteeMember {
 export interface Committee {
   id: string;
   name: string;
+  englishName?: string;
   description: string;
   iconName: string;
   members: CommitteeMember[];
@@ -27,12 +30,14 @@ interface StructureAccordionProps {
   isAr: boolean;
 }
 
-// Helper function to extract First & Last Name
+// Helper function to extract a suitable display name
 function getShortName(fullName: string): string {
   if (!fullName) return '';
   const parts = fullName.trim().split(/\s+/);
   if (parts.length <= 2) return fullName;
-  return `${parts[0]} ${parts[parts.length - 1]}`;
+  // For Arabic names, taking the first two words is usually safer than first and last, 
+  // to avoid breaking names like "بدر الدخيل الله" into "بدر الله".
+  return `${parts[0]} ${parts[1]}`;
 }
 
 export default function StructureAccordion({ committees, isAr }: StructureAccordionProps) {
@@ -136,7 +141,7 @@ export default function StructureAccordion({ committees, isAr }: StructureAccord
                   }
                 `}
               >
-                <span>{committee.name}</span>
+                <span>{(!isAr && committee.englishName) ? committee.englishName : committee.name}</span>
                 <span className={`
                   flex items-center justify-center text-[10px] h-5 min-w-[20px] px-1.5 rounded-full font-bold
                   ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}
@@ -163,7 +168,9 @@ export default function StructureAccordion({ committees, isAr }: StructureAccord
               <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 mb-3 border border-blue-100">
                  <Users className="w-6 h-6" />
               </div>
-              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">{committee.name}</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">
+                {(!isAr && committee.englishName) ? committee.englishName : committee.name}
+              </h2>
               {committee.description && (
                 <p className="text-sm text-slate-500 leading-relaxed">
                   {committee.description}
@@ -176,7 +183,9 @@ export default function StructureAccordion({ committees, isAr }: StructureAccord
               {committee.members && committee.members.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                   {committee.members.map((member) => {
-                    const displayName = getShortName(member.name);
+                    const memberName = (!isAr && member.englishName) ? member.englishName : member.name;
+                    const memberRole = (!isAr && member.englishRole) ? member.englishRole : member.role;
+                    const displayName = getShortName(memberName);
                     
                     return (
                       <div 
@@ -188,7 +197,7 @@ export default function StructureAccordion({ committees, isAr }: StructureAccord
                           {member.avatar ? (
                             <Image 
                               src={member.avatar} 
-                              alt={member.name} 
+                              alt={memberName} 
                               fill 
                               sizes="64px"
                               className="object-cover" 
@@ -217,11 +226,11 @@ export default function StructureAccordion({ committees, isAr }: StructureAccord
                           </div>
                         </div>
 
-                        <h3 className="font-bold text-slate-900 text-xs sm:text-sm transition-colors line-clamp-1 w-full px-1" title={member.name}>
+                        <h3 className="font-bold text-slate-900 text-xs sm:text-sm transition-colors line-clamp-1 w-full px-1" title={memberName}>
                           {displayName}
                         </h3>
-                        <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5 line-clamp-1 w-full">
-                          {member.role}
+                        <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5 line-clamp-1 w-full" title={memberRole}>
+                          {memberRole}
                         </p>
                       </div>
                     );
@@ -268,10 +277,12 @@ export default function StructureAccordion({ committees, isAr }: StructureAccord
 
               <div>
                 <h3 className="text-lg font-bold text-slate-900 flex items-center justify-center gap-2">
-                  {selectedMember.name}
+                  {(!isAr && selectedMember.englishName) ? selectedMember.englishName : selectedMember.name}
                   {isLoadingProfile && <div className="h-3 w-3 rounded-full border-2 border-slate-300 border-t-blue-600 animate-spin" title="Loading latest profile..." />}
                 </h3>
-                <p className="text-blue-600 font-semibold text-sm mt-0.5">{selectedMember.role}</p>
+                <p className="text-blue-600 font-semibold text-sm mt-0.5">
+                  {(!isAr && selectedMember.englishRole) ? selectedMember.englishRole : selectedMember.role}
+                </p>
               </div>
 
               {richProfile?.bio && (
