@@ -1,8 +1,10 @@
 # Admin and student operations — development checkpoint
 
-Date: 2026-10-10. Status: implemented locally and tested; NOT deployed to production.
+Implementation checkpoint: 2026-10-10. Production release: 2026-10-12, commit 8ce1c5775b7b5fef7ce385feac05f4f1189ec1a8 from main, Vercel deployment dpl_uL7TrMQkFwHTauAUGE3PGYgCNnrS (READY).
 
 This checkpoint preserves Firebase Spark, the existing Vercel backend, Cloudinary media, Arabic/English, and the authentication startup/PDF import repairs. No production account, registration, points balance, certificate, environment setting or Firebase rule was changed during this implementation. The pre-existing edit in SPARK_RELEASE_REPORT.md was preserved.
+
+The implementation notes below record pre-release verification. Subsequently the user published the matching Firestore rules, the required indexes were deployed, and the compatible application was released to production. The release did not create test participants or modify attendance/points balances. Browser/mobile/camera and real-provider pilot limitations below still apply.
 
 ## Implemented
 
@@ -71,6 +73,8 @@ Start Auth/Firestore emulators with project demo-ieee-qu. Run scripts/seed-demo.
 
 Local servers/emulators used for this checkpoint were stopped cleanly. Production is unchanged.
 
+That statement describes the local implementation checkpoint; see the production release status above for the subsequent deployment.
+
 ## Remote preview checkpoint
 
 - Branch: codex/admin-command-center; commit c88dd4f2297ebc96e3237c3c7346de8ef33a1c2d.
@@ -78,3 +82,9 @@ Local servers/emulators used for this checkpoint were stopped cleanly. Productio
 - Authorized read-only HTTP checks: /ar/help returned 200; GET /api/platform/syncPublicProfile and GET /api/media returned 405 as expected for POST-only handlers. This verifies deployed startup, not authenticated registration or provider delivery.
 - Configuration metadata confirms server Firebase and Cloudinary variables are scoped to Production only. Public Firebase client variables also target Preview. Consequently this preview must not be presented as a fully operational isolated test environment.
 - No secrets were copied or revealed, no environment scopes were broadened, and no production domain, Firestore rules/indexes or data were changed. Live workflow verification requires an explicit environment choice: isolated test credentials, or a staged deployment using Production configuration without assigning production domains. The latter still accesses production services/data and requires a controlled pilot.
+
+## Production report index correction — 2026-10-12
+
+The deployed event report's feedback count/average aggregation failed with Firestore FAILED_PRECONDITION: “The query requires an index.” Registration and certificate count queries succeeded. The missing composite index is event_feedback/eventId ASC/rating ASC; it has been added to firestore.indexes.json and deployed with --only firestore:indexes. This is a database index correction; the application query and participant records are unchanged.
+
+scripts/check-event-report.mjs runs the actual read-only production aggregate queries using the existing Firebase CLI account for project ieeeqassim. It checks an explicit event ID and prints aggregate values and index status, never participant records or credential values. Use --feedback-only for the affected query or --index-status to monitor index readiness. Emulator tests do not enforce production composite-index requirements, so this live query check is necessary.
