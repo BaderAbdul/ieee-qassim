@@ -7,7 +7,7 @@ import { normalizeUniversityId, saveProfile, syncPublicProfile } from '@/lib/ser
 import { assignCertificate, authorizeCertificate, certificateDownload, renderCertificate } from '@/lib/server/certificates';
 import { processNotificationBatch, queueNotification } from '@/lib/server/notifications';
 import { adjustPoints } from '@/lib/server/points';
-import { manageUser, searchMembers } from '@/lib/server/members';
+import { getMemberActivity, getMemberOverview, manageUser, searchMembers } from '@/lib/server/members';
 import { changeEventState, getAdminOverview, getAuditLog, getEventReport, getOperations, retryNotification } from '@/lib/server/operations';
 import { audit } from '@/lib/server/audit';
 import { saveHomepage } from '@/lib/server/content';
@@ -31,6 +31,8 @@ export async function POST(request: Request, context: { params: Promise<{ action
       case 'getOperations': requireAdmin(actor); result = await getOperations(); break;
       case 'getEventReport': requireAdmin(actor); result = await getEventReport(documentId(data.eventId, 'eventId')); break;
       case 'searchMembers': requireAdmin(actor); result = await searchMembers(data); break;
+      case 'getMemberOverview': requireAdmin(actor); result = await getMemberOverview(data); break;
+      case 'getMemberActivity': requireAdmin(actor); result = await getMemberActivity(data); break;
       case 'getAuditLog':
         if (actor.role !== 'super_admin') throw new ApiError('permission-denied', 'Super admin required.');
         result = await getAuditLog(data); break;
@@ -72,7 +74,7 @@ export async function POST(request: Request, context: { params: Promise<{ action
       case 'syncPublicProfile': {
         const uid = data.userId === undefined ? actor.uid : documentId(data.userId, 'userId');
         if (uid !== actor.uid) requireAdmin(actor);
-        await syncPublicProfile(uid); result = { status: 'success' }; break;
+        await syncPublicProfile(uid, actor.uid); result = { status: 'success' }; break;
       }
       case 'manageUser': {
         if (actor.role !== 'super_admin') throw new ApiError('permission-denied', 'Super admin required.');

@@ -9,6 +9,9 @@ This checkpoint preserves Firebase Spark, the existing Vercel backend, Cloudinar
 - Admin command center: database counts, pending approvals, certificate/mail attention queues, active-event links and explicit load failures. Marketing settings moved into Site content.
 - Shared event workspace: summary/report, content editor, registration desk, check-in, certificates and feedback.
 - Database-backed member search: name/email prefix, exact student ID/account ID, bounded results and pagination. Structure member lookup uses the same search rather than the first 50 users.
+- Member detail diagnostics: bounded registration, attendance, points and certificate history; current public-profile projection status; and an audited manual projection refresh that never recalculates or changes the account balance.
+- Event preparation presets for common workshop, lecture and competition setups. Presets only apply type, duration and approval mode; they never copy identity, schedule, points, certificate choice, counters or publishing state.
+- Deployment configuration readiness notice in the admin area. It reports presence-only booleans for server, Cloudinary and email configuration without exposing or validating any credential value.
 - Explicit waitlisting rather than accidental rejection, chronological registration pagination, complete CSV export, safe quotation/formula handling and partial bulk results with failed-only retries.
 - Stable operation IDs for manual points; duplicate requests return the original result. Excess deductions are rejected. Ledger entries store before/after balances.
 - Profile completion/identity editing through a transactionally claimed university ID; Arabic/Persian digits supported. Public profile projections remain separate from email/student IDs.
@@ -32,14 +35,14 @@ This checkpoint preserves Firebase Spark, the existing Vercel backend, Cloudinar
 | --- | --- | --- |
 | ESLint | PASS | Current source, including multiple TSX changes |
 | TypeScript | PASS | Production build typecheck and local checks |
-| npm test | 159 / 159 | Mixed simulation, regression, static-contract and runtime checks; not 159 real-browser tests |
-| npm run test:spark:build | 27 / 27 | Actual built Next handlers with real local Auth/Firestore emulators under strict CommonJS |
+| npm test | 163 / 163 | Mixed simulation, regression, static-contract and runtime checks; not 163 real-browser tests |
+| npm run test:spark:build | 29 / 29 | Actual built Next handlers with real local Auth/Firestore emulators under strict CommonJS |
 | Actual Firestore rule checks | PASS | Identity/role/points/event/homepage bypass attempts denied; safe owner photo edits allowed |
 | Arabic PDF | PASS | Real PDF bytes produced; Cloudinary transport mocked |
 | npm run test:bundle | PASS | Only traced deployment files copied to a disposable folder; both API bundles start and return structured 401 |
 | Production build | PASS | An inherited global image metadataBase warning remains; locale metadata uses the canonical .online fallback |
 
-The integration checks cover FIFO/capacity, waitlist actions, restricted waitlist candidates, duplicate attendance, concurrent point awards, concurrent student-ID claims, feedback editing, certificate partial failures/revocation/eligibility, member search beyond 50, last-admin protection, stale content saves and audited server edits.
+The integration checks cover FIFO/capacity, waitlist actions, restricted waitlist candidates, duplicate attendance, concurrent point awards, concurrent student-ID claims, feedback editing, certificate partial failures/revocation/eligibility, member search beyond 50, paginated legacy member activity, public-projection diagnosis/repair auditing, last-admin protection, stale content saves and audited server edits.
 
 The browser reached the local demo sign-in and authenticated admin frame. It exposed a loopback-origin discrepancy, which was fixed only for explicitly enabled development/demo environments. Local server mail API requests then returned 200. The embedded browser later crashed and its error page was blocked by Browser Use policy. Full visual/mobile/camera verification was NOT completed, no protection was bypassed, and no screenshot is represented as a successful final visual review.
 
@@ -58,7 +61,7 @@ The browser reached the local demo sign-in and authenticated admin frame. It exp
 - Per-event/task-specific staff permissions. The existing student/event_organizer/super_admin roles remain; organizers still have their existing broad event access.
 - Unattended email/certificate workers and automatic reminders. Current processing still requires relevant admin pages to remain open; no new paid service was provisioned.
 - Tested production backups/restoration, independent alerts, historical projection/counter reconciliation and retention policy. No production preparation script was applied.
-- Member-wide activity/detail view, formal correction-ticket workflow, public-profile visibility controls, semester-specific rankings and reusable event templates.
+- Formal correction-ticket workflow, public-profile visibility controls and semester-specific rankings. Preparation presets exist, but saved organization-specific template management remains future work.
 - Additional server-side search/filtering for full event/idea archives. Loaded-event filters are explicitly labeled as such.
 - Legal/club-owner review of the privacy wording, retention/deletion process and certificate cancellation policy before publication.
 
@@ -67,3 +70,11 @@ The browser reached the local demo sign-in and authenticated admin frame. It exp
 Start Auth/Firestore emulators with project demo-ieee-qu. Run scripts/seed-demo.mjs with FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 and FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099. Start development with NEXT_PUBLIC_FIREBASE_EMULATORS=true, NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-ieee-qu, fake public Firebase configuration and the same emulator hosts. Open /ar/dev-signin. Do not enable these flags on Vercel or use real account data as fixtures.
 
 Local servers/emulators used for this checkpoint were stopped cleanly. Production is unchanged.
+
+## Remote preview checkpoint
+
+- Branch: codex/admin-command-center; commit c88dd4f2297ebc96e3237c3c7346de8ef33a1c2d.
+- Vercel preview READY: https://ieee-qassim-2p0nuajf9-baderabduls-projects.vercel.app
+- Authorized read-only HTTP checks: /ar/help returned 200; GET /api/platform/syncPublicProfile and GET /api/media returned 405 as expected for POST-only handlers. This verifies deployed startup, not authenticated registration or provider delivery.
+- Configuration metadata confirms server Firebase and Cloudinary variables are scoped to Production only. Public Firebase client variables also target Preview. Consequently this preview must not be presented as a fully operational isolated test environment.
+- No secrets were copied or revealed, no environment scopes were broadened, and no production domain, Firestore rules/indexes or data were changed. Live workflow verification requires an explicit environment choice: isolated test credentials, or a staged deployment using Production configuration without assigning production domains. The latter still accesses production services/data and requires a controlled pilot.

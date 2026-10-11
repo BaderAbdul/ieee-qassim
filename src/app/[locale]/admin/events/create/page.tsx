@@ -6,9 +6,9 @@ import { uploadImage, httpsCallable } from '@/lib/backend';
 import Image from 'next/image';
 
 import { useState } from 'react';
-import { serverTimestamp } from 'firebase/firestore';
+import { eventTemplates, eventTemplatePatch } from '@/lib/eventTemplates';
 import { useRouter } from '@/i18n/routing';
-import { EventType, RegistrationMode, EventState, CustomQuestion } from '@/lib/types';
+import { EventType, RegistrationMode, CustomQuestion } from '@/lib/types';
 import { ArrowRight, Save, Plus, Trash2 } from 'lucide-react';
 import { Link } from '@/i18n/routing';
 
@@ -16,6 +16,8 @@ export default function CreateEventPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [templateId, setTemplateId] = useState('workshop');
+  const [saveError, setSaveError] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     title: '',
@@ -96,7 +98,9 @@ export default function CreateEventPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading || isUploading) return;
     setLoading(true);
+    setSaveError(null);
 
     try {
       // Combine date and time
@@ -118,21 +122,18 @@ export default function CreateEventPage() {
         points: formData.points,
         hasCertificate: formData.hasCertificate,
         registrationMode: formData.registrationMode,
-        state: 'Draft' as EventState,
         coverUrl: formData.coverUrl,
         gains: formData.gains.split('\n').filter(g => g.trim()),
         gainsEn: formData.gainsEn.split('\n').filter(g => g.trim()),
         speakers: formData.speakers.split(',').map(s => s.trim()).filter(s => s),
         feedbackQuestions: feedbackQuestions.filter(q => q.title.trim().length > 0),
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
       };
 
       await httpsCallable(null, 'saveEvent')(newEvent);
       router.push('/admin/events');
     } catch (error) {
       console.error("Error creating event", error);
-      alert("حدث خطأ أثناء حفظ الفعالية");
+      setSaveError(error instanceof Error ? error.message : 'حدث خطأ أثناء حفظ الفعالية');
     } finally {
       setLoading(false);
     }
@@ -148,6 +149,17 @@ export default function CreateEventPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 space-y-8">
+        {saveError && <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-700">{saveError}</p>}
+        <section aria-labelledby="preparation-template" className="space-y-3 rounded-xl border border-purple-100 bg-purple-50 p-4">
+          <h2 id="preparation-template" className="font-bold">قالب تجهيز / Preparation preset</h2>
+          <p className="text-sm text-slate-600">يغيّر النوع والمدة وآلية الموافقة فقط. لا ينشر الفعالية ولا يغير عنوانها أو موعدها أو نقاطها أو شهاداتها.</p>
+          <div className="flex flex-wrap gap-3">
+            <select aria-label="قالب تجهيز الفعالية / Event preparation preset" value={templateId} onChange={event => setTemplateId(event.target.value)} className="min-w-0 rounded-lg border bg-white px-3 py-2">
+              {eventTemplates.map(template => <option key={template.id} value={template.id}>{template.label} / {template.labelEn} — {template.durationHours}h — {template.registrationMode}</option>)}
+            </select>
+            <button type="button" disabled={loading} onClick={() => { if (confirm('تطبيق النوع والمدة وآلية الموافقة من القالب؟ بقية بياناتك ستبقى كما هي.')) setFormData(previous => ({ ...previous, ...eventTemplatePatch(templateId) })); }} className="rounded-lg bg-purple-600 px-4 py-2 font-bold text-white disabled:opacity-50">تطبيق القالب / Apply preset</button>
+          </div>
+        </section>
         
         {/* Section 1: Basic Info */}
         <div>

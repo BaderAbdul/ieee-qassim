@@ -34,6 +34,59 @@ export async function searchMembers(input: Record<string, unknown>) {
   return { users: [...found.values()].slice(0, 50).map(memberRecord), nextCursor: null, hasMore: false, truncated: found.size > 50 || results.some(result => result.size > 50) };
 }
 
+const activityCollections = {
+  registrations: ['registrations', ['eventId', 'status', 'timestamp']],
+  attendance: ['attendance_logs', ['eventId', 'timestamp', 'verifiedByAdmin']],
+  points: ['point_transactions', ['amount', 'source', 'reason', 'sourceEventId', 'createdAt', 'balanceBefore', 'balanceAfter']],
+  certificates: ['certificates', ['eventId', 'eventTitle', 'status', 'createdAt', 'issueDate']],
+} as const;
+
+function activityDate(value: unknown) {
+  if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') return value.toDate().toISOString();
+  return typeof value === 'string' ? value : null;
+}
+
+/** Read-only diagnostics. Never repair historical totals or projections implicitly. */
+export async function getMemberOverview(input: Record<string, unknown>) {
+  const uid = documentId(input.userId, 'userId'); const db = getFirestore();
+  const [user, projection, ...counts] = await Promise.all([
+    db.collection('users').doc(uid).get(), db.collection('public_profiles').doc(uid).get(),
+    ...Object.values(activityCollections).map(([collection]) => db.collection(collection).where('userId', '==', uid).count().get()),
+  ]);
+  if (!user.exists) throw new ApiError('not-found', 'Member not found. / العضو غير موجود.');
+  const balance = Number(user.data()?.totalPoints) || 0;
+  const projectedBalance = projection.exists ? Number(projection.data()?.totalPoints) || 0 : null;
+  return {
+    member: memberRecord(user), counts: Object.fromEntries(Object.keys(activityCollections).map((key, index) => [key, counts[index].data().count])),
+    publicProjection: { exists: projection.exists, balance: projectedBalance, matchesBalance: projectedBalance === balance },
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+/** Stable document-ID pagination includes legacy entries without timestamp fields. */
+export async function getMemberActivity(input: Record<string, unknown>) {
+  const uid = documentId(input.userId, 'userId'); const section = String(input.section);
+  if (!Object.hasOwn(activityCollections, section)) throw new ApiError('invalid-argument', 'Invalid activity section.');
+  const [collection, allowedFields] = activityCollections[section as keyof typeof activityCollections];
+  const db = getFirestore(); const member = await db.collection('users').doc(uid).get();
+  if (!member.exists) throw new ApiError('not-found', 'Member not found.');
+  let query = db.collection(collection).where('userId', '==', uid).orderBy('__name__').limit(31);
+  if (input.cursor) {
+    const cursor = await db.collection(collection).doc(documentId(input.cursor, 'cursor')).get();
+    if (!cursor.exists || cursor.data()?.userId !== uid) throw new ApiError('invalid-argument', 'Activity cursor does not belong to this member.');
+    query = query.startAfter(cursor);
+  }
+  const snap = await query.get(); const docs = snap.docs.slice(0, 30);
+  const entries = docs.map(doc => {
+    const data = doc.data();
+    return { id: doc.id, ...Object.fromEntries(allowedFields.filter(field => data[field] !== undefined).map(field => [field, ['timestamp', 'createdAt', 'issueDate'].includes(field) ? activityDate(data[field]) : data[field]])) };
+  });
+  const ids = [...new Set(entries.map(entry => { const data = entry as Record<string, unknown>; return data.eventId || data.sourceEventId; }).filter((id): id is string => typeof id === 'string' && !!id && !id.includes('/')))];
+  const events = ids.length ? await db.getAll(...ids.map(id => db.collection('events').doc(id))) : [];
+  const titles = new Map(events.map(event => [event.id, event.data()?.title || event.id]));
+  return { entries: entries.map(entry => { const data = entry as Record<string, unknown>; const id = data.eventId || data.sourceEventId; return { ...entry, ...(typeof id === 'string' ? { eventTitle: titles.get(id) || data.eventTitle || id } : {}) }; }), nextCursor: snap.size > 30 ? docs.at(-1)!.id : null, order: 'documentId' };
+}
+
 export async function manageUser(actorUid: string, input: Record<string, unknown>) {
   const uid = documentId(input.userId, 'userId');
   if (!['role', 'restriction', 'delete'].includes(String(input.change))) throw new ApiError('invalid-argument', 'Invalid user change.');

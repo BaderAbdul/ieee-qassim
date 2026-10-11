@@ -360,3 +360,47 @@ test('Event content saves create audited drafts and cannot overwrite counters or
   assert.equal((await call('organizer', 'saveEvent', { eventId: id, capacity: 2 })).status, 409);
   assert.equal((await call('organizer', 'saveEvent', { eventId: id, title: 'تعديل قديم', expectedUpdatedAt })).status, 409);
 });
+
+test('Member diagnostics are admin-only, read-only and flag a missing public projection', async () => {
+  await db.collection('users').doc('activity-member').set({ displayName: 'عضو تجريبي', role: 'student', totalPoints: 10, email: 'activity@example.test' });
+  assert.equal((await call('carol', 'getMemberOverview', { userId: 'activity-member' })).status, 403);
+  assert.equal((await call('carol', 'getMemberActivity', { userId: 'activity-member', section: 'points' })).status, 403);
+  const overview = await call('organizer', 'getMemberOverview', { userId: 'activity-member' });
+  assert.equal(overview.status, 200); assert.equal(overview.data.member.totalPoints, 10);
+  assert.deepEqual(overview.data.publicProjection, { exists: false, balance: null, matchesBalance: false });
+  assert.equal((await db.collection('public_profiles').doc('activity-member').get()).exists, false);
+  await db.collection('public_profiles').doc('activity-member').set({ totalPoints: 5 });
+  const stale = await call('organizer', 'getMemberOverview', { userId: 'activity-member' });
+  assert.equal(stale.data.publicProjection.matchesBalance, false);
+  assert.equal((await db.collection('users').doc('activity-member').get()).data().totalPoints, 10);
+  assert.equal((await call('carol', 'syncPublicProfile', { userId: 'activity-member' })).status, 403);
+  assert.equal((await call('organizer', 'syncPublicProfile', { userId: 'activity-member' })).status, 200);
+  assert.equal((await db.collection('public_profiles').doc('activity-member').get()).data().totalPoints, 10);
+  assert.equal((await db.collection('users').doc('activity-member').get()).data().totalPoints, 10);
+  const projectionAudit = await db.collection('audit_logs').where('targetId', '==', 'activity-member').get();
+  assert.ok(projectionAudit.docs.some(doc => doc.data().action === 'profile.sync_projection'));
+  assert.equal((await call('organizer', 'getMemberOverview', { userId: 'missing-member' })).status, 404);
+});
+
+test('Member activity includes undated legacy records, stable pagination and no certificate secrets', async () => {
+  await db.collection('events').doc('activity-event').set({ title: 'عنوان الفعالية' });
+  const batch = db.batch();
+  for (let index = 0; index < 65; index++) batch.set(db.collection('registrations').doc(`activity-${String(index).padStart(3, '0')}`), { userId: 'activity-member', eventId: 'activity-event', status: 'approved', secretField: 'hidden' });
+  batch.set(db.collection('registrations').doc('activity-foreign'), { userId: 'carol', eventId: 'activity-event' });
+  batch.set(db.collection('certificates').doc('activity-certificate'), { userId: 'activity-member', eventId: 'activity-event', status: 'Available', cloudinaryPublicId: 'private-asset', externalUrl: 'https://example.test/private', lease: 'secret', downloadToken: 'hidden' });
+  await batch.commit();
+  const ids = []; let cursor = null;
+  do {
+    const page = await call('organizer', 'getMemberActivity', { userId: 'activity-member', section: 'registrations', ...(cursor ? { cursor } : {}) });
+    assert.equal(page.status, 200); assert.ok(page.data.entries.length <= 30);
+    for (const entry of page.data.entries) { ids.push(entry.id); assert.equal(entry.secretField, undefined); assert.equal(entry.eventTitle, 'عنوان الفعالية'); }
+    cursor = page.data.nextCursor;
+  } while (cursor);
+  assert.equal(ids.length, 65); assert.equal(new Set(ids).size, 65);
+  assert.equal((await call('organizer', 'getMemberActivity', { userId: 'activity-member', section: 'registrations', cursor: 'activity-foreign' })).status, 400);
+  assert.equal((await call('organizer', 'getMemberActivity', { userId: 'activity-member', section: '__proto__' })).status, 400);
+  const certs = await call('organizer', 'getMemberActivity', { userId: 'activity-member', section: 'certificates' });
+  for (const field of ['cloudinaryPublicId', 'externalUrl', 'lease', 'downloadToken']) assert.equal(certs.data.entries[0][field], undefined);
+  const summary = await call('organizer', 'getMemberOverview', { userId: 'activity-member' });
+  assert.equal(summary.data.counts.registrations, 65); assert.equal(summary.data.counts.certificates, 1);
+});

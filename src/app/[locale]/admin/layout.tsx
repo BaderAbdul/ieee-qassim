@@ -23,6 +23,7 @@ import {
 import { usePathname } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import NotificationQueueControl from '@/components/admin/NotificationQueueControl';
+import ConfigurationNotice from '@/components/admin/ConfigurationNotice';
 
 const subscribeSidebar = (notify: () => void) => {
   window.addEventListener('storage', notify);
@@ -196,6 +197,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Main Content */}
       <div className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
         <div className="max-w-6xl mx-auto">
+          <ConfigurationNotice />
           {children}
         </div>
       </div>

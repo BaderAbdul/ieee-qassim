@@ -11,13 +11,14 @@ export function publicProfile(data: FirebaseFirestore.DocumentData) {
   return result;
 }
 
-export async function syncPublicProfile(uid: string) {
+export async function syncPublicProfile(uid: string, actorUid?: string) {
   const db = getFirestore();
   await db.runTransaction(async tx => {
     const source = await tx.get(db.collection('users').doc(uid));
     const target = db.collection('public_profiles').doc(uid);
     if (!source.exists || source.data()?.isRestricted) tx.delete(target);
     else tx.set(target, publicProfile(source.data()!));
+    if (actorUid && actorUid !== uid) audit(tx, 'profile.sync_projection', actorUid, uid, { removed: !source.exists || source.data()?.isRestricted === true });
   });
 }
 

@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Search, Trophy, Shield, ShieldAlert, Trash2, Edit3, Lock, Unlock } from 'lucide-react';
 import type { MemberSearchResult } from '@/lib/adminTypes';
 import { AdminError } from '@/components/admin/AdminData';
+import { Link } from '@/i18n/routing';
 
 interface AdminUserItem {
   id: string;
@@ -208,7 +209,8 @@ export default function AdminUsersPage() {
               {filteredUsers.map(u => (
                 <tr key={u.id} className="hover:bg-gray-50 transition-colors">
                   <td className="py-4 px-6">
-                    <div className="font-bold text-gray-900">{u.arabicFullName || u.displayName}</div>
+                    <Link href={`/admin/users/${encodeURIComponent(u.id)}`} className="font-bold text-purple-700 hover:underline">{u.arabicFullName || u.displayName || u.id}</Link>
+                    {u.isRestricted && <p className="text-xs text-amber-700">حساب مقيّد / مؤرشف</p>}
                   </td>
                   <td className="py-4 px-6 text-gray-500">{u.email}</td>
                   <td className="py-4 px-6">
@@ -261,7 +263,7 @@ export default function AdminUsersPage() {
                           <button
                             onClick={() => handleDeleteUser(u.id)}
                             className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"
-                            title="حذف الحساب"
+                            title="أرشفة الحساب"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>

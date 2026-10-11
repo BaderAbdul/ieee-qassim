@@ -15,6 +15,19 @@ export interface AdminMember {
   photoURL?: string; role?: string; totalPoints?: number; isRestricted?: boolean;
 }
 export interface MemberSearchResult { users: AdminMember[]; nextCursor: string | null; hasMore?: boolean; truncated?: boolean }
+export type MemberActivitySection = 'registrations' | 'attendance' | 'points' | 'certificates';
+export interface MemberOverview {
+  member: AdminMember & { universityId?: string; college?: string; major?: string; academicLevel?: string; profileCompleted?: boolean; createdAt?: string; archivedAt?: string };
+  counts: Record<MemberActivitySection, number>;
+  publicProjection: { exists: boolean; balance: number | null; matchesBalance: boolean };
+  generatedAt: string;
+}
+export interface MemberActivityEntry {
+  id: string; eventId?: string; sourceEventId?: string; eventTitle?: string; status?: string;
+  timestamp?: string; createdAt?: string; issueDate?: string; amount?: number; reason?: string; source?: string;
+  balanceBefore?: number; balanceAfter?: number;
+}
+export interface MemberActivityResult { entries: MemberActivityEntry[]; nextCursor: string | null; order: 'documentId' }
 export interface OperationJob { id: string; status: string; to?: string; attempts?: number; eventId?: string; eventTitle?: string; studentName?: string; lastError?: string }
 export interface AdminOperations { notificationJobs: OperationJob[]; certificateJobs: OperationJob[] }
 export interface AuditEntry { id: string; action: string; actorUid?: string; targetId?: string; createdAt?: string; reason?: string }
