@@ -23,7 +23,8 @@ import {
   Cpu,
   Monitor,
   Zap,
-  Check
+  Check,
+  Trash2
 } from 'lucide-react';
 import { AdminError, AdminLoading, formatAdminDate, useAdminQuery } from '@/components/admin/AdminData';
 import { httpsCallable } from '@/lib/backend';
@@ -141,6 +142,28 @@ export default function AdminShowcasePage() {
       setSelectedApp(prev => prev ? { ...prev, status: targetStatus, adminNotes: reviewNotes.trim() } : null);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : (isAr ? 'فشلت العملية' : 'Action failed'));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteApplication = async () => {
+    if (!selectedApp) return;
+    const confirmMessage = isAr 
+      ? `هل أنت متأكد من رغبتك في حذف طلب "${selectedApp.projectName}" نهائياً؟ لا يمكن التراجع عن هذا الإجراء.`
+      : `Are you sure you want to permanently delete application "${selectedApp.projectName}"? This cannot be undone.`;
+    if (!window.confirm(confirmMessage)) return;
+
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      await httpsCallable(null, 'deleteShowcaseApplication')({
+        applicationId: selectedApp.id
+      });
+      setSelectedApp(null);
+      refresh();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : (isAr ? 'فشل حذف الطلب' : 'Failed to delete application'));
     } finally {
       setActionLoading(false);
     }
@@ -594,9 +617,21 @@ export default function AdminShowcasePage() {
 
             {/* Modal Actions Footer */}
             <div className="p-4 sm:p-5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
-              <span className="text-xs text-slate-400 font-mono">
-                {isAr ? 'تاريخ التقديم:' : 'Submitted:'} {formatAdminDate(selectedApp.createdAt as any, locale)}
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-slate-400 font-mono">
+                  {isAr ? 'تاريخ التقديم:' : 'Submitted:'} {formatAdminDate(selectedApp.createdAt as any, locale)}
+                </span>
+                <button
+                  type="button"
+                  disabled={actionLoading}
+                  onClick={handleDeleteApplication}
+                  className="px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:border-rose-300 text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                  title={isAr ? 'حذف الطلب نهائياً' : 'Delete Application'}
+                >
+                  <Trash2 size={13} />
+                  <span>{isAr ? 'حذف الطلب' : 'Delete'}</span>
+                </button>
+              </div>
 
               <div className="flex items-center gap-2">
                 <button

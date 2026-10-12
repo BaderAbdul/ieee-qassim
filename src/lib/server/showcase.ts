@@ -160,32 +160,52 @@ export async function submitShowcaseApplication(actorUid: string, data: Record<s
   const agreedToTerms = Boolean(data.agreedToTerms);
   if (!agreedToTerms) throw new ApiError('invalid-argument', 'يجب الموافقة على الإقرار والشروط.');
 
-  // Check for existing submission for this applicant & event
-  const existingQuery = await db.collection('showcase_applications')
-    .where('eventId', '==', eventId)
-    .where('applicantId', '==', actorUid)
-    .limit(1)
-    .get();
+  // Identify existing submission for this applicant & event
+  let targetDocRef: FirebaseFirestore.DocumentReference | null = null;
+  let targetDocData: FirebaseFirestore.DocumentData | null = null;
+  let isUpdate = false;
 
-  const isUpdate = !existingQuery.empty && (data.isUpdate === true || data.applicationId === existingQuery.docs[0].id);
-
-  if (!existingQuery.empty && !isUpdate) {
-    const existingDoc = existingQuery.docs[0];
-    const existing = existingDoc.data();
-    if (existing.status !== 'withdrawn') {
-      return {
-        alreadySubmitted: true,
-        referenceNumber: existing.referenceNumber,
-        status: existing.status,
-        applicationId: existingDoc.id
-      };
+  const passedAppId = typeof data.applicationId === 'string' ? data.applicationId.trim() : '';
+  if (passedAppId) {
+    const directSnap = await db.collection('showcase_applications').doc(passedAppId).get();
+    if (directSnap.exists) {
+      const d = directSnap.data()!;
+      if (d.applicantId === actorUid) {
+        targetDocRef = directSnap.ref;
+        targetDocData = d;
+        isUpdate = true;
+      }
     }
   }
 
-  const existingDoc = !existingQuery.empty ? existingQuery.docs[0] : null;
-  const docRef = isUpdate && existingDoc ? existingDoc.ref : db.collection('showcase_applications').doc();
-  const referenceNumber = isUpdate && existingDoc 
-    ? existingDoc.data().referenceNumber 
+  if (!targetDocRef) {
+    const existingQuery = await db.collection('showcase_applications')
+      .where('eventId', '==', eventId)
+      .where('applicantId', '==', actorUid)
+      .limit(1)
+      .get();
+
+    if (!existingQuery.empty) {
+      targetDocRef = existingQuery.docs[0].ref;
+      targetDocData = existingQuery.docs[0].data();
+      if (data.isUpdate === true || passedAppId === existingQuery.docs[0].id) {
+        isUpdate = true;
+      } else if (targetDocData.status !== 'withdrawn') {
+        return {
+          alreadySubmitted: true,
+          referenceNumber: targetDocData.referenceNumber,
+          status: targetDocData.status,
+          applicationId: existingQuery.docs[0].id
+        };
+      } else {
+        isUpdate = true;
+      }
+    }
+  }
+
+  const docRef = isUpdate && targetDocRef ? targetDocRef : db.collection('showcase_applications').doc();
+  const referenceNumber = isUpdate && targetDocData?.referenceNumber 
+    ? targetDocData.referenceNumber 
     : `IEEE-SHOW-${randomBytes(3).toString('hex').toUpperCase()}`;
 
   await db.runTransaction(async tx => {
@@ -210,9 +230,9 @@ export async function submitShowcaseApplication(actorUid: string, data: Record<s
       updatedAt: FieldValue.serverTimestamp()
     };
 
-    if (isUpdate && existingDoc) {
+    if (isUpdate && targetDocData) {
       // Preserve current status unless it was withdrawn
-      const currentStatus = existingDoc.data().status;
+      const currentStatus = targetDocData.status;
       payload.status = currentStatus === 'withdrawn' ? 'pending' : currentStatus;
       tx.update(docRef, payload);
       audit(tx, 'showcase.update', actorUid, docRef.id, {
@@ -237,7 +257,7 @@ export async function submitShowcaseApplication(actorUid: string, data: Record<s
     applicationId: docRef.id,
     referenceNumber,
     isUpdate,
-    status: isUpdate && existingDoc ? existingDoc.data().status : 'pending'
+    status: isUpdate && targetDocData ? targetDocData.status : 'pending'
   };
 }
 
@@ -383,3 +403,64 @@ export async function reviewShowcaseApplication(
     };
   });
 }
+
+export async function getMyShowcaseApplication(actorUid: string, eventId = 'ieee-day-2026') {
+  const db = getFirestore();
+  const snap = await db.collection('showcase_applications')
+    .where('eventId', '==', eventId)
+    .where('applicantId', '==', actorUid)
+    .limit(1)
+    .get();
+
+  if (snap.empty) {
+    return { application: null };
+  }
+
+  const doc = snap.docs[0];
+  const d = doc.data();
+  return {
+    application: {
+      id: doc.id,
+      referenceNumber: d.referenceNumber,
+      eventId: d.eventId,
+      applicantId: d.applicantId,
+      fullName: d.fullName,
+      email: d.email,
+      whatsapp: d.whatsapp,
+      organization: d.organization,
+      projectName: d.projectName,
+      category: d.category,
+      description: d.description,
+      stage: d.stage,
+      mediaUrl: d.mediaUrl,
+      presentationMethod: d.presentationMethod,
+      equipment: d.equipment,
+      teamSize: d.teamSize,
+      availability: d.availability,
+      status: d.status,
+      createdAt: d.createdAt?.toDate ? d.createdAt.toDate().toISOString() : d.createdAt,
+      updatedAt: d.updatedAt?.toDate ? d.updatedAt.toDate().toISOString() : d.updatedAt
+    }
+  };
+}
+
+export async function deleteShowcaseApplication(actorUid: string, applicationId: string) {
+  const db = getFirestore();
+  const docRef = db.collection('showcase_applications').doc(applicationId);
+
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(docRef);
+    if (!snap.exists) throw new ApiError('not-found', 'Application not found.');
+    const data = snap.data()!;
+
+    tx.delete(docRef);
+    audit(tx, 'showcase.delete', actorUid, applicationId, {
+      referenceNumber: data.referenceNumber,
+      projectName: data.projectName,
+      applicantId: data.applicantId
+    });
+  });
+
+  return { success: true };
+}
+

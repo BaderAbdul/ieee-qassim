@@ -13,6 +13,8 @@ import { audit } from '@/lib/server/audit';
 import { saveHomepage } from '@/lib/server/content';
 import { saveEvent } from '@/lib/server/events';
 import { 
+  deleteShowcaseApplication,
+  getMyShowcaseApplication,
   getShowcaseApplications, 
   getShowcaseSettings, 
   reviewShowcaseApplication, 
@@ -129,9 +131,15 @@ export async function POST(request: Request, context: { params: Promise<{ action
       }
       case 'getCertificateDownloadUrl': result = await certificateDownload(data.certificateId, actor.uid, admin); break;
       case 'submitShowcaseApplication': result = await submitShowcaseApplication(actor.uid, data); break;
+      case 'getMyShowcaseApplication': result = await getMyShowcaseApplication(actor.uid, typeof data.eventId === 'string' ? data.eventId : 'ieee-day-2026'); break;
       case 'getShowcaseApplications': result = await getShowcaseApplications(actor, typeof data.eventId === 'string' ? data.eventId : 'ieee-day-2026'); break;
       case 'getShowcaseSettings': result = await getShowcaseSettings(); break;
       case 'saveShowcaseSettings': requireAdmin(actor); result = await saveShowcaseSettings(actor.uid, data); break;
+      case 'deleteShowcaseApplication': {
+        requireAdmin(actor);
+        result = await deleteShowcaseApplication(actor.uid, String(data.applicationId));
+        break;
+      }
       case 'reviewShowcaseApplication': {
         requireAdmin(actor);
         result = await reviewShowcaseApplication(actor.uid, {

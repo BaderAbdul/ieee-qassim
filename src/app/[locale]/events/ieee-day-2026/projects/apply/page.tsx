@@ -121,25 +121,34 @@ export default function ShowcaseApplicationPage() {
 
   // Check if current user already applied for IEEE Day 2026 showcase
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setExistingSubmission(null);
+      setIsEditing(false);
+      return;
+    }
     let active = true;
     const checkSubmissions = async () => {
       setCheckingExisting(true);
       try {
-        const res = await httpsCallable<unknown, { applications?: Array<any> }>(
+        const res = await httpsCallable<unknown, { application?: any }>(
           null, 
-          'getShowcaseApplications'
+          'getMyShowcaseApplication'
         )({ eventId: 'ieee-day-2026' });
 
-        if (active && res.data.applications && res.data.applications.length > 0) {
-          const app = res.data.applications[0];
-          setExistingSubmission({
-            alreadySubmitted: true,
-            referenceNumber: app.referenceNumber,
-            status: app.status,
-            applicationId: app.id,
-            ...app
-          });
+        if (active) {
+          if (res.data.application && res.data.application.applicantId === user.uid) {
+            const app = res.data.application;
+            setExistingSubmission({
+              alreadySubmitted: true,
+              referenceNumber: app.referenceNumber,
+              status: app.status,
+              applicationId: app.id,
+              ...app
+            });
+          } else {
+            setExistingSubmission(null);
+            setIsEditing(false);
+          }
         }
       } catch (err) {
         console.error('Check existing error:', err);
@@ -286,9 +295,30 @@ export default function ShowcaseApplicationPage() {
         setExistingSubmission({
           alreadySubmitted: true,
           referenceNumber: res.data.referenceNumber,
-          status: res.data.status
+          status: res.data.status,
+          applicationId: (res.data as any).applicationId
         });
       } else {
+        setExistingSubmission({
+          alreadySubmitted: true,
+          referenceNumber: res.data.referenceNumber,
+          status: 'pending',
+          applicationId: (res.data as any).applicationId,
+          applicantId: user.uid,
+          fullName: fullName.trim(),
+          email: email.trim(),
+          whatsapp: whatsapp.trim(),
+          organization: organization.trim(),
+          projectName: projectName.trim(),
+          category,
+          description: description.trim(),
+          stage,
+          mediaUrl: mediaUrl.trim() || undefined,
+          presentationMethod,
+          equipment,
+          teamSize,
+          availability: true
+        });
         setSuccessRef(res.data.referenceNumber);
       }
     } catch (err) {
