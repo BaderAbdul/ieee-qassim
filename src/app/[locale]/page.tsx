@@ -161,13 +161,6 @@ export default async function HomePage({ params }: PageProps) {
             </div>
             
             <HeroActionButtons />
-            <div className="flex justify-center lg:justify-start">
-              <Link href="/help" className="group inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs sm:text-sm font-bold text-slate-600 hover:text-blue-700 hover:bg-blue-50/80 transition-colors">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-blue-700 text-[11px] font-black">?</span>
-                {isAr ? 'كيف أسجّل وأحصل على النقاط والشهادة؟' : 'How do registration, points and certificates work?'}
-                <ArrowRight className="h-3.5 w-3.5 rtl:-scale-x-100 opacity-60 transition-transform group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5" />
-              </Link>
-            </div>
           </div>
           
           <div className="relative block w-full h-[360px] lg:h-full lg:min-h-[500px] mt-4 lg:mt-0 flex items-center justify-center lg:block">
@@ -282,6 +275,18 @@ export default async function HomePage({ params }: PageProps) {
             </div>
             <h3 className="text-slate-900 font-black text-xs sm:text-xl leading-tight group-hover:text-emerald-700 transition-colors">{t('activityAndCerts')}</h3>
             <p className="hidden sm:block text-slate-500 text-sm mt-2">{t('activityAndCertsDesc')}</p>
+          </Link>
+        </div>
+
+        {/* Guide / How it Works Pill */}
+        <div className="mt-5 sm:mt-7 flex justify-center">
+          <Link
+            href="/help"
+            className="group inline-flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-full bg-white hover:bg-blue-50/80 text-slate-700 hover:text-blue-700 text-xs sm:text-sm font-bold border border-slate-200/90 hover:border-blue-200 shadow-xs hover:shadow-sm transition-all hover:-translate-y-0.5"
+          >
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-blue-700 text-[11px] font-black">?</span>
+            <span>{isAr ? 'كيف أسجّل وأحصل على النقاط والشهادة؟ الدليل الإرشادي' : 'How do registration, points and certificates work? Guide'}</span>
+            <ArrowRight className="h-3.5 w-3.5 rtl:-scale-x-100 opacity-60 transition-transform group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5" />
           </Link>
         </div>
       </section>
