@@ -23,7 +23,10 @@ import {
   ArrowRight,
   ExternalLink,
   Users,
-  Cpu
+  Cpu,
+  Edit3,
+  Save,
+  RotateCcw
 } from 'lucide-react';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import type { 
@@ -95,13 +98,14 @@ export default function ShowcaseApplicationPage() {
   // Submission & Validation State
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [existingSubmission, setExistingSubmission] = useState<ExistingSubmission | null>(null);
+  const [existingSubmission, setExistingSubmission] = useState<(ExistingSubmission & Record<string, any>) | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
   const [successRef, setSuccessRef] = useState<string | null>(null);
   const [checkingExisting, setCheckingExisting] = useState(false);
 
-  // Auto-prefill authenticated user details once available
+  // Auto-prefill authenticated user details once available (if not editing an existing submission)
   useEffect(() => {
-    if (user && userData) {
+    if (user && userData && !existingSubmission) {
       if (!fullName) {
         setFullName(userData.arabicFullName || userData.displayName || user.displayName || '');
       }
@@ -113,7 +117,7 @@ export default function ShowcaseApplicationPage() {
         setOrganization(orgParts || (userData.isQassimStudent ? 'جامعة القصيم' : ''));
       }
     }
-  }, [user, userData, fullName, email, organization]);
+  }, [user, userData, fullName, email, organization, existingSubmission]);
 
   // Check if current user already applied for IEEE Day 2026 showcase
   useEffect(() => {
@@ -122,7 +126,7 @@ export default function ShowcaseApplicationPage() {
     const checkSubmissions = async () => {
       setCheckingExisting(true);
       try {
-        const res = await httpsCallable<unknown, { applications?: Array<{ referenceNumber: string; status: string; id: string }> }>(
+        const res = await httpsCallable<unknown, { applications?: Array<any> }>(
           null, 
           'getShowcaseApplications'
         )({ eventId: 'ieee-day-2026' });
@@ -133,11 +137,11 @@ export default function ShowcaseApplicationPage() {
             alreadySubmitted: true,
             referenceNumber: app.referenceNumber,
             status: app.status,
-            applicationId: app.id
+            applicationId: app.id,
+            ...app
           });
         }
       } catch (err) {
-        // Silently catch in case endpoint is restricted or fresh
         console.error('Check existing error:', err);
       } finally {
         if (active) setCheckingExisting(false);
@@ -146,6 +150,31 @@ export default function ShowcaseApplicationPage() {
     checkSubmissions();
     return () => { active = false; };
   }, [user]);
+
+  const startEditing = () => {
+    if (!existingSubmission) return;
+    setFullName(existingSubmission.fullName || '');
+    setEmail(existingSubmission.email || '');
+    setWhatsapp(existingSubmission.whatsapp || '');
+    setOrganization(existingSubmission.organization || '');
+    setProjectName(existingSubmission.projectName || '');
+    setCategory(existingSubmission.category || 'electronics_iot');
+    setDescription(existingSubmission.description || '');
+    setStage(existingSubmission.stage || 'working_project');
+    setMediaUrl(existingSubmission.mediaUrl || '');
+    setPresentationMethod(existingSubmission.presentationMethod || 'physical_prototype');
+    setEquipment(existingSubmission.equipment || ['table', 'electricity']);
+    setTeamSize(existingSubmission.teamSize || 2);
+    setAvailability('yes');
+    setAgreedToTerms(true);
+    setIsEditing(true);
+    setSubmitError(null);
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setSubmitError(null);
+  };
 
   const toggleEquipment = (id: ShowcaseEquipment) => {
     if (id === 'no_special_requirements') {
@@ -209,7 +238,7 @@ export default function ShowcaseApplicationPage() {
 
     setSubmitting(true);
     try {
-      const res = await httpsCallable<unknown, { success?: boolean; alreadySubmitted?: boolean; referenceNumber: string; status: string }>(
+      const res = await httpsCallable<unknown, { success?: boolean; alreadySubmitted?: boolean; referenceNumber: string; status: string; isUpdate?: boolean }>(
         null,
         'submitShowcaseApplication'
       )({
@@ -227,10 +256,33 @@ export default function ShowcaseApplicationPage() {
         equipment,
         teamSize,
         availability: true,
-        agreedToTerms: true
+        agreedToTerms: true,
+        isUpdate: isEditing,
+        applicationId: existingSubmission?.applicationId || existingSubmission?.id
       });
 
-      if (res.data.alreadySubmitted) {
+      if (res.data.isUpdate) {
+        setExistingSubmission(prev => ({
+          ...prev,
+          alreadySubmitted: true,
+          referenceNumber: res.data.referenceNumber,
+          status: res.data.status,
+          fullName: fullName.trim(),
+          email: email.trim(),
+          whatsapp: whatsapp.trim(),
+          organization: organization.trim(),
+          projectName: projectName.trim(),
+          category,
+          description: description.trim(),
+          stage,
+          mediaUrl: mediaUrl.trim() || undefined,
+          presentationMethod,
+          equipment,
+          teamSize,
+          availability: true
+        }));
+        setIsEditing(false);
+      } else if (res.data.alreadySubmitted) {
         setExistingSubmission({
           alreadySubmitted: true,
           referenceNumber: res.data.referenceNumber,
@@ -336,27 +388,74 @@ export default function ShowcaseApplicationPage() {
           </div>
         </header>
 
-        {/* Existing Submission Notice */}
-        {existingSubmission && (
-          <div className="bg-blue-50 border-2 border-blue-200 rounded-3xl p-6 sm:p-8 space-y-4">
-            <div className="flex items-start justify-between gap-4">
+        {/* Existing Submission Notice & Details */}
+        {existingSubmission && !isEditing && (
+          <div className="bg-blue-50/90 border-2 border-blue-200 rounded-3xl p-6 sm:p-8 space-y-6 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0">
-                  <CheckCircle2 className="w-6 h-6" />
+                <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-600/20">
+                  <CheckCircle2 className="w-7 h-7" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black font-cairo text-slate-900">
-                    {isAr ? 'لديك طلب مشاركة مسجل مسبقاً' : 'You already have an active submission'}
+                  <h3 className="text-lg sm:text-xl font-black font-cairo text-slate-900">
+                    {isAr ? 'لديك طلب مشاركة مسجل مسبقاً' : 'You have a submitted application'}
                   </h3>
-                  <p className="text-xs text-slate-600">
-                    {isAr ? 'رقم مرجع الطلب:' : 'Reference number:'} <strong className="font-mono text-blue-700">{existingSubmission.referenceNumber}</strong>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    {isAr ? 'رقم مرجع الطلب:' : 'Reference number:'} <strong className="font-mono text-blue-700 font-bold">{existingSubmission.referenceNumber}</strong>
                   </p>
                 </div>
               </div>
-              <div>{statusBadge(existingSubmission.status)}</div>
+              <div className="flex items-center gap-2">
+                {statusBadge(existingSubmission.status)}
+                <button
+                  type="button"
+                  onClick={startEditing}
+                  className="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-blue-700 px-4 py-2 rounded-xl text-xs font-bold border border-blue-300 shadow-2xs transition-all cursor-pointer"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>{isAr ? 'تعديل بيانات المشروع' : 'Edit Submission'}</span>
+                </button>
+              </div>
             </div>
-            <p className="text-sm text-slate-700 leading-relaxed font-medium">
-              {isAr ? 'تم استلام طلبك لمعرض IEEE Day 2026 بنجاح وهو قيد الفرز من قبل اللجنة المنظمة. سيتم إشعارك والتواصل معك عبر الواتساب والبريد فور انتهاء المراجعة.' : 'Your application for IEEE Day 2026 Showcase has been received and is being reviewed. The organizing team will reach out via WhatsApp/Email.'}
+
+            {/* Project Summary Box */}
+            <div className="bg-white rounded-2xl p-5 border border-blue-100 shadow-2xs space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">{isAr ? 'اسم المشروع' : 'Project Name'}</span>
+                  <strong className="text-sm sm:text-base text-slate-900 font-black">{existingSubmission.projectName}</strong>
+                </div>
+                <span className="bg-purple-50 text-purple-700 border border-purple-200 px-3 py-1 rounded-xl text-xs font-bold">
+                  {CATEGORIES.find(c => c.id === existingSubmission.category)?.[isAr ? 'titleAr' : 'titleEn'] || existingSubmission.category}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">{isAr ? 'وصف المشروع' : 'Description'}</span>
+                <p className="text-xs sm:text-sm text-slate-700 leading-relaxed line-clamp-3">
+                  {existingSubmission.description}
+                </p>
+              </div>
+
+              {existingSubmission.mediaUrl && (
+                <div className="pt-1">
+                  <a
+                    href={existingSubmission.mediaUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-blue-600 font-bold hover:underline"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>{isAr ? 'استعراض رابط وسائط المشروع المرفق' : 'View Submitted Media Link'}</span>
+                  </a>
+                </div>
+              )}
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed font-medium">
+              {isAr 
+                ? '⚡️ يمكنك تعديل بيانات مشروعك ومتطلبات العرض في أي وقت قبل إغلاق باب التقديم. سيتم إشعارك فور مراجعة الطلب.'
+                : '⚡️ You can update your project details and requirements anytime before applications close.'}
             </p>
           </div>
         )}
@@ -383,10 +482,22 @@ export default function ShowcaseApplicationPage() {
               <span className="text-xl sm:text-2xl font-black font-mono text-emerald-700 tracking-wider">{successRef}</span>
             </div>
 
-            <div className="pt-2">
+            <div className="pt-2 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setSuccessRef(null);
+                  startEditing();
+                }}
+                className="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-800 px-5 py-3 rounded-xl font-bold text-sm border border-slate-200 transition-all cursor-pointer shadow-2xs"
+              >
+                <Edit3 className="w-4 h-4" />
+                <span>{isAr ? 'تعديل البيانات' : 'Edit Submission'}</span>
+              </button>
+
               <Link
                 href="/events"
-                className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-xl font-bold text-sm transition-all"
+                className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-xl font-bold text-sm transition-all shadow-md"
               >
                 <span>{isAr ? 'العودة لصفحة الفعاليات' : 'Return to Events'}</span>
               </Link>
@@ -394,33 +505,59 @@ export default function ShowcaseApplicationPage() {
           </div>
         )}
 
-        {/* Form View (when not yet submitted or not showing success) */}
-        {!existingSubmission && !successRef && (
+        {/* Form View: Visible when creating fresh application or editing an existing one */}
+        {((!existingSubmission && !successRef) || isEditing) && (
           <form onSubmit={handleSubmit} className="space-y-8">
 
-            {/* Auth Gate Banner (Prompt user to sign in if not authenticated) */}
-            {!user && (
-              <div className="bg-amber-50 border border-amber-200 rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-3 text-amber-900">
-                  <Lock className="w-6 h-6 text-amber-600 shrink-0" />
-                  <div>
-                    <h4 className="text-sm font-bold font-cairo">
-                      {isAr ? 'سجّل دخولك لحفظ طلبك ومتابعة حالته' : 'Sign in to track your application'}
-                    </h4>
-                    <p className="text-xs text-amber-700">
-                      {isAr ? 'تعبئة البيانات تلقائياً وربط طلبك بحسابك في المنصة.' : 'Auto-prefill your info and link the submission to your IEEE profile.'}
-                    </p>
-                  </div>
+            {/* Editing Notice Header */}
+            {isEditing && (
+              <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 flex items-center justify-between gap-3 text-purple-900">
+                <div className="flex items-center gap-2.5">
+                  <Edit3 className="w-5 h-5 text-purple-600 shrink-0" />
+                  <span className="text-xs sm:text-sm font-bold">
+                    {isAr ? `تعديل طلب المشاركة (${existingSubmission?.referenceNumber})` : `Editing application (${existingSubmission?.referenceNumber})`}
+                  </span>
                 </div>
                 <button
                   type="button"
-                  onClick={login}
-                  className="w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl transition-all shrink-0 cursor-pointer"
+                  onClick={cancelEditing}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-slate-900 bg-white px-3 py-1.5 rounded-lg border border-slate-200 cursor-pointer"
                 >
-                  {isAr ? 'تسجيل الدخول الآن' : 'Sign In Now'}
+                  <RotateCcw className="w-3 h-3" />
+                  <span>{isAr ? 'إلغاء التعديل' : 'Cancel'}</span>
                 </button>
               </div>
             )}
+
+            {/* Mandatory Auth Gate for Unauthenticated Users */}
+            {!user ? (
+              <div className="bg-white rounded-3xl p-8 sm:p-12 border border-slate-200 shadow-sm text-center space-y-6">
+                <div className="w-16 h-16 rounded-3xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto border border-blue-100">
+                  <Lock className="w-8 h-8" />
+                </div>
+                <div className="space-y-2 max-w-md mx-auto">
+                  <h3 className="text-xl sm:text-2xl font-black font-cairo text-slate-900">
+                    {isAr ? 'تسجيل الدخول إلزامي لتقديم الطلب' : 'Sign in Required to Apply'}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                    {isAr 
+                      ? 'لضمان صحة البيانات وإتاحة متابعة حالة الطلب وتعديله لاحقاً، يجب تسجيل الدخول بحسابك في منصة IEEE Qassim قبل إرسال المشروع.'
+                      : 'To ensure submission integrity and allow tracking and editing your project, you must sign in with your IEEE Qassim account.'}
+                  </p>
+                </div>
+                <div>
+                  <button
+                    type="button"
+                    onClick={login}
+                    className="inline-flex items-center gap-2.5 bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-800 hover:to-indigo-800 text-white font-bold font-cairo px-8 py-3.5 rounded-2xl shadow-lg transition-transform transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+                  >
+                    <Lock className="w-4 h-4" />
+                    <span>{isAr ? 'تسجيل الدخول والمتابعة' : 'Sign In and Continue'}</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
 
             {/* Section A: Applicant Information */}
             <section className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-2xs space-y-6">
@@ -780,19 +917,22 @@ export default function ShowcaseApplicationPage() {
                 {submitting ? (
                   <>
                     <LoadingSpinner size="sm" color="border-white" />
-                    <span>{isAr ? 'جارٍ إرسال الطلب...' : 'Submitting Application...'}</span>
+                    <span>{isAr ? (isEditing ? 'جارٍ حفظ التعديلات...' : 'جارٍ إرسال الطلب...') : (isEditing ? 'Saving Changes...' : 'Submitting Application...')}</span>
                   </>
                 ) : (
                   <>
-                    <Send className="w-5 h-5" />
-                    <span>{isAr ? 'إرسال طلب المشاركة في المعرض ⚡️' : 'Submit Showcase Application ⚡️'}</span>
+                    {isEditing ? <Save className="w-5 h-5" /> : <Send className="w-5 h-5" />}
+                    <span>{isAr ? (isEditing ? 'حفظ تعديلات المشروع ⚡️' : 'إرسال طلب المشاركة في المعرض ⚡️') : (isEditing ? 'Save Changes ⚡️' : 'Submit Showcase Application ⚡️')}</span>
                   </>
                 )}
               </button>
             </div>
 
-          </form>
+          </>
         )}
+
+      </form>
+    )}
 
       </div>
     </div>

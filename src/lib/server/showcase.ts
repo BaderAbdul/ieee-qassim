@@ -160,14 +160,16 @@ export async function submitShowcaseApplication(actorUid: string, data: Record<s
   const agreedToTerms = Boolean(data.agreedToTerms);
   if (!agreedToTerms) throw new ApiError('invalid-argument', 'يجب الموافقة على الإقرار والشروط.');
 
-  // Prevent accidental duplicates for this applicant & event
+  // Check for existing submission for this applicant & event
   const existingQuery = await db.collection('showcase_applications')
     .where('eventId', '==', eventId)
     .where('applicantId', '==', actorUid)
     .limit(1)
     .get();
 
-  if (!existingQuery.empty) {
+  const isUpdate = !existingQuery.empty && (data.isUpdate === true || data.applicationId === existingQuery.docs[0].id);
+
+  if (!existingQuery.empty && !isUpdate) {
     const existingDoc = existingQuery.docs[0];
     const existing = existingDoc.data();
     if (existing.status !== 'withdrawn') {
@@ -180,14 +182,14 @@ export async function submitShowcaseApplication(actorUid: string, data: Record<s
     }
   }
 
-  // Generate Reference Number
-  const randomSuffix = randomBytes(3).toString('hex').toUpperCase();
-  const referenceNumber = `IEEE-SHOW-${randomSuffix}`;
-
-  const docRef = db.collection('showcase_applications').doc();
+  const existingDoc = !existingQuery.empty ? existingQuery.docs[0] : null;
+  const docRef = isUpdate && existingDoc ? existingDoc.ref : db.collection('showcase_applications').doc();
+  const referenceNumber = isUpdate && existingDoc 
+    ? existingDoc.data().referenceNumber 
+    : `IEEE-SHOW-${randomBytes(3).toString('hex').toUpperCase()}`;
 
   await db.runTransaction(async tx => {
-    tx.set(docRef, {
+    const payload: Record<string, unknown> = {
       referenceNumber,
       eventId,
       applicantId: actorUid,
@@ -205,22 +207,37 @@ export async function submitShowcaseApplication(actorUid: string, data: Record<s
       teamSize,
       availability,
       agreedToTerms,
-      status: 'pending',
-      createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp()
-    });
-    audit(tx, 'showcase.submit', actorUid, docRef.id, {
-      referenceNumber,
-      eventId,
-      projectName
-    });
+    };
+
+    if (isUpdate && existingDoc) {
+      // Preserve current status unless it was withdrawn
+      const currentStatus = existingDoc.data().status;
+      payload.status = currentStatus === 'withdrawn' ? 'pending' : currentStatus;
+      tx.update(docRef, payload);
+      audit(tx, 'showcase.update', actorUid, docRef.id, {
+        referenceNumber,
+        eventId,
+        projectName
+      });
+    } else {
+      payload.status = 'pending';
+      payload.createdAt = FieldValue.serverTimestamp();
+      tx.set(docRef, payload);
+      audit(tx, 'showcase.submit', actorUid, docRef.id, {
+        referenceNumber,
+        eventId,
+        projectName
+      });
+    }
   });
 
   return {
     success: true,
     applicationId: docRef.id,
     referenceNumber,
-    status: 'pending'
+    isUpdate,
+    status: isUpdate && existingDoc ? existingDoc.data().status : 'pending'
   };
 }
 
@@ -244,10 +261,21 @@ export async function getShowcaseApplications(actor: { uid: string; role: string
           eventId: d.eventId,
           applicantId: d.applicantId,
           fullName: d.fullName,
+          email: d.email,
+          whatsapp: d.whatsapp,
+          organization: d.organization,
           projectName: d.projectName,
           category: d.category,
+          description: d.description,
+          stage: d.stage,
+          mediaUrl: d.mediaUrl,
+          presentationMethod: d.presentationMethod,
+          equipment: d.equipment,
+          teamSize: d.teamSize,
+          availability: d.availability,
           status: d.status,
-          createdAt: d.createdAt?.toDate ? d.createdAt.toDate().toISOString() : d.createdAt
+          createdAt: d.createdAt?.toDate ? d.createdAt.toDate().toISOString() : d.createdAt,
+          updatedAt: d.updatedAt?.toDate ? d.updatedAt.toDate().toISOString() : d.updatedAt
         };
       })
     };
