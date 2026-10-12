@@ -151,7 +151,9 @@ export default async function HomePage({ params }: PageProps) {
               </div>
               
               <h1 className="text-4xl sm:text-7xl lg:text-8xl font-black mb-2 sm:mb-3 font-thmanyah text-slate-900 drop-shadow-sm uppercase tracking-tight">
-                {stats.heroTitle?.trim() || t('Hero.headline')}
+                {isAr
+                  ? (stats.heroTitle?.trim() || t('Hero.headline'))
+                  : ((stats as { heroTitleEn?: string }).heroTitleEn?.trim() || (stats.heroTitle && !/[\u0600-\u06FF]/.test(stats.heroTitle) ? stats.heroTitle.trim() : t('Hero.headline')))}
               </h1>
               <p className="text-slate-600 font-medium text-sm sm:text-base max-w-lg mx-auto lg:mx-0 mb-2 sm:mb-4 lg:mb-6 leading-relaxed">
                 {(isAr ? stats.heroSubtitleAr : stats.heroSubtitleEn)?.trim() || t('Hero.description')}
@@ -249,7 +251,7 @@ export default async function HomePage({ params }: PageProps) {
       {/* Quick Links / Feature Highlights */}
       <section className="py-6 sm:py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full mb-6 sm:mb-10">
         <div className="grid grid-cols-3 gap-2 sm:gap-6">
-          <Link href={latestEvent ? `/events/${latestEvent.id}` : "/events"} className="bg-gradient-to-b from-white to-slate-50 rounded-2xl px-2 py-4 sm:p-8 shadow-sm hover:shadow-md border border-slate-200/80 flex flex-col items-center justify-center text-center hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden">
+          <Link href={latestEvent ? `/events/${latestEvent.id}` : "/events"} className="bg-gradient-to-b from-white to-slate-50 rounded-2xl px-2 py-4 sm:p-8 shadow-sm hover:shadow-lg hover:shadow-blue-500/10 border border-slate-200/80 hover:border-blue-300 flex flex-col items-center justify-center text-center hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden">
             <div className="absolute top-1.5 sm:top-3 end-1.5 sm:end-3 text-slate-300 group-hover:text-blue-500 transition-colors">
               <ArrowRight className="w-3.5 h-3.5 sm:w-5 sm:h-5 rtl:-scale-x-100" />
             </div>
@@ -260,7 +262,7 @@ export default async function HomePage({ params }: PageProps) {
             <p className="hidden sm:block text-slate-500 text-sm mt-2">{t('upcomingEventsDesc')}</p>
           </Link>
           
-          <Link href="/leaderboard" className="bg-gradient-to-b from-white to-slate-50 rounded-2xl px-2 py-4 sm:p-8 shadow-sm hover:shadow-md border border-slate-200/80 flex flex-col items-center justify-center text-center hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden">
+          <Link href="/leaderboard" className="bg-gradient-to-b from-white to-slate-50 rounded-2xl px-2 py-4 sm:p-8 shadow-sm hover:shadow-lg hover:shadow-amber-500/10 border border-slate-200/80 hover:border-amber-300 flex flex-col items-center justify-center text-center hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden">
             <div className="absolute top-1.5 sm:top-3 end-1.5 sm:end-3 text-slate-300 group-hover:text-amber-500 transition-colors">
               <ArrowRight className="w-3.5 h-3.5 sm:w-5 sm:h-5 rtl:-scale-x-100" />
             </div>
@@ -271,7 +273,7 @@ export default async function HomePage({ params }: PageProps) {
             <p className="hidden sm:block text-slate-500 text-sm mt-2">{t('leaderboardDesc')}</p>
           </Link>
 
-          <Link href="/profile" className="bg-gradient-to-b from-white to-slate-50 rounded-2xl px-2 py-4 sm:p-8 shadow-sm hover:shadow-md border border-slate-200/80 flex flex-col items-center justify-center text-center hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden">
+          <Link href="/profile" className="bg-gradient-to-b from-white to-slate-50 rounded-2xl px-2 py-4 sm:p-8 shadow-sm hover:shadow-lg hover:shadow-emerald-500/10 border border-slate-200/80 hover:border-emerald-300 flex flex-col items-center justify-center text-center hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden">
             <div className="absolute top-1.5 sm:top-3 end-1.5 sm:end-3 text-slate-300 group-hover:text-emerald-500 transition-colors">
               <ArrowRight className="w-3.5 h-3.5 sm:w-5 sm:h-5 rtl:-scale-x-100" />
             </div>
