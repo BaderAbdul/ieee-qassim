@@ -25,6 +25,14 @@ const nextConfig: NextConfig = {
       }
     ]
   },
+  async rewrites() {
+    return [
+      {
+        source: '/__/auth/:path*',
+        destination: 'https://ieeeqassim.firebaseapp.com/__/auth/:path*',
+      },
+    ];
+  },
   async redirects() {
     return [
       {

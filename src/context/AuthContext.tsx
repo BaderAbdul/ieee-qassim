@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { User } from 'firebase/auth';
+import InAppBrowserModal from '@/components/auth/InAppBrowserModal';
 
 export interface UserData {
   isRestricted?: boolean;
@@ -58,6 +59,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   const [error, setError] = useState<string | null>(null);
+  const [showInAppBrowserModal, setShowInAppBrowserModal] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -69,7 +71,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const { onAuthStateChanged, setPersistence, browserLocalPersistence, getRedirectResult } = await import('firebase/auth');
         const { doc, runTransaction, onSnapshot } = await import('firebase/firestore');
         await setPersistence(auth, browserLocalPersistence);
-        await getRedirectResult(auth);
+
+        try {
+          await getRedirectResult(auth);
+        } catch (redirectResultErr: unknown) {
+          console.warn('Redirect auth result warning/error', redirectResultErr);
+          const errCode = typeof redirectResultErr === 'object' && redirectResultErr && 'code' in redirectResultErr 
+            ? (redirectResultErr as { code: string }).code 
+            : '';
+          if (errCode === 'auth/missing-initial-state' || errCode === 'auth/invalid-credential') {
+            if (alive) {
+              setError('تعذر استعادة حالة الجلسة عند العودة من تسجيل الدخول. يُرجى فتح الرابط مباشرة في متصفح Safari أو Chrome.');
+            }
+          }
+        }
+
         if (!alive) return;
         unsubscribeAuth = onAuthStateChanged(auth, currentUser => {
           unsubscribeSnapshot?.();
@@ -127,25 +143,60 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const login = async () => {
     try {
       setError(null);
+
+      // Check if user is opening from inside an in-app browser (e.g. WhatsApp, Instagram)
+      const { isInAppBrowser } = await import('@/lib/auth/inAppBrowser');
+      if (isInAppBrowser()) {
+        setShowInAppBrowserModal(true);
+        return;
+      }
+
       const { auth, googleProvider } = await import('@/lib/firebase/client');
       const { signInWithPopup, signInWithRedirect } = await import('firebase/auth');
+      
       try { 
         await signInWithPopup(auth, googleProvider); 
-      } catch (reason) {
-        const code = typeof reason === 'object' && reason && 'code' in reason ? reason.code : '';
+      } catch (reason: unknown) {
+        const code = typeof reason === 'object' && reason && 'code' in reason 
+          ? (reason as { code: string }).code 
+          : '';
+
+        // Ignore harmless user cancellation
         if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return;
-        
-        // Ad-blockers or privacy settings often suppress popups; fallback automatically to redirect
+
+        // If popup was blocked or disallowed user agent, fall back or guide user
+        if (code === 'auth/disallowed-useragent') {
+          setShowInAppBrowserModal(true);
+          return;
+        }
+
+        // Try redirect flow as fallback
         try {
           await signInWithRedirect(auth, googleProvider);
-        } catch (redirectErr) {
+        } catch (redirectErr: unknown) {
           console.error('Redirect sign-in failed', redirectErr);
+          const redirectCode = typeof redirectErr === 'object' && redirectErr && 'code' in redirectErr
+            ? (redirectErr as { code: string }).code
+            : '';
+          if (redirectCode === 'auth/disallowed-useragent') {
+            setShowInAppBrowserModal(true);
+            return;
+          }
           throw reason;
         }
       }
-    } catch (reason) {
+    } catch (reason: unknown) {
       console.error('Login failed', reason);
-      setError('تعذر تسجيل الدخول. إذا كنت تستخدم مانع إعلانات (AdBlocker)، يُرجى السماح بالنوافذ المنبثقة أو تعطيله مؤقتاً.');
+      const errCode = typeof reason === 'object' && reason && 'code' in reason 
+        ? (reason as { code: string }).code 
+        : '';
+      if (errCode === 'auth/disallowed-useragent') {
+        setShowInAppBrowserModal(true);
+      } else if (errCode === 'auth/missing-initial-state') {
+        setError('تعذر استعادة حالة الجلسة. يُرجى فتح الموقع في متصفح خارجي مثل Safari أو Chrome.');
+      } else {
+        setError('تعذر تسجيل الدخول. إذا كنت تستخدم مانع إعلانات (AdBlocker)، يُرجى السماح بالنوافذ المنبثقة أو تعطيله مؤقتاً.');
+      }
     }
   };
 
@@ -165,6 +216,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   return (
     <AuthContext.Provider value={{ user, userData, loading, error, login, logout }}>
       {children}
+      <InAppBrowserModal 
+        isOpen={showInAppBrowserModal} 
+        onClose={() => setShowInAppBrowserModal(false)} 
+      />
     </AuthContext.Provider>
   );
 };

@@ -3,9 +3,21 @@ import { getAuth, GoogleAuthProvider, connectAuthEmulator } from "firebase/auth"
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
+const getAuthDomain = () => {
+  if (typeof window !== 'undefined') {
+    const host = window.location.host;
+    // When served over production domains (like ieeequ.online or custom vercel domains),
+    // proxying auth requests through the same origin prevents iOS Safari third-party storage partitioning.
+    if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
+      return host;
+    }
+  }
+  return process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
+};
+
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  authDomain: getAuthDomain(),
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
