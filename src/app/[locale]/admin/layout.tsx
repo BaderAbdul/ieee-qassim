@@ -18,7 +18,8 @@ import {
   Settings,
   Activity,
   BarChart3,
-  ClipboardList
+  ClipboardList,
+  Rocket
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useLocale } from 'next-intl';
@@ -100,6 +101,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const navItems = [
     { name: isAr ? 'مركز العمل' : 'Command center', href: '/admin', icon: <LayoutDashboard size={20} /> },
     { name: isAr ? 'إدارة الفعاليات' : 'Events', href: '/admin/events', icon: <Calendar size={20} /> },
+    { name: isAr ? 'معرض المشاريع' : 'Projects Showcase', href: '/admin/showcase', icon: <Rocket size={20} /> },
     { name: isAr ? 'المسجلون والطلاب' : 'Users & Members', href: '/admin/users', icon: <Users size={20} /> },
     { name: isAr ? 'تسجيل الحضور (QR)' : 'Check-In Desk', href: '/admin/check-in', icon: <QrCode size={20} /> },
     { name: isAr ? 'الأفكار والمبادرات' : 'Ideas & Proposals', href: '/admin/ideas', icon: <Lightbulb size={20} /> },

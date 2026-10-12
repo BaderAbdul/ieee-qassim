@@ -94,3 +94,76 @@ export interface Certificate {
   revokedBy?: string;
   revokedAt?: Timestamp | Date;
 }
+
+export type ShowcaseCategory = 
+  | 'electronics_iot'
+  | 'robotics'
+  | 'ai_data'
+  | 'software_dev'
+  | 'energy_sustainability'
+  | 'other_engineering';
+
+export type ShowcaseStage = 
+  | 'working_project'
+  | 'functional_prototype'
+  | 'simulation_software';
+
+export type ShowcasePresentationMethod = 
+  | 'physical_prototype'
+  | 'laptop_demo'
+  | 'poster_presentation';
+
+export type ShowcaseEquipment = 
+  | 'table'
+  | 'electricity'
+  | 'display_screen'
+  | 'additional_space'
+  | 'no_special_requirements';
+
+export type ShowcaseStatus = 
+  | 'pending'
+  | 'accepted'
+  | 'rejected'
+  | 'waitlisted'
+  | 'withdrawn';
+
+export interface ShowcaseApplication {
+  id: string;
+  referenceNumber: string;
+  eventId: string;
+  applicantId: string;
+  // Section A: Applicant Information
+  fullName: string;
+  email: string;
+  whatsapp: string;
+  organization: string;
+  // Section B: Project Information
+  projectName: string;
+  category: ShowcaseCategory;
+  description: string;
+  stage: ShowcaseStage;
+  mediaUrl?: string;
+  // Section C: Exhibition Requirements
+  presentationMethod: ShowcasePresentationMethod;
+  equipment: ShowcaseEquipment[];
+  teamSize: number;
+  availability: boolean;
+  agreedToTerms: boolean;
+  // Admin & Review Metadata
+  status: ShowcaseStatus;
+  adminNotes?: string;
+  reviewedBy?: string;
+  reviewedAt?: Timestamp | Date | string | null;
+  createdAt: Timestamp | Date | string;
+  updatedAt: Timestamp | Date | string;
+}
+
+export interface ShowcaseSettings {
+  maxAcceptedProjects: number;
+  applicationsOpen: boolean;
+  openDate?: string | null;
+  closeDate?: string | null;
+  updatedAt?: Timestamp | Date | string;
+  updatedBy?: string;
+}
+

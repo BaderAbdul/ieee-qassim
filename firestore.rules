@@ -127,6 +127,10 @@ service cloud.firestore {
       allow read: if organizer() || owner(resource.data.userId);
       allow write: if false;
     }
+    match /showcase_applications/{id} {
+      allow read: if organizer() || (authenticated() && resource.data.applicantId == request.auth.uid);
+      allow write: if false; // All creation, status changes, and reviews are handled server-side via authenticated API endpoints with transactions, capacity checks, and audit trails.
+    }
     match /mail/{id} { allow read, write: if false; }
     match /audit_logs/{id} {
       allow read: if superAdmin();

@@ -12,6 +12,13 @@ import { changeEventState, getAdminOverview, getAuditLog, getEventReport, getOpe
 import { audit } from '@/lib/server/audit';
 import { saveHomepage } from '@/lib/server/content';
 import { saveEvent } from '@/lib/server/events';
+import { 
+  getShowcaseApplications, 
+  getShowcaseSettings, 
+  reviewShowcaseApplication, 
+  saveShowcaseSettings, 
+  submitShowcaseApplication 
+} from '@/lib/server/showcase';
 
 export const runtime = 'nodejs';
 export const maxDuration = 180;
@@ -121,6 +128,19 @@ export async function POST(request: Request, context: { params: Promise<{ action
         }); result = { status: 'success' }; break;
       }
       case 'getCertificateDownloadUrl': result = await certificateDownload(data.certificateId, actor.uid, admin); break;
+      case 'submitShowcaseApplication': result = await submitShowcaseApplication(actor.uid, data); break;
+      case 'getShowcaseApplications': result = await getShowcaseApplications(actor, typeof data.eventId === 'string' ? data.eventId : 'ieee-day-2026'); break;
+      case 'getShowcaseSettings': result = await getShowcaseSettings(); break;
+      case 'saveShowcaseSettings': requireAdmin(actor); result = await saveShowcaseSettings(actor.uid, data); break;
+      case 'reviewShowcaseApplication': {
+        requireAdmin(actor);
+        result = await reviewShowcaseApplication(actor.uid, {
+          applicationId: String(data.applicationId),
+          status: data.status as any,
+          adminNotes: typeof data.adminNotes === 'string' ? data.adminNotes : undefined
+        });
+        break;
+      }
       default: throw new ApiError('not-found', 'Unknown operation.');
     }
     return Response.json({ data: result }, { headers: { 'Cache-Control': 'no-store', 'X-Request-Id': requestId } });

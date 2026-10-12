@@ -22,7 +22,8 @@ import {
   QrCode,
   X,
   Maximize2,
-  Download
+  Download,
+  Sparkles
 } from 'lucide-react';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import EventDetailsSkeleton from '@/components/skeletons/EventDetailsSkeleton';
@@ -241,6 +242,38 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                   </div>
                 </div>
              </div>
+
+             {/* IEEE Day Projects Showcase CTA Banner */}
+             {(eventId === 'ieee-day-2026' || title.toLowerCase().includes('ieee day') || title.includes('يوم IEEE') || title.includes('معرض')) && (
+               <div className="relative bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 rounded-[2rem] p-6 sm:p-7 shadow-lg text-white overflow-hidden border border-amber-300/40">
+                 <div className="absolute top-0 end-0 -mt-6 -me-6 w-32 h-32 bg-white/20 rounded-full blur-2xl pointer-events-none" />
+                 <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+                   <div className="space-y-1.5">
+                     <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/20 text-white text-xs font-bold">
+                       <Sparkles className="w-3.5 h-3.5 text-amber-200" />
+                       <span>{isAr ? 'معرض المشاريع التقنية والهندسية' : 'Engineering Projects Showcase'}</span>
+                     </div>
+                     <h3 className="text-xl sm:text-2xl font-black font-cairo text-white">
+                       {isAr ? 'عندك مشروع؟ شاركنا في المعرض ⚡️' : 'Have a project? Join the Showcase ⚡️'}
+                     </h3>
+                     <p className="text-xs sm:text-sm text-amber-50/90 font-medium max-w-xl">
+                       {isAr 
+                         ? 'استعرض فكرتك وابتكارك أمام الحضور والمهتمين بالتقنية في بيت الثقافة – بريدة. التقديم مفتوح والمساحات محدودة.'
+                         : 'Exhibit your prototype and innovation at Culture House – Buraidah. Applications are open with limited exhibition slots.'}
+                     </p>
+                   </div>
+                   <div className="shrink-0">
+                     <Link
+                       href="/events/ieee-day-2026/projects/apply"
+                       className="inline-flex items-center gap-2 bg-slate-950 hover:bg-black active:scale-95 text-white px-5 sm:px-6 py-3.5 rounded-2xl font-bold text-sm shadow-xl transition-all cursor-pointer border border-white/20"
+                     >
+                       <span>{isAr ? 'التقديم للمعرض الآن' : 'Apply for Showcase'}</span>
+                       <ArrowRight className="w-4 h-4 rotate-180 rtl:rotate-0" />
+                     </Link>
+                   </div>
+                 </div>
+               </div>
+             )}
 
              {/* Registration CTA Card */}
              <div className="bg-gradient-to-br from-blue-900 to-indigo-900 rounded-[2rem] p-6 sm:p-10 shadow-xl relative overflow-hidden text-white">
