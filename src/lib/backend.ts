@@ -19,12 +19,36 @@ export function httpsCallable<Input = unknown, Output = unknown>(_unused: unknow
   };
 }
 
+import { compressImage } from './imageCompressor';
+
 export async function uploadImage(file: File, purpose: 'avatar' | 'event') {
   if (!auth.currentUser) throw new Error('Sign in first.');
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 3 * 1024 * 1024) throw new Error('Use JPG, PNG or WebP under 3 MB.');
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+    throw new Error('Use JPG, PNG or WebP images.');
+  }
+
+  // Automatically compress and resize client-side before uploading
+  // Avatars are downscaled to 800x800, Event posters/covers up to 1920x1920 WebP
+  const compressedFile = await compressImage(file, {
+    maxWidth: purpose === 'avatar' ? 800 : 1920,
+    maxHeight: purpose === 'avatar' ? 800 : 1920,
+    quality: purpose === 'avatar' ? 0.82 : 0.85,
+    mimeType: 'image/webp'
+  });
+
+  if (compressedFile.size > 3 * 1024 * 1024) {
+    throw new Error('Choose an image under 3 MB. / اختر صورة بحجم أقل من 3 ميجابايت.');
+  }
+
   const form = new FormData();
-  form.append('file', file); form.append('purpose', purpose);
-  const response = await fetch('/api/media', { method: 'POST', headers: { Authorization: `Bearer ${await auth.currentUser.getIdToken()}` }, body: form, signal: AbortSignal.timeout(55000) });
+  form.append('file', compressedFile); 
+  form.append('purpose', purpose);
+  const response = await fetch('/api/media', { 
+    method: 'POST', 
+    headers: { Authorization: `Bearer ${await auth.currentUser.getIdToken()}` }, 
+    body: form, 
+    signal: AbortSignal.timeout(55000) 
+  });
   const result = await readBackendResponse(response);
   if (typeof result.url !== 'string' || !result.url.startsWith('https://')) throw new Error('Invalid upload response. / رد رفع الصورة غير صالح.');
   return result.url;

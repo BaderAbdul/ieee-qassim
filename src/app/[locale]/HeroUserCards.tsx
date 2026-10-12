@@ -138,19 +138,19 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
 
   return (
     <>
-      {/* Card 1: Featured Event (Top Right) */}
+      {/* Card 1: Featured Event (Top Right) - Slimmer & Portrait */}
       <div 
         data-hero-card
-        className={`absolute top-0 lg:top-4 rtl:left-2 lg:rtl:left-0 lg:ltr:right-0 ltr:-right-2 w-[17rem] lg:w-80 bg-white/80 backdrop-blur-md rounded-3xl p-4 lg:p-5 shadow-2xl transition-all duration-300 group cursor-pointer ${
+        className={`absolute top-0 lg:top-4 rtl:left-2 lg:rtl:left-2 lg:ltr:right-2 ltr:-right-2 w-[14rem] sm:w-[15rem] lg:w-[16.5rem] bg-white/85 backdrop-blur-md rounded-[1.75rem] p-3.5 sm:p-4 shadow-2xl transition-all duration-300 group cursor-pointer ${
           latestEvent?.isPinned 
             ? 'ring-2 ring-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.4)] border-amber-300' 
             : 'border border-white/60 shadow-blue-900/15 hover:shadow-blue-500/20'
         } transform hover:-translate-y-2 lg:hover:z-50 ${activeCard === 1 ? 'z-50 scale-105' : 'z-30'}`}
         onClick={() => { if(latestEvent) handleCardClick(1, `/events/${latestEvent.id}`) }}
       >
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-2.5">
           <div className="flex items-center gap-1.5">
-            <span className="bg-blue-50/90 text-blue-700 text-[10px] font-black tracking-wider uppercase px-3 py-1 rounded-full border border-blue-200/50">
+            <span className="bg-blue-50/90 text-blue-700 text-[10px] font-black tracking-wider uppercase px-2.5 py-0.5 rounded-full border border-blue-200/50">
               {latestEvent?.state === 'Ongoing' ? (isAr ? 'جاري الآن' : 'Ongoing') : (latestEvent?.state === 'Registration Open' ? (isAr ? 'التسجيل مفتوح' : 'Open') : (isAr ? 'قريباً' : 'Soon'))}
             </span>
             {latestEvent?.isPinned && (
@@ -160,44 +160,44 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
               </span>
             )}
           </div>
-          <div className="bg-slate-100/90 text-slate-600 text-[10px] font-bold px-2 py-1 rounded-md">
+          <div className="bg-slate-100/90 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-md">
             {latestEvent ? toJsDate(latestEvent.date)?.toLocaleDateString(isAr ? 'ar-SA' : 'en-US') || '---' : '---'}
           </div>
         </div>
 
-        {/* Poster Card Container */}
-        <div className="w-full h-28 lg:h-36 rounded-2xl mb-3 relative overflow-hidden bg-slate-900 shadow-inner group-hover:shadow-lg transition-shadow">
+        {/* Poster Card Container - Slim Portrait Ratio */}
+        <div className="w-full aspect-[4/3] rounded-2xl mb-2.5 relative overflow-hidden bg-slate-900 shadow-inner group-hover:shadow-lg transition-shadow">
            {coverUrl ? (
              <Image 
                src={coverUrl}
                alt={latestEvent ? (latestEvent.title || '') : ''}
                fill
                className="object-cover object-center group-hover:scale-110 transition-transform duration-700"
-               sizes="(max-width: 768px) 100vw, 320px"
+               sizes="(max-width: 768px) 100vw, 260px"
              />
            ) : (
              <div className="absolute inset-0 bg-gradient-to-br from-[#00629B] via-indigo-800 to-purple-900">
                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-15"></div>
              </div>
            )}
-           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/40 to-transparent pointer-events-none" />
-           <div className="absolute bottom-3 right-3 left-3 z-10">
-             <h4 className="text-white font-black text-sm lg:text-base leading-snug drop-shadow-md truncate font-cairo">
+           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-900/40 to-transparent pointer-events-none" />
+           <div className="absolute bottom-2.5 right-2.5 left-2.5 z-10">
+             <h4 className="text-white font-black text-xs sm:text-sm leading-snug drop-shadow-md truncate font-cairo">
                {latestEvent ? (isAr ? latestEvent.title : (latestEvent.titleEn || latestEvent.title)) : (isAr ? 'لا توجد فعاليات' : 'No Events')}
              </h4>
-             <p className="text-blue-200 text-[10px] lg:text-xs font-medium mt-0.5">
+             <p className="text-blue-200 text-[10px] font-medium mt-0.5">
                {latestEvent ? `${latestEvent.registeredCount || 0} ${isAr ? 'مسجل' : 'Registered'}` : ''}
              </p>
            </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <div className="flex -space-x-2 rtl:space-x-reverse">
-            <div className="h-6 w-6 rounded-full border-2 border-white bg-blue-100 shadow-xs"></div>
-            <div className="h-6 w-6 rounded-full border-2 border-white bg-indigo-100 shadow-xs"></div>
-            <div className="h-6 w-6 rounded-full border-2 border-white bg-purple-100 shadow-xs"></div>
+        <div className="flex items-center justify-between pt-0.5">
+          <div className="flex -space-x-1.5 rtl:space-x-reverse">
+            <div className="h-5 w-5 rounded-full border-2 border-white bg-blue-100 shadow-xs"></div>
+            <div className="h-5 w-5 rounded-full border-2 border-white bg-indigo-100 shadow-xs"></div>
+            <div className="h-5 w-5 rounded-full border-2 border-white bg-purple-100 shadow-xs"></div>
           </div>
-          <span className="text-[10px] lg:text-xs font-bold text-slate-500">
+          <span className="text-[10px] font-bold text-slate-500">
             {latestEvent ? `+${latestEvent.registeredCount || 0} ${isAr ? 'انضموا' : 'Joined'}` : ''}
           </span>
         </div>
