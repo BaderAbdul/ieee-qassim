@@ -11,7 +11,6 @@ import { useRouter } from '@/i18n/routing';
 import { EventType, RegistrationMode, CustomQuestion } from '@/lib/types';
 import { ArrowRight, Save, Plus, Trash2 } from 'lucide-react';
 import { Link } from '@/i18n/routing';
-import EventVisibilityControl from '@/components/admin/EventVisibilityControl';
 
 export default function CreateEventPage() {
   const router = useRouter();
@@ -34,7 +33,6 @@ export default function CreateEventPage() {
     capacity: 50,
     isUnlimitedCapacity: false,
     hideExactCapacity: false,
-    hideFromDiscovery: false,
     points: 10,
     hasCertificate: false,
     registrationMode: 'Auto' as RegistrationMode,
@@ -121,7 +119,6 @@ export default function CreateEventPage() {
         capacity: formData.capacity,
         isUnlimitedCapacity: formData.isUnlimitedCapacity,
         hideExactCapacity: formData.hideExactCapacity,
-        hideFromDiscovery: formData.hideFromDiscovery,
         points: formData.points,
         hasCertificate: formData.hasCertificate,
         registrationMode: formData.registrationMode,
@@ -164,7 +161,6 @@ export default function CreateEventPage() {
           </div>
         </section>
         
-        <EventVisibilityControl hidden={formData.hideFromDiscovery} onChange={hidden => setFormData(previous => ({ ...previous, hideFromDiscovery: hidden }))} disabled={loading} />
         {/* Section 1: Basic Info */}
         <div>
           <h2 className="text-xl font-bold text-gray-900 mb-4 font-cairo border-b pb-2">المعلومات الأساسية</h2>

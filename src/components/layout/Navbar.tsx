@@ -1,117 +1,178 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Link, usePathname } from '@/i18n/routing';
 import { useAuth } from '@/context/AuthContext';
 import Image from 'next/image';
-import { Calendar, Trophy, UserCircle, Globe, ShieldCheck, LogIn, Home, Users, Menu, X, HelpCircle, Lightbulb, ChevronDown } from 'lucide-react';
+import { 
+  Calendar, 
+  Trophy, 
+  UserCircle, 
+  Globe, 
+  ShieldCheck, 
+  LogIn, 
+  Sparkles,
+  Users
+} from 'lucide-react';
 
 export default function Navbar() {
   const t = useTranslations('Navbar');
-  const isAr = useLocale() === 'ar';
+  const locale = useLocale();
+  const isAr = locale === 'ar';
   const pathname = usePathname();
-  const { user, userData, loading, login } = useAuth();
-  const [openPath, setOpenPath] = useState<string | null>(null);
-  const [isSigningIn, setIsSigningIn] = useState(false);
-  const [loginError, setLoginError] = useState('');
-  const moreRef = useRef<HTMLDivElement>(null);
-  const toggleRef = useRef<HTMLButtonElement>(null);
-  const isMoreOpen = openPath === pathname;
+  const { user, userData, login } = useAuth();
+  const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
-    if (!isMoreOpen) return;
-    const outside = (event: PointerEvent) => {
-      if (!moreRef.current?.contains(event.target as Node)) setOpenPath(null);
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 10);
     };
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setOpenPath(null);
-        toggleRef.current?.focus();
-      }
-    };
-    document.addEventListener('pointerdown', outside);
-    document.addEventListener('keydown', escape);
-    return () => {
-      document.removeEventListener('pointerdown', outside);
-      document.removeEventListener('keydown', escape);
-    };
-  }, [isMoreOpen]);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
-  if (pathname.startsWith('/admin')) return null;
+  // If in admin dashboard, let admin layout manage its own sidebar & navigation
+  if (pathname.startsWith('/admin')) {
+    return null;
+  }
 
-  const isActive = (path: string) => path === '/' ? pathname === '/' || pathname === '' : pathname === path || pathname.startsWith(`${path}/`);
-  const mainLinks = [
-    { href: '/', label: t('home'), icon: Home },
+  const isActive = (path: string) => {
+    if (path === '/') {
+      return pathname === '/' || pathname === '';
+    }
+    return pathname.startsWith(path);
+  };
+
+  const navLinks = [
+    { href: '/', label: t('home'), icon: Sparkles },
     { href: '/events', label: t('events'), icon: Calendar },
     { href: '/leaderboard', label: t('leaderboard'), icon: Trophy },
+    { href: '/structure', label: t('structure'), icon: Users },
+    ...(user ? [
+      { href: '/profile', label: t('profile'), icon: UserCircle },
+    ] : []),
+    ...(userData?.role === 'super_admin' || userData?.role === 'event_organizer' ? [
+      { href: '/admin', label: t('admin'), icon: ShieldCheck, isAdmin: true }
+    ] : []),
   ];
-  const accountLabel = isAr ? 'حسابي' : 'My account';
-  const canAdmin = userData?.role === 'super_admin' || userData?.role === 'event_organizer';
-  const signIn = async () => {
-    if (loading || isSigningIn) return;
-    setIsSigningIn(true);
-    setLoginError('');
-    try { await login(); }
-    catch { setLoginError(isAr ? 'تعذر تسجيل الدخول. حاول مرة أخرى.' : 'Sign-in failed. Please try again.'); }
-    finally { setIsSigningIn(false); }
+
+  const getFirstAndLastName = (fullName?: string, fallback?: string | null) => {
+    if (userData?.firstName && userData?.familyName) {
+      return `${userData.firstName} ${userData.familyName}`;
+    }
+    const name = fullName || fallback || (isAr ? 'عضو' : 'Student');
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length <= 2) return name;
+    return `${parts[0]} ${parts[parts.length - 1]}`;
   };
-  const accountClasses = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 text-sm font-bold transition-colors';
+
+  const displayName = getFirstAndLastName(userData?.arabicFullName, user?.displayName);
+
+  const isHomePage = pathname === '/' || pathname === '/ar' || pathname === '/en' || pathname === '';
+  const navbarBg = (isScrolled || !isHomePage)
+    ? 'bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-sm' 
+    : 'bg-transparent';
 
   return (
-    <>
-      <header data-public-navigation className="fixed inset-x-0 top-0 z-50 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-4 sm:px-6 lg:px-8">
-          <Link href="/" aria-label={isAr ? 'IEEE القصيم — الرئيسية' : 'IEEE Qassim — home'} className="flex min-h-11 shrink-0 items-center rounded-lg">
-            <div className="relative h-10 w-20 sm:w-28">
-              <Image src="/logo.png" alt="IEEE Qassim" fill sizes="112px" className="object-contain" priority />
-            </div>
-          </Link>
+    <header className={`fixed top-0 w-full z-50 transition-all duration-300 ${navbarBg}`}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
+          
+          {/* Brand Logo */}
+          <div className="flex items-center">
+            <Link href="/" className="flex items-center gap-2 group">
+              <div className="relative w-20 h-8 sm:w-28 sm:h-10 flex-shrink-0">
+                <Image 
+                  src="/logo.png" 
+                  alt="IEEE Qassim Logo" 
+                  fill
+                  className="object-contain"
+                  priority
+                />
+              </div>
+            </Link>
+          </div>
 
-          <nav aria-label={isAr ? 'التنقل الرئيسي' : 'Main navigation'} className="hidden min-w-0 items-center gap-1 lg:flex">
-            {mainLinks.map(({ href, label, icon: Icon }) => (
-              <Link key={href} href={href} aria-current={isActive(href) ? 'page' : undefined} className={`${accountClasses} ${isActive(href) ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-100'}`}>
-                <Icon aria-hidden="true" className="h-4 w-4" /><span>{label}</span>
-              </Link>
-            ))}
-            {user ? <Link href="/profile" aria-current={isActive('/profile') ? 'page' : undefined} className={`${accountClasses} ${isActive('/profile') ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-100'}`}><UserCircle aria-hidden="true" className="h-4 w-4" />{accountLabel}</Link> : null}
+          {/* Navigation Links */}
+          <nav aria-label={isAr ? 'التنقل الرئيسي' : 'Main navigation'} className="flex min-w-0 items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar mx-1 flex-1 justify-start px-1">
+            {navLinks.map((item) => {
+              const active = isActive(item.href);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-label={item.label}
+                  aria-current={active ? 'page' : undefined}
+                  className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all ${
+                    active 
+                      ? 'bg-blue-50 text-blue-700 shadow-xs' 
+                      : item.isAdmin
+                        ? 'text-purple-600 hover:bg-purple-50 hover:text-purple-700'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100/70'
+                  }`}
+                >
+                  <Icon aria-hidden="true" className="h-4 w-4 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="sr-only sm:not-sr-only whitespace-nowrap">{item.label}</span>
+                </Link>
+              );
+            })}
           </nav>
 
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            {!user ? (
-              <button type="button" onClick={() => void signIn()} disabled={loading || isSigningIn} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-2 text-xs font-bold text-white transition-colors hover:bg-blue-700 disabled:opacity-60 sm:px-3 sm:text-sm">
-                <LogIn aria-hidden="true" className="h-4 w-4" /><span>{isSigningIn ? (isAr ? 'جارٍ الدخول…' : 'Signing in…') : t('login')}</span>
-              </button>
-            ) : <Link href="/profile" className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-2 text-xs font-bold text-slate-700 hover:bg-slate-100 sm:text-sm lg:hidden"><UserCircle aria-hidden="true" className="h-5 w-5" /><span>{accountLabel}</span></Link>}
+          {/* Right Controls: Language & Auth & Mobile Toggle */}
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+            
+            {/* Language Switcher */}
+            <Link
+              href={pathname || '/'}
+              locale={isAr ? 'en' : 'ar'}
+              className="inline-flex items-center justify-center w-9 h-9 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 transition-colors"
+              title={isAr ? 'English' : 'العربية'}
+            >
+              <Globe className="h-5 w-5" />
+            </Link>
 
-            <div ref={moreRef} className="relative" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setOpenPath(null); }}>
-              <button ref={toggleRef} type="button" aria-expanded={isMoreOpen} aria-controls="more-navigation" onClick={() => setOpenPath(isMoreOpen ? null : pathname)} className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl px-2 text-xs font-bold text-slate-700 hover:bg-slate-100 sm:text-sm">
-                {isMoreOpen ? <X aria-hidden="true" className="h-5 w-5" /> : <Menu aria-hidden="true" className="h-5 w-5 lg:hidden" />}
-                <span>{isAr ? 'المزيد' : 'More'}</span><ChevronDown aria-hidden="true" className="hidden h-4 w-4 lg:block" />
+            {/* Auth Session */}
+            {user ? (
+              <div className="flex items-center gap-2 ps-2 border-s border-gray-200">
+                <Link 
+                  href="/profile" 
+                  className="hidden sm:flex items-center gap-2.5 p-1 pe-3 rounded-full hover:bg-slate-100/70 transition-colors"
+                  title={displayName}
+                >
+                  <div className="h-8 w-8 relative rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center overflow-hidden border border-blue-200 shadow-xs">
+                    {user.photoURL ? (
+                      <Image src={user.photoURL} alt={displayName} fill sizes="32px" className="object-cover" />
+                    ) : (
+                      <span>{displayName.charAt(0).toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div className="flex flex-col text-start">
+                    <span className="text-xs font-bold text-slate-900 max-w-[140px] truncate leading-tight">
+                      {displayName}
+                    </span>
+                    <span className="text-[10px] text-blue-600 font-medium">
+                      {userData?.totalPoints ?? 0} {isAr ? 'نقطة' : 'pts'}
+                    </span>
+                  </div>
+                </Link>
+              </div>
+            ) : (
+              <button
+                onClick={login}
+                className="inline-flex items-center gap-1.5 sm:gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold shadow-sm shadow-blue-500/20 hover:shadow-md transition-all transform hover:-translate-y-0.5"
+              >
+                <LogIn className="h-4 w-4" />
+                <span className="hidden sm:inline">{t('login')}</span>
+                <span className="sm:hidden">{t('login')}</span>
               </button>
-              {isMoreOpen ? (
-                <nav id="more-navigation" aria-label={isAr ? 'روابط إضافية' : 'More navigation'} className="absolute end-0 top-[calc(100%_+_0.5rem)] w-64 max-w-[calc(100vw_-_2rem)] max-h-[calc(100dvh_-_6rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
-                  <Link href="/structure" onClick={() => setOpenPath(null)} className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"><Users aria-hidden="true" className="h-5 w-5" />{isAr ? 'فريق النادي' : 'Club team'}</Link>
-                  {canAdmin ? <Link href="/admin" onClick={() => setOpenPath(null)} className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-purple-700 hover:bg-purple-50"><ShieldCheck aria-hidden="true" className="h-5 w-5" />{t('admin')}</Link> : null}
-                  <Link href="/help" onClick={() => setOpenPath(null)} className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"><HelpCircle aria-hidden="true" className="h-5 w-5" />{isAr ? 'المساعدة والتواصل' : 'Help and contact'}</Link>
-                  {user && !userData?.isRestricted ? <button type="button" onClick={() => { setOpenPath(null); toggleRef.current?.focus(); window.dispatchEvent(new CustomEvent('ieee-open-suggestion')); }} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-start text-sm font-semibold text-slate-700 hover:bg-slate-50"><Lightbulb aria-hidden="true" className="h-5 w-5 text-amber-600" />{isAr ? 'شاركنا اقتراحك' : 'Share a suggestion'}</button> : null}
-                  <Link href={pathname || '/'} locale={isAr ? 'en' : 'ar'} onClick={() => setOpenPath(null)} className="mt-1 flex min-h-11 items-center gap-3 rounded-xl border-t border-slate-100 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"><Globe aria-hidden="true" className="h-5 w-5" /><span lang={isAr ? 'en' : 'ar'}>{isAr ? 'English' : 'العربية'}</span></Link>
-                </nav>
-              ) : null}
-            </div>
+            )}
+
           </div>
-        </div>
-        {loginError ? <p role="alert" className="border-t border-red-100 bg-red-50 px-4 py-2 text-center text-sm text-red-800">{loginError}</p> : null}
-      </header>
 
-      <nav aria-label={isAr ? 'التنقل الرئيسي للجوال' : 'Mobile main navigation'} className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 pt-2 shadow-[0_-4px_16px_rgba(15,23,42,0.04)] backdrop-blur-md lg:hidden" style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
-        <div className="mx-auto grid max-w-lg grid-cols-4 gap-1">
-          {mainLinks.map(({ href, label, icon: Icon }) => (
-            <Link key={href} href={href} aria-current={isActive(href) ? 'page' : undefined} className={`flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 text-xs font-bold ${isActive(href) ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}><Icon aria-hidden="true" className="h-5 w-5 shrink-0" /><span className="max-w-full break-words text-center leading-tight">{label}</span></Link>
-          ))}
-          {user ? <Link href="/profile" aria-current={isActive('/profile') ? 'page' : undefined} className={`flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 text-xs font-bold ${isActive('/profile') ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}><UserCircle aria-hidden="true" className="h-5 w-5 shrink-0" /><span className="max-w-full break-words text-center leading-tight">{accountLabel}</span></Link> : <button type="button" onClick={() => void signIn()} disabled={loading || isSigningIn} className="flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60"><UserCircle aria-hidden="true" className="h-5 w-5 shrink-0" /><span className="max-w-full break-words text-center leading-tight">{accountLabel}</span></button>}
         </div>
-      </nav>
-    </>
+      </div>
+    </header>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, use } from 'react';
+import Image from 'next/image';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { httpsCallable } from '@/lib/backend';
 import { db, functions } from '@/lib/firebase/client';
@@ -22,7 +23,6 @@ import {
 } from 'lucide-react';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import EventDetailsSkeleton from '@/components/skeletons/EventDetailsSkeleton';
-import EventPoster from '@/components/ui/EventPoster';
 import { formatDateSafe } from '@/lib/dateUtils';
 import { eventCapacityLabel, eventStateLabel, eventTypeLabel, registrationLabel } from '@/lib/studentExperience';
 
@@ -35,25 +35,22 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
   const isAr = locale === 'ar';
   const dateLocale = isAr ? ar : enUS;
   
-  const { user, login, loading: authLoading } = useAuth();
+  const { user, login } = useAuth();
   
   const [event, setEvent] = useState<PlatformEvent | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<Error | null>(null);
   
   const [registrationStatus, setRegistrationStatus] = useState<string | null>(null);
-  const [registrationKey, setRegistrationKey] = useState<string | null>(null);
-  const [registrationErrorKey, setRegistrationErrorKey] = useState<string | null>(null);
   const [isRegistering, setIsRegistering] = useState(false);
   const [attendeeCount, setAttendeeCount] = useState(0);
   const [actionError, setActionError] = useState('');
   const [confirmCancel, setConfirmCancel] = useState(false);
-  const registrationReady = !user || registrationKey === `${eventId}:${user.uid}`;
 
   useEffect(() => {
     return onSnapshot(doc(db, 'events', eventId), snapshot => {
       const current = snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } as PlatformEvent : null;
-      setEvent(current); setAttendeeCount(current?.registeredCount ?? 0); setLoadError(null); setLoading(false);
+      setEvent(current); setAttendeeCount(current?.registeredCount ?? 0); setLoading(false);
     }, error => { setLoadError(error); setLoading(false); });
   }, [eventId]);
 
@@ -61,9 +58,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
     if (!user) return;
     return onSnapshot(doc(db, 'registrations', `${eventId}_${user.uid}`), snapshot => {
       setRegistrationStatus(snapshot.exists() ? snapshot.data().status : null);
-      setRegistrationKey(`${eventId}:${user.uid}`);
-      setRegistrationErrorKey(null);
-    }, () => { setRegistrationKey(null); setRegistrationErrorKey(`${eventId}:${user.uid}`); });
+    }, () => setActionError(isAr ? 'تعذر تحديث حالة التسجيل. حدّث الصفحة قبل إعادة المحاولة.' : 'Could not refresh registration status. Refresh before retrying.'));
   }, [user, eventId, isAr]);
 
   const handleRegister = async () => {
@@ -98,7 +93,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
 
   if (loadError) throw loadError;
 
-  if (loading || (event && event.id !== eventId)) {
+  if (loading) {
     return <EventDetailsSkeleton />;
   }
 
@@ -130,32 +125,60 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
   const gains = isAr ? event.gains : event.gainsEn || event.gains;
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-10 pt-24 lg:pt-28">
+    <div className="min-h-screen bg-slate-50 pb-20 pt-24 sm:pt-32">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Breadcrumb / Back button */}
         <div className="mb-6">
           <Link
             href="/events"
-            className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-slate-600 hover:text-slate-900 transition-colors px-1 py-2"
+            className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-slate-900 transition-colors bg-white/50 px-4 py-2 rounded-xl backdrop-blur-sm"
           >
             <ArrowRight className="h-4 w-4 rotate-180 rtl:rotate-0" />
             <span>{t('backToEvents')}</span>
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12">
           
           {/* Left Column (Poster) - 5 Cols */}
-          {event.coverUrl && <div className="hidden lg:col-span-5 lg:block">
-            <div className="lg:sticky lg:top-24"><EventPoster url={event.coverUrl} title={title} /></div>
-          </div>}
+          <div className="lg:col-span-5 relative">
+            <div className="lg:sticky lg:top-28 w-full bg-slate-900 rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden shadow-2xl shadow-slate-900/20 border-4 sm:border-8 border-white group">
+              <div className="aspect-[3/4] relative w-full bg-slate-800">
+                {event.coverUrl ? (
+                  <Image 
+                    src={event.coverUrl} 
+                    alt={title} 
+                    fill
+                    priority
+                    quality={95}
+                    sizes="(max-width: 1024px) 100vw, 40vw"
+                    className="object-cover transition-transform duration-700 group-hover:scale-105" 
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-blue-700 to-indigo-800" />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent pointer-events-none" />
+                
+                {event.coverUrl && (
+                  <a 
+                    href={event.coverUrl} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="absolute bottom-4 sm:bottom-6 start-4 sm:start-6 bg-black/60 hover:bg-black/90 backdrop-blur-md text-white px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all sm:opacity-0 sm:translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 flex items-center gap-2 shadow-lg border border-white/10"
+                  >
+                    {isAr ? 'عرض البوستر بالكامل' : 'View full poster'}
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
 
           {/* Right Column (Content) - 7 Cols */}
-          <div className={`${event.coverUrl ? 'lg:col-span-7' : 'lg:col-span-12'} space-y-5 pb-6`}>
+          <div className="lg:col-span-7 space-y-8 pb-10">
              
              {/* Title & Header Info */}
-             <div className="bg-white rounded-2xl p-5 sm:p-7 shadow-sm border border-slate-200">
+             <div className="bg-white rounded-[2rem] p-6 sm:p-10 shadow-sm border border-gray-100">
                 <div className="flex flex-wrap items-center gap-2.5 mb-5">
                   <span className="bg-blue-50 text-blue-600 px-3.5 py-1.5 rounded-xl text-xs font-bold border border-blue-100">
                     {eventTypeLabel(event.type, isAr)}
@@ -165,7 +188,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                   </span>
                 </div>
                 
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 font-thmanyah leading-snug mb-5">
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 font-cairo leading-tight mb-6">
                   {title}
                 </h1>
                 
@@ -175,9 +198,9 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                       <Calendar className="w-6 h-6" />
                     </div>
                     <div>
-                      <span className="text-sm text-slate-600 font-semibold block mb-0.5">{t('date')}</span>
-                      <span className="text-base font-bold text-slate-900 block">{formatDateSafe(eventDate, 'dd MMMM yyyy', { locale: dateLocale })}</span>
-                      <span className="text-sm text-slate-600"><bdi>{formatDateSafe(eventDate, 'HH:mm', { locale: dateLocale })}</bdi> · {event.durationHours} {isAr ? 'ساعة' : 'hours'} · {isAr ? 'توقيت الرياض' : 'Riyadh time'}</span>
+                      <span className="text-xs text-slate-500 font-bold block mb-0.5">{t('date')}</span>
+                      <span className="text-sm font-bold text-slate-900 block">{formatDateSafe(eventDate, 'dd MMMM yyyy', { locale: dateLocale })}</span>
+                      <span className="text-xs font-semibold text-slate-500">{formatDateSafe(eventDate, 'HH:mm', { locale: dateLocale })} ({event.durationHours}h) · {isAr ? 'توقيت الرياض' : 'Riyadh time'}</span>
                     </div>
                   </div>
                   
@@ -186,15 +209,15 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                       <MapPin className="w-6 h-6" />
                     </div>
                     <div>
-                      <span className="text-sm text-slate-600 font-semibold block mb-0.5">{t('location')}</span>
-                      <span className="text-base font-bold text-slate-900 block break-words">{location}</span>
+                      <span className="text-xs text-slate-500 font-bold block mb-0.5">{t('location')}</span>
+                      <span className="text-sm font-bold text-slate-900 block truncate max-w-[200px]">{location}</span>
                     </div>
                   </div>
                 </div>
              </div>
 
              {/* Registration CTA Card */}
-             <div id="registration" className="bg-blue-950 rounded-2xl p-5 sm:p-7 shadow-sm relative overflow-hidden text-white scroll-mt-24">
+             <div className="bg-gradient-to-br from-blue-900 to-indigo-900 rounded-[2rem] p-6 sm:p-10 shadow-xl relative overflow-hidden text-white">
                 <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-blue-500/20 rounded-full blur-3xl pointer-events-none"></div>
                 
                 <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
@@ -204,7 +227,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                       <div className="flex items-center gap-2">
                         <Users className="w-5 h-5 text-blue-300" />
                         <div>
-                          <div className="text-sm text-blue-100">{t('capacity')}</div>
+                          <div className="text-[10px] text-blue-200 font-bold">{t('capacity')}</div>
                           <div className="text-sm font-bold text-white">{eventCapacityLabel({ ...event, registeredCount: attendeeCount }, isAr)}</div>
                         </div>
                       </div>
@@ -213,7 +236,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                       <div className="flex items-center gap-2">
                         <Trophy className="w-5 h-5 text-amber-400" />
                         <div>
-                          <div className="text-sm text-amber-100">{isAr ? 'نقاط الحضور' : 'Attendance points'}</div>
+                          <div className="text-[10px] text-amber-200 font-bold">{isAr ? 'المكافأة' : 'Reward'}</div>
                           <div className="text-sm font-bold text-white">{t('pointsReward', { points: event.points })}</div>
                         </div>
                       </div>
@@ -223,7 +246,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                         <div className="flex items-center gap-2">
                           <Award className="w-5 h-5 text-emerald-400" />
                           <div>
-                            <div className="text-sm text-emerald-100">{isAr ? 'الشهادة' : 'Certificate'}</div>
+                            <div className="text-[10px] text-emerald-200 font-bold">{isAr ? 'الشهادة' : 'Certificate'}</div>
                             <div className="text-sm font-bold text-white">{t('certifiedCertificate')}</div>
                           </div>
                         </div>
@@ -232,12 +255,12 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                   </div>
 
                   <div className="shrink-0 sm:w-64 space-y-3">
-                    {user && registrationErrorKey === `${eventId}:${user.uid}` ? <div role="alert" className="rounded-xl bg-white/10 p-4 text-sm leading-6"><p>{isAr ? 'تعذر تحميل حالة مشاركتك.' : 'Your participation status could not be loaded.'}</p><button type="button" onClick={() => window.location.reload()} className="mt-2 min-h-11 rounded-lg border border-white/30 px-3 py-2 font-bold">{isAr ? 'تحديث الصفحة' : 'Reload page'}</button></div> : authLoading || !registrationReady ? <p role="status" className="rounded-xl bg-white/10 p-4 text-sm text-white">{isAr ? 'جارٍ تحميل حالة مشاركتك…' : 'Loading your participation status…'}</p> : !user ? (
+                    {!user ? (
                       <button 
                         onClick={login} 
                         className="w-full bg-white hover:bg-blue-50 text-blue-900 py-3.5 px-6 rounded-2xl font-bold shadow-lg transition-transform transform hover:-translate-y-1"
                       >
-                        {isRegistrationOpen ? t('loginToRegister') : (isAr ? 'سجّل دخولك لعرض مشاركتك' : 'Sign in to view your participation')}
+                        {t('loginToRegister')}
                       </button>
                     ) : (
                       <>
@@ -279,9 +302,9 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                               <div className="font-bold text-sm mb-0.5">
                                 {registrationLabel(registrationStatus, isAr)}
                               </div>
-                              <div className="text-sm leading-6">
+                              <div className="text-[10px] opacity-80">
                                 {registrationStatus === 'rejected' ? (isAr ? 'تواصل مع المنظم إذا أردت الاستفسار عن القرار.' : 'Contact the organizer if you need to ask about this decision.') : registrationStatus === 'attended'
-                                  ? (isAr ? 'حضورك موثّق. يمكنك مراجعة نقاطك وشهادتك من حسابك.' : 'Attendance confirmed. View points and certificates in your account.')
+                                  ? (isAr ? 'تم احتساب نقاط الحضور وانطباعك بنجاح' : 'Attendance points & feedback recorded')
                                   : registrationStatus === 'approved' 
                                     ? ((event.state === 'Completed' || event.state === 'Archived') ? (isAr ? 'شكراً لاهتمامك بهذه الفعالية' : 'Thank you for your interest in this event') : t('registeredNotice')) :
                                    registrationStatus === 'waitlisted' ? t('waitlistedNotice') :
@@ -294,15 +317,14 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                               className="w-full inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-100 text-slate-900 py-3 rounded-xl text-sm font-bold shadow-md transition-colors"
                             >
                               <QrCode className="h-4 w-4 text-blue-600" />
-                              <span>{registrationStatus === 'attended' ? (isAr ? 'تقييم الفعالية' : 'Rate this event') : (isAr ? 'تعليمات تسجيل الحضور' : 'Check-in instructions')}</span>
+                              <span>{registrationStatus === 'attended' ? (isAr ? 'تقييم الفعالية أو تعديل انطباعك' : 'Rate the event / Edit feedback') : (isAr ? 'تعليمات تسجيل الحضور' : 'Check-in instructions')}</span>
                             </Link>}
-                            {registrationStatus === 'attended' && event.hasCertificate && <Link href="/profile?tab=certificates" className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/30 px-4 py-3 text-sm font-bold text-white hover:bg-white/10"><Award size={18} aria-hidden="true" />{isAr ? 'شهاداتي' : 'My certificates'}</Link>}
                             
                             {['approved', 'pending', 'waitlisted'].includes(registrationStatus) && (event.state === 'Registration Open' || event.state === 'Ongoing') && (
                               <button 
                                 onClick={() => setConfirmCancel(true)}
                                 disabled={isRegistering}
-                                className="flex min-h-11 w-full items-center justify-center rounded-xl bg-white/10 py-3 text-sm font-bold text-white transition-colors hover:bg-white/20"
+                                className="w-full text-white/60 hover:text-white bg-white/5 hover:bg-white/10 py-2.5 rounded-xl text-xs font-bold transition-colors flex items-center justify-center"
                               >
                                 {isRegistering ? <LoadingSpinner size="sm" color="border-white" className="me-2" /> : null}
                                 {t('cancelRegistration')}
@@ -310,7 +332,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                             )}
                             {confirmCancel && <div role="group" aria-label={isAr ? 'تأكيد إلغاء التسجيل' : 'Confirm cancellation'} className="p-3 bg-white/10 rounded-xl text-sm">
                               <p>{isAr ? 'هل تريد إلغاء التسجيل؟ قد يُمنح مقعدك لشخص آخر.' : 'Cancel registration? Your seat may be offered to another student.'}</p>
-                              <div className="mt-3 flex flex-wrap gap-3"><button disabled={isRegistering} onClick={handleCancelRegistration} className="min-h-11 rounded-lg bg-red-600 px-3 py-3 disabled:opacity-50">{isAr ? 'نعم، إلغاء التسجيل' : 'Confirm cancellation'}</button><button onClick={() => setConfirmCancel(false)} className="min-h-11 rounded-lg px-3 py-3 underline">{isAr ? 'الاحتفاظ بالتسجيل' : 'Keep registration'}</button></div>
+                              <div className="flex gap-3 mt-3"><button disabled={isRegistering} onClick={handleCancelRegistration} className="rounded-lg bg-red-600 px-3 py-2">{isAr ? 'نعم، إلغاء التسجيل' : 'Confirm cancellation'}</button><button onClick={() => setConfirmCancel(false)}>{isAr ? 'الاحتفاظ بالتسجيل' : 'Keep registration'}</button></div>
                             </div>}
                           </div>
                         )}
@@ -321,15 +343,13 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                 {actionError && <p role="alert" className="mt-4 rounded-xl bg-red-950/40 p-3 text-sm text-red-100">{actionError}</p>}
              </div>
 
-             {event.coverUrl && <div className="lg:hidden"><EventPoster url={event.coverUrl} title={title} compact /></div>}
-
              {/* About Section */}
-             <div className="bg-white rounded-2xl p-5 sm:p-7 shadow-sm border border-slate-200">
+             <div className="bg-white rounded-[2rem] p-6 sm:p-10 shadow-sm border border-gray-100">
                 <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 font-cairo text-slate-900 flex items-center gap-3">
                   <span className="w-2 h-6 sm:h-8 bg-blue-600 rounded-full" />
                   <span>{t('about')}</span>
                 </h2>
-                <p className="text-slate-700 text-base leading-8 whitespace-pre-wrap">
+                <p className="text-slate-600 text-sm sm:text-lg leading-relaxed whitespace-pre-wrap">
                   {description}
                 </p>
              </div>

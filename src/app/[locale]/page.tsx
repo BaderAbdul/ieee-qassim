@@ -8,7 +8,7 @@ import { Calendar, Trophy, ArrowRight, UserCircle, Users } from 'lucide-react';
 const HeroUserCards = dynamic(() => import('./HeroUserCards'), { ssr: true });
 const HeroActionButtons = dynamic(() => import('./HeroActionButtons'), { ssr: true });
 import EventCard from '@/components/ui/EventCard';
-import { toJsDate } from '@/lib/dateUtils';
+import { sortEventsByClosestDate } from '@/lib/dateUtils';
 
 export const revalidate = 60; // Enable ISR, cache for 60 seconds
 
@@ -26,76 +26,116 @@ export default async function HomePage({ params }: PageProps) {
   let eventsList: PlatformEvent[] = [];
   let latestEvent: PlatformEvent | null = null;
 
-  // Capture one request time so ongoing and future sections agree.
-  // eslint-disable-next-line react-hooks/purity -- Server render time determines the upcoming query.
-  const now = Date.now();
-  const activeStates = ['Published', 'Registration Open', 'Registration Closed', 'Ongoing'];
-  let candidates: PlatformEvent[] = [];
-  let recentEvents: PlatformEvent[] = [];
-
-  const serializeEvent = (id: string, data: Record<string, unknown>): PlatformEvent => ({
-    ...data,
-    id,
-    date: toJsDate(data.date)?.toISOString() ?? data.date,
-    createdAt: toJsDate(data.createdAt)?.toISOString() ?? data.createdAt,
-    updatedAt: toJsDate(data.updatedAt)?.toISOString() ?? data.updatedAt,
-  }) as unknown as PlatformEvent;
-  const canFeature = (event: PlatformEvent) => event.hideFromDiscovery !== true && activeStates.includes(event.state) && (event.state === 'Ongoing' || (toJsDate(event.date)?.getTime() ?? 0) >= now);
-
   try {
+    // Dynamic import to avoid loading admin SDK in client bundles if mistakenly tree-shaken
     const { adminDb } = await import('@/lib/firebase/admin');
-    if (!adminDb) throw new Error('Homepage server data is unavailable.');
-    const [statsDoc, futureSnap, ongoingSnap, recentSnap] = await Promise.all([
-      adminDb.collection('settings').doc('homepage').get(),
-      adminDb.collection('events').where('state', 'in', activeStates).where('date', '>=', new Date(now)).orderBy('date', 'asc').limit(12).get(),
-      adminDb.collection('events').where('state', '==', 'Ongoing').orderBy('date', 'desc').limit(3).get(),
-      adminDb.collection('events').where('state', '==', 'Completed').orderBy('date', 'desc').limit(6).get(),
-    ]);
-    if (statsDoc.exists) stats = { ...stats, ...statsDoc.data() };
-    candidates = [...ongoingSnap.docs, ...futureSnap.docs].map(doc => serializeEvent(doc.id, doc.data()));
-    recentEvents = recentSnap.docs.map(doc => serializeEvent(doc.id, doc.data()));
-    if (stats.featuredEventId) {
-      const featured = await adminDb.collection('events').doc(stats.featuredEventId).get();
-      if (featured.exists) {
-        const event = serializeEvent(featured.id, featured.data() ?? {});
-        if (canFeature(event)) latestEvent = event;
+    
+    if (adminDb) {
+      const statsDoc = await adminDb.collection('settings').doc('homepage').get();
+      if (statsDoc.exists) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        stats = { ...stats, ...(statsDoc.data() as any) };
+      }
+
+      const validStates = ['Published', 'Registration Open', 'Ongoing', 'Completed', 'Registration Closed'];
+      const eventsSnap = await adminDb.collection('events')
+        .where('state', 'in', validStates)
+        .orderBy('date', 'desc')
+        .limit(20)
+        .get();
+
+      const evs = eventsSnap.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          date: data.date?.toDate ? data.date.toDate().toISOString() : data.date,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt
+        };
+      }) as PlatformEvent[];
+
+      const sortedEvents = sortEventsByClosestDate(evs);
+      eventsList = sortedEvents.slice(0, 3);
+
+      latestEvent = sortedEvents[0] || null;
+      const featuredId = stats.featuredEventId;
+      if (featuredId) {
+        try {
+        const evDoc = await adminDb.collection('events').doc(featuredId).get();
+        if (evDoc.exists && validStates.includes(evDoc.data()?.state)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const data = evDoc.data() as any;
+          latestEvent = {  
+            id: evDoc.id, 
+            ...data,
+            date: data.date?.toDate ? data.date.toDate().toISOString() : data.date,
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
+            updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt
+          } as PlatformEvent;
+        }
+        } catch (error) { console.warn('Featured event unavailable', error); }
       }
     }
   } catch (error) {
-    console.warn('Homepage server data unavailable; using the public event query.', error);
-    const { collection, getDocs, doc, getDoc, query, where, limit, orderBy } = await import('firebase/firestore');
-    const { db } = await import('@/lib/firebase/client');
-    const [statsDoc, futureSnap, ongoingSnap, recentSnap] = await Promise.all([
-      getDoc(doc(db, 'settings', 'homepage')),
-      getDocs(query(collection(db, 'events'), where('state', 'in', activeStates), where('date', '>=', new Date(now)), orderBy('date', 'asc'), limit(12))),
-      getDocs(query(collection(db, 'events'), where('state', '==', 'Ongoing'), orderBy('date', 'desc'), limit(3))),
-      getDocs(query(collection(db, 'events'), where('state', '==', 'Completed'), orderBy('date', 'desc'), limit(6))),
-    ]);
-    if (statsDoc.exists()) stats = { ...stats, ...statsDoc.data() };
-    candidates = [...ongoingSnap.docs, ...futureSnap.docs].map(doc => serializeEvent(doc.id, doc.data()));
-    recentEvents = recentSnap.docs.map(doc => serializeEvent(doc.id, doc.data()));
-    if (stats.featuredEventId) {
-      const featured = await getDoc(doc(db, 'events', stats.featuredEventId));
-      if (featured.exists()) {
-        const event = serializeEvent(featured.id, featured.data());
-        if (canFeature(event)) latestEvent = event;
+    console.warn("Firebase Admin failed or threw an error. Falling back to Client SDK for homepage events.", error);
+    try {
+      const { collection, getDocs, doc, getDoc, query, where, limit, orderBy } = await import('firebase/firestore');
+      const { db } = await import('@/lib/firebase/client');
+      
+      const statsDoc = await getDoc(doc(db, 'settings', 'homepage'));
+      if (statsDoc.exists()) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        stats = { ...stats, ...(statsDoc.data() as any) };
       }
+
+      const validStates = ['Published', 'Registration Open', 'Ongoing', 'Completed', 'Registration Closed'];
+      const eventsSnap = await getDocs(
+        query(collection(db, 'events'), where('state', 'in', validStates), orderBy('date', 'desc'), limit(20))
+      );
+
+      const evs = eventsSnap.docs.map(d => {
+        const data = d.data();
+        return {
+          id: d.id,
+          ...data,
+          date: data.date?.toDate ? data.date.toDate().toISOString() : data.date,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt
+        };
+      }) as PlatformEvent[];
+
+      const sortedEvs = sortEventsByClosestDate(evs);
+      eventsList = sortedEvs.slice(0, 3);
+      latestEvent = sortedEvs[0] || null;
+
+      const featuredId = stats.featuredEventId;
+      if (featuredId) {
+        try {
+        const evDoc = await getDoc(doc(db, 'events', featuredId));
+        if (evDoc.exists() && validStates.includes(evDoc.data().state)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const data = evDoc.data() as any;
+          latestEvent = {  
+            id: evDoc.id, 
+            ...data,
+            date: data.date?.toDate ? data.date.toDate().toISOString() : data.date,
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
+            updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt
+          } as PlatformEvent;
+        }
+        } catch (error) { console.warn('Featured event unavailable', error); }
+      }
+    } catch (fallbackError) {
+      console.error("Fallback Client SDK also failed:", fallbackError);
+      throw fallbackError;
     }
   }
-  if (latestEvent) candidates.push(latestEvent);
-  const uniqueCandidates = [...new Map(candidates.filter(canFeature).map(event => [event.id, event])).values()];
-  eventsList = uniqueCandidates.sort((a, b) => {
-    if (a.state === 'Ongoing' && b.state !== 'Ongoing') return -1;
-    if (a.state !== 'Ongoing' && b.state === 'Ongoing') return 1;
-    return (toJsDate(a.date)?.getTime() ?? 0) - (toJsDate(b.date)?.getTime() ?? 0);
-  }).slice(0, 3);
-  latestEvent = eventsList[0] ?? null;
-  recentEvents = recentEvents.filter(event => event.hideFromDiscovery !== true).slice(0, 3);
 
   return (
     <div className="flex flex-col bg-[#F8FAFC] min-h-screen">
       {/* Light Mode Premium Hero Section */}
-      <section className="relative overflow-hidden pt-28 pb-6 lg:pt-32 lg:pb-12 px-4 sm:px-6 lg:px-8">
+      <section className="relative overflow-hidden pt-24 pb-12 lg:pb-20 px-4 sm:px-6 lg:px-8">
         <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-[radial-gradient(circle,rgba(37,99,235,0.15)_0%,transparent_70%)] pointer-events-none" />
         <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-[radial-gradient(circle,rgba(79,70,229,0.15)_0%,transparent_70%)] pointer-events-none" />
         
@@ -110,10 +150,10 @@ export default async function HomePage({ params }: PageProps) {
                 </span>
               </div>
               
-              <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black mb-3 font-thmanyah text-slate-900 tracking-tight leading-tight">
+              <h1 className="text-4xl sm:text-7xl lg:text-8xl font-black mb-2 sm:mb-3 font-thmanyah text-slate-900 drop-shadow-sm uppercase tracking-tight">
                 {stats.heroTitle?.trim() || t('Hero.headline')}
               </h1>
-              <p className="text-slate-600 text-base sm:text-lg max-w-lg mx-auto lg:mx-0 mb-3 lg:mb-6 leading-relaxed">
+              <p className="text-slate-600 font-medium text-sm sm:text-base max-w-lg mx-auto lg:mx-0 mb-2 sm:mb-4 lg:mb-6 leading-relaxed">
                 {(isAr ? stats.heroSubtitleAr : stats.heroSubtitleEn)?.trim() || t('Hero.description')}
               </p>
             </div>
@@ -122,50 +162,83 @@ export default async function HomePage({ params }: PageProps) {
             <Link href="/help" className="text-sm font-semibold text-blue-700 underline underline-offset-4">{isAr ? 'كيف أسجّل وأحصل على النقاط والشهادة؟' : 'How do registration, points and certificates work?'}</Link>
           </div>
           
-          <div className="w-full mt-2 lg:mt-0">
-            <HeroUserCards latestEvent={latestEvent} />
+          <div className="relative block w-full h-[320px] lg:h-full lg:min-h-[500px] mt-4 lg:mt-0 flex items-center justify-center lg:block">
+            <div className="relative w-full max-w-sm lg:max-w-none h-full">
+               <HeroUserCards latestEvent={latestEvent} />
+            </div>
           </div>
         </div>
       </section>
 
 
 
-      <section className="max-w-7xl mx-auto w-full px-4 py-7 sm:px-6 lg:px-8" aria-labelledby="upcoming-events-title">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      {/* Events Carousel Section */}
+      <section className="py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full relative z-20">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-4">
           <div>
-            <h2 id="upcoming-events-title" className="mb-1 text-2xl font-bold text-slate-900 sm:text-3xl">{isAr ? 'القادمة والجارية' : 'Upcoming and ongoing'}</h2>
-            <p className="text-base text-slate-600">{isAr ? 'اختر فعالية واطّلع على طريقة المشاركة.' : 'Choose an event and see how to take part.'}</p>
+            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mb-2">{isAr ? 'أحدث الفعاليات' : 'Latest Events'}</h2>
+            <p className="text-slate-500 font-medium text-sm sm:text-base">{isAr ? 'اكتشف وسجل في أحدث فعاليات وورش عمل النادي' : 'Discover and register for the latest club events and workshops'}</p>
           </div>
-          <Link href="/events" className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-base font-semibold text-blue-700 hover:bg-blue-50">
-            {isAr ? 'كل الفعاليات' : 'All events'}<ArrowRight aria-hidden="true" className="h-4 w-4 rtl:-scale-x-100" />
+          <Link 
+            href="/events"
+            className="hidden sm:inline-flex items-center justify-center bg-blue-50 text-blue-700 px-5 py-2.5 rounded-xl font-bold hover:bg-blue-100 transition-colors"
+          >
+            {isAr ? 'استعرض الكل' : 'View All'}
+            <ArrowRight className="ms-2 h-4 w-4 rtl:-scale-x-100" />
           </Link>
         </div>
 
         {eventsList.length > 0 ? (
-          <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 sm:gap-5">
-            {eventsList.map(event => <EventCard key={event.id} event={event} />)}
+          <div className="flex overflow-x-auto pb-8 -mx-4 px-4 sm:mx-0 sm:px-0 snap-x snap-mandatory hide-scrollbar gap-4 sm:gap-6">
+            {eventsList.map((event) => {
+              const isCompleted = event.state === 'Completed' || event.state === 'Archived';
+              return (
+                <div 
+                  key={event.id}
+                  className={`min-w-[42vw] max-w-[42vw] sm:min-w-[340px] sm:max-w-[340px] flex-shrink-0 snap-start ${isCompleted ? 'grayscale-[40%] opacity-90' : ''}`}
+                >
+                  <EventCard event={event} />
+                </div>
+              );
+            })}
+            
+            {/* View All Card */}
+            <div className="min-w-[42vw] max-w-[42vw] sm:min-w-[340px] sm:max-w-[340px] flex-shrink-0 snap-start">
+              <Link 
+                href="/events"
+                className="h-full min-h-[300px] bg-gradient-to-br from-blue-50 to-indigo-50 rounded-3xl sm:rounded-[2rem] border-2 border-dashed border-blue-200 flex flex-col items-center justify-center p-8 text-center transition-all duration-500 hover:bg-blue-100 hover:border-blue-300 group cursor-pointer block"
+              >
+                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4 group-hover:scale-110 transition-transform duration-500 mx-auto">
+                  <ArrowRight className="w-8 h-8 text-blue-600 rtl:-scale-x-100" />
+                </div>
+                <h3 className="text-xl font-black text-slate-800 mb-2 font-cairo">
+                  {isAr ? 'استكشف المزيد' : 'Explore More'}
+                </h3>
+                <p className="text-slate-500 text-sm mb-6">
+                  {isAr ? 'هناك المزيد من الفعاليات وورش العمل بانتظارك' : 'More events and workshops are waiting for you'}
+                </p>
+                <span className="inline-flex items-center justify-center bg-blue-600 text-white px-8 py-3 rounded-xl font-bold shadow-md shadow-blue-500/20 hover:bg-blue-700 transition-colors w-full">
+                  {isAr ? 'استعرض كل الفعاليات' : 'View All Events'}
+                </span>
+              </Link>
+            </div>
           </div>
         ) : (
-          <div className="rounded-2xl border border-slate-200 bg-white p-6">
-            <p className="text-base text-slate-700">{isAr ? 'لا توجد فعاليات قادمة معلنة حاليًا. تابعنا لمعرفة الموعد القادم.' : 'No upcoming events have been announced yet. Check back for the next date.'}</p>
+          <div className="text-center py-12 bg-white/60 rounded-3xl border border-slate-200 border-dashed">
+            <p className="text-slate-500 font-medium">{isAr ? 'لا توجد فعاليات حالياً' : 'No events available right now'}</p>
           </div>
         )}
+        
+        <div className="mt-2 text-center sm:hidden">
+          <Link 
+            href="/events"
+            className="inline-flex items-center justify-center bg-blue-50 text-blue-700 px-5 py-3.5 rounded-xl font-bold hover:bg-blue-100 transition-colors w-full shadow-sm"
+          >
+            {isAr ? 'استعرض الكل' : 'View All'}
+            <ArrowRight className="ms-2 h-5 w-5 rtl:-scale-x-100" />
+          </Link>
+        </div>
       </section>
-
-      {recentEvents.length > 0 && (
-        <section className="max-w-7xl mx-auto w-full px-4 py-7 sm:px-6 lg:px-8" aria-labelledby="past-events-title">
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 id="past-events-title" className="mb-1 text-2xl font-bold text-slate-900">{isAr ? 'من فعالياتنا السابقة' : 'From our past events'}</h2>
-              <p className="text-base text-slate-600">{isAr ? 'تعرّف على اللقاءات والورش التي شارك فيها المجتمع.' : 'Explore the talks and workshops the community took part in.'}</p>
-            </div>
-            <Link href="/events?view=past" className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-base font-semibold text-blue-700 hover:bg-blue-50">{isAr ? 'أرشيف الفعاليات' : 'Event archive'}<ArrowRight aria-hidden="true" className="h-4 w-4 rtl:-scale-x-100" /></Link>
-          </div>
-          <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 sm:gap-5">
-            {recentEvents.map(event => <EventCard key={event.id} event={event} />)}
-          </div>
-        </section>
-      )}
 
       {/* Quick Links / Feature Highlights */}
       <section className="py-6 sm:py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full mb-6 sm:mb-10">
@@ -177,7 +250,7 @@ export default async function HomePage({ params }: PageProps) {
             <div className="w-10 h-10 sm:w-16 sm:h-16 bg-blue-50 text-blue-600 rounded-xl sm:rounded-2xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-blue-100 group-hover:scale-110 transition-all duration-300 shadow-inner">
               <Calendar className="w-5 h-5 sm:w-8 sm:h-8" />
             </div>
-            <h3 className="text-slate-900 font-bold text-sm sm:text-xl leading-snug group-hover:text-blue-700 transition-colors">{latestEvent ? (latestEvent.state === 'Ongoing' ? (isAr ? 'الفعالية الجارية' : 'Ongoing event') : (isAr ? 'الفعالية القادمة' : 'Next event')) : t('upcomingEvents')}</h3>
+            <h3 className="text-slate-900 font-black text-[10px] sm:text-xl leading-tight group-hover:text-blue-700 transition-colors">{latestEvent ? (isAr ? 'الفعالية القادمة' : 'Next Event') : t('upcomingEvents')}</h3>
             <p className="hidden sm:block text-slate-500 text-sm mt-2">{t('upcomingEventsDesc')}</p>
           </Link>
           
@@ -188,7 +261,7 @@ export default async function HomePage({ params }: PageProps) {
             <div className="w-10 h-10 sm:w-16 sm:h-16 bg-amber-50 text-amber-600 rounded-xl sm:rounded-2xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-amber-100 group-hover:scale-110 transition-all duration-300 shadow-inner">
               <Trophy className="w-5 h-5 sm:w-8 sm:h-8" />
             </div>
-            <h3 className="text-slate-900 font-bold text-sm sm:text-xl leading-snug group-hover:text-amber-700 transition-colors">{t('leaderboard')}</h3>
+            <h3 className="text-slate-900 font-black text-[10px] sm:text-xl leading-tight group-hover:text-amber-700 transition-colors">{t('leaderboard')}</h3>
             <p className="hidden sm:block text-slate-500 text-sm mt-2">{t('leaderboardDesc')}</p>
           </Link>
 
@@ -199,7 +272,7 @@ export default async function HomePage({ params }: PageProps) {
             <div className="w-10 h-10 sm:w-16 sm:h-16 bg-emerald-50 text-emerald-600 rounded-xl sm:rounded-2xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-emerald-100 group-hover:scale-110 transition-all duration-300 shadow-inner">
               <UserCircle className="w-5 h-5 sm:w-8 sm:h-8" />
             </div>
-            <h3 className="text-slate-900 font-bold text-sm sm:text-xl leading-snug group-hover:text-emerald-700 transition-colors">{t('activityAndCerts')}</h3>
+            <h3 className="text-slate-900 font-black text-[10px] sm:text-xl leading-tight group-hover:text-emerald-700 transition-colors">{t('activityAndCerts')}</h3>
             <p className="hidden sm:block text-slate-500 text-sm mt-2">{t('activityAndCertsDesc')}</p>
           </Link>
         </div>
@@ -211,9 +284,9 @@ export default async function HomePage({ params }: PageProps) {
           <div className="absolute top-0 right-1/4 w-96 h-96 bg-blue-50 rounded-full pointer-events-none opacity-60"></div>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div className="text-center mb-8 sm:mb-12">
-              <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-2 sm:mb-4">{isAr ? 'فريق المجتمع' : 'Community team'}</h2>
+              <h2 className="text-2xl sm:text-3xl font-black font-cairo text-slate-900 mb-2 sm:mb-4">هيكلة النادي</h2>
               <p className="text-slate-500 font-medium text-sm sm:text-base max-w-2xl mx-auto">
-                {isAr ? 'تعرّف على لجان الفرع الطلابي ومسارات العمل في جامعة القصيم.' : 'Meet the student branch committees and teams at Qassim University.'}
+                يتكون الفرع الطلابي لجمعية مهندسي الكهرباء والإلكترونيات (IEEE) بجامعة القصيم من عدة لجان ومسارات تعمل بتكامل لتحقيق أهداف النادي.
               </p>
             </div>
             

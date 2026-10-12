@@ -3,137 +3,282 @@
 import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { PlatformEvent } from '@/lib/types';
-import { formatDateSafe } from '@/lib/dateUtils';
+import { toJsDate } from '@/lib/dateUtils';
 import { useAuth } from '@/context/AuthContext';
-import { ArrowRight, Calendar, Clock, MapPin, Trophy, UserCircle } from 'lucide-react';
+import { Trophy, UserCircle, Pin } from 'lucide-react';
 import { useLocale } from 'next-intl';
-import { Link } from '@/i18n/routing';
-import { ar, enUS } from 'date-fns/locale';
-import { eventStateLabel, registrationLabel } from '@/lib/studentExperience';
+import { useRouter } from '@/i18n/routing';
 
 interface HeroUserCardsProps {
-  latestEvent: (Omit<PlatformEvent, 'date'> & { date: unknown }) | null;
-}
-
-interface ActivitySummary {
-  userId: string;
-  eventId?: string;
-  points: number;
-  registration: string | null;
-  certificateTitle: string | null;
-  attended: boolean;
-  rank: number | null;
-  rankUnavailable: boolean;
-  failed: boolean;
+  latestEvent: (Omit<PlatformEvent, 'date'> & { date: unknown; imageUrl?: string; image?: string }) | null;
 }
 
 export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
-  const { user, userData, loading } = useAuth();
-  const isAr = useLocale() === 'ar';
-  const [activity, setActivity] = useState<ActivitySummary | null>(null);
-  const userId = user?.uid;
-  const eventId = latestEvent?.id;
-  const points = Number(userData?.totalPoints) || 0;
+  const { user, userData } = useAuth();
+  const locale = useLocale();
+  const isAr = locale === 'ar';
+  const router = useRouter();
+
+  const [activeCard, setActiveCard] = useState<number | null>(null);
+  const [latestEventRegStatus, setLatestEventRegStatus] = useState<string | null>(null);
+  const [latestCert, setLatestCert] = useState<{title: string, date: string} | null>(null);
+  const [latestAttendance, setLatestAttendance] = useState<{title: string, date: string} | null>(null);
+  const [userRank, setUserRank] = useState<number | null>(null);
+  const [loadingData, setLoadingData] = useState(true);
 
   useEffect(() => {
-    if (!userId) return;
-    let alive = true;
-    const fetchSummary = async () => {
-      const summary: ActivitySummary = { userId, eventId, points, registration: null, certificateTitle: null, attended: false, rank: null, rankUnavailable: false, failed: false };
-      try {
-        const { collection, doc, getDoc, getDocs, getCountFromServer, query, where, limit, orderBy } = await import('firebase/firestore');
-        const { db } = await import('@/lib/firebase/client');
-        const [registration, certificate, attendance, rank, projection] = await Promise.allSettled([
-          eventId ? getDoc(doc(db, 'registrations', `${eventId}_${userId}`)) : Promise.resolve(null),
-          getDocs(query(collection(db, 'certificates'), where('userId', '==', userId), orderBy('issueDate', 'desc'), limit(5))),
-          getDocs(query(collection(db, 'attendance_logs'), where('userId', '==', userId), orderBy('timestamp', 'desc'), limit(1))),
-          points > 0 ? getCountFromServer(query(collection(db, 'public_profiles'), where('totalPoints', '>', points))) : Promise.resolve(null),
-          points > 0 ? getDoc(doc(db, 'public_profiles', userId)) : Promise.resolve(null),
-        ]);
-        if (registration.status === 'fulfilled' && registration.value?.exists()) summary.registration = registration.value.data().status;
-        if (certificate.status === 'fulfilled') {
-          const available = certificate.value.docs.find(item => item.data().status === 'Available');
-          summary.certificateTitle = available?.data().eventTitle || null;
-        }
-        if (attendance.status === 'fulfilled') summary.attended = !attendance.value.empty;
-        if (rank.status === 'fulfilled' && rank.value && projection.status === 'fulfilled' && projection.value?.exists() && Number(projection.value.data().totalPoints) === points) summary.rank = rank.value.data().count + 1;
-        summary.rankUnavailable = points > 0 && summary.rank === null;
-        summary.failed = [registration, certificate, attendance, rank].some(result => result.status === 'rejected');
-      } catch {
-        summary.failed = true;
-        summary.rankUnavailable = points > 0;
+    if (user && latestEvent) {
+      const fetchRegStatus = async () => {
+        try {
+          const { doc, getDoc } = await import('firebase/firestore');
+          const { db } = await import('@/lib/firebase/client');
+          const regDoc = await getDoc(doc(db, 'registrations', `${latestEvent.id}_${user.uid}`));
+          if (regDoc.exists()) {
+            setLatestEventRegStatus(regDoc.data().status);
+          }
+        } catch (error) { console.warn('Could not load featured registration', error); }
       }
-      if (alive) setActivity(summary);
-    };
-    void fetchSummary();
-    return () => { alive = false; };
-  }, [userId, eventId, points]);
+      fetchRegStatus();
+    }
+  }, [user, latestEvent]);
 
-  const summary = activity && activity.userId === userId && activity.eventId === eventId && activity.points === points ? activity : null;
-  const pending = !!user && !summary;
-  const activityText = summary?.certificateTitle
-    ? (isAr ? 'شهادتك جاهزة للعرض' : 'Your certificate is ready')
-    : summary?.registration
-      ? registrationLabel(summary.registration, isAr)
-      : summary?.attended
-        ? (isAr ? 'حضورك موثّق' : 'Your attendance is verified')
-        : summary?.failed
-          ? (isAr ? 'افتح حسابك لمراجعة نشاطك' : 'Open your account to review activity')
-          : (isAr ? 'تسجيلاتك وشهاداتك في مكان واحد' : 'Your registrations and certificates in one place');
-  const title = latestEvent ? (isAr ? latestEvent.title : latestEvent.titleEn || latestEvent.title) : '';
-  const location = latestEvent ? (isAr ? latestEvent.location : latestEvent.locationEn || latestEvent.location) : '';
-  const dateLocale = isAr ? ar : enUS;
+  useEffect(() => {
+    if (user) {
+      const fetchActivityAndRank = async () => {
+        try {
+          const { collection, query, getDocs, where, limit, orderBy, getCountFromServer } = await import('firebase/firestore');
+          const { db } = await import('@/lib/firebase/client');
+
+          // Fetch Certificates
+          const certQ = query(
+            collection(db, 'certificates'),
+            where('userId', '==', user.uid),
+            orderBy('issueDate', 'desc'),
+            limit(1)
+          );
+          
+          // Fetch Attendance
+          const attQ = query(
+            collection(db, 'attendance_logs'),
+            where('userId', '==', user.uid),
+            orderBy('timestamp', 'desc'),
+            limit(1)
+          );
+
+          const [certSnap, attSnap] = await Promise.all([
+            getDocs(certQ),
+            getDocs(attQ)
+          ]);
+
+          if (!certSnap.empty) {
+            const data = certSnap.docs[0].data();
+            setLatestCert({ title: data.eventTitle || (isAr ? 'شهادة مشاركة' : 'Certificate of Participation'), date: isAr ? 'شهادة معتمدة صدرت' : 'Certificate Issued' });
+          }
+
+          if (!attSnap.empty) {
+            setLatestAttendance({ title: isAr ? 'حضور موثّق' : 'Attendance Verified', date: isAr ? 'تم توثيق حضورك بنجاح' : 'Check-in successful' });
+          }
+
+          // Fetch Rank accurately for logged-in user
+          if (user && userData) {
+            const pts = Number(userData?.totalPoints) || 0;
+            if (pts > 0) {
+              const rankQuery = query(
+                collection(db, 'public_profiles'),
+                where('totalPoints', '>', pts)
+              );
+              try {
+                const rankCountSnap = await getCountFromServer(rankQuery);
+                setUserRank(rankCountSnap.data().count + 1);
+              } catch (countErr) {
+                console.warn('getCountFromServer failed, falling back to getDocs', countErr);
+                const rankDocsSnap = await getDocs(rankQuery);
+                setUserRank(rankDocsSnap.size + 1);
+              }
+            } else {
+              setUserRank(null); // Unranked if 0 points
+            }
+          } else {
+            setUserRank(null);
+          }
+
+        } catch (e) {
+          console.error('Error fetching activity data', e);
+        } finally {
+          setLoadingData(false);
+        }
+      };
+      fetchActivityAndRank();
+    }
+  }, [user, userData, isAr]);
+
+  const handleCardClick = (cardId: number, path: string) => {
+    if (activeCard === cardId || window.innerWidth >= 1024) {
+      if (path.startsWith('http')) {
+        window.location.href = path;
+      } else {
+        router.push(path);
+      }
+    } else {
+      setActiveCard(cardId);
+    }
+  };
+
+  const coverUrl = latestEvent?.coverUrl || latestEvent?.imageUrl || latestEvent?.image;
 
   return (
-    <div className="w-full space-y-3 text-start">
-      {latestEvent ? (
-        <Link href={`/events/${latestEvent.id}`} className="group block overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600">
-          <div className="relative h-32 overflow-hidden bg-gradient-to-br from-blue-800 to-slate-900 sm:h-40">
-            {latestEvent.coverUrl && <Image src={latestEvent.coverUrl} alt="" fill sizes="(max-width: 1024px) 100vw, 520px" className="object-cover object-center" />}
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 to-transparent" />
-            <span className="absolute start-4 top-4 rounded-full bg-white px-3 py-1.5 text-sm font-bold text-blue-700">{latestEvent.state === 'Ongoing' ? (isAr ? 'تجري الآن' : 'Happening now') : (isAr ? 'الفعالية القادمة' : 'Next event')}</span>
+    <>
+      {/* Card 1: Featured Event (Top Right) */}
+      <div 
+        className={`absolute top-0 lg:top-4 rtl:left-2 lg:rtl:left-0 lg:ltr:right-0 ltr:-right-2 w-72 lg:w-80 bg-white/80 backdrop-blur-md rounded-3xl p-4 lg:p-5 shadow-2xl transition-all duration-300 group cursor-pointer ${
+          latestEvent?.isPinned 
+            ? 'ring-2 ring-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.4)] border-amber-300' 
+            : 'border border-white/60 shadow-blue-900/15 hover:shadow-blue-500/20'
+        } transform hover:-translate-y-2 lg:hover:z-50 ${activeCard === 1 ? 'z-50 scale-105' : 'z-30'}`}
+        onClick={() => { if(latestEvent) handleCardClick(1, `/events/${latestEvent.id}`) }}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-1.5">
+            <span className="bg-blue-50/90 text-blue-700 text-[10px] font-black tracking-wider uppercase px-3 py-1 rounded-full border border-blue-200/50">
+              {latestEvent?.state === 'Ongoing' ? (isAr ? 'جاري الآن' : 'Ongoing') : (latestEvent?.state === 'Registration Open' ? (isAr ? 'التسجيل مفتوح' : 'Open') : (isAr ? 'قريباً' : 'Soon'))}
+            </span>
+            {latestEvent?.isPinned && (
+              <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-amber-300">
+                <Pin className="w-2.5 h-2.5 fill-current" />
+                {isAr ? 'مثبتة' : 'Pinned'}
+              </span>
+            )}
           </div>
-          <div className="space-y-3 p-4 sm:p-5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-sm font-semibold text-blue-700">{eventStateLabel(latestEvent.state, isAr)}</span>
-              <span className="inline-flex items-center gap-1 text-sm font-semibold text-slate-700">{isAr ? 'التفاصيل' : 'Details'} <ArrowRight aria-hidden="true" className="h-4 w-4 rtl:-scale-x-100" /></span>
-            </div>
-            <h2 className="text-xl font-bold leading-snug text-slate-900 sm:text-2xl">{title}</h2>
-            <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-600">
-              <span className="inline-flex items-center gap-2"><Calendar aria-hidden="true" className="h-4 w-4 text-blue-600" />{formatDateSafe(latestEvent.date, 'd MMMM', { locale: dateLocale })}</span>
-              <span className="inline-flex items-center gap-2"><Clock aria-hidden="true" className="h-4 w-4 text-blue-600" /><span dir="ltr">{formatDateSafe(latestEvent.date, 'HH:mm')}</span><span>{isAr ? 'بتوقيت الرياض' : 'Riyadh time'}</span></span>
-              <span className="inline-flex min-w-0 items-center gap-2"><MapPin aria-hidden="true" className="h-4 w-4 shrink-0 text-blue-600" /><span className="break-words">{location}</span></span>
-            </div>
+          <div className="bg-slate-100/90 text-slate-600 text-[10px] font-bold px-2 py-1 rounded-md">
+            {latestEvent ? toJsDate(latestEvent.date)?.toLocaleDateString(isAr ? 'ar-SA' : 'en-US') || '---' : '---'}
           </div>
-        </Link>
-      ) : (
-        <div className="rounded-3xl border border-slate-200 bg-white p-5">
-          <Calendar aria-hidden="true" className="mb-3 h-7 w-7 text-blue-600" />
-          <h2 className="mb-2 text-lg font-bold text-slate-900">{isAr ? 'فعاليات جديدة قريبًا' : 'New events coming soon'}</h2>
-          <p className="text-sm leading-relaxed text-slate-600">{isAr ? 'تصفّح الفعاليات السابقة وتعرّف على أنشطة المجتمع.' : 'Explore past events and discover the community’s activities.'}</p>
-          <Link href="/events" className="mt-3 inline-flex min-h-11 items-center gap-2 font-semibold text-blue-700">{isAr ? 'استكشف الفعاليات' : 'Explore events'}<ArrowRight aria-hidden="true" className="h-4 w-4 rtl:-scale-x-100" /></Link>
         </div>
-      )}
 
-      {loading ? <div aria-label={isAr ? 'جارٍ تحميل حسابك' : 'Loading your account'} className="h-24 animate-pulse rounded-2xl bg-slate-200/60" /> : user ? (
-        <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
-          <Link href="/leaderboard" className="flex min-h-24 items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition-colors hover:border-blue-300 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600">
-            <Trophy aria-hidden="true" className="h-6 w-6 shrink-0 text-amber-600" />
-            <div className="min-w-0">
-              <p className="text-sm text-slate-600">{isAr ? 'نقاطك' : 'Your points'}</p>
-              <p className="text-xl font-bold text-slate-900">{points} <span className="text-sm font-medium">{isAr ? 'نقطة' : 'points'}</span></p>
-              <p className="text-sm text-slate-600">{pending ? (isAr ? 'جارٍ تحميل المركز…' : 'Loading rank…') : summary?.rank ? (isAr ? `المركز ${summary.rank}` : `Rank ${summary.rank}`) : summary?.rankUnavailable ? (isAr ? 'المركز غير متاح الآن' : 'Rank unavailable') : (isAr ? 'ابدأ المشاركة لتحصل على مركز' : 'Participate to earn a rank')}</p>
-            </div>
-          </Link>
-          <Link href="/profile" className="flex min-h-24 items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition-colors hover:border-blue-300 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600">
-            <UserCircle aria-hidden="true" className="h-6 w-6 shrink-0 text-blue-600" />
-            <div className="min-w-0">
-              <p className="mb-1 text-base font-bold text-slate-900">{isAr ? 'نشاطي وشهاداتي' : 'My activity'}</p>
-              <p className="text-sm leading-relaxed text-slate-600">{pending ? (isAr ? 'جارٍ تحميل النشاط…' : 'Loading activity…') : activityText}</p>
-            </div>
-          </Link>
+        {/* Poster Card Container */}
+        <div className="w-full h-28 lg:h-36 rounded-2xl mb-3 relative overflow-hidden bg-slate-900 shadow-inner group-hover:shadow-lg transition-shadow">
+           {coverUrl ? (
+             <Image 
+               src={coverUrl}
+               alt={latestEvent ? (latestEvent.title || '') : ''}
+               fill
+               className="object-cover object-center group-hover:scale-110 transition-transform duration-700"
+               sizes="(max-width: 768px) 100vw, 320px"
+             />
+           ) : (
+             <div className="absolute inset-0 bg-gradient-to-br from-[#00629B] via-indigo-800 to-purple-900">
+               <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-15"></div>
+             </div>
+           )}
+           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/40 to-transparent pointer-events-none" />
+           <div className="absolute bottom-3 right-3 left-3 z-10">
+             <h4 className="text-white font-black text-sm lg:text-base leading-snug drop-shadow-md truncate font-cairo">
+               {latestEvent ? (isAr ? latestEvent.title : (latestEvent.titleEn || latestEvent.title)) : (isAr ? 'لا توجد فعاليات' : 'No Events')}
+             </h4>
+             <p className="text-blue-200 text-[10px] lg:text-xs font-medium mt-0.5">
+               {latestEvent ? `${latestEvent.registeredCount || 0} ${isAr ? 'مسجل' : 'Registered'}` : ''}
+             </p>
+           </div>
         </div>
-      ) : null}
-    </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex -space-x-2 rtl:space-x-reverse">
+            <div className="h-6 w-6 rounded-full border-2 border-white bg-blue-100 shadow-xs"></div>
+            <div className="h-6 w-6 rounded-full border-2 border-white bg-indigo-100 shadow-xs"></div>
+            <div className="h-6 w-6 rounded-full border-2 border-white bg-purple-100 shadow-xs"></div>
+          </div>
+          <span className="text-[10px] lg:text-xs font-bold text-slate-500">
+            {latestEvent ? `+${latestEvent.registeredCount || 0} ${isAr ? 'انضموا' : 'Joined'}` : ''}
+          </span>
+        </div>
+      </div>
+
+      {/* Card 2: Points / Leaderboard */}
+      <div 
+        className={`absolute top-28 lg:top-32 rtl:-right-2 lg:rtl:-right-8 ltr:-left-2 lg:ltr:-left-8 w-56 lg:w-64 bg-white/70 backdrop-blur-md rounded-3xl p-4 lg:p-5 shadow-xl shadow-slate-200/50 border border-white/60 transform -rotate-2 hover:rotate-0 hover:-translate-y-1 hover:shadow-yellow-500/10 lg:hover:z-50 transition-all duration-300 cursor-pointer ${activeCard === 2 ? 'z-50 scale-105 rotate-0' : 'z-20'}`}
+        onClick={() => handleCardClick(2, '/leaderboard')}
+      >
+        <div className="flex items-start gap-3 lg:gap-4">
+          <div className="bg-gradient-to-br from-yellow-100 to-amber-100 p-2.5 lg:p-3.5 rounded-2xl text-amber-600 shadow-sm">
+            <Trophy className="h-5 w-5 lg:h-6 lg:w-6" />
+          </div>
+          <div className="flex-1">
+            <div className="text-[9px] lg:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{isAr ? 'نقاطك' : 'Your Points'}</div>
+            {user && loadingData ? (
+              <div className="h-8 w-16 bg-slate-200 animate-pulse rounded-md mt-1 mb-2"></div>
+            ) : (
+              <div className="text-lg lg:text-2xl font-black text-slate-800 font-cairo flex items-baseline gap-1">
+                {user && userData ? userData.totalPoints || 0 : 0} <span className="text-[10px] font-bold text-emerald-500">Pts</span>
+              </div>
+            )}
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <div className="text-[10px] lg:text-xs font-bold text-slate-500">
+                {userRank ? (isAr ? `المركز: ${userRank}` : `Rank: ${userRank}`) : (user ? (isAr ? 'بدون مركز' : 'Unranked') : (isAr ? 'سجل دخولك' : 'Login'))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Card 3: Activity/Certificate */}
+      <div 
+        className={`absolute top-56 lg:top-auto lg:bottom-10 rtl:left-6 lg:rtl:left-12 ltr:right-6 lg:ltr:right-12 w-60 lg:w-72 bg-[#002855]/70 backdrop-blur-md rounded-3xl p-4 lg:p-5 shadow-2xl shadow-blue-900/40 border-t border-l border-white/20 transform rotate-2 hover:rotate-0 hover:-translate-y-1 hover:shadow-blue-400/20 lg:hover:z-50 transition-all duration-300 cursor-pointer ${activeCard === 3 ? 'z-50 scale-105 rotate-0' : 'z-40'}`}
+        onClick={() => handleCardClick(3, '/profile')}
+      >
+        <div className="flex items-center justify-between mb-3 lg:mb-4">
+          <div className="flex items-center gap-2 lg:gap-3">
+            <div className="bg-blue-500/20 p-2 lg:p-2.5 rounded-2xl text-blue-300 ring-1 ring-white/10">
+              <UserCircle className="h-4 w-4 lg:h-5 lg:w-5" />
+            </div>
+            <div>
+              <div className="text-xs lg:text-sm font-bold text-white tracking-wide">{isAr ? 'نشاطك' : 'Activity'}</div>
+              <div className="text-[8px] lg:text-[9px] text-blue-300 font-medium">
+                {latestCert 
+                  ? latestCert.date
+                  : latestAttendance
+                    ? latestAttendance.date
+                    : latestEventRegStatus === 'approved'
+                      ? (isAr ? 'تم تأكيد تسجيلك' : 'Registration Confirmed')
+                      : latestEventRegStatus === 'pending'
+                        ? (isAr ? 'تسجيلك قيد المراجعة' : 'Registration Pending')
+                        : latestEventRegStatus === 'waitlisted'
+                          ? (isAr ? 'أنت في قائمة الانتظار' : 'You are Waitlisted')
+                          : user
+                            ? (isAr ? 'لا يوجد نشاط حديث' : 'No recent activity') 
+                            : (isAr ? 'مجتمع تقني تفاعلي' : 'Interactive Community')}
+              </div>
+            </div>
+          </div>
+          <div className="h-2 w-2 rounded-full bg-emerald-400 animate-ping shadow-[0_0_12px_rgba(52,211,153,0.8)]"></div>
+        </div>
+        <div className="bg-white/5 rounded-xl p-2.5 lg:p-3 border border-white/10 flex items-center gap-2.5 lg:gap-3">
+          <div className="h-8 w-8 lg:h-10 lg:w-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-lg flex items-center justify-center shadow-inner flex-shrink-0">
+            <svg className="w-4 h-4 lg:w-5 lg:h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <div className="truncate">
+            {user && loadingData ? (
+              <>
+                <div className="h-3 w-24 bg-white/20 animate-pulse rounded mb-1.5"></div>
+                <div className="h-2 w-16 bg-white/10 animate-pulse rounded"></div>
+              </>
+            ) : (
+              <>
+                <div className="text-[9px] lg:text-[10px] font-bold text-white truncate">
+                  {latestCert 
+                    ? latestCert.title 
+                    : latestAttendance
+                      ? latestAttendance.title
+                      : latestEventRegStatus
+                        ? latestEvent?.title
+                        : (user ? (isAr ? 'حضور الفعاليات يمنحك شهادات' : 'Attend events to earn certificates') : (isAr ? 'اكتشف فعالياتنا وانضم إلينا' : 'Discover and join our events'))}
+                </div>
+                <div className="text-[8px] lg:text-[9px] text-emerald-400 font-medium mt-0.5 truncate">{latestCert ? (isAr ? 'متاحة للتحميل' : 'Ready to download') : latestAttendance ? (isAr ? 'تم تسجيل نقاطك' : 'Points awarded') : latestEventRegStatus ? (isAr ? 'الفعالية القادمة' : 'Upcoming Event') : ''}</div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
   );
 }

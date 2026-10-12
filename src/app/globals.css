@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
-@theme inline {
-  --font-sans: var(--font-body), system-ui, sans-serif;
-  --font-cairo: var(--font-cairo-family), sans-serif;
-  --font-inter: var(--font-inter-family), sans-serif;
-  --font-thmanyah: var(--font-thmanyah-family), serif;
+@theme {
+  --font-sans: var(--font-thmanyah), var(--font-cairo), var(--font-inter), system-ui, sans-serif;
+  --font-cairo: var(--font-cairo), sans-serif;
+  --font-inter: var(--font-inter), sans-serif;
+  --font-thmanyah: var(--font-thmanyah), serif;
 }
 
 /* Custom CSS variables and global styles */
@@ -14,31 +14,21 @@
     --foreground: #0f172a;
   }
   html {
-    font-size: 16px;
+    font-size: 15px; /* Slightly smaller base font for mobile */
   }
-  h1, h2 {
-    font-family: var(--font-thmanyah-family), var(--font-cairo-family), serif;
-    text-wrap: balance;
+  @media (min-width: 640px) {
+    html {
+      font-size: 16px; /* Default for larger screens */
+    }
   }
 }
 
 body {
-  --font-body: var(--font-cairo-family), var(--font-inter-family);
   background-color: var(--background);
   color: var(--foreground);
-  font-family: var(--font-body), system-ui, sans-serif;
-  line-height: 1.6;
+  font-family: var(--font-thmanyah);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-html[lang="en"] body { --font-body: var(--font-inter-family), var(--font-cairo-family); }
-html[lang="en"] h1, html[lang="en"] h2 { font-family: var(--font-inter-family), system-ui, sans-serif; }
-
-@media (max-width: 1023px) {
-  .site-shell:has([data-public-navigation]) {
-    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
-  }
 }
 
 html { scroll-padding-top: 5rem; }
@@ -102,9 +92,4 @@ html { scroll-padding-top: 5rem; }
   .hide-scrollbar::-webkit-scrollbar {
     display: none;
   }
-  .no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-  .no-scrollbar::-webkit-scrollbar { display: none; }
 }

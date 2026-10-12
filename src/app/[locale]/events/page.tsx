@@ -45,8 +45,8 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-10 pt-28 sm:pt-32 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-slate-50 py-12 sm:py-16 px-4 sm:px-6 lg:px-8 mt-16">
+      <div className="max-w-7xl mx-auto space-y-10">
         <EventsList events={events} nextCursor={nextCursor} initialNow={requestTime} initialSearch={typeof filters.q === 'string' ? filters.q : ''} initialType={typeof filters.type === 'string' ? filters.type : 'ALL'} initialView={typeof filters.view === 'string' ? filters.view : 'all'} />
       </div>
     </div>

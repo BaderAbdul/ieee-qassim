@@ -11,7 +11,6 @@ import { AlertCircle } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { UserData } from '@/context/AuthContext';
 import { toJsDate } from '@/lib/dateUtils';
-import type { MemberRankState } from '@/lib/memberPresentation';
 
 export default function PublicPassPage({ params }: { params: Promise<{ id: string, locale: string }> }) {
   const [userId, setUserId] = useState<string | null>(null);
@@ -28,22 +27,17 @@ export default function PublicPassPage({ params }: { params: Promise<{ id: strin
   
   const [userData, setUserData] = useState<(UserData & { name?: string }) | null>(null);
   const [userRank, setUserRank] = useState<number | null>(null);
-  const [rankState, setRankState] = useState<MemberRankState>('loading');
   
   useEffect(() => {
     if (!userId) return;
-    let active = true;
 
     const loadData = async () => {
       try {
         setLoading(true);
         setError(null);
-        setUserRank(null);
-        setRankState('loading');
         
         const userDocRef = doc(db, 'public_profiles', userId);
         const userDoc = await getDoc(userDocRef);
-        if (!active) return;
         
         if (!userDoc.exists()) {
           setError(isAr ? 'لم يتم العثور على هذا العضو.' : 'Member not found.');
@@ -53,32 +47,25 @@ export default function PublicPassPage({ params }: { params: Promise<{ id: strin
 
         const data = userDoc.data();
         setUserData(data as UserData);
-        setLoading(false);
 
         // Fetch rank
         const myPoints = data?.totalPoints || 0;
-        if (myPoints <= 0) { setRankState('unranked'); return; }
         const higherPointsQuery = query(
           collection(db, 'public_profiles'),
           where('totalPoints', '>', myPoints)
         );
-        try {
-          const rankCountSnap = await getCountFromServer(higherPointsQuery);
-          if (active) { setUserRank(rankCountSnap.data().count + 1); setRankState('ready'); }
-        } catch {
-          if (active) setRankState('error');
-        }
+        const rankCountSnap = await getCountFromServer(higherPointsQuery);
+        setUserRank(rankCountSnap.data().count + 1);
 
       } catch (err) {
         console.error('Error fetching public pass:', err);
-        if (active) setError(isAr ? 'حدث خطأ أثناء تحميل البطاقة.' : 'Failed to load pass.');
+        setError(isAr ? 'حدث خطأ أثناء تحميل البطاقة.' : 'Failed to load pass.');
       } finally {
-        if (active) setLoading(false);
+        setLoading(false);
       }
     };
 
     loadData();
-    return () => { active = false; };
   }, [userId, isAr]);
 
   if (loading || !userId) {
@@ -132,10 +119,8 @@ export default function PublicPassPage({ params }: { params: Promise<{ id: strin
           user={mockUser}
           userData={userData}
           rank={userRank}
-          rankState={rankState}
           totalPoints={userData.totalPoints || 0}
           isPublicView={true}
-          showQr={true}
         />
 
         <div className="text-center mt-8">

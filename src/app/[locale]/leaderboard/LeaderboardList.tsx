@@ -5,7 +5,6 @@ import { Trophy, Medal, Award, Sparkles } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useLocale } from 'next-intl';
 import { competitionRanks } from '@/lib/studentExperience';
-import { memberMajorLabel } from '@/lib/memberPresentation';
 
 export interface LeaderboardUser {
   id: string;
@@ -17,67 +16,136 @@ export interface LeaderboardUser {
 
 export default function LeaderboardList({ users }: { users: LeaderboardUser[] }) {
   const { user } = useAuth();
-  const isAr = useLocale() === 'ar';
-  if (!users.length) return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center text-slate-600">
-      <Sparkles className="mx-auto mb-3 h-10 w-10 text-blue-400" aria-hidden="true" />
-      <p>{isAr ? 'لم تُسجل نقاط بعد. شارك في فعالية وابدأ رحلتك!' : 'No points recorded yet. Join an event to get started!'}</p>
-    </div>
-  );
+  const locale = useLocale();
+  const isAr = locale === 'ar';
 
-  const ranks = competitionRanks(users.map(member => member.points));
+  if (users.length === 0) {
+    return (
+      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-16 text-center text-slate-500 font-medium">
+        <Sparkles className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+        <p className="text-base">{isAr ? 'لا توجد نقاط مسجلة بعد. كن أول من يحصل على النقاط!' : 'No points recorded yet. Be the first to earn points!'}</p>
+      </div>
+    );
+  }
+
   const top3 = users.slice(0, 3);
   const remaining = users.slice(3);
-  const you = <span className="inline-flex rounded-full bg-blue-600 px-2 py-1 text-xs font-bold text-white">{isAr ? 'أنت' : 'You'}</span>;
+  const ranks = competitionRanks(users.map(user => user.points));
+
+  // Rearrange top3 for podium: 2nd place (idx 1), 1st place (idx 0), 3rd place (idx 2)
+  const first = top3[0];
+  const second = top3[1];
+  const third = top3[2];
+
   return (
-    <div className="space-y-5">
-      <ol aria-label={isAr ? 'أعلى الأعضاء نقاطًا' : 'Highest scoring members'} className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:items-end sm:gap-5">
-        {top3.map((member, index) => {
-          const first = index === 0;
-          const current = member.id === user?.uid;
-          const colors = first ? 'border-amber-300 bg-amber-50' : index === 1 ? 'border-slate-200 bg-white' : 'border-orange-200 bg-orange-50/40';
-          return (
-            <li key={member.id} value={ranks[index]} className={`rounded-2xl border p-4 sm:p-5 ${colors} ${first ? 'sm:order-2' : index === 1 ? 'sm:order-1' : 'sm:order-3'} ${current ? 'ring-2 ring-blue-500 ring-offset-2' : ''}`}>
-              <div className="flex items-center gap-3 sm:flex-col sm:text-center">
-                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${first ? 'bg-amber-200 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>
-                  {first ? <Trophy className="h-6 w-6" aria-hidden="true" /> : <Medal className="h-6 w-6" aria-hidden="true" />}
-                </div>
-                <div className="min-w-0 flex-1 sm:w-full">
-                  <div className="mb-1 flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-600 sm:justify-center">
-                    <bdi>#{ranks[index]}</bdi>{first && <span>{isAr ? 'المتصدر' : 'Leader'}</span>}{current && you}
+    <div className="space-y-8">
+      
+      {/* Top 3 Podium Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 items-end pt-4">
+        
+        {/* 2nd Place (Silver) */}
+        {second ? (
+          <div className="order-2 sm:order-1 bg-gradient-to-b from-slate-50 to-slate-100/80 rounded-3xl border border-slate-200/80 p-6 flex flex-col items-center text-center relative shadow-sm hover:shadow-md transition-all">
+            <div className="absolute -top-4 bg-slate-300 text-slate-800 text-xs font-black px-3 py-1 rounded-full shadow-xs flex items-center gap-1">
+              <Medal className="h-3.5 w-3.5 text-slate-600" />
+              <span>#{ranks[1]}</span>
+            </div>
+            <div className="mt-4 mb-2"></div>
+            <h3 className="font-bold text-slate-900 text-base max-w-full truncate">{second.name}</h3>
+            {second.department && <span className="text-xs text-slate-500 font-medium truncate max-w-full">{second.department}</span>}
+            <div className="mt-3 bg-white px-4 py-1.5 rounded-xl border border-slate-200 text-slate-800 font-black text-lg flex items-center gap-1 shadow-2xs">
+              <span>{second.points}</span>
+              <Award className="h-4 w-4 text-slate-400" />
+            </div>
+          </div>
+        ) : <div className="hidden sm:block order-1" />}
+
+        {/* 1st Place (Gold Champion) */}
+        {first && (
+          <div className="order-1 sm:order-2 bg-gradient-to-b from-amber-50 to-amber-100/80 rounded-3xl border-2 border-amber-300 p-7 flex flex-col items-center text-center relative shadow-md hover:shadow-xl transition-all sm:-translate-y-3">
+            <div className="absolute -top-5 bg-gradient-to-r from-amber-500 to-yellow-500 text-white text-xs font-black px-4 py-1.5 rounded-full shadow-md flex items-center gap-1.5 uppercase tracking-wide">
+              <Trophy className="h-4 w-4" />
+              <span>{isAr ? `المتصدر #${ranks[0]}` : `Leader #${ranks[0]}`}</span>
+            </div>
+            <div className="mt-4 mb-2"></div>
+            <h3 className="font-black text-slate-900 text-lg max-w-full truncate">{first.name}</h3>
+            {first.department && <span className="text-xs text-amber-800 font-bold truncate max-w-full">{first.department}</span>}
+            <div className="mt-3 bg-amber-500 text-white px-5 py-2 rounded-xl font-black text-xl flex items-center gap-1.5 shadow-sm">
+              <span>{first.points}</span>
+              <Award className="h-5 w-5 text-amber-200" />
+            </div>
+          </div>
+        )}
+
+        {/* 3rd Place (Bronze) */}
+        {third ? (
+          <div className="order-3 bg-gradient-to-b from-amber-900/5 to-amber-900/10 rounded-3xl border border-amber-800/20 p-6 flex flex-col items-center text-center relative shadow-sm hover:shadow-md transition-all">
+            <div className="absolute -top-4 bg-amber-800 text-amber-100 text-xs font-black px-3 py-1 rounded-full shadow-xs flex items-center gap-1">
+              <Medal className="h-3.5 w-3.5 text-amber-300" />
+              <span>#{ranks[2]}</span>
+            </div>
+            <div className="mt-4 mb-2"></div>
+            <h3 className="font-bold text-slate-900 text-base max-w-full truncate">{third.name}</h3>
+            {third.department && <span className="text-xs text-slate-500 font-medium truncate max-w-full">{third.department}</span>}
+            <div className="mt-3 bg-white px-4 py-1.5 rounded-xl border border-slate-200 text-amber-900 font-black text-lg flex items-center gap-1 shadow-2xs">
+              <span>{third.points}</span>
+              <Award className="h-4 w-4 text-amber-700" />
+            </div>
+          </div>
+        ) : <div className="hidden sm:block order-3" />}
+
+      </div>
+
+      {/* Ranks 4+ List Container */}
+      {remaining.length > 0 && (
+        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+          <ul className="divide-y divide-gray-100">
+            {remaining.map((u, idx) => {
+              const rank = ranks[idx + 3];
+              const isCurrentUser = user?.uid === u.id;
+              return (
+                <li 
+                  key={u.id} 
+                  className={`p-4 sm:p-5 flex items-center justify-between transition-colors ${
+                    isCurrentUser ? 'bg-blue-50/80 border-s-4 border-blue-600' : 'hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-4 text-start min-w-0">
+                    <span className="w-8 text-center font-bold text-slate-400 text-sm sm:text-base flex-shrink-0">
+                      #{rank}
+                    </span>
+
+                    <div className="min-w-0">
+                      <div className="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2 truncate">
+                        <span className="truncate">{u.name}</span>
+                        {isCurrentUser && (
+                          <span className="text-[10px] font-bold bg-blue-600 text-white px-2 py-0.5 rounded-full flex-shrink-0">
+                            {isAr ? 'أنت' : 'You'}
+                          </span>
+                        )}
+                      </div>
+                      {u.department && (
+                        <span className="text-xs text-slate-500 block truncate">{u.department}</span>
+                      )}
+                    </div>
                   </div>
-                  <h2 className="break-words text-base font-bold leading-relaxed text-slate-900">{member.name}</h2>
-                  {member.department && <p className="mt-1 break-words text-sm text-slate-600">{memberMajorLabel(member.department, isAr)}</p>}
-                </div>
-                <div className="shrink-0 text-center sm:mt-2">
-                  <p className={`text-2xl font-bold ${first ? 'text-amber-800' : 'text-slate-800'}`}>{member.points}</p>
-                  <p className="text-xs text-slate-600">{isAr ? 'نقطة' : 'points'}</p>
-                </div>
-              </div>
-            </li>
-          );
-        })}
-      </ol>
-      {remaining.length > 0 && <ol start={4} aria-label={isAr ? 'بقية الترتيب' : 'Remaining members'} className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        {remaining.map((member, index) => {
-          const current = member.id === user?.uid;
-          return (
-            <li key={member.id} value={ranks[index + 3]} className={`flex items-center justify-between gap-3 p-4 ${current ? 'border-s-4 border-blue-600 bg-blue-50' : ''}`}>
-              <div className="flex min-w-0 items-start gap-3">
-                <span className="w-7 shrink-0 pt-1 text-sm font-semibold text-slate-600"><bdi>#{ranks[index + 3]}</bdi></span>
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2"><h2 className="break-words text-sm font-bold leading-relaxed text-slate-900">{member.name}</h2>{current && you}</div>
-                  {member.department && <p className="mt-1 break-words text-sm text-slate-600">{memberMajorLabel(member.department, isAr)}</p>}
-                </div>
-              </div>
-              <div className="shrink-0 text-end">
-                <p className="flex items-center gap-1 text-lg font-bold text-blue-700">{member.points}<Award className="h-4 w-4 text-amber-600" aria-hidden="true" /></p>
-                <p className="text-xs text-slate-500">{isAr ? 'نقطة' : 'points'}</p>
-              </div>
-            </li>
-          );
-        })}
-      </ol>}
+
+                  <div className="text-end ps-4 flex-shrink-0">
+                    <div className="font-black text-lg sm:text-xl text-blue-700 font-cairo flex items-center justify-end gap-1">
+                      <span>{u.points}</span>
+                      <Award className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                    </div>
+                    <div className="text-[11px] text-slate-400 font-semibold">
+                      {isAr ? 'نقطة' : 'pts'}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
     </div>
   );
 }

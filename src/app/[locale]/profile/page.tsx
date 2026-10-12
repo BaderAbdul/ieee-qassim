@@ -1,16 +1,15 @@
 'use client';
 
-import React, { Suspense, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Link } from '@/i18n/routing';
-import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  doc,
+import { 
+  collection, 
+  query, 
+  where, 
+  getDocs, 
+  doc, 
   getDoc,
   updateDoc,
   getCountFromServer,
@@ -23,15 +22,16 @@ import { httpsCallable } from '@/lib/backend';
 import { PlatformEvent, Certificate, PointTransaction } from '@/lib/types';
 import { formatDateSafe, toJsDate } from '@/lib/dateUtils';
 import { ar, enUS } from 'date-fns/locale';
-import {
-  Trophy,
-  Award,
-  Calendar,
-  CheckCircle,
-  Lock,
-  UserCheck,
-  GraduationCap,
-  ExternalLink,
+import { 
+  Trophy, 
+  Award, 
+  Calendar, 
+  CheckCircle, 
+  Lock, 
+  Sparkles, 
+  UserCheck, 
+  GraduationCap, 
+  ExternalLink, 
   AlertCircle,
   RefreshCw,
   Clock,
@@ -39,14 +39,10 @@ import {
   Edit2,
   X,
   Save,
-  QrCode,
-  Share2,
 } from 'lucide-react';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import DigitalMemberCard from '@/components/ui/DigitalMemberCard';
 import { certificateLabel, normalizeStudentId, registrationLabel } from '@/lib/studentExperience';
-import { mapMemberEvents, memberPassUrl, type MemberRankState } from '@/lib/memberPresentation';
-import { SITE_URL } from '@/lib/site';
 
 interface CertificateData extends Certificate {
   eventTitle: string;
@@ -58,7 +54,6 @@ interface RegistrationWithEvent {
   timestamp: unknown;
   event: PlatformEvent;
   certificate?: CertificateData;
-  eventUnavailable?: boolean;
 }
 
 interface BadgeDef {
@@ -131,52 +126,31 @@ const ALL_BADGES: BadgeDef[] = [
   },
 ];
 
-export default function ProfilePage() {
-  const { user } = useAuth();
-  const locale = useLocale();
-  return <Suspense fallback={<ProfileSkeleton />}><EngineeringProfilePage key={`${user?.uid || 'guest'}:${locale}`} /></Suspense>;
-}
-
-function EngineeringProfilePage() {
+export default function EngineeringProfilePage() {
   const t = useTranslations('Profile');
   const tActivity = useTranslations('Activity');
   const tCommon = useTranslations('Common');
   const locale = useLocale();
   const isAr = locale === 'ar';
   const dateLocale = isAr ? ar : enUS;
-  const searchParams = useSearchParams();
 
   const { user, userData, loading: authLoading, login, logout } = useAuth();
   const userBadges = userData?.badges || [];
 
   const [loading, setLoading] = useState(true);
-  const [pointsLoading, setPointsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [pointError, setPointError] = useState<string | null>(null);
-  const [certificateLoading, setCertificateLoading] = useState(true);
-  const [certificateError, setCertificateError] = useState<string | null>(null);
-
+  
   const [registrations, setRegistrations] = useState<RegistrationWithEvent[]>([]);
   const [certificates, setCertificates] = useState<CertificateData[]>([]);
   const [transactions, setTransactions] = useState<PointTransaction[]>([]);
-
+  
   const [userRank, setUserRank] = useState<number | null>(null);
-  const [rankState, setRankState] = useState<MemberRankState>('loading');
-  const [rankReloadKey, setRankReloadKey] = useState(0);
   const [downloadingCert, setDownloadingCert] = useState<string | null>(null);
   const [certificateLinks, setCertificateLinks] = useState<Record<string, { url: string; expiresAt: number }>>({});
   const [certificateMessage, setCertificateMessage] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
-  const certificateRevisions = useRef<Record<string, string>>({});
-  const certificateRequest = useRef(0);
-  const [shareMessage, setShareMessage] = useState('');
-
-  type AccountTab = 'events' | 'points' | 'certificates';
-  const searchKey = searchParams.toString();
-  const requestedTab = searchParams.get('tab');
-  const [selectedTab, setSelectedTab] = useState<{ search: string; tab: AccountTab } | null>(null);
-  const activeTab: AccountTab = selectedTab?.search === searchKey ? selectedTab.tab : requestedTab === 'points' || requestedTab === 'certificates' ? requestedTab : 'events';
-  const setActiveTab = (tab: AccountTab) => setSelectedTab({ search: searchKey, tab });
+  
+  const [activeTab, setActiveTab] = useState<'events' | 'points' | 'certificates'>('events');
   useEffect(() => {
     const timer = window.setInterval(() => {
       const now = Date.now();
@@ -252,7 +226,7 @@ function EngineeringProfilePage() {
     setIsSavingPublicProfile(true);
     try {
       let avatarUrl = editingPublicProfile.avatar;
-
+      
       if (avatarFile) {
         if (!['image/jpeg', 'image/png', 'image/webp'].includes(avatarFile.type) || avatarFile.size > 3 * 1024 * 1024) {
           throw new Error(isAr ? 'اختر صورة JPG أو PNG أو WebP أصغر من 3 ميغابايت.' : 'Choose a JPG, PNG, or WebP image under 3 MB.');
@@ -281,146 +255,129 @@ function EngineeringProfilePage() {
 
   useEffect(() => {
     let active = true;
-    if (authLoading || !user) return;
-    const loadRegistrations = async () => {
+
+    if (authLoading || !user) {
+      return;
+    }
+
+    const loadData = async () => {
       try {
-        const snap = await getDocs(query(collection(db, 'registrations'), where('userId', '==', user.uid)));
-        if (active) setError(null);
-        const eventIds = [...new Set(snap.docs.map(item => String(item.data().eventId)))];
-        const eventResults = await mapMemberEvents(eventIds, async eventId => {
-          const snapshot = await getDoc(doc(db, 'events', eventId));
-          return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } as PlatformEvent : null;
+        setError(null);
+        
+        // 1. Fetch Registrations
+        const regQ = query(collection(db, 'registrations'), where('userId', '==', user.uid));
+        const regSnap = await getDocs(regQ);
+
+        // 2. Fetch Certificates
+        const certQ = query(collection(db, 'certificates'), where('userId', '==', user.uid));
+        const certSnap = await getDocs(certQ);
+        const certsData = certSnap.docs.map(d => ({ id: d.id, ...d.data() })) as CertificateData[];
+        const certsByEvent = certsData.reduce((acc, cert) => {
+          acc[cert.eventId] = cert;
+          return acc;
+        }, {} as Record<string, CertificateData>);
+
+        const regsWithEvents: RegistrationWithEvent[] = [];
+        for (const rDoc of regSnap.docs) {
+          const rData = rDoc.data();
+          const eventDoc = await getDoc(doc(db, 'events', rData.eventId));
+          if (eventDoc.exists()) {
+            regsWithEvents.push({
+              id: rDoc.id,
+              status: rData.status,
+              timestamp: rData.timestamp || rData.registeredAt,
+              event: { id: eventDoc.id, ...eventDoc.data() } as PlatformEvent,
+              certificate: certsByEvent[eventDoc.id]
+            });
+          }
+        }
+
+        regsWithEvents.sort((a, b) => {
+          const timeA = toJsDate(a.timestamp)?.getTime() || 0;
+          const timeB = toJsDate(b.timestamp)?.getTime() || 0;
+          return timeB - timeA;
         });
-        const events = new Map<string, PlatformEvent>();
-        eventResults.forEach(result => {
-          if (result.status === 'fulfilled' && result.value) events.set(result.value.id, result.value);
+
+        // 3. Fetch Point Transactions
+        const ptQ = query(collection(db, 'point_transactions'), where('userId', '==', user.uid));
+        const ptSnap = await getDocs(ptQ);
+        const ptsData = ptSnap.docs.map(d => ({ id: d.id, ...d.data() })) as PointTransaction[];
+        ptsData.sort((a, b) => {
+          const tA = toJsDate(a.createdAt)?.getTime() || 0;
+          const tB = toJsDate(b.createdAt)?.getTime() || 0;
+          return tB - tA;
         });
-        const records = snap.docs.map(item => {
-          const data = item.data();
-          const event = events.get(data.eventId);
-          return {
-            id: item.id, status: data.status, timestamp: data.timestamp || data.registeredAt,
-            event: event || {
-              id: data.eventId, title: data.eventTitle || (isAr ? 'فعالية غير متاحة للعرض' : 'Event details unavailable'),
-              titleEn: data.eventTitle || (isAr ? 'فعالية غير متاحة للعرض' : 'Event details unavailable'), state: 'Archived',
-            } as PlatformEvent,
-            eventUnavailable: !event,
-          };
-        }).sort((a, b) => (toJsDate(b.timestamp)?.getTime() || 0) - (toJsDate(a.timestamp)?.getTime() || 0));
+
+        // 4. Compute Community Rank accurately via O(1) aggregation
+        const myPoints = userData?.totalPoints || 0;
+        const higherPointsQuery = query(
+          collection(db, 'public_profiles'),
+          where('totalPoints', '>', myPoints)
+        );
+        const rankCountSnap = await getCountFromServer(higherPointsQuery);
+        const userCalculatedRank = myPoints > 0 ? rankCountSnap.data().count + 1 : null;
+
         if (active) {
-          setRegistrations(records);
-          if (eventResults.some(result => result.status === 'rejected')) setError(isAr ? 'بعض تفاصيل الفعاليات غير متاحة. تسجيلاتك محفوظة في القائمة.' : 'Some event details are unavailable. Your registrations remain listed.');
+          setRegistrations(regsWithEvents);
+          setCertificates(certsData.sort((a, b) => {
+            const tA = toJsDate(a.issueDate || a.createdAt)?.getTime() || 0;
+            const tB = toJsDate(b.issueDate || b.createdAt)?.getTime() || 0;
+            return tB - tA;
+          }));
+          setTransactions(ptsData);
+          setUserRank(userCalculatedRank);
         }
-      } catch {
-        if (active) setError(isAr ? 'تعذر تحميل التسجيلات. أعد المحاولة.' : 'Could not load registrations. Please retry.');
+      } catch (err) {
+        console.error('Error fetching profile data:', err);
+        if (active) {
+          setError(isAr ? 'حدث خطأ أثناء تحميل بيانات الملف.' : 'Failed to load profile data.');
+        }
       } finally {
-        if (active) setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     };
-    const loadPoints = async () => {
-      try {
-        const snap = await getDocs(query(collection(db, 'point_transactions'), where('userId', '==', user.uid)));
-        if (active) setPointError(null);
-        const points = snap.docs.map(item => ({ id: item.id, ...item.data() })) as PointTransaction[];
-        points.sort((a, b) => (toJsDate(b.createdAt)?.getTime() || 0) - (toJsDate(a.createdAt)?.getTime() || 0));
-        if (active) setTransactions(points);
-      } catch {
-        if (active) setPointError(isAr ? 'تعذر تحميل سجل النقاط. رصيد الحساب ما زال ظاهرًا أعلاه.' : 'Could not load point history. Your account balance remains visible above.');
-      } finally {
-        if (active) setPointsLoading(false);
-      }
+
+    loadData();
+
+    return () => {
+      active = false;
     };
-    void Promise.allSettled([loadRegistrations(), loadPoints()]);
-    return () => { active = false; };
-  }, [user, authLoading, isAr, reloadKey]);
-
-  // The public projection is the same ranking source used by the leaderboard.
-  // Rank errors never prevent registration, point history or certificate loading.
-  useEffect(() => {
-    if (!user || authLoading) return;
-    let active = true;
-    let revision = 0;
-    const unsubscribe = onSnapshot(doc(db, 'public_profiles', user.uid), async snapshot => {
-      const current = ++revision;
-      const myPoints = snapshot.exists() ? Number(snapshot.data().totalPoints || 0) : 0;
-      if (myPoints <= 0) {
-        setUserRank(null);
-        setRankState('unranked');
-        return;
-      }
-      setRankState('loading');
-      try {
-        const count = await getCountFromServer(query(collection(db, 'public_profiles'), where('totalPoints', '>', myPoints)));
-        if (active && revision === current) {
-          setUserRank(count.data().count + 1);
-          setRankState('ready');
-        }
-      } catch {
-        if (active && revision === current) { setUserRank(null); setRankState('error'); }
-      }
-    }, () => { if (active) { setUserRank(null); setRankState('error'); } });
-    return () => { active = false; revision++; unsubscribe(); };
-  }, [user, authLoading, rankReloadKey]);
+  }, [user, authLoading, isAr, reloadKey, userData?.totalPoints]);
 
   useEffect(() => {
-    const invalidateRequests = () => { certificateRequest.current++; };
-    invalidateRequests();
-    certificateRevisions.current = {};
     if (!user) return;
-    let firstSnapshot = true;
-    const unsubscribe = onSnapshot(query(collection(db, 'certificates'), where('userId', '==', user.uid)), snapshot => {
+    return onSnapshot(query(collection(db, 'certificates'), where('userId', '==', user.uid)), snapshot => {
       const updated = snapshot.docs.map(item => ({ id: item.id, ...item.data() } as CertificateData));
-      const nextRevisions = Object.fromEntries(updated.map(cert => [cert.id, `${cert.status}:${toJsDate(cert.updatedAt)?.getTime() || 0}`]));
-      const previous = certificateRevisions.current;
-      certificateRevisions.current = nextRevisions;
-      if (firstSnapshot) { setCertificateMessage(''); setDownloadingCert(null); firstSnapshot = false; }
-      setCertificateLinks(links => Object.fromEntries(Object.entries(links).filter(([id]) => previous[id] === nextRevisions[id] && nextRevisions[id]?.startsWith('Available:'))));
-      setCertificates(updated.sort((a, b) => (toJsDate(b.issueDate || b.createdAt)?.getTime() || 0) - (toJsDate(a.issueDate || a.createdAt)?.getTime() || 0)));
-      setCertificateLoading(false);
-      setCertificateError(null);
-    }, () => {
-      setCertificateLoading(false);
-      setCertificateError(isAr ? 'تعذر تحديث الشهادات. أعد المحاولة.' : 'Could not refresh certificates. Please retry.');
-    });
-    return () => { invalidateRequests(); unsubscribe(); };
-  }, [user, isAr, reloadKey]);
+      setCertificates(updated.sort((a, b) => (toJsDate(b.issueDate || b.createdAt)?.getTime() ?? 0) - (toJsDate(a.issueDate || a.createdAt)?.getTime() ?? 0)));
+      // Discard links whenever certificate state changes (including revocation).
+      setCertificateLinks({});
+    }, () => setCertificateMessage(isAr ? 'تعذر تحديث حالة الشهادات. أعد تحميل الصفحة.' : 'Could not refresh certificate status. Reload the page.'));
+  }, [user, isAr]);
 
   const handleDownloadCertificate = async (certificateId: string) => {
-    const revision = certificateRevisions.current[certificateId];
-    if (!revision?.startsWith('Available:')) return;
-    const request = ++certificateRequest.current;
     setDownloadingCert(certificateId);
     setCertificateMessage('');
     try {
       const getCertUrl = httpsCallable(functions, 'getCertificateDownloadUrl');
       const res = await getCertUrl({ certificateId });
-      if (request !== certificateRequest.current || revision !== certificateRevisions.current[certificateId]) return;
       const data = res.data as { downloadUrl?: string; url?: string };
       const targetUrl = data?.downloadUrl || data?.url;
       if (targetUrl) {
         const parsed = new URL(targetUrl);
         if (parsed.protocol !== 'https:') throw new Error('Invalid certificate URL');
         setCertificateLinks(previous => ({ ...previous, [certificateId]: { url: parsed.href, expiresAt: Date.now() + 4 * 60 * 1000 } }));
-        setCertificateMessage(isAr ? 'الشهادة جاهزة. اضغط «فتح الشهادة». إذا انتهت صلاحية الرابط اضغط «عرض الشهادة» مجددًا.' : 'Your certificate is ready. Select “Open certificate”. Select “View certificate” again if the link expires.');
+        setCertificateMessage(isAr ? 'الرابط جاهز. اضغط «فتح الشهادة». إذا انتهت صلاحيته جهّز رابطًا جديدًا.' : 'The link is ready. Select “Open certificate”. Generate a new link if it expires.');
       } else {
         setCertificateMessage(isAr ? 'الشهادة قيد التجهيز من قبل المنظمين.' : 'Certificate is being prepared.');
       }
     } catch (err) {
-      if (request !== certificateRequest.current) return;
       console.error('Error downloading certificate:', err);
       setCertificateMessage(isAr ? 'تعذر تجهيز الرابط حالياً. حاول لاحقًا أو تواصل مع المنظم.' : 'Could not prepare the link. Retry later or contact the organizer.');
     } finally {
-      if (request === certificateRequest.current) setDownloadingCert(null);
+      setDownloadingCert(null);
     }
-  };
-
-  const certificateAction = (certificate: CertificateData) => {
-    const link = certificate.status === 'Available' ? certificateLinks[certificate.id] : undefined;
-    if (link) return <a href={link.url} target="_blank" rel="noopener noreferrer" onClick={event => {
-      if (link.expiresAt <= Date.now()) { event.preventDefault(); setCertificateLinks(previous => { const next = { ...previous }; delete next[certificate.id]; return next; }); void handleDownloadCertificate(certificate.id); }
-    }} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700"><ExternalLink className="h-4 w-4" aria-hidden="true" />{isAr ? 'فتح الشهادة' : 'Open certificate'}</a>;
-    if (certificate.status !== 'Available') return null;
-    return <button type="button" onClick={() => handleDownloadCertificate(certificate.id)} disabled={downloadingCert !== null} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-blue-200 px-4 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50 disabled:opacity-60">{downloadingCert === certificate.id ? <><LoadingSpinner size="sm" color="border-blue-600" /><span role="status">{isAr ? 'جارٍ تجهيز الشهادة…' : 'Preparing certificate…'}</span></> : <><ExternalLink className="h-4 w-4" aria-hidden="true" />{isAr ? 'عرض الشهادة' : 'View certificate'}</>}</button>;
   };
 
   const handleSaveName = async (e: React.FormEvent) => {
@@ -496,9 +453,8 @@ function EngineeringProfilePage() {
   const attendedCount = registrations.filter(r => r.status === 'attended').length;
 
   return (
-    <div className="min-h-screen bg-slate-50 py-6 px-4 sm:px-6 lg:px-8 mt-16">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">{isAr ? 'حسابي' : 'My account'}</h1>
+    <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 lg:px-8 mt-16">
+      <div className="max-w-5xl mx-auto space-y-8">
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-2xl flex items-center justify-between">
@@ -521,11 +477,10 @@ function EngineeringProfilePage() {
 
         {/* 1. Digital Member Card */}
         <div className="relative">
-          <DigitalMemberCard
+          <DigitalMemberCard 
             user={user}
             userData={userData}
             rank={userRank}
-            rankState={rankState}
             totalPoints={totalPoints}
             onEditName={() => {
               const parts = (userData?.arabicFullName || '').split(' ').filter(Boolean);
@@ -547,34 +502,52 @@ function EngineeringProfilePage() {
             }}
             onLogout={logout}
           />
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Link href="/profile?tab=events#account-activity" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-3 text-sm font-bold text-white hover:bg-blue-700"><Calendar className="h-4 w-4" aria-hidden="true" />{isAr ? 'تسجيلاتي' : 'My registrations'}</Link>
-            <Link href="/profile?tab=certificates#account-activity" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-3 py-3 text-sm font-bold text-blue-700 hover:bg-blue-50"><Award className="h-4 w-4" aria-hidden="true" />{isAr ? 'شهاداتي' : 'My certificates'}</Link>
-            <Link href="/profile/pass" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"><QrCode className="h-4 w-4" aria-hidden="true" />{isAr ? 'بطاقة العضوية' : 'Membership pass'}</Link>
-            <button type="button" onClick={() => {
-              setEditingCard({
-                theme: userData?.cardPreferences?.theme || 'blue',
-                pattern: userData?.cardPreferences?.pattern || 'none',
-                linkedin: userData?.publicProfile?.linkedin || ''
-              });
-              setShowCardModal(true);
-            }} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"><Edit2 className="h-4 w-4" aria-hidden="true" />{isAr ? 'تخصيص البطاقة' : 'Customize pass'}</button>
+          <div className="absolute top-4 rtl:left-4 ltr:right-4 z-20 md:hidden flex gap-2">
+             <button 
+                onClick={() => {
+                  setEditingCard({
+                    theme: userData?.cardPreferences?.theme || 'blue',
+                    pattern: userData?.cardPreferences?.pattern || 'none',
+                    linkedin: userData?.publicProfile?.linkedin || ''
+                  });
+                  setShowCardModal(true);
+                }}
+                className="bg-indigo-600/80 hover:bg-indigo-600 backdrop-blur-md border border-indigo-400/30 text-white p-2 rounded-xl flex items-center justify-center transition-colors shadow-lg"
+                title={isAr ? 'تخصيص البطاقة' : 'Customize Pass'}
+             >
+                <Edit2 className="w-5 h-5" />
+             </button>
+             <Link 
+                href="/profile/pass" 
+                className="bg-white/20 hover:bg-white/30 backdrop-blur-md border border-white/20 text-white p-2 rounded-xl flex items-center justify-center transition-colors shadow-lg"
+                title={isAr ? 'عرض البطاقة بملء الشاشة' : 'View Full Screen Pass'}
+             >
+                <ExternalLink className="w-5 h-5" />
+             </Link>
           </div>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm">
-            <Link href="/leaderboard" className="inline-flex min-h-11 items-center gap-2 font-semibold text-blue-700"><Trophy className="h-4 w-4" aria-hidden="true" />{isAr ? 'عرض لوحة الشرف' : 'View leaderboard'}</Link>
-            <button type="button" onClick={async () => {
-              const url = memberPassUrl(SITE_URL, locale, user.uid);
-              setShareMessage('');
-              try {
-                if (navigator.share) await navigator.share({ title: isAr ? 'بطاقة عضويتي' : 'My member pass', url });
-                else { await navigator.clipboard.writeText(url); setShareMessage(isAr ? 'نُسخ رابط بطاقة العضوية.' : 'Member pass link copied.'); }
-              } catch (reason) {
-                if (!(reason instanceof Error && reason.name === 'AbortError')) setShareMessage(isAr ? 'تعذرت المشاركة. افتح بطاقة العضوية العامة لنسخ رابطها.' : 'Sharing was unavailable. Open your public pass to copy its link.');
-              }
-            }} className="inline-flex min-h-11 items-center gap-2 font-semibold text-slate-700"><Share2 className="h-4 w-4" aria-hidden="true" />{isAr ? 'مشاركة بطاقة العضوية' : 'Share member pass'}</button>
+          <div className="hidden md:flex justify-end -mt-4 mb-4 gap-2">
+             <button 
+                onClick={() => {
+                  setEditingCard({
+                    theme: userData?.cardPreferences?.theme || 'blue',
+                    pattern: userData?.cardPreferences?.pattern || 'none',
+                    linkedin: userData?.publicProfile?.linkedin || ''
+                  });
+                  setShowCardModal(true);
+                }}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-sm relative z-20"
+             >
+                <Edit2 className="w-4 h-4" />
+                <span>{isAr ? 'تخصيص البطاقة' : 'Customize Pass'}</span>
+             </button>
+             <Link 
+                href="/profile/pass" 
+                className="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-sm relative z-20"
+             >
+                <ExternalLink className="w-4 h-4" />
+                <span>{isAr ? 'عرض البطاقة الرقمية' : 'View Digital Pass'}</span>
+             </Link>
           </div>
-          {shareMessage && <p role="status" className="text-sm text-slate-600">{shareMessage}</p>}
-          {rankState === 'error' && <p role="status" className="mt-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{isAr ? 'تعذر تحميل مركزك في لوحة الشرف.' : 'Your leaderboard rank could not be loaded.'} <button type="button" onClick={() => { setRankState('loading'); setRankReloadKey(key => key + 1); }} className="min-h-11 px-2 font-bold underline">{isAr ? 'إعادة المحاولة' : 'Retry'}</button></p>}
         </div>
 
         {/* Public Board Profile Edit Button (Admin/Organizer Only) */}
@@ -605,248 +578,62 @@ function EngineeringProfilePage() {
           </div>
         )}
 
-        <section aria-label={isAr ? 'ملخص النشاط' : 'Activity summary'} className="grid grid-cols-2 gap-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4">
-            <p className="flex items-center gap-2 text-sm font-medium text-slate-600"><Calendar className="h-4 w-4 text-blue-600" aria-hidden="true" />{t('eventsAttended')}</p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">{loading ? '…' : error ? '—' : attendedCount}</p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-4">
-            <p className="flex items-center gap-2 text-sm font-medium text-slate-600"><Award className="h-4 w-4 text-emerald-600" aria-hidden="true" />{t('certificatesEarned')}</p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">{certificateLoading ? '…' : certificateError ? '—' : certificates.filter(cert => cert.status === 'Available').length}</p>
-          </div>
-        </section>
-
-
-        {/* 4. Activity, Points, and Certificates Tabs */}
-        {certificateMessage && <p role="status" className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">{certificateMessage}</p>}
-        <section id="account-activity" aria-label={isAr ? 'تسجيلاتي ونقاطي وشهاداتي' : 'Registrations, points and certificates'} className="scroll-mt-28 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-          <div role="tablist" aria-label={isAr ? 'نشاط الحساب' : 'Account activity'} className="flex border-b border-slate-100" onKeyDown={event => {
-            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-            const tabs = ['events', 'points', 'certificates'] as const;
-            const forward = isAr ? event.key === 'ArrowLeft' : event.key === 'ArrowRight';
-            const index = event.key === 'Home' ? 0 : event.key === 'End' ? 2 : (tabs.indexOf(activeTab) + (forward ? 1 : 2)) % 3;
-            setActiveTab(tabs[index]);
-            document.getElementById(`account-tab-${tabs[index]}`)?.focus();
-            event.preventDefault();
-          }}>
-            <button
-              type="button" role="tab" id="account-tab-events" aria-selected={activeTab === 'events'} aria-controls="account-panel" tabIndex={activeTab === 'events' ? 0 : -1}
-              onClick={() => setActiveTab('events')}
-              className={`flex-1 py-4 sm:py-5 font-bold text-center transition-all text-sm sm:text-base font-cairo flex items-center justify-center gap-2 ${
-                activeTab === 'events'
-                  ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50/50'
-                  : 'text-slate-500 hover:bg-slate-50'
-              }`}
-            >
-              <span>{isAr ? 'التسجيلات' : 'Registrations'}</span>
-              <span className={`px-2 py-0.5 rounded-full text-xs ${
-                activeTab === 'events' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
-              }`}>
-                {registrations.length}
+        {/* 2. Gamification Summary Cards */}
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex items-center gap-4">
+            <div className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-400 text-white flex items-center justify-center shadow-md shadow-amber-500/20 flex-shrink-0">
+              <Trophy className="h-7 w-7" />
+            </div>
+            <div>
+              <span className="text-xs sm:text-sm font-semibold text-slate-500 block">
+                {t('totalPoints')}
               </span>
-            </button>
-
-            <button
-              type="button" role="tab" id="account-tab-points" aria-selected={activeTab === 'points'} aria-controls="account-panel" tabIndex={activeTab === 'points' ? 0 : -1}
-              onClick={() => setActiveTab('points')}
-              className={`flex-1 py-4 sm:py-5 font-bold text-center transition-all text-sm sm:text-base font-cairo flex items-center justify-center gap-2 ${
-                activeTab === 'points'
-                  ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50/50'
-                  : 'text-slate-500 hover:bg-slate-50'
-              }`}
-            >
-              <span>{tActivity('tabs.points')}</span>
-              <span className={`px-2 py-0.5 rounded-full text-xs ${
-                activeTab === 'points' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
-              }`}>
-                {transactions.length}
+              <span className="text-2xl sm:text-3xl font-black font-cairo text-slate-900">
+                {loading ? '...' : totalPoints}
               </span>
-            </button>
-
-            <button
-              type="button" role="tab" id="account-tab-certificates" aria-selected={activeTab === 'certificates'} aria-controls="account-panel" tabIndex={activeTab === 'certificates' ? 0 : -1}
-              onClick={() => setActiveTab('certificates')}
-              className={`flex-1 py-4 sm:py-5 font-bold text-center transition-all text-sm sm:text-base font-cairo flex items-center justify-center gap-2 ${
-                activeTab === 'certificates'
-                  ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50/50'
-                  : 'text-slate-500 hover:bg-slate-50'
-              }`}
-            >
-              <span>{tActivity('tabs.certificates')}</span>
-              <span className={`px-2 py-0.5 rounded-full text-xs ${
-                activeTab === 'certificates' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
-              }`}>
-                {certificates.length}
-              </span>
-            </button>
+            </div>
           </div>
 
-          <div id="account-panel" role="tabpanel" aria-labelledby={`account-tab-${activeTab}`} tabIndex={0} className="p-4 sm:p-6 min-h-[240px]">
-            {activeTab === 'points' && pointError && <p role="status" className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{pointError} <button type="button" onClick={() => setReloadKey(key => key + 1)} className="min-h-11 px-2 font-bold underline">{tCommon('retry')}</button></p>}
-            {activeTab === 'certificates' && certificateError && <p role="status" className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{certificateError} <button type="button" onClick={() => setReloadKey(key => key + 1)} className="min-h-11 px-2 font-bold underline">{tCommon('retry')}</button></p>}
-            {(activeTab === 'certificates' ? certificateLoading : activeTab === 'points' ? pointsLoading : loading) ? (
-              <div className="flex justify-center items-center h-40">
-                <LoadingSpinner size="md" color="border-blue-600" />
-              </div>
-            ) : (
-              <>
-                {/* Events Tab */}
-                {activeTab === 'events' && (
-                  <div className="space-y-4">
-                    {registrations.length === 0 ? (
-                      <div className="text-center py-16 flex flex-col items-center">
-                        <Calendar className="h-16 w-16 text-slate-200 mb-4" />
-                        <h3 className="text-lg font-bold text-slate-800 mb-2">{error ? (isAr ? 'التسجيلات غير متاحة حاليًا' : 'Registrations are unavailable right now') : tActivity('noEvents')}</h3>
-                        <Link href="/events" className="mt-4 bg-blue-600 text-white font-bold py-2.5 px-6 rounded-xl hover:bg-blue-700 transition-colors shadow-xs">
-                          {isAr ? 'تصفح الفعاليات' : 'Browse Events'}
-                        </Link>
-                      </div>
-                    ) : (
-                      registrations.map((reg) => {
-                        const certificate = certificates.find(cert => cert.eventId === reg.event.id);
-                        return (
-                        <div
-                          key={reg.id}
-                          className="border border-slate-100 rounded-2xl p-5 hover:bg-slate-50/50 hover:border-blue-100 transition-all shadow-xs flex flex-col gap-4 text-start"
-                        >
-                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div className="flex items-start gap-4">
-                              <div className="h-12 w-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center flex-shrink-0">
-                                <Calendar className="h-6 w-6" />
-                              </div>
-                              <div>
-                                {reg.eventUnavailable ? <p className="font-bold text-slate-900 text-base">{isAr ? reg.event.title : (reg.event.titleEn || reg.event.title)}</p> : <Link
-                                  href={`/events/${reg.event.id}`}
-                                  className="font-bold text-slate-900 text-base hover:text-blue-600 transition-colors block"
-                                >
-                                  {isAr ? reg.event.title : (reg.event.titleEn || reg.event.title)}
-                                </Link>}
-                                {reg.event.date && <div className="mt-1 text-sm text-slate-700"><span className="font-semibold">{isAr ? 'موعد الفعالية: ' : 'Event date: '}</span>{formatDateSafe(reg.event.date, 'dd MMMM yyyy · HH:mm', { locale: dateLocale })} <span className="text-xs text-slate-500">{isAr ? '(توقيت الرياض)' : '(Riyadh time)'}</span></div>}
-                                <div className="flex flex-wrap items-center text-xs text-slate-500 mt-1">
-                                  <Clock className="h-3.5 w-3.5 me-1 text-slate-400" />
-                                  <span className="me-1">{isAr ? 'سجّلت يوم:' : 'Registered on:'}</span>
-                                  <span>{formatDateSafe(reg.timestamp, 'dd MMMM yyyy', { locale: dateLocale })}</span>
-                                </div>
-                              </div>
-                            </div>
+          <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex items-center gap-4">
+            <div className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center shadow-md shadow-blue-500/20 flex-shrink-0">
+              <Sparkles className="h-7 w-7" />
+            </div>
+            <div>
+              <span className="text-xs sm:text-sm font-semibold text-slate-500 block">
+                {t('communityRank')}
+              </span>
+              <span className="text-2xl sm:text-3xl font-black font-cairo text-slate-900">
+                {loading ? '...' : userRank ? `#${userRank}` : '#-'}
+              </span>
+            </div>
+          </div>
 
-                            <div className="flex items-center gap-3 self-start md:self-center">
-                              <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                                reg.status === 'approved' || reg.status === 'attended'
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : reg.status === 'waitlisted'
-                                    ? 'bg-amber-100 text-amber-800'
-                                    : reg.status === 'cancelled'
-                                      ? 'bg-red-100 text-red-800'
-                                      : 'bg-slate-100 text-slate-700'
-                              }`}>
-                                {registrationLabel(reg.status, isAr)}
-                              </span>
-                            </div>
-                          </div>
+          <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex items-center gap-4">
+            <div className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/20 flex-shrink-0">
+              <Calendar className="h-7 w-7" />
+            </div>
+            <div>
+              <span className="text-xs sm:text-sm font-semibold text-slate-500 block">
+                {t('eventsAttended')}
+              </span>
+              <span className="text-2xl sm:text-3xl font-black font-cairo text-slate-900">
+                {loading ? '...' : attendedCount}
+              </span>
+            </div>
+          </div>
 
-                          {certificate && (
-                            <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
-                              <span className="text-xs font-medium text-emerald-700 flex items-center gap-1.5">
-                                <CheckCircle className="h-3.5 w-3.5" />
-                                <span>{certificateLabel(certificate.status, isAr)}</span>
-                              </span>
-                              {certificateAction(certificate)}
-                            </div>
-                          )}
-                        </div>
-                      ); })
-                    )}
-                  </div>
-                )}
-
-                {/* Points Tab */}
-                {activeTab === 'points' && (
-                  <div className="space-y-3">
-                    {transactions.length === 0 ? (
-                      <div className="text-center py-16 flex flex-col items-center">
-                        <Trophy className="h-16 w-16 text-slate-200 mb-4" />
-                        <h3 className="text-lg font-bold text-slate-800 mb-2">{pointError ? (isAr ? 'سجل النقاط غير متاح حاليًا' : 'Point history is unavailable right now') : tActivity('noPoints')}</h3>
-                      </div>
-                    ) : (
-                      transactions.map((tx) => (
-                        <div
-                          key={tx.id}
-                          className="border border-slate-100 rounded-2xl p-4 flex items-center justify-between hover:bg-slate-50 transition-colors text-start"
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className={`mt-0.5 h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                              tx.amount > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
-                            }`}>
-                              <ArrowUpRight className={`h-5 w-5 ${tx.amount < 0 ? 'rotate-90' : ''}`} />
-                            </div>
-                            <div>
-                              <span className={`inline-block px-2.5 py-0.5 rounded-md text-[11px] font-bold mb-1 ${
-                                tx.source === 'attendance' ? 'bg-blue-100 text-blue-800' :
-                                tx.source === 'manual_adjustment' ? 'bg-purple-100 text-purple-800' :
-                                'bg-slate-100 text-slate-700'
-                              }`}>
-                                {tx.source === 'attendance' ? tActivity('sourceAttendance') :
-                                 tx.source === 'manual_adjustment' ? tActivity('sourceManual') :
-                                 tx.source === 'attendance_override' ? tActivity('sourceOverride') : 'System'}
-                              </span>
-                              <h4 className="font-bold text-slate-900 text-sm">{tx.reason}</h4>
-                              <p className="text-xs text-slate-400 flex items-center mt-0.5">
-                                <Clock className="h-3 w-3 me-1" />
-                                <span>{formatDateSafe(tx.createdAt, 'dd MMMM yyyy HH:mm', { locale: dateLocale })}</span>
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className={`font-black text-xl font-cairo ${tx.amount > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                            {tx.amount > 0 ? '+' : ''}{tx.amount}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-
-                {/* Certificates Tab */}
-                {activeTab === 'certificates' && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {certificates.length === 0 ? (
-                      <div className="col-span-1 sm:col-span-2 text-center py-16 flex flex-col items-center">
-                        <Award className="h-16 w-16 text-slate-200 mb-4" />
-                        <h3 className="text-lg font-bold text-slate-800 mb-2">{certificateError ? (isAr ? 'الشهادات غير متاحة حاليًا' : 'Certificates are unavailable right now') : tActivity('noCertificates')}</h3>
-                      </div>
-                    ) : (
-                      certificates.map((cert) => (
-                        <div
-                          key={cert.id}
-                          className="border border-emerald-100 bg-emerald-50/20 rounded-2xl p-5 hover:bg-emerald-50/50 transition-colors space-y-4 text-start"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-center gap-3">
-                              <div className="h-10 w-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0">
-                                <Award className="h-5 w-5" />
-                              </div>
-                              <div>
-                                <h4 className="font-bold text-slate-900 text-base break-words">
-                                  {cert.eventTitle}
-                                </h4>
-                                <span className="text-xs text-slate-500 block mt-0.5">
-                                  {formatDateSafe(cert.issueDate || cert.createdAt, 'dd MMMM yyyy', { locale: dateLocale })}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <p className="text-sm font-bold text-slate-700">{certificateLabel(cert.status, isAr)}</p>
-
-                          {certificateAction(cert)}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-              </>
-            )}
+          <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex items-center gap-4">
+            <div className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-purple-600 to-pink-500 text-white flex items-center justify-center shadow-md shadow-purple-500/20 flex-shrink-0">
+              <Award className="h-7 w-7" />
+            </div>
+            <div>
+              <span className="text-xs sm:text-sm font-semibold text-slate-500 block">
+                {t('certificatesEarned')}
+              </span>
+              <span className="text-2xl sm:text-3xl font-black font-cairo text-slate-900">
+                {loading ? '...' : certificates.filter(cert => cert.status === 'Available').length}
+              </span>
+            </div>
           </div>
         </section>
 
@@ -864,7 +651,7 @@ function EngineeringProfilePage() {
 
           <div className="flex overflow-x-auto pb-4 snap-x sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 hide-scrollbar">
             {ALL_BADGES.map((badge) => {
-              const isEarned = userBadges.includes(badge.id) ||
+              const isEarned = userBadges.includes(badge.id) || 
                 (badge.targetType === 'attendance' && attendedCount >= badge.threshold) ||
                 (badge.targetType === 'points' && totalPoints >= badge.threshold);
 
@@ -888,8 +675,8 @@ function EngineeringProfilePage() {
                     </div>
 
                     <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                      isEarned
-                        ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                      isEarned 
+                        ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' 
                         : 'bg-slate-200 text-slate-500 flex items-center gap-1'
                     }`}>
                       {isEarned ? (
@@ -919,8 +706,8 @@ function EngineeringProfilePage() {
                         <span>{progressPct}%</span>
                       </div>
                       <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-blue-600 rounded-full transition-all duration-500"
+                        <div 
+                          className="h-full bg-blue-600 rounded-full transition-all duration-500" 
                           style={{ width: `${progressPct}%` }}
                         />
                       </div>
@@ -931,12 +718,256 @@ function EngineeringProfilePage() {
             })}
           </div>
         </section>
+
+        {/* 4. Activity, Points, and Certificates Tabs */}
+        {certificateMessage && <p role="status" className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">{certificateMessage}</p>}
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="flex border-b border-slate-100">
+            <button 
+              onClick={() => setActiveTab('events')}
+              className={`flex-1 py-4 sm:py-5 font-bold text-center transition-all text-sm sm:text-base font-cairo flex items-center justify-center gap-2 ${
+                activeTab === 'events' 
+                  ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50/50' 
+                  : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              <span>{tActivity('tabs.events')}</span>
+              <span className={`px-2 py-0.5 rounded-full text-xs ${
+                activeTab === 'events' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+              }`}>
+                {registrations.length}
+              </span>
+            </button>
+
+            <button 
+              onClick={() => setActiveTab('points')}
+              className={`flex-1 py-4 sm:py-5 font-bold text-center transition-all text-sm sm:text-base font-cairo flex items-center justify-center gap-2 ${
+                activeTab === 'points' 
+                  ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50/50' 
+                  : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              <span>{tActivity('tabs.points')}</span>
+              <span className={`px-2 py-0.5 rounded-full text-xs ${
+                activeTab === 'points' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+              }`}>
+                {transactions.length}
+              </span>
+            </button>
+
+            <button 
+              onClick={() => setActiveTab('certificates')}
+              className={`flex-1 py-4 sm:py-5 font-bold text-center transition-all text-sm sm:text-base font-cairo flex items-center justify-center gap-2 ${
+                activeTab === 'certificates' 
+                  ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50/50' 
+                  : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              <span>{tActivity('tabs.certificates')}</span>
+              <span className={`px-2 py-0.5 rounded-full text-xs ${
+                activeTab === 'certificates' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+              }`}>
+                {certificates.length}
+              </span>
+            </button>
+          </div>
+
+          <div className="p-6 sm:p-8 min-h-[300px]">
+            {loading ? (
+              <div className="flex justify-center items-center h-40">
+                <LoadingSpinner size="md" color="border-blue-600" />
+              </div>
+            ) : (
+              <>
+                {/* Events Tab */}
+                {activeTab === 'events' && (
+                  <div className="space-y-4">
+                    {registrations.length === 0 ? (
+                      <div className="text-center py-16 flex flex-col items-center">
+                        <Calendar className="h-16 w-16 text-slate-200 mb-4" />
+                        <h3 className="text-xl font-bold text-slate-800 font-cairo mb-2">{tActivity('noEvents')}</h3>
+                        <Link href="/events" className="mt-4 bg-blue-600 text-white font-bold py-2.5 px-6 rounded-xl hover:bg-blue-700 transition-colors shadow-xs">
+                          {isAr ? 'تصفح الفعاليات' : 'Browse Events'}
+                        </Link>
+                      </div>
+                    ) : (
+                      registrations.map((reg) => {
+                        const certificate = certificates.find(cert => cert.eventId === reg.event.id);
+                        return (
+                        <div 
+                          key={reg.id}
+                          className="border border-slate-100 rounded-2xl p-5 hover:bg-slate-50/50 hover:border-blue-100 transition-all shadow-xs flex flex-col gap-4 text-start"
+                        >
+                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div className="flex items-start gap-4">
+                              <div className="h-12 w-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center flex-shrink-0">
+                                <Calendar className="h-6 w-6" />
+                              </div>
+                              <div>
+                                <Link 
+                                  href={`/events/${reg.event.id}`}
+                                  className="font-bold text-slate-900 text-base hover:text-blue-600 transition-colors block"
+                                >
+                                  {isAr ? reg.event.title : (reg.event.titleEn || reg.event.title)}
+                                </Link>
+                                <div className="flex items-center text-xs text-slate-500 mt-1">
+                                  <Clock className="h-3.5 w-3.5 me-1 text-slate-400" />
+                                  <span>{formatDateSafe(reg.timestamp, 'dd MMMM yyyy', { locale: dateLocale })}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 self-start md:self-center">
+                              <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                reg.status === 'approved' || reg.status === 'attended' 
+                                  ? 'bg-emerald-100 text-emerald-800' 
+                                  : reg.status === 'waitlisted' 
+                                    ? 'bg-amber-100 text-amber-800' 
+                                    : reg.status === 'cancelled' 
+                                      ? 'bg-red-100 text-red-800' 
+                                      : 'bg-slate-100 text-slate-700'
+                              }`}>
+                                {registrationLabel(reg.status, isAr)}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {certificate && (
+                            <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                              <span className="text-xs font-medium text-emerald-700 flex items-center gap-1.5">
+                                <CheckCircle className="h-3.5 w-3.5" />
+                                <span>{certificateLabel(certificate.status, isAr)}</span>
+                              </span>
+                              <button
+                                onClick={() => handleDownloadCertificate(certificate.id)}
+                                disabled={certificate.status !== 'Available' || downloadingCert === certificate.id}
+                                className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                <span>{isAr ? 'تجهيز رابط الشهادة' : 'Prepare certificate link'}</span>
+                              </button>
+                            </div>
+                          )}
+                          {certificate && certificate.status === 'Available' && certificateLinks[certificate.id] && <a href={certificateLinks[certificate.id].url} target="_blank" rel="noopener noreferrer" className="font-bold text-blue-700 underline">{isAr ? 'فتح الشهادة' : 'Open certificate'}</a>}
+                        </div>
+                      ); })
+                    )}
+                  </div>
+                )}
+
+                {/* Points Tab */}
+                {activeTab === 'points' && (
+                  <div className="space-y-3">
+                    {transactions.length === 0 ? (
+                      <div className="text-center py-16 flex flex-col items-center">
+                        <Trophy className="h-16 w-16 text-slate-200 mb-4" />
+                        <h3 className="text-xl font-bold text-slate-800 font-cairo mb-2">{tActivity('noPoints')}</h3>
+                      </div>
+                    ) : (
+                      transactions.map((tx) => (
+                        <div 
+                          key={tx.id} 
+                          className="border border-slate-100 rounded-2xl p-4 flex items-center justify-between hover:bg-slate-50 transition-colors text-start"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className={`mt-0.5 h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                              tx.amount > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                            }`}>
+                              <ArrowUpRight className={`h-5 w-5 ${tx.amount < 0 ? 'rotate-90' : ''}`} />
+                            </div>
+                            <div>
+                              <span className={`inline-block px-2.5 py-0.5 rounded-md text-[11px] font-bold mb-1 ${
+                                tx.source === 'attendance' ? 'bg-blue-100 text-blue-800' : 
+                                tx.source === 'manual_adjustment' ? 'bg-purple-100 text-purple-800' : 
+                                'bg-slate-100 text-slate-700'
+                              }`}>
+                                {tx.source === 'attendance' ? tActivity('sourceAttendance') : 
+                                 tx.source === 'manual_adjustment' ? tActivity('sourceManual') : 
+                                 tx.source === 'attendance_override' ? tActivity('sourceOverride') : 'System'}
+                              </span>
+                              <h4 className="font-bold text-slate-900 text-sm">{tx.reason}</h4>
+                              <p className="text-xs text-slate-400 flex items-center mt-0.5">
+                                <Clock className="h-3 w-3 me-1" />
+                                <span>{formatDateSafe(tx.createdAt, 'dd MMMM yyyy HH:mm', { locale: dateLocale })}</span>
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className={`font-black text-xl font-cairo ${tx.amount > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {tx.amount > 0 ? '+' : ''}{tx.amount}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {/* Certificates Tab */}
+                {activeTab === 'certificates' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {certificates.length === 0 ? (
+                      <div className="col-span-1 sm:col-span-2 text-center py-16 flex flex-col items-center">
+                        <Award className="h-16 w-16 text-slate-200 mb-4" />
+                        <h3 className="text-xl font-bold text-slate-800 font-cairo mb-2">{tActivity('noCertificates')}</h3>
+                      </div>
+                    ) : (
+                      certificates.map((cert) => (
+                        <div 
+                          key={cert.id} 
+                          className="border border-emerald-100 bg-emerald-50/20 rounded-2xl p-5 hover:bg-emerald-50/50 transition-colors space-y-4 text-start"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-3">
+                              <div className="h-10 w-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0">
+                                <Award className="h-5 w-5" />
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-slate-900 text-sm line-clamp-1" title={cert.eventTitle}>
+                                  {cert.eventTitle}
+                                </h4>
+                                <span className="text-xs text-slate-500 block mt-0.5">
+                                  {formatDateSafe(cert.issueDate || cert.createdAt, 'dd MMMM yyyy', { locale: dateLocale })}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <p className="text-sm font-bold text-slate-700">{certificateLabel(cert.status, isAr)}</p>
+
+                          <button
+                            onClick={() => handleDownloadCertificate(cert.id)}
+                            disabled={cert.status !== 'Available' || downloadingCert === cert.id}
+                            className="bg-emerald-500 hover:bg-emerald-600 text-white p-2.5 sm:p-3 rounded-xl sm:rounded-2xl shadow-md transition-colors disabled:opacity-70 disabled:cursor-not-allowed group"
+                          >
+                            {downloadingCert === cert.id ? (
+                              <>
+                                <LoadingSpinner size="sm" color="border-white" className="me-1.5" />
+                                <span>{isAr ? 'جاري الفتح...' : 'Opening...'}</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>{isAr ? 'تجهيز رابط الشهادة' : 'Prepare certificate link'}</span>
+                                <ExternalLink className="h-3.5 w-3.5 ms-1" />
+                              </>
+                            )}
+                          </button>
+                          {cert.status === 'Available' && certificateLinks[cert.id] && <a href={certificateLinks[cert.id].url} target="_blank" rel="noopener noreferrer" className="block text-blue-700 font-bold underline">{isAr ? 'فتح الشهادة' : 'Open certificate'}</a>}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
       </div>
 
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl relative">
-            <button
+            <button 
               onClick={() => setShowEditModal(false)}
               className="absolute top-4 rtl:left-4 ltr:right-4 text-slate-400 hover:text-slate-600"
             >
@@ -945,7 +976,7 @@ function EngineeringProfilePage() {
             <h3 className="text-xl font-bold font-cairo text-slate-900 mb-2">
               {isAr ? 'تعديل الاسم الشخصي' : 'Edit Full Name'}
             </h3>
-
+            
             <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-xl flex gap-3 text-sm mb-5">
               <AlertCircle className="h-5 w-5 flex-shrink-0 text-amber-600" />
               <p className="font-medium">
@@ -969,14 +1000,14 @@ function EngineeringProfilePage() {
                 </div>
               </div>
               <div className="flex gap-3 mt-6">
-                <button
-                  type="button"
+                <button 
+                  type="button" 
                   onClick={() => setShowEditModal(false)}
                   className="flex-1 py-2.5 px-4 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-colors"
                 >
                   {isAr ? 'إلغاء' : 'Cancel'}
                 </button>
-                <button
+                <button 
                   type="submit"
                   disabled={isSaving}
                   className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50"
@@ -993,7 +1024,7 @@ function EngineeringProfilePage() {
       {showProfileModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl relative">
-            <button
+            <button 
               onClick={() => setShowProfileModal(false)}
               className="absolute top-4 rtl:left-4 ltr:right-4 text-slate-400 hover:text-slate-600"
             >
@@ -1002,7 +1033,7 @@ function EngineeringProfilePage() {
             <h3 className="text-xl font-bold font-cairo text-slate-900 mb-6">
               {isAr ? 'تعديل البيانات الأكاديمية' : 'Edit Academic Details'}
             </h3>
-
+            
             <form onSubmit={handleSaveProfile} className="space-y-4">
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">{isAr ? 'الكلية' : 'College'}</label>
@@ -1027,14 +1058,14 @@ function EngineeringProfilePage() {
               </div>
 
               <div className="flex gap-3 mt-6">
-                <button
-                  type="button"
+                <button 
+                  type="button" 
                   onClick={() => setShowProfileModal(false)}
                   className="flex-1 py-2.5 px-4 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-colors"
                 >
                   {isAr ? 'إلغاء' : 'Cancel'}
                 </button>
-                <button
+                <button 
                   type="submit"
                   disabled={isSavingProfile}
                   className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50"
@@ -1060,9 +1091,9 @@ function EngineeringProfilePage() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-
+            
             <form onSubmit={handleSavePublicProfile} className="p-6 space-y-6">
-
+              
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-3">
                   {isAr ? 'صورة العرض (Avatar)' : 'Avatar'}
@@ -1165,9 +1196,9 @@ function EngineeringProfilePage() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-
+            
             <form onSubmit={handleSaveCard} className="p-6 space-y-6">
-
+              
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-3">
                   {isAr ? 'سمة الألوان (Theme)' : 'Color Theme'}
@@ -1210,8 +1241,8 @@ function EngineeringProfilePage() {
                       type="button"
                       onClick={() => setEditingCard({...editingCard, pattern: p.id})}
                       className={`py-3 px-2 rounded-xl text-sm font-bold border transition-all ${
-                        editingCard.pattern === p.id
-                          ? 'bg-slate-800 text-white border-slate-800'
+                        editingCard.pattern === p.id 
+                          ? 'bg-slate-800 text-white border-slate-800' 
                           : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
                       }`}
                     >
