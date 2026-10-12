@@ -12,6 +12,7 @@ import { useRouter } from '@/i18n/routing';
 import { EventType, RegistrationMode, CustomQuestion } from '@/lib/types';
 import { ArrowRight, Save, Plus, Trash2 } from 'lucide-react';
 import { Link } from '@/i18n/routing';
+import EventVisibilityControl from '@/components/admin/EventVisibilityControl';
 
 export default function EditEventPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -37,6 +38,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
     capacity: 50,
     isUnlimitedCapacity: false,
     hideExactCapacity: false,
+    hideFromDiscovery: false,
     registeredCount: 0,
     attendanceCount: 0,
     points: 10,
@@ -94,6 +96,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
             capacity: data.capacity ?? 50,
             isUnlimitedCapacity: data.isUnlimitedCapacity || false,
             hideExactCapacity: data.hideExactCapacity || false,
+            hideFromDiscovery: data.hideFromDiscovery === true,
             registeredCount: data.registeredCount || 0,
             attendanceCount: data.attendanceCount || 0,
             points: data.points ?? 10,
@@ -164,6 +167,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         capacity: formData.capacity,
         isUnlimitedCapacity: formData.isUnlimitedCapacity,
         hideExactCapacity: formData.hideExactCapacity,
+        hideFromDiscovery: formData.hideFromDiscovery,
         points: formData.points,
         hasCertificate: formData.hasCertificate,
         registrationMode: formData.registrationMode,
@@ -200,6 +204,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
 
       <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 space-y-8">
         
+        <EventVisibilityControl hidden={formData.hideFromDiscovery} onChange={hidden => setFormData(previous => ({ ...previous, hideFromDiscovery: hidden }))} disabled={loading} />
         {/* Section 1: Basic Info */}
         <div>
           <h2 className="text-xl font-bold text-gray-900 mb-4 font-cairo border-b pb-2">المعلومات الأساسية</h2>

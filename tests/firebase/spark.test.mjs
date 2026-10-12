@@ -361,6 +361,29 @@ test('Event content saves create audited drafts and cannot overwrite counters or
   assert.equal((await call('organizer', 'saveEvent', { eventId: id, title: 'تعديل قديم', expectedUpdatedAt })).status, 409);
 });
 
+test('Discovery visibility is organizer-controlled metadata and preserves registrations and certificates', async () => {
+  const ref = db.collection('events').doc('visibility');
+  await ref.set({ ...event('Completed', 10), date: new Date('2026-11-10T10:00:00.000Z'), durationHours: 2, registeredCount: 2, attendanceCount: 1 });
+  const registration = db.collection('registrations').doc('visibility_carol');
+  const certificate = db.collection('certificates').doc('certificate_visibility_carol');
+  await registration.set({ userId: 'carol', eventId: ref.id, status: 'attended' });
+  await certificate.set({ userId: 'carol', eventId: ref.id, status: 'Rendered', url: 'https://cert.example.test/visibility' });
+  assert.equal((await call('carol', 'saveEvent', { eventId: ref.id, hideFromDiscovery: true })).status, 403);
+  assert.equal((await call('organizer', 'saveEvent', { eventId: ref.id, hideFromDiscovery: 'true' })).status, 400);
+  assert.equal((await call('organizer', 'saveEvent', { eventId: ref.id, hideFromDiscovery: true })).status, 200);
+  const hidden = (await ref.get()).data();
+  assert.equal(hidden.hideFromDiscovery, true);
+  assert.equal(hidden.state, 'Completed');
+  assert.equal(hidden.registeredCount, 2);
+  assert.equal(hidden.attendanceCount, 1);
+  assert.equal((await registration.get()).data().status, 'attended');
+  assert.equal((await certificate.get()).data().url, 'https://cert.example.test/visibility');
+  assert.equal((await call('organizer', 'saveEvent', { eventId: ref.id, hideFromDiscovery: false })).status, 200);
+  assert.equal((await ref.get()).data().hideFromDiscovery, false);
+  const visibilityAudit = await db.collection('audit_logs').where('targetId', '==', ref.id).get();
+  assert.ok(visibilityAudit.docs.some(doc => doc.data().action === 'event.update' && doc.data().fields?.includes('hideFromDiscovery')));
+});
+
 test('Member diagnostics are admin-only, read-only and flag a missing public projection', async () => {
   await db.collection('users').doc('activity-member').set({ displayName: 'عضو تجريبي', role: 'student', totalPoints: 10, email: 'activity@example.test' });
   assert.equal((await call('carol', 'getMemberOverview', { userId: 'activity-member' })).status, 403);

@@ -35,6 +35,8 @@ export interface PlatformEvent {
   capacity: number;
   isUnlimitedCapacity?: boolean;
   hideExactCapacity?: boolean;
+  /** Hide from public listings; permalinks and previous registrations remain available. */
+  hideFromDiscovery?: boolean;
   registeredCount?: number;
   attendanceCount?: number;
   points: number;

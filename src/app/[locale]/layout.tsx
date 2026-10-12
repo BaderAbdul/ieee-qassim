@@ -21,19 +21,19 @@ const thmanyah = localFont({
     { path: '../../fonts/thmanyah-serif-display-bold.woff2', weight: '700', style: 'normal' },
     { path: '../../fonts/thmanyah-serif-display-black.woff2', weight: '900', style: 'normal' }
   ],
-  variable: '--font-thmanyah',
+  variable: '--font-thmanyah-family',
   display: 'swap',
 });
 
 const cairo = Cairo({
   subsets: ['arabic', 'latin'],
-  variable: '--font-cairo',
+  variable: '--font-cairo-family',
   display: 'swap',
 });
 
 const inter = Inter({
   subsets: ['latin'],
-  variable: '--font-inter',
+  variable: '--font-inter-family',
   display: 'swap',
 });
 
@@ -60,7 +60,7 @@ export default async function RootLayout({
   children: React.ReactNode;
   params: Promise<{locale: string}>;
 }>) {
-  // Await the params promise in Next.js 15
+  // Route parameters are asynchronous in the installed Next.js version.
   const { locale } = await params;
 
   // Ensure that the incoming `locale` is valid
@@ -82,7 +82,7 @@ export default async function RootLayout({
         <NextIntlClientProvider messages={messages}>
           <AuthProvider>
             <ProfileGuard>
-              <div className="flex flex-col min-h-screen">
+              <div className="site-shell flex flex-col min-h-screen">
                 <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:start-3 focus:z-[100] focus:rounded-xl focus:bg-blue-600 focus:px-4 focus:py-3 focus:text-white">{locale === 'ar' ? 'تجاوز إلى المحتوى' : 'Skip to content'}</a>
                 <Navbar />
                 <main id="main-content" tabIndex={-1} className="flex-grow min-w-0">
