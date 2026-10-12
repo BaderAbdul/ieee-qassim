@@ -196,10 +196,10 @@ export default function EventsList({ events: initialEvents, nextCursor = null, i
           </button>
         </div>
       ) : (
-        /* Events Grid */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
+        /* Events Grid: 2 columns on mobile (portrait), 3 on desktop */
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-6 lg:gap-8">
           {filteredEvents.map((event) => (
-            <div key={event.id} className="transition-transform duration-300">
+            <div key={event.id} className="transition-transform duration-300 h-full">
               <EventCard event={event} />
             </div>
           ))}
