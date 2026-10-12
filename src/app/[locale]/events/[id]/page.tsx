@@ -19,7 +19,10 @@ import {
   CheckCircle, 
   AlertCircle,
   ArrowRight,
-  QrCode
+  QrCode,
+  X,
+  Maximize2,
+  Download
 } from 'lucide-react';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import EventDetailsSkeleton from '@/components/skeletons/EventDetailsSkeleton';
@@ -46,6 +49,23 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
   const [attendeeCount, setAttendeeCount] = useState(0);
   const [actionError, setActionError] = useState('');
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [isPosterOpen, setIsPosterOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsPosterOpen(false);
+    };
+    if (isPosterOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
+  }, [isPosterOpen]);
 
   useEffect(() => {
     return onSnapshot(doc(db, 'events', eventId), snapshot => {
@@ -143,7 +163,10 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
           
           {/* Left Column (Poster) - 5 Cols */}
           <div className="lg:col-span-5 relative">
-            <div className="lg:sticky lg:top-28 w-full bg-slate-900 rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden shadow-2xl shadow-slate-900/20 border-4 sm:border-8 border-white group">
+            <div 
+              onClick={() => { if (event.coverUrl) setIsPosterOpen(true); }}
+              className={`lg:sticky lg:top-28 w-full bg-slate-900 rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden shadow-2xl shadow-slate-900/20 border-4 sm:border-8 border-white group ${event.coverUrl ? 'cursor-pointer' : ''}`}
+            >
               <div className="aspect-[16/10] sm:aspect-[3/4] relative w-full bg-slate-800">
                 {event.coverUrl ? (
                   <Image 
@@ -161,14 +184,17 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent pointer-events-none" />
                 
                 {event.coverUrl && (
-                  <a 
-                    href={event.coverUrl} 
-                    target="_blank" 
-                    rel="noreferrer"
-                    className="absolute bottom-4 sm:bottom-6 start-4 sm:start-6 bg-black/60 hover:bg-black/90 backdrop-blur-md text-white px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all sm:opacity-0 sm:translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 flex items-center gap-2 shadow-lg border border-white/10"
+                  <button 
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsPosterOpen(true);
+                    }}
+                    className="absolute bottom-4 sm:bottom-6 start-4 sm:start-6 bg-black/70 hover:bg-black/90 active:scale-95 backdrop-blur-md text-white px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all sm:opacity-0 sm:translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 flex items-center gap-2 shadow-lg border border-white/15 cursor-pointer"
                   >
-                    {isAr ? 'عرض البوستر بالكامل' : 'View full poster'}
-                  </a>
+                    <Maximize2 className="w-4 h-4 text-blue-400" />
+                    <span>{isAr ? 'عرض البوستر بالكامل' : 'View full poster'}</span>
+                  </button>
                 )}
               </div>
             </div>
@@ -405,6 +431,62 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
           </div>
         </div>
       </div>
+
+      {/* In-app Poster Preview Modal / Lightbox */}
+      {isPosterOpen && event.coverUrl && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={() => setIsPosterOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label={isAr ? 'معاينة البوستر' : 'Poster preview'}
+        >
+          <div 
+            className="relative max-w-4xl w-full max-h-[92vh] flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Toolbar */}
+            <div className="w-full flex items-center justify-between gap-3 text-white mb-3 px-2">
+              <div className="min-w-0 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                <h3 className="text-sm sm:text-base font-bold text-white/90 truncate font-cairo">
+                  {title}
+                </h3>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <a
+                  href={event.coverUrl}
+                  download
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm font-bold backdrop-blur-md transition-all border border-white/15"
+                  title={isAr ? 'تحميل الصورة' : 'Download image'}
+                >
+                  <Download className="w-4 h-4" />
+                  <span className="hidden sm:inline">{isAr ? 'تحميل' : 'Download'}</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setIsPosterOpen(false)}
+                  className="p-1.5 sm:p-2 rounded-xl bg-white/10 hover:bg-white/25 active:scale-95 text-white transition-all backdrop-blur-md border border-white/15 cursor-pointer"
+                  aria-label={isAr ? 'إغلاق' : 'Close'}
+                >
+                  <X className="w-5 h-5 sm:w-6 sm:h-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Poster Frame */}
+            <div className="relative w-full max-h-[82vh] rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl border border-white/15 bg-slate-900/90 flex items-center justify-center">
+              <img
+                src={event.coverUrl}
+                alt={title}
+                className="max-h-[82vh] w-auto max-w-full object-contain select-none"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
