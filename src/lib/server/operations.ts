@@ -54,7 +54,7 @@ export async function getEventReport(eventId: string): Promise<EventReport> {
 export async function changeEventState(actorUid: string, eventId: string, state: unknown) {
   if (!states.includes(state as EventState)) throw new ApiError('invalid-argument', 'Invalid event state.');
   const db = getFirestore(); const ref = db.collection('events').doc(eventId);
-  return db.runTransaction(async tx => {
+  const result = await db.runTransaction(async tx => {
     const snap = await tx.get(ref); const event = snap.data();
     if (!event) throw new ApiError('not-found', 'Event not found.');
     if (event.state === state) return { status: 'success', state, unchanged: true };
@@ -68,6 +68,17 @@ export async function changeEventState(actorUid: string, eventId: string, state:
     audit(tx, 'event.state', actorUid, eventId, { before: event.state, after: state });
     return { status: 'success', state };
   });
+
+  try {
+    const { revalidatePath } = await import('next/cache');
+    revalidatePath('/[locale]', 'page');
+    revalidatePath('/[locale]/events', 'page');
+    revalidatePath(`/[locale]/events/${eventId}`, 'page');
+  } catch {
+    // Graceful fallback if called outside Next request cycle
+  }
+
+  return result;
 }
 
 export async function getOperations() {

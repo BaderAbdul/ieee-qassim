@@ -10,6 +10,7 @@ import { collection, doc, getDoc, getDocs, limit, orderBy, query, startAfter, wh
 import { db } from '@/lib/firebase/client';
 import { sortEventsByClosestDate, toJsDate } from '@/lib/dateUtils';
 import { eventTypeLabel } from '@/lib/studentExperience';
+import { eventCache } from '@/lib/eventCache';
 
 interface EventsListProps {
   events: PlatformEvent[];
@@ -24,6 +25,12 @@ export default function EventsList({ events: initialEvents, nextCursor = null, i
   const t = useTranslations('Events');
   const locale = useLocale();
   const isAr = locale === 'ar';
+
+  useEffect(() => {
+    if (initialEvents && initialEvents.length > 0) {
+      eventCache.populate(initialEvents);
+    }
+  }, [initialEvents]);
 
   const [events, setEvents] = useState(initialEvents);
   const [cursor, setCursor] = useState(nextCursor);

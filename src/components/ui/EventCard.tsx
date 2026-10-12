@@ -7,12 +7,16 @@ import { useLocale } from 'next-intl';
 import { MapPin, Calendar, Clock, Users, ArrowRight, Pin, CheckCircle2 } from 'lucide-react';
 import { formatDateSafe } from '@/lib/dateUtils';
 import { eventCapacityLabel, eventStateLabel, eventTypeLabel } from '@/lib/studentExperience';
+import { eventCache } from '@/lib/eventCache';
 
 interface EventCardProps {
   event: PlatformEvent;
 }
 
 export default function EventCard({ event }: EventCardProps) {
+  if (typeof window !== 'undefined' && event?.id) {
+    eventCache.set(event.id, event);
+  }
   const locale = useLocale();
   const isAr = locale === 'ar';
   const dateLocale = isAr ? ar : enUS;

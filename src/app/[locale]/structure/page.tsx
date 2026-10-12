@@ -3,8 +3,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import StructureAccordion, { Committee } from './StructureAccordion';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+export const revalidate = 300; // Cache on edge for 5 minutes
 
 export default async function StructurePage({ params }: { params: Promise<{ locale: string }> }) {
   const resolvedParams = await params;
@@ -12,15 +11,25 @@ export default async function StructurePage({ params }: { params: Promise<{ loca
   
   let committees: Committee[] = [];
   try {
-    const docSnap = await getDoc(doc(db, 'settings', 'homepage'));
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      if (data && data.committees) {
-        committees = data.committees;
+    const { adminDb } = await import('@/lib/firebase/admin');
+    if (adminDb) {
+      const snap = await adminDb.collection('settings').doc('homepage').get();
+      if (snap.exists && snap.data()?.committees) {
+        committees = snap.data()!.committees;
       }
     }
-  } catch (err) {
-    console.error("Error fetching structure", err);
+  } catch {
+    try {
+      const docSnap = await getDoc(doc(db, 'settings', 'homepage'));
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data && data.committees) {
+          committees = data.committees;
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching structure", err);
+    }
   }
 
   return (

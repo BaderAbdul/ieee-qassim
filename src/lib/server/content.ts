@@ -30,7 +30,7 @@ export async function saveHomepage(actorUid: string, input: Record<string, unkno
   }
   const update = Object.fromEntries(Object.entries(input).filter(([key]) => key !== 'expectedStructureRevision'));
   const db = getFirestore();
-  return db.runTransaction(async tx => {
+  const result = await db.runTransaction(async tx => {
     const ref = db.collection('settings').doc('homepage');
     const old = (await tx.get(ref)).data() || {};
     if (input.committees !== undefined && Number(old.structureRevision || 0) !== input.expectedStructureRevision) throw new ApiError('failed-precondition', 'Another organizer changed the structure. Reload it before saving. / تغيرت الهيكلة من منظم آخر؛ أعد تحميلها قبل الحفظ.');
@@ -44,4 +44,14 @@ export async function saveHomepage(actorUid: string, input: Record<string, unkno
     audit(tx, input.committees !== undefined ? 'content.structure' : 'content.homepage', actorUid, 'homepage', { fields: Object.keys(update) });
     return { status: 'success', structureRevision };
   });
+
+  try {
+    const { revalidatePath } = await import('next/cache');
+    revalidatePath('/[locale]', 'page');
+    revalidatePath('/[locale]/structure', 'page');
+  } catch {
+    // Graceful fallback if called outside Next request cycle
+  }
+
+  return result;
 }

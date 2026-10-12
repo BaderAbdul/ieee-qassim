@@ -76,6 +76,27 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} dir={dir}>
+      <head>
+        <script
+          type="speculationrules"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              prefetch: [
+                {
+                  where: {
+                    and: [
+                      { href_matches: "/*" },
+                      { not: { href_matches: "*/admin*" } },
+                      { not: { href_matches: "*/api*" } }
+                    ]
+                  },
+                  eagerness: "moderate"
+                }
+              ]
+            })
+          }}
+        />
+      </head>
       <body
         className={`${cairo.variable} ${inter.variable} ${thmanyah.variable} font-sans antialiased bg-gray-50 text-gray-900`}
       >

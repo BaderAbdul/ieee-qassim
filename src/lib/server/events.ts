@@ -10,7 +10,7 @@ export async function saveEvent(actorUid: string, input: Record<string, unknown>
   const db = getFirestore();
   const ref = input.eventId === undefined ? db.collection('events').doc() : db.collection('events').doc(documentId(input.eventId, 'eventId'));
   if (Object.keys(input).some(key => ![...fields, 'eventId', 'state', 'createdAt', 'updatedAt', 'expectedUpdatedAt'].includes(key))) throw new ApiError('invalid-argument', 'Invalid event fields.');
-  return db.runTransaction(async tx => {
+  const result = await db.runTransaction(async tx => {
     const snap = await tx.get(ref);
     if (input.eventId !== undefined && !snap.exists) throw new ApiError('not-found', 'Event not found.');
     const old = snap.data() || {};
@@ -46,4 +46,15 @@ export async function saveEvent(actorUid: string, input: Record<string, unknown>
     audit(tx, snap.exists ? 'event.update' : 'event.create', actorUid, ref.id, { fields: fields.filter(field => input[field] !== undefined) });
     return { status: 'success', eventId: ref.id };
   });
+
+  try {
+    const { revalidatePath } = await import('next/cache');
+    revalidatePath('/[locale]', 'page');
+    revalidatePath('/[locale]/events', 'page');
+    revalidatePath(`/[locale]/events/${ref.id}`, 'page');
+  } catch {
+    // Graceful fallback if called outside Next request cycle
+  }
+
+  return result;
 }

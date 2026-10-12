@@ -29,6 +29,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import EventDetailsSkeleton from '@/components/skeletons/EventDetailsSkeleton';
 import { formatDateSafe } from '@/lib/dateUtils';
 import { eventCapacityLabel, eventStateLabel, eventTypeLabel, registrationLabel } from '@/lib/studentExperience';
+import { eventCache } from '@/lib/eventCache';
 
 export default function EventDetailsPage({ params }: { params: Promise<{ id: string; locale: string }> }) {
   const unwrappedParams = use(params);
@@ -41,13 +42,15 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
   
   const { user, login, error: authError } = useAuth();
   
-  const [event, setEvent] = useState<PlatformEvent | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Instant load from memory cache if available, eliminating skeleton flicker on navigation
+  const cached = typeof window !== 'undefined' ? eventCache.get(eventId) : null;
+  const [event, setEvent] = useState<PlatformEvent | null>(cached || null);
+  const [loading, setLoading] = useState<boolean>(!cached);
   const [loadError, setLoadError] = useState<Error | null>(null);
   
   const [registrationStatus, setRegistrationStatus] = useState<string | null>(null);
   const [isRegistering, setIsRegistering] = useState(false);
-  const [attendeeCount, setAttendeeCount] = useState(0);
+  const [attendeeCount, setAttendeeCount] = useState(cached?.registeredCount ?? 0);
   const [actionError, setActionError] = useState('');
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [isPosterOpen, setIsPosterOpen] = useState(false);
@@ -71,6 +74,9 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
   useEffect(() => {
     return onSnapshot(doc(db, 'events', eventId), snapshot => {
       const current = snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } as PlatformEvent : null;
+      if (current) {
+        eventCache.set(eventId, current);
+      }
       setEvent(current); setAttendeeCount(current?.registeredCount ?? 0); setLoading(false);
     }, error => { setLoadError(error); setLoading(false); });
   }, [eventId]);

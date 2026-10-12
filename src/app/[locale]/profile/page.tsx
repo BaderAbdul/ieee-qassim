@@ -264,30 +264,53 @@ export default function EngineeringProfilePage() {
       try {
         setError(null);
         
-        // 1. Fetch Registrations
+        // 1. Concurrently fetch Registrations, Certificates, Point Transactions, and Community Rank
         const regQ = query(collection(db, 'registrations'), where('userId', '==', user.uid));
-        const regSnap = await getDocs(regQ);
-
-        // 2. Fetch Certificates
         const certQ = query(collection(db, 'certificates'), where('userId', '==', user.uid));
-        const certSnap = await getDocs(certQ);
+        const ptQ = query(collection(db, 'point_transactions'), where('userId', '==', user.uid));
+        const myPoints = userData?.totalPoints || 0;
+        const higherPointsQuery = query(
+          collection(db, 'public_profiles'),
+          where('totalPoints', '>', myPoints)
+        );
+
+        const [regSnap, certSnap, ptSnap, rankCountSnap] = await Promise.all([
+          getDocs(regQ),
+          getDocs(certQ),
+          getDocs(ptQ),
+          myPoints > 0 ? getCountFromServer(higherPointsQuery).catch(() => null) : null
+        ]);
+
         const certsData = certSnap.docs.map(d => ({ id: d.id, ...d.data() })) as CertificateData[];
         const certsByEvent = certsData.reduce((acc, cert) => {
           acc[cert.eventId] = cert;
           return acc;
         }, {} as Record<string, CertificateData>);
 
+        // 2. Concurrently fetch all registered events in parallel (O(1) network waterfall)
+        const uniqueEventIds = Array.from(new Set(regSnap.docs.map(d => d.data().eventId).filter(Boolean)));
+        const eventDocs = await Promise.all(
+          uniqueEventIds.map(eventId => getDoc(doc(db, 'events', eventId)).catch(() => null))
+        );
+
+        const eventMap = new Map<string, PlatformEvent>();
+        for (const eDoc of eventDocs) {
+          if (eDoc && eDoc.exists()) {
+            eventMap.set(eDoc.id, { id: eDoc.id, ...eDoc.data() } as PlatformEvent);
+          }
+        }
+
         const regsWithEvents: RegistrationWithEvent[] = [];
         for (const rDoc of regSnap.docs) {
           const rData = rDoc.data();
-          const eventDoc = await getDoc(doc(db, 'events', rData.eventId));
-          if (eventDoc.exists()) {
+          const event = eventMap.get(rData.eventId);
+          if (event) {
             regsWithEvents.push({
               id: rDoc.id,
               status: rData.status,
               timestamp: rData.timestamp || rData.registeredAt,
-              event: { id: eventDoc.id, ...eventDoc.data() } as PlatformEvent,
-              certificate: certsByEvent[eventDoc.id]
+              event,
+              certificate: certsByEvent[event.id]
             });
           }
         }
@@ -298,9 +321,7 @@ export default function EngineeringProfilePage() {
           return timeB - timeA;
         });
 
-        // 3. Fetch Point Transactions
-        const ptQ = query(collection(db, 'point_transactions'), where('userId', '==', user.uid));
-        const ptSnap = await getDocs(ptQ);
+        // 3. Process Point Transactions
         const ptsData = ptSnap.docs.map(d => ({ id: d.id, ...d.data() })) as PointTransaction[];
         ptsData.sort((a, b) => {
           const tA = toJsDate(a.createdAt)?.getTime() || 0;
@@ -308,14 +329,8 @@ export default function EngineeringProfilePage() {
           return tB - tA;
         });
 
-        // 4. Compute Community Rank accurately via O(1) aggregation
-        const myPoints = userData?.totalPoints || 0;
-        const higherPointsQuery = query(
-          collection(db, 'public_profiles'),
-          where('totalPoints', '>', myPoints)
-        );
-        const rankCountSnap = await getCountFromServer(higherPointsQuery);
-        const userCalculatedRank = myPoints > 0 ? rankCountSnap.data().count + 1 : null;
+        // 4. Compute Community Rank
+        const userCalculatedRank = rankCountSnap ? rankCountSnap.data().count + 1 : null;
 
         if (active) {
           setRegistrations(regsWithEvents);

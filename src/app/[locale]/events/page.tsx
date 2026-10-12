@@ -5,8 +5,7 @@ import { PlatformEvent } from '@/lib/types';
 import { sortEventsByClosestDate } from '@/lib/dateUtils';
 import EventsList from './EventsList';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+export const revalidate = 60; // Enable ISR Edge Caching, revalidate every 60s
 
 export default async function EventsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   let events: PlatformEvent[] = [];
@@ -14,34 +13,58 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
   const filters = await searchParams;
   // eslint-disable-next-line react-hooks/purity -- Dynamic server request time is passed once to the client to avoid hydration drift.
   const requestTime = Date.now();
+  const validStates = ['Published', 'Registration Open', 'Registration Closed', 'Ongoing', 'Completed'];
   
   try {
-    const eventsRef = collection(db, 'events');
-    const q = query(
-      eventsRef, 
-      where('state', 'in', ['Published', 'Registration Open', 'Registration Closed', 'Ongoing', 'Completed']),
-      orderBy('date', 'desc'),
-      limit(24)
-    );
-    const snapshot = await getDocs(q);
-    nextCursor = snapshot.size === 24 ? snapshot.docs.at(-1)?.id ?? null : null;
+    const { adminDb } = await import('@/lib/firebase/admin');
+    if (adminDb) {
+      const snapshot = await adminDb.collection('events')
+        .where('state', 'in', validStates)
+        .orderBy('date', 'desc')
+        .limit(24)
+        .get();
+
+      nextCursor = snapshot.size === 24 ? snapshot.docs.at(-1)?.id ?? null : null;
+      const fetchedEvents = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          date: data.date?.toDate ? data.date.toDate().toISOString() : data.date,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt
+        };
+      }) as PlatformEvent[];
+      events = sortEventsByClosestDate(fetchedEvents);
+    }
+  } catch {
+    try {
+      const eventsRef = collection(db, 'events');
+      const q = query(
+        eventsRef, 
+        where('state', 'in', validStates),
+        orderBy('date', 'desc'),
+        limit(24)
+      );
+      const snapshot = await getDocs(q);
+      nextCursor = snapshot.size === 24 ? snapshot.docs.at(-1)?.id ?? null : null;
+        
+      const fetchedEvents = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          date: data.date?.toDate ? data.date.toDate().toISOString() : data.date,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt
+        };
+      }) as PlatformEvent[];
       
-    const fetchedEvents = snapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-        // Convert Firebase Timestamp to ISO string to pass safely to Client Component
-        date: data.date?.toDate ? data.date.toDate().toISOString() : data.date,
-        createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
-        updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt
-      };
-    }) as PlatformEvent[];
-    
-    events = sortEventsByClosestDate(fetchedEvents);
-  } catch (error) {
-    console.error("Error fetching events", error);
-    throw error;
+      events = sortEventsByClosestDate(fetchedEvents);
+    } catch (error) {
+      console.error("Error fetching events", error);
+      throw error;
+    }
   }
 
   return (
