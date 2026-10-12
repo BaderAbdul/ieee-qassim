@@ -4,7 +4,7 @@ import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
 import { ar, enUS } from 'date-fns/locale';
 import { useLocale } from 'next-intl';
-import { MapPin, Calendar, Clock, Users, ArrowRight, Pin } from 'lucide-react';
+import { MapPin, Calendar, Clock, Users, ArrowRight, Pin, CheckCircle2 } from 'lucide-react';
 import { formatDateSafe } from '@/lib/dateUtils';
 import { eventCapacityLabel, eventStateLabel, eventTypeLabel } from '@/lib/studentExperience';
 
@@ -21,6 +21,8 @@ export default function EventCard({ event }: EventCardProps) {
   const day = formatDateSafe(eventDate, 'dd', { locale: dateLocale });
   const month = formatDateSafe(eventDate, 'MMM', { locale: dateLocale }).toUpperCase();
   
+  const isCompleted = event.state === 'Completed' || event.state === 'Archived';
+
   // Badge setup
   let badgeColor = 'bg-slate-100 text-slate-800 border-slate-200';
   const badgeText = eventStateLabel(event.state, isAr);
@@ -33,8 +35,8 @@ export default function EventCard({ event }: EventCardProps) {
     badgeColor = 'bg-orange-100 text-orange-800 border-orange-200';
   } else if (event.state === 'Ongoing') {
     badgeColor = 'bg-amber-100 text-amber-800 border-amber-200';
-  } else if (event.state === 'Completed') {
-    badgeColor = 'bg-slate-100 text-slate-800 border-slate-200';
+  } else if (isCompleted) {
+    badgeColor = 'bg-slate-800 text-slate-200 border-slate-700';
   }
 
   const title = isAr ? event.title : event.titleEn || event.title;
@@ -44,10 +46,12 @@ export default function EventCard({ event }: EventCardProps) {
   const capacityDisplay = eventCapacityLabel(event, isAr);
 
   return (
-    <div className={`group h-full bg-white rounded-2xl sm:rounded-[2rem] overflow-hidden flex flex-col transition-all duration-500 hover:-translate-y-2 relative ${
+    <div className={`group h-full rounded-2xl sm:rounded-[2rem] overflow-hidden flex flex-col transition-all duration-500 hover:-translate-y-2 relative ${
       event.isPinned 
-        ? 'ring-2 ring-amber-400 shadow-[0_0_25px_rgba(245,158,11,0.35)] border border-amber-300' 
-        : 'shadow-sm hover:shadow-2xl border border-gray-100/80'
+        ? 'bg-white ring-2 ring-amber-400 shadow-[0_0_25px_rgba(245,158,11,0.35)] border border-amber-300' 
+        : isCompleted
+          ? 'bg-slate-50/80 border border-slate-200/90 shadow-2xs hover:shadow-lg hover:border-slate-300 opacity-[0.97]'
+          : 'bg-white shadow-sm hover:shadow-2xl border border-gray-100/80'
     }`}>
       {/* Top Image Section */}
       <div className="relative h-28 sm:h-56 w-full bg-slate-100 overflow-hidden shrink-0">
@@ -57,7 +61,7 @@ export default function EventCard({ event }: EventCardProps) {
             alt={title}
             fill
             quality={85}
-            className="object-cover transition-transform duration-700 group-hover:scale-110"
+            className={`object-cover transition-transform duration-700 group-hover:scale-110 ${isCompleted ? 'grayscale-[30%] group-hover:grayscale-0' : ''}`}
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 50vw, 33vw"
           />
         ) : (
@@ -79,13 +83,14 @@ export default function EventCard({ event }: EventCardProps) {
 
         {/* Floating Date Badge */}
         <div className="absolute top-2 sm:top-4 start-2 sm:start-4 bg-white/95 backdrop-blur-md rounded-lg sm:rounded-2xl p-1 px-1.5 sm:p-2 sm:px-3 text-center shadow-md border border-white/20 z-10">
-          <div className="text-[9px] sm:text-sm font-bold text-blue-600 leading-none mb-0.5 sm:mb-1">{month}</div>
-          <div className="text-xs sm:text-xl font-black text-slate-900 leading-none font-cairo">{day}</div>
+          <div className={`text-[9px] sm:text-sm font-bold leading-none mb-0.5 sm:mb-1 ${isCompleted ? 'text-slate-500' : 'text-blue-600'}`}>{month}</div>
+          <div className={`text-xs sm:text-xl font-black leading-none font-cairo ${isCompleted ? 'text-slate-700' : 'text-slate-900'}`}>{day}</div>
         </div>
 
         {/* State + Pinned Badges (stacked in the same corner so they never collide) */}
         <div className="absolute top-2 sm:top-4 end-2 sm:end-4 z-10 flex flex-col items-end gap-1">
-          <span className={`px-2 py-0.5 sm:px-3 sm:py-1.5 rounded-full text-[9px] sm:text-xs font-bold border shadow-xs whitespace-nowrap ${badgeColor}`}>
+          <span className={`px-2 py-0.5 sm:px-3 sm:py-1.5 rounded-full text-[9px] sm:text-xs font-bold border shadow-xs whitespace-nowrap inline-flex items-center gap-1 ${badgeColor}`}>
+            {isCompleted && <CheckCircle2 className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-emerald-400" />}
             {badgeText}
           </span>
           {event.isPinned && (
@@ -149,9 +154,13 @@ export default function EventCard({ event }: EventCardProps) {
       <div className="p-2 sm:p-4 pt-0">
         <Link 
           href={`/events/${event.id}`}
-          className="flex items-center justify-center w-full py-2 sm:py-3.5 bg-slate-900 hover:bg-blue-600 text-white rounded-lg sm:rounded-xl text-[11px] sm:text-sm font-bold transition-colors duration-300 gap-1 sm:gap-2"
+          className={`flex items-center justify-center w-full py-2 sm:py-3.5 rounded-lg sm:rounded-xl text-[11px] sm:text-sm font-bold transition-all duration-300 gap-1 sm:gap-2 ${
+            isCompleted
+              ? 'bg-slate-100 hover:bg-slate-800 text-slate-700 hover:text-white border border-slate-200 hover:border-slate-800 shadow-2xs'
+              : 'bg-slate-900 hover:bg-blue-600 text-white shadow-xs'
+          }`}
         >
-          <span>{isAr ? 'التفاصيل' : 'Details'}</span>
+          <span>{isCompleted ? (isAr ? 'أرشيف الفعالية' : 'Archive') : (isAr ? 'التفاصيل' : 'Details')}</span>
           <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 rtl:-scale-x-100" />
         </Link>
       </div>

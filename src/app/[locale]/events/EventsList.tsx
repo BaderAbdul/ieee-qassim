@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { PlatformEvent } from '@/lib/types';
-import { Calendar, Search, Filter, Lightbulb } from 'lucide-react';
+import { Calendar, Search, Filter, Lightbulb, CheckCircle2, Sparkles } from 'lucide-react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import EventCard from '@/components/ui/EventCard';
@@ -84,6 +84,21 @@ export default function EventsList({ events: initialEvents, nextCursor = null, i
       return true;
     });
   }, [events, selectedType, searchQuery, view, now]);
+
+  // Separate active events from completed ones when viewing "all"
+  const { activeEvents, completedEvents } = useMemo(() => {
+    if (view !== 'all') {
+      return { activeEvents: filteredEvents, completedEvents: [] };
+    }
+    const active: PlatformEvent[] = [];
+    const completed: PlatformEvent[] = [];
+    filteredEvents.forEach(ev => {
+      const isPast = ['Completed', 'Archived'].includes(ev.state) || (toJsDate(ev.date)?.getTime() ?? 0) < now;
+      if (isPast) completed.push(ev);
+      else active.push(ev);
+    });
+    return { activeEvents: active, completedEvents: completed };
+  }, [filteredEvents, view, now]);
 
   return (
     <div className="space-y-10">
@@ -195,8 +210,53 @@ export default function EventsList({ events: initialEvents, nextCursor = null, i
             {isAr ? 'إعادة ضبط عوامل التصفية' : 'Reset filters'}
           </button>
         </div>
+      ) : view === 'all' && completedEvents.length > 0 && activeEvents.length > 0 ? (
+        /* Separated Sections when viewing all with both active and completed events */
+        <div className="space-y-12">
+          {/* Active / Upcoming Events */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <h2 className="text-lg sm:text-xl font-bold font-cairo text-slate-900">
+                {isAr ? 'الفعاليات القادمة والنشطة' : 'Upcoming & Active Events'}
+              </h2>
+              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                {activeEvents.length}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-6 lg:gap-8">
+              {activeEvents.map((event) => (
+                <div key={event.id} className="transition-transform duration-300 h-full">
+                  <EventCard event={event} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Completed Events Archive */}
+          <div className="space-y-4 pt-8 border-t border-slate-200/80">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-slate-500" />
+                <h2 className="text-lg sm:text-xl font-bold font-cairo text-slate-800">
+                  {isAr ? 'الفعاليات السابقة والمكتملة' : 'Past & Completed Events'}
+                </h2>
+                <span className="text-xs font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-full">
+                  {completedEvents.length}
+                </span>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-6 lg:gap-8">
+              {completedEvents.map((event) => (
+                <div key={event.id} className="transition-transform duration-300 h-full">
+                  <EventCard event={event} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       ) : (
-        /* Events Grid: 2 columns on mobile (portrait), 3 on desktop */
+        /* Standard Events Grid: 2 columns on mobile (portrait), 3 on desktop */
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-6 lg:gap-8">
           {filteredEvents.map((event) => (
             <div key={event.id} className="transition-transform duration-300 h-full">

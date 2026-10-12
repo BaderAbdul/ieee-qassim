@@ -196,7 +196,7 @@ export default async function HomePage({ params }: PageProps) {
               return (
                 <div 
                   key={event.id}
-                  className={`min-w-[42vw] max-w-[42vw] sm:min-w-[340px] sm:max-w-[340px] flex-shrink-0 snap-start ${isCompleted ? 'grayscale-[40%] opacity-90' : ''}`}
+                  className="min-w-[42vw] max-w-[42vw] sm:min-w-[340px] sm:max-w-[340px] flex-shrink-0 snap-start"
                 >
                   <EventCard event={event} />
                 </div>
