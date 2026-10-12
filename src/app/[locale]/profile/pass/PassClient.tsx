@@ -1,18 +1,23 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { QRCodeSVG } from 'qrcode.react';
 import { ShieldCheck, ArrowLeft, ArrowRight, Zap, Trophy, Calendar } from 'lucide-react';
 import Image from 'next/image';
 import { useLocale } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
+import { memberMajorLabel, memberPassUrl } from '@/lib/memberPresentation';
+import { SITE_URL } from '@/lib/site';
 
 export default function PassClient() {
   const { user, userData, loading } = useAuth();
   const locale = useLocale();
   const isAr = locale === 'ar';
   const router = useRouter();
+  useEffect(() => {
+    if (!loading && !user) router.replace('/profile');
+  }, [loading, user, router]);
 
   if (loading) {
     return (
@@ -23,12 +28,11 @@ export default function PassClient() {
   }
 
   if (!user) {
-    router.push('/profile');
     return null;
   }
 
   const displayName = userData?.arabicFullName || user.displayName || 'Member';
-  const major = userData?.major || 'General Member';
+  const major = memberMajorLabel(userData?.major, isAr);
   const joinDate = user.metadata?.creationTime 
     ? new Date(user.metadata.creationTime).getFullYear() 
     : new Date().getFullYear();
@@ -42,6 +46,8 @@ export default function PassClient() {
 
       {/* Navigation */}
       <button 
+        type="button"
+        aria-label={isAr ? 'العودة إلى حسابي' : 'Back to my account'}
         onClick={() => router.push('/profile')}
         className="absolute top-6 rtl:right-6 ltr:left-6 z-50 bg-white/10 hover:bg-white/20 text-white p-3 rounded-full backdrop-blur-md transition-colors"
       >
@@ -54,7 +60,7 @@ export default function PassClient() {
           
           {/* Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 flex flex-col items-center justify-center relative overflow-hidden h-32">
-            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff22_1px,transparent_1px),linear-gradient(to_bottom,#ffffff22_1px,transparent_1px)] [background-size:24px_24px] opacity-30"></div>
             <div className="z-10 flex flex-col items-center">
               <span className="text-white/80 font-black text-xs tracking-[0.3em] uppercase mb-1">IEEE Qassim Branch</span>
               <h2 className="text-white font-black text-2xl tracking-widest drop-shadow-md">DIGITAL PASS</h2>
@@ -77,24 +83,25 @@ export default function PassClient() {
               </div>
             </div>
 
-            <h3 className="text-2xl font-black text-white font-cairo leading-tight mb-1">{displayName}</h3>
+            <h3 className="break-words text-2xl font-bold text-white leading-relaxed mb-1">{displayName}</h3>
             <p className="text-blue-300 text-sm font-medium mb-6">{major}</p>
 
             {/* QR Code */}
             <div className="bg-white p-4 rounded-3xl shadow-lg w-full max-w-[240px] aspect-square flex items-center justify-center mx-auto mb-6 relative group">
               <div className="absolute inset-0 bg-blue-500/10 rounded-3xl blur-xl group-hover:bg-blue-500/20 transition-colors"></div>
               <QRCodeSVG 
-                value={`ieee-qu-user:${user.uid}`} 
+                value={memberPassUrl(SITE_URL, locale, user.uid)}
                 size={180}
                 bgColor={"#ffffff"}
                 fgColor={"#0f172a"}
                 level={"Q"}
-                includeMargin={false}
+                marginSize={4}
+                title={isAr ? 'فتح بطاقة العضو العامة' : 'Open public member pass'}
                 className="relative z-10"
               />
             </div>
 
-            <p className="text-white/40 text-[10px] uppercase tracking-widest font-mono font-bold mb-6">ID: {user.uid.substring(0, 12)}</p>
+            <p className="text-slate-300 text-xs font-mono font-semibold mb-6">{isAr ? 'معرّف العضوية:' : 'Member ID:'} <bdi>{user.uid.substring(0, 12)}</bdi></p>
 
             {/* Stats Row */}
             <div className="grid grid-cols-3 gap-2 w-full border-t border-white/10 pt-6">
@@ -103,21 +110,21 @@ export default function PassClient() {
                   <Trophy className="w-4 h-4 text-amber-400" />
                 </div>
                 <span className="text-white font-bold text-sm">{totalPoints}</span>
-                <span className="text-white/40 text-[9px] uppercase tracking-wider">{isAr ? 'نقاط' : 'Pts'}</span>
+                <span className="text-slate-300 text-xs">{isAr ? 'نقاط' : 'Points'}</span>
               </div>
               <div className="flex flex-col items-center border-x border-white/10">
                 <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center mb-1">
                   <Zap className="w-4 h-4 text-emerald-400" />
                 </div>
-                <span className="text-white font-bold text-sm text-emerald-400">Active</span>
-                <span className="text-white/40 text-[9px] uppercase tracking-wider">{isAr ? 'الحالة' : 'Status'}</span>
+                <span className="text-white font-bold text-sm text-emerald-300">{isAr ? 'عضو' : 'Member'}</span>
+                <span className="text-slate-300 text-xs">{isAr ? 'الحالة' : 'Status'}</span>
               </div>
               <div className="flex flex-col items-center">
                 <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center mb-1">
                   <Calendar className="w-4 h-4 text-blue-400" />
                 </div>
                 <span className="text-white font-bold text-sm">{joinDate}</span>
-                <span className="text-white/40 text-[9px] uppercase tracking-wider">{isAr ? 'منذ' : 'Since'}</span>
+                <span className="text-slate-300 text-xs">{isAr ? 'منذ' : 'Since'}</span>
               </div>
             </div>
             
@@ -125,7 +132,7 @@ export default function PassClient() {
         </div>
       </div>
       
-      <p className="text-white/40 text-xs text-center font-medium max-w-xs">
+      <p className="text-slate-300 text-sm text-center font-medium max-w-xs">
         {isAr ? 'قم بإبراز هذه البطاقة عند الدخول لفعاليات الفرع الطلابي لتسجيل حضورك' : 'Present this pass at student branch events to register your attendance'}
       </p>
     </div>

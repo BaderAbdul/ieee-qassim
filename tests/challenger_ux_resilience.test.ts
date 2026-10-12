@@ -167,12 +167,17 @@ test('UX Resilience: All 9 streaming fallbacks exist and mount matching geometri
 
 test('CLS Defense: Event Details Skeleton geometry strictly matches Event Details Page geometry', () => {
   const pageSource = readSource('src/app/[locale]/events/[id]/page.tsx');
+  const posterSource = readSource('src/components/ui/EventPoster.tsx');
   const skeletonSource = readSource('src/components/skeletons/EventDetailsSkeleton.tsx');
 
-  for (const geometry of ['aspect-[3/4]', 'grid-cols-1 lg:grid-cols-12', 'lg:col-span-5', 'lg:col-span-7']) {
+  for (const geometry of ['grid-cols-1 lg:grid-cols-12', 'lg:col-span-5', 'lg:col-span-7', 'hidden lg:col-span-5 lg:block', 'pt-24 lg:pt-28']) {
     assert.ok(pageSource.includes(geometry), `Page geometry missing: ${geometry}`);
     assert.ok(skeletonSource.includes(geometry), `Skeleton geometry mismatch: ${geometry}`);
   }
+  assert.ok(pageSource.includes('<EventPoster'), 'The detail page must mount the extracted poster viewer');
+  assert.ok(posterSource.includes('aspect-[3/4]') && skeletonSource.includes('aspect-[3/4]'), 'Desktop poster aspect ratio must match its skeleton');
+  assert.ok(posterSource.includes("compact ? 'h-40'"), 'The mobile poster must remain compact');
+  assert.ok(pageSource.indexOf('id="registration"') < pageSource.indexOf('<EventPoster url={event.coverUrl} title={title} compact'), 'Mobile registration must precede its poster');
 });
 
 // ============================================================================

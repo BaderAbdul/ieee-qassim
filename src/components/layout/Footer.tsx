@@ -3,7 +3,8 @@
 import React from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Link, usePathname } from '@/i18n/routing';
-import { Calendar, Trophy, UserCircle } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { Lightbulb } from 'lucide-react';
 
 function TwitterIcon({ className }: { className?: string }) {
   return (
@@ -25,6 +26,7 @@ export default function Footer() {
   const t = useTranslations('Footer');
   const locale = useLocale();
   const pathname = usePathname();
+  const { user, userData } = useAuth();
   const isAr = locale === 'ar';
   const currentYear = new Date().getFullYear();
 
@@ -34,72 +36,72 @@ export default function Footer() {
   }
 
   return (
-    <footer className="bg-slate-900 text-slate-300 border-t border-slate-800 transition-colors">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="flex flex-col items-center justify-center gap-6">
+    <footer className="min-w-0 border-t border-slate-800 bg-slate-900 text-slate-200">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-4">
+            <Link href="/" className="inline-flex min-h-11 items-center text-base font-bold text-white">{isAr ? 'IEEE القصيم' : 'IEEE Qassim'}</Link>
           {/* Social Links */}
-          <div className="flex items-center gap-4">
-            <a href="https://x.com/ieeeqaasim?s=11" target="_blank" rel="noopener noreferrer" className="p-2.5 rounded-full bg-slate-800 text-slate-400 hover:text-[#1DA1F2] hover:bg-slate-700 transition-all" title="X (Twitter)">
+          <div className="flex items-center gap-2">
+            <a href="https://x.com/ieeeqaasim?s=11" target="_blank" rel="noopener noreferrer" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-800 text-slate-200 transition-colors hover:bg-slate-700 hover:text-white" aria-label={isAr ? 'IEEE القصيم على X — نافذة جديدة' : 'IEEE Qassim on X — new window'}>
               <TwitterIcon className="h-5 w-5" />
             </a>
-            <a href="https://www.linkedin.com/company/ieee-qassim/" target="_blank" rel="noopener noreferrer" className="p-2.5 rounded-full bg-slate-800 text-slate-400 hover:text-[#0A66C2] hover:bg-slate-700 transition-all" title="LinkedIn">
+            <a href="https://www.linkedin.com/company/ieee-qassim/" target="_blank" rel="noopener noreferrer" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-800 text-slate-200 transition-colors hover:bg-slate-700 hover:text-white" aria-label={isAr ? 'IEEE القصيم على LinkedIn — نافذة جديدة' : 'IEEE Qassim on LinkedIn — new window'}>
               <LinkedinIcon className="h-5 w-5" />
             </a>
           </div>
+          </div>
 
           {/* Primary Quick Links */}
-          <ul className="flex flex-wrap justify-center gap-6 text-sm font-medium">
+          <nav aria-label={isAr ? 'روابط الموقع' : 'Site links'}><ul className="flex flex-wrap gap-x-4 text-sm font-semibold">
             <li>
-              <Link href="/" className="hover:text-blue-400 transition-colors">
+              <Link href="/" className="inline-flex min-h-11 items-center transition-colors hover:text-white">
                 {t('home')}
               </Link>
             </li>
             <li>
-              <Link href="/events" className="hover:text-blue-400 transition-colors inline-flex items-center gap-1.5">
-                <Calendar className="h-4 w-4 text-slate-500" />
+              <Link href="/events" className="inline-flex min-h-11 items-center transition-colors hover:text-white">
                 <span>{t('events')}</span>
               </Link>
             </li>
             <li>
-              <Link href="/leaderboard" className="hover:text-blue-400 transition-colors inline-flex items-center gap-1.5">
-                <Trophy className="h-4 w-4 text-slate-500" />
+              <Link href="/leaderboard" className="inline-flex min-h-11 items-center transition-colors hover:text-white">
                 <span>{t('leaderboard')}</span>
               </Link>
             </li>
             <li>
-              <Link href="/structure" className="hover:text-blue-400 transition-colors">
-                {isAr ? 'الهيكلة' : 'Structure'}
+              <Link href="/structure" className="inline-flex min-h-11 items-center transition-colors hover:text-white">
+                {isAr ? 'فريق النادي' : 'Club team'}
               </Link>
             </li>
             <li>
-              <Link href="/profile" className="hover:text-blue-400 transition-colors inline-flex items-center gap-1.5">
-                <UserCircle className="h-4 w-4 text-slate-500" />
-                <span>{t('profile')}</span>
+              <Link href="/profile" className="inline-flex min-h-11 items-center transition-colors hover:text-white">
+                <span>{isAr ? 'حسابي' : 'My account'}</span>
               </Link>
             </li>
-          </ul>
+          </ul></nav>
 
           {/* Local Policy Links */}
-          <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-2 text-xs text-slate-400 pt-2 border-t border-slate-800/60 w-full max-w-4xl text-center">
-            <Link href="/help" className="hover:text-slate-200 transition-colors">{isAr ? 'المساعدة والتواصل' : 'Help and contact'}</Link>
-            <Link href="/privacy" className="hover:text-slate-200 transition-colors">
+          <div className="flex flex-wrap items-center gap-x-4 border-t border-slate-700/70 pt-2 text-sm text-slate-300">
+            <Link href="/help" className="inline-flex min-h-11 items-center transition-colors hover:text-white">{isAr ? 'المساعدة' : 'Help'}</Link>
+            {user && !userData?.isRestricted ? <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('ieee-open-suggestion'))} className="inline-flex min-h-11 items-center gap-1.5 text-amber-200 transition-colors hover:text-amber-100"><Lightbulb aria-hidden="true" className="h-4 w-4" />{isAr ? 'شاركنا اقتراحك' : 'Suggest an idea'}</button> : null}
+            <Link href="/privacy" className="inline-flex min-h-11 items-center transition-colors hover:text-white">
               {isAr ? 'سياسة الخصوصية' : 'Privacy Policy'}
             </Link>
-            <span className="text-slate-700">|</span>
-            <Link href="/terms" className="hover:text-slate-200 transition-colors">
+            <Link href="/terms" className="inline-flex min-h-11 items-center transition-colors hover:text-white">
               {isAr ? 'الشروط والأحكام' : 'Terms & Conditions'}
             </Link>
           </div>
         </div>
 
         {/* Bottom Disclaimer & Copyright */}
-        <div className="mt-8 pt-6 border-t border-slate-800/80 text-center space-y-2.5 text-xs text-slate-500 max-w-4xl mx-auto">
+        <div className="mt-3 border-t border-slate-700/70 pt-4 text-sm text-slate-300">
           <p className="leading-relaxed">
             {isAr 
               ? `© حقوق النشر ${currentYear} لجمعية IEEE – جميع الحقوق محفوظة. تعتبر IEEE أكبر منظمة مهنية تقنية عالمية غير ربحية مكرسة لتقدم التكنولوجيا لخدمة البشرية.`
               : `© Copyright ${currentYear} IEEE – All rights reserved. A public charity, IEEE is the world’s largest technical professional organization dedicated to advancing technology for the benefit of humanity.`}
           </p>
-          <p className="text-[11px] text-slate-400/80 pt-1 flex items-center justify-center gap-1.5">
+          <p className="mt-2 flex flex-wrap items-center gap-x-1.5 text-sm text-slate-300">
             <span>{isAr ? 'تطوير وتصميم:' : 'Developed & Designed by:'}</span>
             <a 
               href="https://www.linkedin.com/in/bader-aldukhailallah" 

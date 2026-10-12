@@ -4,7 +4,7 @@ import { documentId } from './lifecycle';
 import { audit } from './audit';
 
 const textFields: Record<string, number> = { title: 200, titleEn: 200, description: 12000, descriptionEn: 12000, location: 500, locationEn: 500, coverUrl: 2000 };
-const fields = [...Object.keys(textFields), 'type', 'date', 'durationHours', 'capacity', 'isUnlimitedCapacity', 'hideExactCapacity', 'points', 'hasCertificate', 'registrationMode', 'gains', 'gainsEn', 'speakers', 'feedbackQuestions', 'isPinned'];
+const fields = [...Object.keys(textFields), 'type', 'date', 'durationHours', 'capacity', 'isUnlimitedCapacity', 'hideExactCapacity', 'hideFromDiscovery', 'points', 'hasCertificate', 'registrationMode', 'gains', 'gainsEn', 'speakers', 'feedbackQuestions', 'isPinned'];
 
 export async function saveEvent(actorUid: string, input: Record<string, unknown>) {
   const db = getFirestore();
@@ -20,7 +20,7 @@ export async function saveEvent(actorUid: string, input: Record<string, unknown>
     for (const [field, max] of Object.entries(textFields)) if (data[field] !== undefined && (typeof data[field] !== 'string' || data[field].length > max)) throw new ApiError('invalid-argument', `Invalid ${field}.`);
     if (typeof data.title !== 'string' || !data.title.trim() || !['Workshop', 'Camp', 'Lecture', 'Competition', 'Meetup', 'Challenge', 'Other'].includes(String(data.type)) || !['Auto', 'Manual'].includes(String(data.registrationMode))) throw new ApiError('invalid-argument', 'Complete the title, event type and registration mode.');
     if (!Number.isSafeInteger(data.capacity) || data.capacity < 0 || !Number.isSafeInteger(data.points) || data.points < 0 || data.points > 100000 || !Number.isFinite(data.durationHours) || data.durationHours <= 0 || data.durationHours > 72) throw new ApiError('invalid-argument', 'Invalid capacity, points or duration.');
-    for (const field of ['isUnlimitedCapacity', 'hideExactCapacity', 'hasCertificate', 'isPinned']) if (data[field] !== undefined && typeof data[field] !== 'boolean') throw new ApiError('invalid-argument', `Invalid ${field}.`);
+    for (const field of ['isUnlimitedCapacity', 'hideExactCapacity', 'hideFromDiscovery', 'hasCertificate', 'isPinned']) if (data[field] !== undefined && typeof data[field] !== 'boolean') throw new ApiError('invalid-argument', `Invalid ${field}.`);
     if (data.isUnlimitedCapacity !== true && data.capacity < Number(old.registeredCount || 0)) throw new ApiError('failed-precondition', 'Capacity cannot be lower than the reserved seats.');
     if (data.coverUrl) {
       try { const url = new URL(data.coverUrl); if (url.protocol !== 'https:' || url.username || url.password) throw new Error(); }

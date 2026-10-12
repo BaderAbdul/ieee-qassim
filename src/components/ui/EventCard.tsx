@@ -4,7 +4,7 @@ import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
 import { ar, enUS } from 'date-fns/locale';
 import { useLocale } from 'next-intl';
-import { MapPin, Calendar, Clock, Users, ArrowRight, Pin } from 'lucide-react';
+import { MapPin, Calendar, Clock, Users, ArrowRight, Pin, Trophy, Award } from 'lucide-react';
 import { formatDateSafe } from '@/lib/dateUtils';
 import { eventCapacityLabel, eventStateLabel, eventTypeLabel } from '@/lib/studentExperience';
 
@@ -13,152 +13,62 @@ interface EventCardProps {
 }
 
 export default function EventCard({ event }: EventCardProps) {
-  const locale = useLocale();
-  const isAr = locale === 'ar';
+  const isAr = useLocale() === 'ar';
   const dateLocale = isAr ? ar : enUS;
-
-  const eventDate = event.date;
-  const day = formatDateSafe(eventDate, 'dd', { locale: dateLocale });
-  const month = formatDateSafe(eventDate, 'MMM', { locale: dateLocale }).toUpperCase();
-  
-  // Badge setup
-  let badgeColor = 'bg-slate-100 text-slate-800 border-slate-200';
-  const badgeText = eventStateLabel(event.state, isAr);
-  
-  if (event.state === 'Published') {
-    badgeColor = 'bg-blue-100 text-blue-800 border-blue-200';
-  } else if (event.state === 'Registration Open') {
-    badgeColor = 'bg-emerald-100 text-emerald-800 border-emerald-200';
-  } else if (event.state === 'Registration Closed') {
-    badgeColor = 'bg-orange-100 text-orange-800 border-orange-200';
-  } else if (event.state === 'Ongoing') {
-    badgeColor = 'bg-amber-100 text-amber-800 border-amber-200';
-  } else if (event.state === 'Completed') {
-    badgeColor = 'bg-slate-100 text-slate-800 border-slate-200';
-  }
-
   const title = isAr ? event.title : event.titleEn || event.title;
   const location = isAr ? event.location : event.locationEn || event.location;
-
-  // Capacity logic
-  const capacityDisplay = eventCapacityLabel(event, isAr);
+  const badgeColor = event.state === 'Registration Open'
+    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+    : event.state === 'Ongoing'
+      ? 'bg-amber-50 text-amber-900 border-amber-200'
+      : event.state === 'Published'
+        ? 'bg-blue-50 text-blue-800 border-blue-200'
+        : 'bg-slate-50 text-slate-700 border-slate-200';
+  const date = formatDateSafe(event.date, 'd MMMM yyyy', { locale: dateLocale });
+  const time = formatDateSafe(event.date, 'HH:mm');
+  const capacity = eventCapacityLabel(event, isAr);
+  const hasReward = event.points > 0 || event.hasCertificate;
 
   return (
-    <div className={`group h-full bg-white rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden flex flex-col transition-all duration-500 hover:-translate-y-2 relative ${
-      event.isPinned 
-        ? 'ring-2 ring-amber-400 shadow-[0_0_25px_rgba(245,158,11,0.35)] border border-amber-300' 
-        : 'shadow-sm hover:shadow-2xl border border-gray-100/80'
-    }`}>
-      {/* Top Image Section */}
-      <div className="relative h-32 sm:h-56 w-full bg-slate-100 overflow-hidden shrink-0">
+    <article className={`group flex h-full flex-col overflow-hidden rounded-3xl border bg-white shadow-sm transition-shadow hover:shadow-md ${event.isPinned ? 'border-amber-300' : 'border-slate-200'}`}>
+      <Link href={`/events/${event.id}`} tabIndex={-1} aria-hidden="true" className="relative block h-36 shrink-0 overflow-hidden bg-gradient-to-br from-blue-900 to-slate-900 sm:h-40">
         {event.coverUrl ? (
-          <Image
-            src={event.coverUrl}
-            alt={title}
-            fill
-            quality={85}
-            className="object-cover transition-transform duration-700 group-hover:scale-110"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-          />
+          <Image src={event.coverUrl} alt="" fill quality={85} className="object-cover" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" />
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-900 to-indigo-900">
-            {/* Abstract fallback pattern */}
-            <div className="absolute inset-0 opacity-20">
-               <svg className="h-full w-full" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                  <pattern id={`grid-pattern-${event.id}`} width="32" height="32" patternUnits="userSpaceOnUse">
-                    <path d="M 32 0 L 0 0 0 32" fill="none" stroke="white" strokeWidth="1" />
-                  </pattern>
-                </defs>
-                <rect width="100%" height="100%" fill={`url(#grid-pattern-${event.id})`} />
-              </svg>
-            </div>
-          </div>
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.07)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.07)_1px,transparent_1px)] bg-size-[32px_32px]" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent pointer-events-none" />
-
-        {/* Pinned Badge */}
-        {event.isPinned && (
-          <div className="absolute top-3 sm:top-4 start-1/2 -translate-x-1/2 z-10">
-            <span className="flex items-center gap-1 px-3 py-1 bg-amber-500/90 text-white text-[10px] sm:text-xs font-black rounded-full shadow-lg backdrop-blur-md border border-amber-300/50">
-              <Pin className="w-3 h-3 fill-current" />
-              {isAr ? 'مميزة ومثبتة' : 'Featured'}
-            </span>
-          </div>
-        )}
-
-        {/* Floating Date Badge */}
-        <div className="absolute top-3 sm:top-4 start-3 sm:start-4 bg-white/95 backdrop-blur-md rounded-xl sm:rounded-2xl p-1.5 sm:p-2 px-2.5 sm:px-3 text-center shadow-lg border border-white/20 z-10">
-          <div className="text-[10px] sm:text-sm font-bold text-blue-600 leading-none mb-1">{month}</div>
-          <div className="text-base sm:text-xl font-black text-slate-900 leading-none font-cairo">{day}</div>
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/40 to-transparent" />
+        <div className="absolute start-3 top-3 flex flex-wrap gap-2">
+          <span className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${badgeColor}`}>{eventStateLabel(event.state, isAr)}</span>
+          {event.isPinned && <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-sm font-semibold text-amber-900"><Pin aria-hidden="true" className="h-3.5 w-3.5" />{isAr ? 'مميزة' : 'Featured'}</span>}
         </div>
+        <span className="absolute bottom-3 start-3 rounded-full bg-white px-3 py-1 text-sm font-medium text-slate-700">{eventTypeLabel(event.type, isAr)}</span>
+      </Link>
 
-        {/* State Badge */}
-        <div className="absolute top-3 sm:top-4 end-3 sm:end-4 z-10">
-          <span className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-bold border shadow-md ${badgeColor}`}>
-            {badgeText}
-          </span>
-        </div>
-
-        {/* Category Label overlay */}
-        <div className="absolute bottom-3 sm:bottom-4 start-3 sm:start-4">
-          <span className="px-2.5 sm:px-3 py-1 bg-white/20 backdrop-blur-md border border-white/30 text-white text-[10px] sm:text-xs font-bold rounded-full tracking-wide">
-            {eventTypeLabel(event.type, isAr)}
-          </span>
-        </div>
-      </div>
-
-      {/* Content Section */}
-      <div className="p-3 sm:p-6 flex flex-col grow">
-        <h3 className="text-sm sm:text-xl font-black text-slate-900 mb-2 sm:mb-4 line-clamp-2 font-cairo group-hover:text-blue-600 transition-colors leading-tight">
-          {title}
+      <div className="space-y-3 p-4 sm:p-5">
+        <h3 className="text-lg font-bold leading-snug text-slate-900 sm:text-xl">
+          <Link href={`/events/${event.id}`} className="rounded-sm transition-colors hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600">{title}</Link>
         </h3>
-
-        <div className="space-y-1.5 sm:space-y-3 mb-3 sm:mb-6">
-          <div className="flex items-center text-[10px] sm:text-sm text-slate-600">
-            <div className="w-5 h-5 sm:w-8 sm:h-8 rounded-full bg-blue-50 flex items-center justify-center me-1.5 sm:me-3 shrink-0">
-              <Calendar className="h-2.5 w-2.5 sm:h-4 sm:w-4 text-blue-600" />
-            </div>
-            <span className="font-medium truncate">{formatDateSafe(eventDate, 'd MMMM yyyy', { locale: dateLocale })}</span>
+        <div className="space-y-2 text-sm leading-relaxed text-slate-600">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span className="inline-flex items-center gap-2"><Calendar aria-hidden="true" className="h-4 w-4 shrink-0 text-blue-600" />{date || (isAr ? 'الموعد يُعلن لاحقًا' : 'Date to be announced')}</span>
+            {time && <span className="inline-flex items-center gap-2"><Clock aria-hidden="true" className="h-4 w-4 shrink-0 text-blue-600" /><span dir="ltr">{time}</span></span>}
           </div>
-
-          <div className="flex items-center text-[10px] sm:text-sm text-slate-600">
-            <div className="w-5 h-5 sm:w-8 sm:h-8 rounded-full bg-blue-50 flex items-center justify-center me-1.5 sm:me-3 shrink-0">
-              <Clock className="h-2.5 w-2.5 sm:h-4 sm:w-4 text-blue-600" />
-            </div>
-            <span className="font-medium truncate" dir="ltr">
-              {formatDateSafe(eventDate, 'HH:mm', { locale: dateLocale })} <span className="hidden sm:inline">({event.durationHours}h)</span>
-            </span>
-          </div>
-
-          <div className="flex items-center text-[10px] sm:text-sm text-slate-600">
-            <div className="w-5 h-5 sm:w-8 sm:h-8 rounded-full bg-blue-50 flex items-center justify-center me-1.5 sm:me-3 shrink-0">
-              <MapPin className="h-2.5 w-2.5 sm:h-4 sm:w-4 text-blue-600" />
-            </div>
-            <span className="font-medium truncate">{location}</span>
-          </div>
+          <div className="flex items-start gap-2"><MapPin aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" /><span className="break-words">{location || (isAr ? 'الموقع يُعلن لاحقًا' : 'Location to be announced')}</span></div>
         </div>
-
-        <div className="mt-auto flex items-center justify-between pt-2.5 sm:pt-4 border-t border-slate-100">
-          <div className="flex items-center gap-1.5 sm:gap-2">
-             <Users aria-hidden="true" className="h-4 w-4 text-slate-400" />
-             <div className="text-[10px] sm:text-xs font-bold text-slate-500">
-               {capacityDisplay}
-             </div>
+        {hasReward && (
+          <div className="flex flex-wrap gap-2 text-sm">
+            {event.points > 0 && <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 font-medium text-amber-900"><Trophy aria-hidden="true" className="h-4 w-4" />{event.points} {isAr ? 'نقطة حضور' : 'attendance points'}</span>}
+            {event.hasCertificate && <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1.5 font-medium text-blue-800"><Award aria-hidden="true" className="h-4 w-4" />{isAr ? 'شهادة حضور' : 'Attendance certificate'}</span>}
           </div>
-        </div>
+        )}
       </div>
-
-      {/* Button placed at the very bottom overlapping the card or completely full width */}
-      <div className="p-2 sm:p-4 pt-0">
-        <Link 
-          href={`/events/${event.id}`}
-          className="flex items-center justify-center w-full py-2 sm:py-3.5 bg-slate-900 hover:bg-blue-600 text-white rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold transition-colors duration-300 gap-1.5 sm:gap-2"
-        >
-          <span>{isAr ? 'التفاصيل' : 'Details'}</span>
-          <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 rtl:-scale-x-100" />
+      <div className="mt-auto space-y-3 px-4 pb-4 sm:px-5 sm:pb-5">
+        <p className="flex items-center gap-2 border-t border-slate-100 pt-3 text-sm text-slate-600"><Users aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-500" />{capacity}</p>
+        <Link href={`/events/${event.id}`} aria-label={isAr ? `تفاصيل ${title}` : `Details for ${title}`} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-base font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600">
+          {isAr ? 'تفاصيل الفعالية' : 'Event details'}<ArrowRight aria-hidden="true" className="h-4 w-4 rtl:-scale-x-100" />
         </Link>
       </div>
-    </div>
+    </article>
   );
 }

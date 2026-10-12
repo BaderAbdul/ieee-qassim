@@ -3,11 +3,11 @@ import { Skeleton } from './Skeleton';
 
 export function EventDetailsSkeleton() {
   return (
-    <div className="min-h-screen bg-slate-50 pb-20 pt-24 sm:pt-32" role="status" aria-label="Loading event">
+    <div className="min-h-screen bg-slate-50 pb-10 pt-24 lg:pt-28" role="status" aria-label="Loading event">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <Skeleton className="h-10 w-40 rounded-xl mb-6" />
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12">
-          <div className="lg:col-span-5">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+          <div className="hidden lg:col-span-5 lg:block">
             <div className="rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden border-4 sm:border-8 border-white">
               <Skeleton className="aspect-[3/4] w-full rounded-none" />
             </div>
