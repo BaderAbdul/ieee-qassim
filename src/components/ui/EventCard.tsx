@@ -77,27 +77,23 @@ export default function EventCard({ event }: EventCardProps) {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent pointer-events-none" />
 
-        {/* Pinned Badge */}
-        {event.isPinned && (
-          <div className="absolute top-3 sm:top-4 start-1/2 -translate-x-1/2 z-10">
-            <span className="flex items-center gap-1 px-3 py-1 bg-amber-500/90 text-white text-[10px] sm:text-xs font-black rounded-full shadow-lg backdrop-blur-md border border-amber-300/50">
-              <Pin className="w-3 h-3 fill-current" />
-              {isAr ? 'مميزة ومثبتة' : 'Featured'}
-            </span>
-          </div>
-        )}
-
         {/* Floating Date Badge */}
         <div className="absolute top-3 sm:top-4 start-3 sm:start-4 bg-white/95 backdrop-blur-md rounded-xl sm:rounded-2xl p-1.5 sm:p-2 px-2.5 sm:px-3 text-center shadow-lg border border-white/20 z-10">
           <div className="text-[10px] sm:text-sm font-bold text-blue-600 leading-none mb-1">{month}</div>
           <div className="text-base sm:text-xl font-black text-slate-900 leading-none font-cairo">{day}</div>
         </div>
 
-        {/* State Badge */}
-        <div className="absolute top-3 sm:top-4 end-3 sm:end-4 z-10">
-          <span className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-bold border shadow-md ${badgeColor}`}>
+        {/* State + Pinned Badges (stacked in the same corner so they never collide) */}
+        <div className="absolute top-3 sm:top-4 end-3 sm:end-4 z-10 flex flex-col items-end gap-1.5">
+          <span className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-bold border shadow-md whitespace-nowrap ${badgeColor}`}>
             {badgeText}
           </span>
+          {event.isPinned && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500 text-white text-[10px] sm:text-xs font-black rounded-full shadow-md border border-amber-300/60 whitespace-nowrap">
+              <Pin className="w-3 h-3 fill-current" />
+              {isAr ? 'مثبتة' : 'Pinned'}
+            </span>
+          )}
         </div>
 
         {/* Category Label overlay */}

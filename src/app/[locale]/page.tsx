@@ -159,10 +159,16 @@ export default async function HomePage({ params }: PageProps) {
             </div>
             
             <HeroActionButtons />
-            <Link href="/help" className="text-sm font-semibold text-blue-700 underline underline-offset-4">{isAr ? 'كيف أسجّل وأحصل على النقاط والشهادة؟' : 'How do registration, points and certificates work?'}</Link>
+            <div className="flex justify-center lg:justify-start">
+              <Link href="/help" className="group inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs sm:text-sm font-bold text-slate-600 hover:text-blue-700 hover:bg-blue-50/80 transition-colors">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-blue-700 text-[11px] font-black">?</span>
+                {isAr ? 'كيف أسجّل وأحصل على النقاط والشهادة؟' : 'How do registration, points and certificates work?'}
+                <ArrowRight className="h-3.5 w-3.5 rtl:-scale-x-100 opacity-60 transition-transform group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5" />
+              </Link>
+            </div>
           </div>
           
-          <div className="relative block w-full h-[320px] lg:h-full lg:min-h-[500px] mt-4 lg:mt-0 flex items-center justify-center lg:block">
+          <div className="relative block w-full h-[360px] lg:h-full lg:min-h-[500px] mt-4 lg:mt-0 flex items-center justify-center lg:block">
             <div className="relative w-full max-w-sm lg:max-w-none h-full">
                <HeroUserCards latestEvent={latestEvent} />
             </div>
@@ -243,36 +249,36 @@ export default async function HomePage({ params }: PageProps) {
       {/* Quick Links / Feature Highlights */}
       <section className="py-6 sm:py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full mb-6 sm:mb-10">
         <div className="grid grid-cols-3 gap-2 sm:gap-6">
-          <Link href={latestEvent ? `/events/${latestEvent.id}` : "/events"} className="bg-gradient-to-b from-white to-slate-50 rounded-2xl p-3 sm:p-8 shadow-sm hover:shadow-md border border-slate-200/80 flex flex-col items-center justify-center text-center hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden">
+          <Link href={latestEvent ? `/events/${latestEvent.id}` : "/events"} className="bg-gradient-to-b from-white to-slate-50 rounded-2xl px-2 py-4 sm:p-8 shadow-sm hover:shadow-md border border-slate-200/80 flex flex-col items-center justify-center text-center hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden">
             <div className="absolute top-1.5 sm:top-3 end-1.5 sm:end-3 text-slate-300 group-hover:text-blue-500 transition-colors">
-              <ArrowRight className="w-3 h-3 sm:w-5 sm:h-5 rtl:-scale-x-100" />
+              <ArrowRight className="w-3.5 h-3.5 sm:w-5 sm:h-5 rtl:-scale-x-100" />
             </div>
-            <div className="w-10 h-10 sm:w-16 sm:h-16 bg-blue-50 text-blue-600 rounded-xl sm:rounded-2xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-blue-100 group-hover:scale-110 transition-all duration-300 shadow-inner">
+            <div className="w-11 h-11 sm:w-16 sm:h-16 bg-blue-50 text-blue-600 rounded-xl sm:rounded-2xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-blue-100 group-hover:scale-110 transition-all duration-300 shadow-inner">
               <Calendar className="w-5 h-5 sm:w-8 sm:h-8" />
             </div>
-            <h3 className="text-slate-900 font-black text-[10px] sm:text-xl leading-tight group-hover:text-blue-700 transition-colors">{latestEvent ? (isAr ? 'الفعالية القادمة' : 'Next Event') : t('upcomingEvents')}</h3>
+            <h3 className="text-slate-900 font-black text-xs sm:text-xl leading-tight group-hover:text-blue-700 transition-colors">{latestEvent ? (isAr ? 'الفعالية القادمة' : 'Next Event') : t('upcomingEvents')}</h3>
             <p className="hidden sm:block text-slate-500 text-sm mt-2">{t('upcomingEventsDesc')}</p>
           </Link>
           
-          <Link href="/leaderboard" className="bg-gradient-to-b from-white to-slate-50 rounded-2xl p-3 sm:p-8 shadow-sm hover:shadow-md border border-slate-200/80 flex flex-col items-center justify-center text-center hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden">
+          <Link href="/leaderboard" className="bg-gradient-to-b from-white to-slate-50 rounded-2xl px-2 py-4 sm:p-8 shadow-sm hover:shadow-md border border-slate-200/80 flex flex-col items-center justify-center text-center hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden">
             <div className="absolute top-1.5 sm:top-3 end-1.5 sm:end-3 text-slate-300 group-hover:text-amber-500 transition-colors">
-              <ArrowRight className="w-3 h-3 sm:w-5 sm:h-5 rtl:-scale-x-100" />
+              <ArrowRight className="w-3.5 h-3.5 sm:w-5 sm:h-5 rtl:-scale-x-100" />
             </div>
-            <div className="w-10 h-10 sm:w-16 sm:h-16 bg-amber-50 text-amber-600 rounded-xl sm:rounded-2xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-amber-100 group-hover:scale-110 transition-all duration-300 shadow-inner">
+            <div className="w-11 h-11 sm:w-16 sm:h-16 bg-amber-50 text-amber-600 rounded-xl sm:rounded-2xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-amber-100 group-hover:scale-110 transition-all duration-300 shadow-inner">
               <Trophy className="w-5 h-5 sm:w-8 sm:h-8" />
             </div>
-            <h3 className="text-slate-900 font-black text-[10px] sm:text-xl leading-tight group-hover:text-amber-700 transition-colors">{t('leaderboard')}</h3>
+            <h3 className="text-slate-900 font-black text-xs sm:text-xl leading-tight group-hover:text-amber-700 transition-colors">{t('leaderboard')}</h3>
             <p className="hidden sm:block text-slate-500 text-sm mt-2">{t('leaderboardDesc')}</p>
           </Link>
 
-          <Link href="/profile" className="bg-gradient-to-b from-white to-slate-50 rounded-2xl p-3 sm:p-8 shadow-sm hover:shadow-md border border-slate-200/80 flex flex-col items-center justify-center text-center hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden">
+          <Link href="/profile" className="bg-gradient-to-b from-white to-slate-50 rounded-2xl px-2 py-4 sm:p-8 shadow-sm hover:shadow-md border border-slate-200/80 flex flex-col items-center justify-center text-center hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden">
             <div className="absolute top-1.5 sm:top-3 end-1.5 sm:end-3 text-slate-300 group-hover:text-emerald-500 transition-colors">
-              <ArrowRight className="w-3 h-3 sm:w-5 sm:h-5 rtl:-scale-x-100" />
+              <ArrowRight className="w-3.5 h-3.5 sm:w-5 sm:h-5 rtl:-scale-x-100" />
             </div>
-            <div className="w-10 h-10 sm:w-16 sm:h-16 bg-emerald-50 text-emerald-600 rounded-xl sm:rounded-2xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-emerald-100 group-hover:scale-110 transition-all duration-300 shadow-inner">
+            <div className="w-11 h-11 sm:w-16 sm:h-16 bg-emerald-50 text-emerald-600 rounded-xl sm:rounded-2xl flex items-center justify-center mb-2 sm:mb-4 group-hover:bg-emerald-100 group-hover:scale-110 transition-all duration-300 shadow-inner">
               <UserCircle className="w-5 h-5 sm:w-8 sm:h-8" />
             </div>
-            <h3 className="text-slate-900 font-black text-[10px] sm:text-xl leading-tight group-hover:text-emerald-700 transition-colors">{t('activityAndCerts')}</h3>
+            <h3 className="text-slate-900 font-black text-xs sm:text-xl leading-tight group-hover:text-emerald-700 transition-colors">{t('activityAndCerts')}</h3>
             <p className="hidden sm:block text-slate-500 text-sm mt-2">{t('activityAndCertsDesc')}</p>
           </Link>
         </div>

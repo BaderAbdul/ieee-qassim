@@ -85,11 +85,13 @@ html { scroll-padding-top: 5rem; }
   .animation-delay-4000 {
     animation-delay: 4s;
   }
-  .hide-scrollbar {
+  .hide-scrollbar,
+  .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
-  .hide-scrollbar::-webkit-scrollbar {
+  .hide-scrollbar::-webkit-scrollbar,
+  .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
 }

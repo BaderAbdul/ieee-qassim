@@ -112,6 +112,16 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
     }
   }, [user, userData, isAr]);
 
+  // Reset the mobile stack when tapping anywhere outside the cards
+  useEffect(() => {
+    if (activeCard === null) return;
+    const reset = (e: PointerEvent) => {
+      if (!(e.target as HTMLElement)?.closest?.('[data-hero-card], [data-hero-dot]')) setActiveCard(null);
+    };
+    document.addEventListener('pointerdown', reset);
+    return () => document.removeEventListener('pointerdown', reset);
+  }, [activeCard]);
+
   const handleCardClick = (cardId: number, path: string) => {
     if (activeCard === cardId || window.innerWidth >= 1024) {
       if (path.startsWith('http')) {
@@ -130,7 +140,8 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
     <>
       {/* Card 1: Featured Event (Top Right) */}
       <div 
-        className={`absolute top-0 lg:top-4 rtl:left-2 lg:rtl:left-0 lg:ltr:right-0 ltr:-right-2 w-72 lg:w-80 bg-white/80 backdrop-blur-md rounded-3xl p-4 lg:p-5 shadow-2xl transition-all duration-300 group cursor-pointer ${
+        data-hero-card
+        className={`absolute top-0 lg:top-4 rtl:left-2 lg:rtl:left-0 lg:ltr:right-0 ltr:-right-2 w-[17rem] lg:w-80 bg-white/80 backdrop-blur-md rounded-3xl p-4 lg:p-5 shadow-2xl transition-all duration-300 group cursor-pointer ${
           latestEvent?.isPinned 
             ? 'ring-2 ring-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.4)] border-amber-300' 
             : 'border border-white/60 shadow-blue-900/15 hover:shadow-blue-500/20'
@@ -194,7 +205,8 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
 
       {/* Card 2: Points / Leaderboard */}
       <div 
-        className={`absolute top-28 lg:top-32 rtl:-right-2 lg:rtl:-right-8 ltr:-left-2 lg:ltr:-left-8 w-56 lg:w-64 bg-white/70 backdrop-blur-md rounded-3xl p-4 lg:p-5 shadow-xl shadow-slate-200/50 border border-white/60 transform -rotate-2 hover:rotate-0 hover:-translate-y-1 hover:shadow-yellow-500/10 lg:hover:z-50 transition-all duration-300 cursor-pointer ${activeCard === 2 ? 'z-50 scale-105 rotate-0' : 'z-20'}`}
+        data-hero-card
+        className={`absolute top-28 lg:top-32 rtl:-right-1 lg:rtl:-right-8 ltr:-left-1 lg:ltr:-left-8 w-52 lg:w-64 bg-white/70 backdrop-blur-md rounded-3xl p-4 lg:p-5 shadow-xl shadow-slate-200/50 border border-white/60 transform -rotate-2 hover:rotate-0 hover:-translate-y-1 hover:shadow-yellow-500/10 lg:hover:z-50 transition-all duration-300 cursor-pointer ${activeCard === 2 ? 'z-50 scale-105 rotate-0' : 'z-20'}`}
         onClick={() => handleCardClick(2, '/leaderboard')}
       >
         <div className="flex items-start gap-3 lg:gap-4">
@@ -202,7 +214,7 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
             <Trophy className="h-5 w-5 lg:h-6 lg:w-6" />
           </div>
           <div className="flex-1">
-            <div className="text-[9px] lg:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{isAr ? 'نقاطك' : 'Your Points'}</div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{isAr ? 'نقاطك' : 'Your Points'}</div>
             {user && loadingData ? (
               <div className="h-8 w-16 bg-slate-200 animate-pulse rounded-md mt-1 mb-2"></div>
             ) : (
@@ -221,6 +233,7 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
 
       {/* Card 3: Activity/Certificate */}
       <div 
+        data-hero-card
         className={`absolute top-56 lg:top-auto lg:bottom-10 rtl:left-6 lg:rtl:left-12 ltr:right-6 lg:ltr:right-12 w-60 lg:w-72 bg-[#002855]/70 backdrop-blur-md rounded-3xl p-4 lg:p-5 shadow-2xl shadow-blue-900/40 border-t border-l border-white/20 transform rotate-2 hover:rotate-0 hover:-translate-y-1 hover:shadow-blue-400/20 lg:hover:z-50 transition-all duration-300 cursor-pointer ${activeCard === 3 ? 'z-50 scale-105 rotate-0' : 'z-40'}`}
         onClick={() => handleCardClick(3, '/profile')}
       >
@@ -231,7 +244,7 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
             </div>
             <div>
               <div className="text-xs lg:text-sm font-bold text-white tracking-wide">{isAr ? 'نشاطك' : 'Activity'}</div>
-              <div className="text-[8px] lg:text-[9px] text-blue-300 font-medium">
+              <div className="text-[10px] text-blue-300 font-medium">
                 {latestCert 
                   ? latestCert.date
                   : latestAttendance
@@ -264,7 +277,7 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
               </>
             ) : (
               <>
-                <div className="text-[9px] lg:text-[10px] font-bold text-white truncate">
+                <div className="text-[11px] font-bold text-white truncate">
                   {latestCert 
                     ? latestCert.title 
                     : latestAttendance
@@ -273,11 +286,33 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
                         ? latestEvent?.title
                         : (user ? (isAr ? 'حضور الفعاليات يمنحك شهادات' : 'Attend events to earn certificates') : (isAr ? 'اكتشف فعالياتنا وانضم إلينا' : 'Discover and join our events'))}
                 </div>
-                <div className="text-[8px] lg:text-[9px] text-emerald-400 font-medium mt-0.5 truncate">{latestCert ? (isAr ? 'متاحة للتحميل' : 'Ready to download') : latestAttendance ? (isAr ? 'تم تسجيل نقاطك' : 'Points awarded') : latestEventRegStatus ? (isAr ? 'الفعالية القادمة' : 'Upcoming Event') : ''}</div>
+                <div className="text-[10px] text-emerald-400 font-medium mt-0.5 truncate">{latestCert ? (isAr ? 'متاحة للتحميل' : 'Ready to download') : latestAttendance ? (isAr ? 'تم تسجيل نقاطك' : 'Points awarded') : latestEventRegStatus ? (isAr ? 'الفعالية القادمة' : 'Upcoming Event') : ''}</div>
               </>
             )}
           </div>
         </div>
+      </div>
+
+      {/* Mobile stack indicators: show which card is in front and let users switch */}
+      <div className="absolute -bottom-7 inset-x-0 flex items-center justify-center gap-2 lg:hidden" role="tablist" aria-label={isAr ? 'بطاقات الواجهة' : 'Hero cards'}>
+        {[1, 2, 3].map((id) => {
+          const label = id === 1 ? (isAr ? 'الفعالية' : 'Event') : id === 2 ? (isAr ? 'نقاطك' : 'Points') : (isAr ? 'نشاطك' : 'Activity');
+          const isOn = activeCard === id || (activeCard === null && id === 3);
+          return (
+            <button
+              key={id}
+              type="button"
+              data-hero-dot
+              role="tab"
+              aria-selected={isOn}
+              aria-label={label}
+              onClick={() => setActiveCard(id)}
+              className="p-1.5"
+            >
+              <span className={`block h-1.5 rounded-full transition-all duration-300 ${isOn ? 'w-6 bg-[#00629B]' : 'w-1.5 bg-slate-300'}`} />
+            </button>
+          );
+        })}
       </div>
     </>
   );

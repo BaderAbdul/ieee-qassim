@@ -35,7 +35,7 @@ export default function Footer() {
 
   return (
     <footer className="bg-slate-900 text-slate-300 border-t border-slate-800 transition-colors">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-28 sm:pb-10">
         <div className="flex flex-col items-center justify-center gap-6">
           {/* Social Links */}
           <div className="flex items-center gap-4">
@@ -48,7 +48,7 @@ export default function Footer() {
           </div>
 
           {/* Primary Quick Links */}
-          <ul className="flex flex-wrap justify-center gap-6 text-sm font-medium">
+          <ul className="grid grid-cols-3 sm:flex sm:flex-wrap justify-center gap-x-4 gap-y-1 sm:gap-6 text-sm font-medium text-center [&_a]:inline-flex [&_a]:py-2 [&_a]:justify-center">
             <li>
               <Link href="/" className="hover:text-blue-400 transition-colors">
                 {t('home')}
@@ -80,12 +80,11 @@ export default function Footer() {
           </ul>
 
           {/* Local Policy Links */}
-          <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-2 text-xs text-slate-400 pt-2 border-t border-slate-800/60 w-full max-w-4xl text-center">
+          <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-2 text-xs text-slate-400 pt-2 border-t border-slate-800/60 w-full max-w-4xl text-center [&_a]:inline-flex [&_a]:py-1.5">
             <Link href="/help" className="hover:text-slate-200 transition-colors">{isAr ? 'المساعدة والتواصل' : 'Help and contact'}</Link>
             <Link href="/privacy" className="hover:text-slate-200 transition-colors">
               {isAr ? 'سياسة الخصوصية' : 'Privacy Policy'}
             </Link>
-            <span className="text-slate-700">|</span>
             <Link href="/terms" className="hover:text-slate-200 transition-colors">
               {isAr ? 'الشروط والأحكام' : 'Terms & Conditions'}
             </Link>

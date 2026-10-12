@@ -35,7 +35,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
   const isAr = locale === 'ar';
   const dateLocale = isAr ? ar : enUS;
   
-  const { user, login } = useAuth();
+  const { user, login, error: authError } = useAuth();
   
   const [event, setEvent] = useState<PlatformEvent | null>(null);
   const [loading, setLoading] = useState(true);
@@ -144,7 +144,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
           {/* Left Column (Poster) - 5 Cols */}
           <div className="lg:col-span-5 relative">
             <div className="lg:sticky lg:top-28 w-full bg-slate-900 rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden shadow-2xl shadow-slate-900/20 border-4 sm:border-8 border-white group">
-              <div className="aspect-[3/4] relative w-full bg-slate-800">
+              <div className="aspect-[16/10] sm:aspect-[3/4] relative w-full bg-slate-800">
                 {event.coverUrl ? (
                   <Image 
                     src={event.coverUrl} 
@@ -256,12 +256,19 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
 
                   <div className="shrink-0 sm:w-64 space-y-3">
                     {!user ? (
-                      <button 
-                        onClick={login} 
-                        className="w-full bg-white hover:bg-blue-50 text-blue-900 py-3.5 px-6 rounded-2xl font-bold shadow-lg transition-transform transform hover:-translate-y-1"
-                      >
-                        {t('loginToRegister')}
-                      </button>
+                      <div className="space-y-2">
+                        <button 
+                          onClick={login} 
+                          className="w-full bg-white hover:bg-blue-50 text-blue-900 py-3.5 px-6 rounded-2xl font-bold shadow-lg transition-transform transform hover:-translate-y-1"
+                        >
+                          {t('loginToRegister')}
+                        </button>
+                        {authError && (
+                          <p className="text-xs text-amber-200 text-center font-medium bg-amber-950/50 p-2.5 rounded-xl border border-amber-500/30">
+                            {authError}
+                          </p>
+                        )}
+                      </div>
                     ) : (
                       <>
                         {!registrationStatus || registrationStatus === 'cancelled' ? (

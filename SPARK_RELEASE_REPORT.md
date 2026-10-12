@@ -2,7 +2,11 @@
 
 10 October 2026, Asia/Riyadh. Local core migration; not a verified production release.
 
-## Active production incident — NOT READY
+## Production startup incident — repaired; real-user pilot pending
+
+Repair bda7ffb was first tested on Vercel Preview dpl_7hxyNw9gJSCWumN7UX9x8B8z3sgM: both API routes returned expected GET 405 responses instead of empty 500s. It was then released to Production dpl_48BUZwu3aVMrntEvn3SPLudpw9oh (READY). Live POST checks on www.ieeequ.online returned structured 401 responses for missing authentication on syncPublicProfile/media and an invalid diagnostic token on registerForEvent. The invalid-token check confirms authentication initialization reaches token verification with Production configuration. No real registration, attendance, points or media writes were made by these probes.
+
+The repaired candidate passed 148 regressions and all 14 emulator tests using the actual built Next.js route handlers under strict CommonJS loading, including PDF rendering. Isolated traced bundles also started under that mode. This confirms the startup failure is resolved; it does not replace a real-user Google sign-in/registration/attendance and live Cloudinary pilot. A scoped post-deploy error/fatal log query returned no matching records during the short observation window, not a permanent all-clear.
 
 ### Root cause and repair candidate
 

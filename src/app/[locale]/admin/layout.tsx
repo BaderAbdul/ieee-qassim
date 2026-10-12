@@ -119,33 +119,75 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         }`}
       >
         {/* Header & Toggle Button */}
-        <div className="p-4 sm:p-5 border-b border-slate-800/80 flex items-center justify-between">
-            <div className={`truncate ${isCollapsed ? 'md:hidden' : ''}`}>
-              <h2 className="text-lg font-black font-cairo text-purple-400 tracking-wide">
-                {isAr ? 'لوحة الإدارة' : 'Admin Portal'}
-              </h2>
-              <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">
-                IEEE Qassim
-              </p>
-            </div>
-          <button type="button" aria-controls="admin-navigation-panel" aria-expanded={mobileOpen} onClick={() => setMobileOpen(value => !value)} className="md:hidden rounded-xl bg-slate-800 px-3 py-2 text-sm font-bold">{mobileOpen ? (isAr ? 'إغلاق القائمة' : 'Close menu') : (isAr ? 'القائمة' : 'Menu')}</button>
-          
-          <button
-            onClick={toggleSidebar}
-            aria-label={isCollapsed ? (isAr ? 'توسيع القائمة' : 'Expand sidebar') : (isAr ? 'طي القائمة' : 'Collapse sidebar')}
-            aria-expanded={!isCollapsed}
-            className={`hidden md:block p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all ${
-              isCollapsed ? 'mx-auto' : ''
-            }`}
-            title={isCollapsed ? (isAr ? 'توسيع القائمة' : 'Expand Sidebar') : (isAr ? 'طَيّ القائمة (أيقونات فقط)' : 'Collapse Sidebar')}
-          >
-            {isCollapsed ? (
-              isAr ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />
-            ) : (
-              isAr ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />
-            )}
-          </button>
+        <div className="p-3 sm:p-5 border-b border-slate-800/80 flex items-center justify-between">
+          <div className={`truncate ${isCollapsed ? 'md:hidden' : ''}`}>
+            <h2 className="text-base sm:text-lg font-black font-cairo text-purple-400 tracking-wide">
+              {isAr ? 'لوحة الإدارة' : 'Admin Portal'}
+            </h2>
+            <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">
+              IEEE Qassim
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {/* Mobile partial collapse / expand button */}
+            <button
+              type="button"
+              aria-controls="admin-navigation-panel"
+              aria-expanded={mobileOpen}
+              onClick={() => setMobileOpen(value => !value)}
+              className="md:hidden inline-flex items-center gap-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 px-3 py-1.5 text-xs font-bold text-slate-200 transition-colors"
+            >
+              {mobileOpen ? (isAr ? 'إخفاء جزئي (أيقونات)' : 'Icons only') : (isAr ? 'عرض العناوين' : 'Full menu')}
+            </button>
+            
+            <button
+              onClick={toggleSidebar}
+              aria-label={isCollapsed ? (isAr ? 'توسيع القائمة' : 'Expand sidebar') : (isAr ? 'طي القائمة' : 'Collapse sidebar')}
+              aria-expanded={!isCollapsed}
+              className={`hidden md:block p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all ${
+                isCollapsed ? 'mx-auto' : ''
+              }`}
+              title={isCollapsed ? (isAr ? 'توسيع القائمة' : 'Expand Sidebar') : (isAr ? 'طَيّ القائمة (أيقونات فقط)' : 'Collapse Sidebar')}
+            >
+              {isCollapsed ? (
+                isAr ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />
+              ) : (
+                isAr ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />
+              )}
+            </button>
+          </div>
         </div>
+
+        {/* Mobile quick icons strip when full menu is closed (partial collapse) */}
+        {!mobileOpen && (
+          <div className="md:hidden flex items-center gap-1 p-2 overflow-x-auto no-scrollbar border-b border-slate-800/60 bg-slate-900/90">
+            {navItems.map((item) => {
+              const active = isCurrentPath(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-label={item.name}
+                  title={item.name}
+                  className={`p-2.5 rounded-xl shrink-0 transition-colors ${
+                    active
+                      ? 'bg-purple-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  }`}
+                >
+                  {item.icon}
+                </Link>
+              );
+            })}
+            <Link
+              href="/"
+              title={isAr ? 'العودة للمنصة' : 'Back to main site'}
+              className="p-2.5 rounded-xl shrink-0 text-slate-400 hover:text-white hover:bg-slate-800"
+            >
+              <LogOut size={20} className="rtl:rotate-180" />
+            </Link>
+          </div>
+        )}
         
         {/* Navigation Links */}
         <div id="admin-navigation-panel" className={`${mobileOpen ? 'flex' : 'hidden'} md:flex flex-1 flex-col`}>
@@ -176,7 +218,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </nav>
 
         {/* Return to Main Site Button */}
-        <NotificationQueueControl />
+        {!isCollapsed && <NotificationQueueControl />}
         <div className="p-3 border-t border-slate-800/80">
           <Link 
             href="/" 

@@ -129,17 +129,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setError(null);
       const { auth, googleProvider } = await import('@/lib/firebase/client');
       const { signInWithPopup, signInWithRedirect } = await import('firebase/auth');
-      try { await signInWithPopup(auth, googleProvider); }
-      catch (reason) {
+      try { 
+        await signInWithPopup(auth, googleProvider); 
+      } catch (reason) {
         const code = typeof reason === 'object' && reason && 'code' in reason ? reason.code : '';
         if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return;
-        if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') {
+        
+        // Ad-blockers or privacy settings often suppress popups; fallback automatically to redirect
+        try {
           await signInWithRedirect(auth, googleProvider);
-        } else { throw reason; }
+        } catch (redirectErr) {
+          console.error('Redirect sign-in failed', redirectErr);
+          throw reason;
+        }
       }
     } catch (reason) {
       console.error('Login failed', reason);
-      setError('تعذر تسجيل الدخول. أعد المحاولة. / Sign-in failed. Please retry.');
+      setError('تعذر تسجيل الدخول. إذا كنت تستخدم مانع إعلانات (AdBlocker)، يُرجى السماح بالنوافذ المنبثقة أو تعطيله مؤقتاً.');
     }
   };
 

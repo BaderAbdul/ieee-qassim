@@ -71,7 +71,9 @@ export default function DigitalMemberCard({ user, userData, rank, totalPoints, o
   const patternClass = getPatternClass();
 
   // QR Code URL pointing to public pass view
-  const qrValue = `https://ieeequ.org/pass/${user.uid}`;
+  const qrValue = typeof window !== 'undefined' 
+    ? `${window.location.origin}/pass/${user.uid}` 
+    : `https://www.ieeequ.online/pass/${user.uid}`;
 
   return (
     <div className="w-full max-w-4xl mx-auto mb-10">
