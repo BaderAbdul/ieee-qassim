@@ -94,8 +94,8 @@ export default function Navbar() {
             </Link>
           </div>
 
-          {/* Navigation Links */}
-          <nav aria-label={isAr ? 'التنقل الرئيسي' : 'Main navigation'} className="flex min-w-0 items-center gap-0.5 sm:gap-2 overflow-x-auto no-scrollbar mx-1 flex-1 justify-start px-1">
+          {/* Navigation Links (Centered) */}
+          <nav aria-label={isAr ? 'التنقل الرئيسي' : 'Main navigation'} className="flex min-w-0 items-center gap-0.5 sm:gap-2 overflow-x-auto no-scrollbar mx-1 sm:mx-4 flex-1 justify-center px-1">
             {navLinks.map((item) => {
               const active = isActive(item.href);
               const Icon = item.icon;
