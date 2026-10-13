@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { authenticate, errorResponse, limitRequests, readJson, requireAdmin } from '@/lib/server/request';
 import { ApiError } from '@/lib/server/errors';
-import { changeRegistration, documentId, initiatePendingCheckIn, recordAttendance, submitEventFeedback, type AttendanceInput } from '@/lib/server/lifecycle';
+import { changeRegistration, documentId, initiatePendingCheckIn, recordAttendance, submitEventFeedback, syncEventAttendance, type AttendanceInput } from '@/lib/server/lifecycle';
 import { normalizeUniversityId, saveProfile, syncPublicProfile } from '@/lib/server/profiles';
 import { assignCertificate, authorizeCertificate, certificateDownload, renderCertificate } from '@/lib/server/certificates';
 import { processNotificationBatch, queueNotification } from '@/lib/server/notifications';
@@ -80,6 +80,11 @@ export async function POST(request: Request, context: { params: Promise<{ action
         if (override) requireAdmin(actor);
         if (data.feedbackData && (typeof data.feedbackData !== 'object' || Array.isArray(data.feedbackData))) throw new ApiError('invalid-argument', 'Invalid feedback.');
         result = await recordAttendance({ eventId: documentId(data.eventId, 'eventId'), userId: override ? documentId(data.targetUserId, 'userId').replace('ieee-qu-user:', '') : actor.uid, actorUid: actor.uid, admin: override, token: typeof data.token === 'string' ? data.token : undefined, feedback: data.feedbackData as AttendanceInput['feedback'] }); break;
+      }
+      case 'syncEventAttendance': {
+        requireAdmin(actor);
+        result = await syncEventAttendance(documentId(data.eventId, 'eventId'), actor.uid);
+        break;
       }
       case 'checkUniversityId': {
         const id = normalizeUniversityId(data.universityId);

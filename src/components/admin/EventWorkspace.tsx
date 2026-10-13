@@ -31,7 +31,7 @@ export default function EventWorkspace({ children }: { children: React.ReactNode
   const tabs = [
     { path: '', label: isAr ? 'ملخص وتقرير' : 'Summary & report' },
     { path: '/edit', label: isAr ? 'تفاصيل الفعالية' : 'Event details' },
-    { path: '/registrations', label: isAr ? 'التسجيلات' : 'Registrations' },
+    { path: '/registrations', label: (event?.requiresRegistration === false || event?.type === 'Booth') ? (isAr ? 'سجل الحضور والزوار' : 'Attendance & Visitors') : (isAr ? 'التسجيلات والحضور' : 'Registrations & Attendance') },
     { path: '/checkin-desk', label: isAr ? 'التحضير' : 'Check-in desk' },
     { path: '/certificates', label: isAr ? 'الشهادات' : 'Certificates' },
     { path: '/feedback', label: isAr ? 'التقييمات' : 'Feedback' },

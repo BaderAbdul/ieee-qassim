@@ -237,9 +237,30 @@ export async function recordAttendance(input: AttendanceInput) {
     tx.set(db.collection('public_profiles').doc(userId), publicProfile({ ...userData, totalPoints, badges: nextBadges }));
     tx.create(logRef, { eventId, userId, timestamp: FieldValue.serverTimestamp(), verifiedByAdmin: input.admin ? actorUid : false });
     if (regSnap.exists) {
-      tx.update(regRef, { status: 'attended', attended: true, attendedAt: FieldValue.serverTimestamp() });
+      const regData = regSnap.data() || {};
+      tx.update(regRef, {
+        status: 'attended',
+        attended: true,
+        attendedAt: FieldValue.serverTimestamp(),
+        ...(!regData.timestamp ? { timestamp: regData.registeredAt || FieldValue.serverTimestamp() } : {}),
+        ...(!regData.userName ? { userName: userData.arabicFullName || userData.displayName || 'Student' } : {}),
+        ...(!regData.userEmail ? { userEmail: userData.email || '' } : {}),
+        ...(userData.universityId && !regData.universityId ? { universityId: userData.universityId } : {}),
+      });
     } else {
-      tx.set(regRef, { eventId, userId, status: 'attended', attended: true, registeredAt: FieldValue.serverTimestamp(), attendedAt: FieldValue.serverTimestamp() });
+      tx.set(regRef, {
+        eventId,
+        userId,
+        status: 'attended',
+        attended: true,
+        isWalkIn: true,
+        timestamp: FieldValue.serverTimestamp(),
+        registeredAt: FieldValue.serverTimestamp(),
+        attendedAt: FieldValue.serverTimestamp(),
+        userName: userData.arabicFullName || userData.displayName || 'Student',
+        userEmail: userData.email || '',
+        ...(userData.universityId ? { universityId: userData.universityId } : {}),
+      });
     }
     tx.update(eventRef, { attendanceCount: FieldValue.increment(1) });
     if (feedback) tx.set(db.collection('event_feedback').doc(`${eventId}_${userId}`), { eventId, userId, userEmail: userSnap.data()?.email || '', rating: feedback.rating, answers: feedback.answers || {}, createdAt: FieldValue.serverTimestamp() });
@@ -256,3 +277,122 @@ export async function recordAttendance(input: AttendanceInput) {
     return { status: 'success', userId, awardedPoints };
   }, { maxAttempts: 10 });
 }
+
+export async function syncEventAttendance(eventId: string, actorUid: string) {
+  const db = getFirestore();
+  const eventDoc = await db.collection('events').doc(documentId(eventId, 'eventId')).get();
+  if (!eventDoc.exists) throw new ApiError('not-found', 'Event not found.');
+
+  const [logsSnap, regsSnap] = await Promise.all([
+    db.collection('attendance_logs').where('eventId', '==', eventId).get(),
+    db.collection('registrations').where('eventId', '==', eventId).get(),
+  ]);
+
+  const existingRegMap = new Map<string, FirebaseFirestore.DocumentData>();
+  regsSnap.docs.forEach(doc => {
+    existingRegMap.set(doc.data().userId, { id: doc.id, ref: doc.ref, ...doc.data() });
+  });
+
+  let repairedCount = 0;
+  const userIdsToFetch = new Set<string>();
+
+  for (const logDoc of logsSnap.docs) {
+    const logData = logDoc.data();
+    const userId = logData.userId;
+    const existing = existingRegMap.get(userId);
+    if (!existing || !existing.timestamp || !existing.userName) {
+      userIdsToFetch.add(userId);
+    }
+  }
+
+  for (const regDoc of regsSnap.docs) {
+    const regData = regDoc.data();
+    if (!regData.timestamp && regData.userId) {
+      userIdsToFetch.add(regData.userId);
+    }
+  }
+
+  const userMap = new Map<string, FirebaseFirestore.DocumentData>();
+  const uidList = Array.from(userIdsToFetch);
+  for (let i = 0; i < uidList.length; i += 25) {
+    const chunk = uidList.slice(i, i + 25);
+    const snaps = await Promise.all(chunk.map(uid => db.collection('users').doc(uid).get()));
+    snaps.forEach(s => {
+      if (s.exists) userMap.set(s.id, s.data()!);
+    });
+  }
+
+  const batches: FirebaseFirestore.WriteBatch[] = [db.batch()];
+  let currentBatchOps = 0;
+
+  const queueWrite = (ref: FirebaseFirestore.DocumentReference, data: Record<string, unknown>, merge = true) => {
+    if (currentBatchOps >= 400) {
+      batches.push(db.batch());
+      currentBatchOps = 0;
+    }
+    const batch = batches[batches.length - 1];
+    batch.set(ref, data, { merge });
+    currentBatchOps++;
+    repairedCount++;
+  };
+
+  for (const logDoc of logsSnap.docs) {
+    const logData = logDoc.data();
+    const userId = logData.userId;
+    const existing = existingRegMap.get(userId);
+    const user = userMap.get(userId);
+    const regRef = db.collection('registrations').doc(`${eventId}_${userId}`);
+
+    if (!existing) {
+      queueWrite(regRef, {
+        eventId,
+        userId,
+        status: 'attended',
+        attended: true,
+        isWalkIn: true,
+        timestamp: logData.timestamp || FieldValue.serverTimestamp(),
+        registeredAt: logData.timestamp || FieldValue.serverTimestamp(),
+        attendedAt: logData.timestamp || FieldValue.serverTimestamp(),
+        userName: user?.arabicFullName || user?.displayName || 'Student',
+        userEmail: user?.email || '',
+        ...(user?.universityId ? { universityId: user.universityId } : {}),
+      }, false);
+    } else if (!existing.timestamp || !existing.userName || existing.status !== 'attended') {
+      queueWrite(regRef, {
+        status: 'attended',
+        attended: true,
+        timestamp: existing.timestamp || existing.attendedAt || existing.registeredAt || logData.timestamp || FieldValue.serverTimestamp(),
+        attendedAt: existing.attendedAt || logData.timestamp || FieldValue.serverTimestamp(),
+        ...(!existing.userName ? { userName: user?.arabicFullName || user?.displayName || 'Student' } : {}),
+        ...(!existing.userEmail ? { userEmail: user?.email || '' } : {}),
+        ...(user?.universityId && !existing.universityId ? { universityId: user.universityId } : {}),
+      }, true);
+    }
+  }
+
+  for (const regDoc of regsSnap.docs) {
+    const regData = regDoc.data();
+    if (!regData.timestamp) {
+      const user = userMap.get(regData.userId);
+      queueWrite(regDoc.ref, {
+        timestamp: regData.attendedAt || regData.registeredAt || FieldValue.serverTimestamp(),
+        ...(!regData.userName && user ? { userName: user.arabicFullName || user.displayName || 'Student' } : {}),
+        ...(!regData.userEmail && user ? { userEmail: user.email || '' } : {}),
+        ...(user?.universityId && !regData.universityId ? { universityId: user.universityId } : {}),
+      }, true);
+    }
+  }
+
+  if (currentBatchOps > 0) {
+    await Promise.all(batches.map(b => b.commit()));
+  }
+
+  if (repairedCount > 0) {
+    await db.runTransaction(async tx => {
+      audit(tx, 'attendance.sync', actorUid, eventId, { repairedCount, totalLogs: logsSnap.size });
+    });
+  }
+
+  return { status: 'success', repairedCount, totalAttendance: logsSnap.size };
+}
+

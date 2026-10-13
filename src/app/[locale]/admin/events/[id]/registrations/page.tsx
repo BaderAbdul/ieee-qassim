@@ -8,7 +8,7 @@ import { db, functions } from '@/lib/firebase/client';
 import { httpsCallable } from '@/lib/backend';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
-import { ArrowRight, Download, Users, Check, X, Clock, UserCheck, CheckSquare, Square, Trophy, QrCode } from 'lucide-react';
+import { ArrowRight, Download, Users, Check, X, Clock, UserCheck, CheckSquare, Square, Trophy, QrCode, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -23,7 +23,11 @@ interface RegistrationData {
   academicLevel?: string;
   isQassimStudent?: boolean;
   status: string;
+  attended?: boolean;
+  isWalkIn?: boolean;
   timestamp: { toDate?: () => Date } | Date | null;
+  attendedAt?: { toDate?: () => Date } | Date | null;
+  registeredAt?: { toDate?: () => Date } | Date | null;
 }
 
 const toDate = (val: { toDate?: () => Date } | Date | null | undefined): Date | null => {
@@ -43,7 +47,8 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
   const [pageCursor, setPageCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [nextCursor, setNextCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [hasMore, setHasMore] = useState(false);
-  const [totals, setTotals] = useState({ all: 0, approved: 0, waiting: 0 });
+  const [totals, setTotals] = useState({ all: 0, approved: 0, waiting: 0, attended: 0 });
+  const [isSyncing, setIsSyncing] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [results, setResults] = useState<OperationResult[]>([]);
   const [retryJob, setRetryJob] = useState<{ status?: string; points?: { amount: number; reason: string; operationIds: Record<string, string> }; items: RegistrationData[] } | null>(null);
@@ -83,14 +88,52 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
     const fetchRegistrations = async () => {
       try {
         const eventSnap = await getDoc(doc(db, 'events', eventId));
+        let eventData: PlatformEvent | null = null;
         if (eventSnap.exists() && active) {
-          setEvent({ id: eventSnap.id, ...eventSnap.data() } as PlatformEvent);
+          eventData = { id: eventSnap.id, ...eventSnap.data() } as PlatformEvent;
+          setEvent(eventData);
         }
 
         const base = query(collection(db, 'registrations'), where('eventId', '==', eventId));
-        const counts = await Promise.all([getCountFromServer(base), getCountFromServer(query(base, where('status', '==', 'approved'))), getCountFromServer(query(base, where('status', 'in', ['pending', 'waitlisted'])))]);
-        if (active) setTotals({ all: counts[0].data().count, approved: counts[1].data().count, waiting: counts[2].data().count });
-        const q = query(base, orderBy('timestamp', 'asc'), orderBy(documentId()), ...(pageCursor ? [startAfter(pageCursor)] : []), limit(50));
+        const [countsAll, countsApproved, countsWaiting, countsAttended, countsLogs] = await Promise.all([
+          getCountFromServer(base),
+          getCountFromServer(query(base, where('status', '==', 'approved'))),
+          getCountFromServer(query(base, where('status', 'in', ['pending', 'waitlisted']))),
+          getCountFromServer(query(base, where('status', '==', 'attended'))),
+          getCountFromServer(query(collection(db, 'attendance_logs'), where('eventId', '==', eventId))),
+        ]);
+
+        const rawAll = countsAll.data().count;
+        const rawApproved = countsApproved.data().count;
+        const rawWaiting = countsWaiting.data().count;
+        const rawAttended = countsAttended.data().count;
+        const rawLogs = countsLogs.data().count;
+
+        const attendedTotal = Math.max(rawAttended, rawLogs);
+        const allTotal = Math.max(rawAll, attendedTotal);
+
+        if (active) {
+          setTotals({
+            all: allTotal,
+            approved: rawApproved,
+            waiting: rawWaiting,
+            attended: attendedTotal,
+          });
+        }
+
+        // Auto-heal missing registrations/timestamps if logs exist but aren't reflected in registrations
+        if (pageCursor === null && (rawLogs > rawAttended || (eventData && (eventData.requiresRegistration === false || eventData.type === 'Booth')))) {
+          httpsCallable(functions, 'syncEventAttendance')({ eventId })
+            .then(res => {
+              const resData = res.data as { repairedCount?: number };
+              if (resData?.repairedCount && resData.repairedCount > 0 && active) {
+                setReloadKey(k => k + 1);
+              }
+            })
+            .catch(() => {});
+        }
+
+        const q = query(base, ...(pageCursor ? [startAfter(pageCursor)] : []), limit(50));
         const snap = await getDocs(q);
         
         // Parallelize user fetching using Promise.all & cache to eliminate N+1 sequential waterfall
@@ -130,13 +173,17 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
             academicLevel: cachedUser?.academicLevel as string | undefined,
             isQassimStudent: cachedUser?.isQassimStudent as boolean | undefined,
             status: regData.status,
-            timestamp: regData.timestamp
+            attended: regData.attended === true || regData.status === 'attended',
+            isWalkIn: regData.isWalkIn === true || (!regData.registeredAt && Boolean(regData.attendedAt)),
+            timestamp: regData.timestamp || regData.attendedAt || regData.registeredAt || null,
+            attendedAt: regData.attendedAt || null,
+            registeredAt: regData.registeredAt || null,
           };
         });
         
         regs.sort((a, b) => {
-          const tA = (a.timestamp as { toDate?: () => Date })?.toDate?.()?.getTime() || 0;
-          const tB = (b.timestamp as { toDate?: () => Date })?.toDate?.()?.getTime() || 0;
+          const tA = toDate(a.timestamp || a.attendedAt || a.registeredAt)?.getTime() || 0;
+          const tB = toDate(b.timestamp || b.attendedAt || b.registeredAt)?.getTime() || 0;
           return tA - tB; // Earliest first
         });
         
@@ -219,44 +266,122 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
+  const handleSyncAttendance = async () => {
+    setIsSyncing(true);
+    try {
+      const syncFn = httpsCallable<{ eventId: string }, { status: string; repairedCount: number; totalAttendance: number }>(functions, 'syncEventAttendance');
+      const res = await syncFn({ eventId });
+      setResults([{
+        id: 'sync',
+        name: 'مزامنة سجل الحضور',
+        success: true,
+        message: `تم التحقق وتحديث ${res.data.repairedCount} سجلاً. إجمالي الحضور المؤكد: ${res.data.totalAttendance}`
+      }]);
+      setReloadKey(k => k + 1);
+    } catch (err) {
+      setResults([{
+        id: 'sync',
+        name: 'مزامنة سجل الحضور',
+        success: false,
+        message: err instanceof Error ? err.message : 'تعذر مزامنة الحضور'
+      }]);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const exportCSV = async () => {
     if (!event) return;
     setExporting(true);
     try {
-    const all: RegistrationData[] = [];
-    let cursor: QueryDocumentSnapshot<DocumentData> | undefined;
-    do {
-      const snap = await getDocs(query(collection(db, 'registrations'), where('eventId', '==', eventId), orderBy('timestamp', 'asc'), orderBy(documentId()), ...(cursor ? [startAfter(cursor)] : []), limit(200)));
-      const page = snap.docs.map(item => ({ id: item.id, ...item.data() } as RegistrationData));
-      // Bounded enrichment preserves all exported columns without loading every user at once.
-      for (let offset = 0; offset < page.length; offset += 25) {
-        await Promise.all(page.slice(offset, offset + 25).map(async item => {
-          const profile = await getDoc(doc(db, 'users', item.userId));
-          if (profile.exists()) {
-            const user = profile.data();
-            Object.assign(item, { userName: item.userName || user.arabicFullName || user.displayName, userEmail: item.userEmail || user.email, universityId: user.universityId || item.universityId, college: user.college || '', major: user.major || '', academicLevel: user.academicLevel || '', isQassimStudent: user.isQassimStudent === true });
-          }
-        }));
+      const all: RegistrationData[] = [];
+      let cursor: QueryDocumentSnapshot<DocumentData> | undefined;
+      do {
+        const snap = await getDocs(query(
+          collection(db, 'registrations'),
+          where('eventId', '==', eventId),
+          ...(cursor ? [startAfter(cursor)] : []),
+          limit(200)
+        ));
+        const page = snap.docs.map(item => ({ id: item.id, ...item.data() } as RegistrationData));
+        for (let offset = 0; offset < page.length; offset += 25) {
+          await Promise.all(page.slice(offset, offset + 25).map(async item => {
+            const profile = await getDoc(doc(db, 'users', item.userId));
+            if (profile.exists()) {
+              const user = profile.data();
+              Object.assign(item, {
+                userName: item.userName || user.arabicFullName || user.displayName,
+                userEmail: item.userEmail || user.email,
+                universityId: user.universityId || item.universityId,
+                college: user.college || '',
+                major: user.major || '',
+                academicLevel: user.academicLevel || '',
+                isQassimStudent: user.isQassimStudent === true
+              });
+            }
+          }));
+        }
+        all.push(...page);
+        cursor = snap.size === 200 ? snap.docs.at(-1) : undefined;
+      } while (cursor);
+
+      // Verify if any attendance logs are missing from registrations in CSV
+      const logsSnap = await getDocs(query(collection(db, 'attendance_logs'), where('eventId', '==', eventId), limit(500)));
+      const missingUids = logsSnap.docs
+        .map(d => d.data().userId as string)
+        .filter(uid => uid && !all.some(r => r.userId === uid));
+
+      if (missingUids.length > 0) {
+        for (let offset = 0; offset < missingUids.length; offset += 25) {
+          const chunk = missingUids.slice(offset, offset + 25);
+          await Promise.all(chunk.map(async uid => {
+            const profile = await getDoc(doc(db, 'users', uid));
+            const logDoc = logsSnap.docs.find(d => d.data().userId === uid);
+            const user = profile.exists() ? profile.data() : null;
+            all.push({
+              id: `${eventId}_${uid}`,
+              userId: uid,
+              userName: (user?.arabicFullName as string) || (user?.displayName as string) || 'Student',
+              userEmail: (user?.email as string) || '',
+              universityId: user?.universityId as string,
+              college: user?.college as string,
+              major: user?.major as string,
+              academicLevel: user?.academicLevel as string,
+              isQassimStudent: user?.isQassimStudent === true,
+              status: 'attended',
+              attended: true,
+              isWalkIn: true,
+              timestamp: logDoc?.data().timestamp || null,
+            });
+          }));
+        }
       }
-      all.push(...page);
-      cursor = snap.size === 200 ? snap.docs.at(-1) : undefined;
-    } while (cursor);
-    const headers = ['Name', 'Email', 'University ID', 'College', 'Major', 'Academic Level', 'Qassim Student?', 'Status', 'Date (UTC)'];
-    const rows = all.map(r => {
-      const d = toDate(r.timestamp);
-      return [
-        r.userName, r.userEmail, r.universityId || '', r.college || '', r.major || '', r.academicLevel || '', r.isQassimStudent ? 'Yes' : 'No',
-        r.status,
-        d ? d.toISOString() : ''
-      ];
-    });
-    
-    downloadCSV(`registrations_${event.title}.csv`, [headers, ...rows]);
-    } catch (error) { setResults([{ id: 'export', name: 'تصدير جميع التسجيلات', success: false, message: error instanceof Error ? error.message : 'تعذر التصدير' }]); }
-    finally { setExporting(false); }
+
+      const headers = ['Name', 'Email', 'University ID', 'College', 'Major', 'Academic Level', 'Qassim Student?', 'Status', 'Attendance Type', 'Date (UTC)'];
+      const rows = all.map(r => {
+        const d = toDate(r.timestamp || r.attendedAt || r.registeredAt);
+        const isWalkIn = r.isWalkIn || r.status === 'attended';
+        return [
+          r.userName,
+          r.userEmail,
+          r.universityId || '',
+          r.college || '',
+          r.major || '',
+          r.academicLevel || '',
+          r.isQassimStudent ? 'Yes' : 'No',
+          r.status,
+          isWalkIn ? 'Walk-in / Booth (حضور مباشر)' : 'Pre-registered (تسجيل مسبق)',
+          d ? d.toISOString() : ''
+        ];
+      });
+      
+      downloadCSV(`registrations_${event.title}.csv`, [headers, ...rows]);
+    } catch (error) {
+      setResults([{ id: 'export', name: 'تصدير جميع التسجيلات والحضور', success: false, message: error instanceof Error ? error.message : 'تعذر التصدير' }]);
+    } finally {
+      setExporting(false);
+    }
   };
-
-
 
   if (loading) {
     return <div className="py-20 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div></div>;
@@ -266,7 +391,7 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
     return <div className="text-center py-20 text-gray-500">الفعالية غير موجودة.</div>;
   }
 
-  const approvedCount = totals.approved;
+  const isBoothOrWalkIn = event.requiresRegistration === false || event.type === 'Booth';
 
   return (
     <div>
@@ -276,21 +401,44 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
             <Link href="/admin/events" className="text-gray-500 hover:text-gray-900 me-2">
               <ArrowRight className="h-5 w-5 rtl:-scale-x-100" />
             </Link>
-            <h1 className="text-3xl font-bold text-gray-900 font-cairo">مكتب التسجيل</h1>
+            <h1 className="text-3xl font-bold text-gray-900 font-cairo">
+              {isBoothOrWalkIn ? 'سجل الحضور والزوار' : 'مكتب التسجيل وسجل الحضور'}
+            </h1>
           </div>
-          <p className="text-gray-600 text-lg">{event.title}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-gray-600 text-lg">{event.title}</p>
+            {isBoothOrWalkIn && (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                بوث / بدون تسجيل مسبق
+              </span>
+            )}
+          </div>
         </div>
         
-        <div className="flex gap-2">
-          <button onClick={exportCSV} disabled={exporting} className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center shadow-sm disabled:opacity-50">
+        <div className="flex flex-wrap gap-2">
+          <button 
+            onClick={handleSyncAttendance} 
+            disabled={isSyncing} 
+            className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center shadow-sm disabled:opacity-50"
+            title="مزامنة بيانات الحضور مع سجل التحضير للتأكد من ظهور كافة الزوار"
+          >
+            <RefreshCw size={18} className={`me-2 ${isSyncing ? 'animate-spin text-purple-600' : ''}`} />
+            {isSyncing ? 'جارٍ المزامنة…' : 'مزامنة الحضور'}
+          </button>
+          <button 
+            onClick={exportCSV} 
+            disabled={exporting} 
+            className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center shadow-sm disabled:opacity-50"
+          >
             <Download size={18} className="me-2" />
-            {exporting ? 'جارٍ تصدير الكل…' : 'تصدير جميع التسجيلات (CSV)'}
+            {exporting ? 'جارٍ تصدير الكل…' : 'تصدير السجل (CSV)'}
           </button>
         </div>
       </div>
 
       {results.length > 0 && <section className="mb-6 rounded-xl border p-4 bg-white" aria-live="polite"><p>نجح {results.filter(item => item.success).length} / {results.length}. فشل {results.filter(item => !item.success).length}.</p>{results.filter(item => !item.success).map(item => <p key={item.id} className="text-red-700">{item.name}: {item.message}</p>)}{retryJob && <button disabled={isUpdatingBulk} onClick={() => performJob(retryJob)} className="mt-3 rounded-lg bg-blue-600 text-white px-4 py-2">إعادة محاولة الفاشل فقط</button>}</section>}
       <p className="mb-4 text-sm text-gray-500">المحمّل {registrations.length} من {totals.all}. التحديد يشمل الصفوف المحمّلة فقط؛ التصدير يشمل الجميع.</p>
+      
       {/* Check-in Desk Link Section */}
       <div className="bg-gradient-to-r from-blue-900 to-indigo-900 rounded-2xl p-6 mb-6 shadow-sm text-white flex flex-col md:flex-row items-center justify-between gap-6">
         <div>
@@ -299,7 +447,7 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
             مكتب التحضير (Check-in Desk)
           </h3>
           <p className="text-blue-100 text-sm max-w-lg">
-            قم بالانتقال إلى مكتب التحضير لفتح شاشة الـ QR للطلاب، أو استخدام كاميرا الجهاز لمسح بطاقاتهم الجامعية/الرقمية للتحضير السريع والآمن.
+            قم بالانتقال إلى مكتب التحضير لفتح شاشة الـ QR للطلاب، أو استخدام كاميرا الجهاز لمسح بطاقاتهم الرقمية للتحضير السريع والآمن.
           </p>
         </div>
         <Link 
@@ -314,7 +462,7 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
       {selectedIds.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-blue-800 font-bold">
-            تم تحديد {selectedIds.length} مسجل
+            تم تحديد {selectedIds.length} {isBoothOrWalkIn ? 'زائر' : 'مسجل'}
           </div>
           <div className="flex flex-wrap gap-2">
             <button 
@@ -324,27 +472,31 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
             >
               <Trophy size={16} /> رصد نقاط
             </button>
-            <button 
-              disabled={isUpdatingBulk}
-              onClick={() => handleBulkUpdateStatus('approved')}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition-colors disabled:opacity-50"
-            >
-              <Check size={16} /> قبول
-            </button>
-            <button 
-              disabled={isUpdatingBulk}
-              onClick={() => handleBulkUpdateStatus('waitlisted')}
-              className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition-colors disabled:opacity-50"
-            >
-              <Clock size={16} /> انتظار
-            </button>
-            <button 
-              disabled={isUpdatingBulk}
-              onClick={() => handleBulkUpdateStatus('rejected')}
-              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition-colors disabled:opacity-50"
-            >
-              <X size={16} /> رفض
-            </button>
+            {!isBoothOrWalkIn && (
+              <>
+                <button 
+                  disabled={isUpdatingBulk}
+                  onClick={() => handleBulkUpdateStatus('approved')}
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition-colors disabled:opacity-50"
+                >
+                  <Check size={16} /> قبول
+                </button>
+                <button 
+                  disabled={isUpdatingBulk}
+                  onClick={() => handleBulkUpdateStatus('waitlisted')}
+                  className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition-colors disabled:opacity-50"
+                >
+                  <Clock size={16} /> انتظار
+                </button>
+                <button 
+                  disabled={isUpdatingBulk}
+                  onClick={() => handleBulkUpdateStatus('rejected')}
+                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition-colors disabled:opacity-50"
+                >
+                  <X size={16} /> رفض
+                </button>
+              </>
+            )}
             <button 
               disabled={isUpdatingBulk}
               onClick={() => handleBulkUpdateStatus('attended')}
@@ -356,39 +508,84 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex items-center">
-          <div className="h-12 w-12 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center me-4">
-            <Users size={24} />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-500 mb-1">إجمالي المسجلين</p>
-            <h3 className="text-2xl font-bold text-gray-900">{totals.all}</h3>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex items-center">
-          <div className="h-12 w-12 rounded-lg bg-green-100 text-green-600 flex items-center justify-center me-4">
-            <Check size={24} />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-500 mb-1">المقبولين (سعة {event.capacity})</p>
-            <h3 className="text-2xl font-bold text-gray-900">{approvedCount}</h3>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex items-center">
-          <div className="h-12 w-12 rounded-lg bg-yellow-100 text-yellow-600 flex items-center justify-center me-4">
-            <Clock size={24} />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-500 mb-1">قائمة الانتظار / معلق</p>
-            <h3 className="text-2xl font-bold text-gray-900">{totals.waiting}</h3>
-          </div>
-        </div>
+      <div className={`grid grid-cols-1 ${isBoothOrWalkIn ? 'sm:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-4'} gap-6 mb-8`}>
+        {isBoothOrWalkIn ? (
+          <>
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-emerald-100 flex items-center">
+              <div className="h-12 w-12 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center me-4">
+                <UserCheck size={24} />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500 mb-1">الحضور المؤكد (الزوار)</p>
+                <h3 className="text-2xl font-bold text-gray-900">{totals.attended}</h3>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-purple-100 flex items-center">
+              <div className="h-12 w-12 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center me-4">
+                <Users size={24} />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500 mb-1">طريقة الحضور</p>
+                <h3 className="text-xl font-bold text-gray-900">حضور مباشر (بوث)</h3>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-yellow-100 flex items-center">
+              <div className="h-12 w-12 rounded-lg bg-yellow-100 text-yellow-600 flex items-center justify-center me-4">
+                <Trophy size={24} />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500 mb-1">النقاط لكل زائر</p>
+                <h3 className="text-2xl font-bold text-gray-900">{event.points || 0} نقطة</h3>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex items-center">
+              <div className="h-12 w-12 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center me-4">
+                <Users size={24} />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500 mb-1">إجمالي المسجلين</p>
+                <h3 className="text-2xl font-bold text-gray-900">{totals.all}</h3>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex items-center">
+              <div className="h-12 w-12 rounded-lg bg-green-100 text-green-600 flex items-center justify-center me-4">
+                <Check size={24} />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500 mb-1">المقبولين (سعة {event.capacity})</p>
+                <h3 className="text-2xl font-bold text-gray-900">{totals.approved}</h3>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-emerald-100 flex items-center">
+              <div className="h-12 w-12 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center me-4">
+                <UserCheck size={24} />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500 mb-1">الحضور المؤكد</p>
+                <h3 className="text-2xl font-bold text-gray-900">{totals.attended}</h3>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex items-center">
+              <div className="h-12 w-12 rounded-lg bg-yellow-100 text-yellow-600 flex items-center justify-center me-4">
+                <Clock size={24} />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500 mb-1">قائمة الانتظار / معلق</p>
+                <h3 className="text-2xl font-bold text-gray-900">{totals.waiting}</h3>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         {registrations.length === 0 ? (
-          <div className="p-12 text-center text-gray-500">لا يوجد مسجلين حتى الآن.</div>
+          <div className="p-12 text-center text-gray-500">
+            {isBoothOrWalkIn ? 'لا يوجد زوار أو حضور مسجلين في البوث حتى الآن. يمكنك فتح مكتب التحضير لبدء تسجيل حضور الطلاب.' : 'لا يوجد مسجلين حتى الآن.'}
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-start">
@@ -400,7 +597,7 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
                     </button>
                   </th>
                   <th className="px-6 py-4 text-start text-xs font-semibold text-gray-500 uppercase tracking-wider">الطالب</th>
-                  <th className="px-6 py-4 text-start text-xs font-semibold text-gray-500 uppercase tracking-wider">تاريخ التسجيل</th>
+                  <th className="px-6 py-4 text-start text-xs font-semibold text-gray-500 uppercase tracking-wider">{isBoothOrWalkIn ? 'تاريخ الحضور' : 'تاريخ التسجيل'}</th>
                   <th className="px-6 py-4 text-start text-xs font-semibold text-gray-500 uppercase tracking-wider">الحالة</th>
                   <th className="px-6 py-4 text-start text-xs font-semibold text-gray-500 uppercase tracking-wider">إجراءات</th>
                 </tr>
@@ -416,42 +613,58 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
                     <td className="px-6 py-4">
                       <div className="font-bold text-gray-900">{reg.userName}</div>
                       <div className="text-sm text-gray-500">{reg.userEmail}</div>
+                      {reg.universityId && <div className="text-xs text-slate-400 font-mono mt-0.5">{reg.universityId}</div>}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {toDate(reg.timestamp) ? format(toDate(reg.timestamp)!, 'dd MMM yyyy HH:mm', { locale: ar }) : ''}
+                      <div>
+                        {toDate(reg.timestamp || reg.attendedAt || reg.registeredAt) ? format(toDate(reg.timestamp || reg.attendedAt || reg.registeredAt)!, 'dd MMM yyyy HH:mm', { locale: ar }) : '—'}
+                      </div>
+                      {reg.isWalkIn && (
+                        <span className="text-[10px] text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded font-bold border border-purple-200">
+                          حضور مباشر (بوث)
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1 ${
                         reg.status === 'approved' ? 'bg-green-100 text-green-700' :
                         reg.status === 'attended' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
                         reg.status === 'waitlisted' ? 'bg-yellow-100 text-yellow-700' :
                         reg.status === 'rejected' || reg.status === 'cancelled' ? 'bg-red-100 text-red-700' :
                         'bg-blue-100 text-blue-700'
                       }`}>
-                        {reg.status === 'attended' ? 'attended (حاضر)' : reg.status}
+                        {reg.status === 'attended' ? <><UserCheck size={14} /> حاضر</> : reg.status}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-start text-sm font-medium">
                       <div className="flex items-center gap-2">
-                        {reg.status !== 'approved' && reg.status !== 'attended' && (
-                          <button disabled={isUpdatingBulk || isAwarding} aria-label={`قبول ${reg.userName}`} onClick={() => handleUpdateStatus(reg.id, 'approved')} className="text-green-600 hover:bg-green-50 p-2.5 rounded" title="قبول">
-                            <Check size={18} />
-                          </button>
-                        )}
-                        {reg.status === 'approved' && ['Ongoing', 'Completed'].includes(event.state) && (
-                          <button disabled={isUpdatingBulk || isAwarding} aria-label={`تحضير ${reg.userName}`} onClick={() => handleUpdateStatus(reg.id, 'attended')} className="text-blue-600 hover:bg-blue-50 p-2.5 rounded" title="تحضير (حضر الفعالية)">
-                            <UserCheck size={18} />
-                          </button>
-                        )}
-                        {reg.status !== 'waitlisted' && reg.status !== 'attended' && (
-                          <button disabled={isUpdatingBulk || isAwarding} aria-label={`نقل ${reg.userName} إلى الانتظار`} onClick={() => handleUpdateStatus(reg.id, 'waitlisted')} className="text-yellow-600 hover:bg-yellow-50 p-2.5 rounded" title="وضع في قائمة الانتظار">
-                            <Clock size={18} />
-                          </button>
-                        )}
-                        {reg.status !== 'rejected' && reg.status !== 'cancelled' && reg.status !== 'attended' && (
-                          <button disabled={isUpdatingBulk || isAwarding} aria-label={`رفض ${reg.userName}`} onClick={() => handleUpdateStatus(reg.id, 'rejected')} className="text-red-600 hover:bg-red-50 p-2.5 rounded" title="رفض">
-                            <X size={18} />
-                          </button>
+                        {reg.status === 'attended' ? (
+                          <span className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200">
+                            تم التحضير بنجاح
+                          </span>
+                        ) : (
+                          <>
+                            {reg.status !== 'approved' && (
+                              <button disabled={isUpdatingBulk || isAwarding} aria-label={`قبول ${reg.userName}`} onClick={() => handleUpdateStatus(reg.id, 'approved')} className="text-green-600 hover:bg-green-50 p-2.5 rounded" title="قبول">
+                                <Check size={18} />
+                              </button>
+                            )}
+                            {reg.status === 'approved' && ['Ongoing', 'Completed'].includes(event.state) && (
+                              <button disabled={isUpdatingBulk || isAwarding} aria-label={`تحضير ${reg.userName}`} onClick={() => handleUpdateStatus(reg.id, 'attended')} className="text-blue-600 hover:bg-blue-50 p-2.5 rounded" title="تحضير (حضر الفعالية)">
+                                <UserCheck size={18} />
+                              </button>
+                            )}
+                            {reg.status !== 'waitlisted' && (
+                              <button disabled={isUpdatingBulk || isAwarding} aria-label={`نقل ${reg.userName} إلى الانتظار`} onClick={() => handleUpdateStatus(reg.id, 'waitlisted')} className="text-yellow-600 hover:bg-yellow-50 p-2.5 rounded" title="وضع في قائمة الانتظار">
+                                <Clock size={18} />
+                              </button>
+                            )}
+                            {reg.status !== 'rejected' && reg.status !== 'cancelled' && (
+                              <button disabled={isUpdatingBulk || isAwarding} aria-label={`رفض ${reg.userName}`} onClick={() => handleUpdateStatus(reg.id, 'rejected')} className="text-red-600 hover:bg-red-50 p-2.5 rounded" title="رفض">
+                                <X size={18} />
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </td>

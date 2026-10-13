@@ -604,18 +604,7 @@ export class IEEEPlatformClient {
         throw new Error('Event is not currently accepting attendance.');
       }
 
-      // 3. Verify Registration Status
-      const regId = `${eventId}_${actorUid}`;
-      const regRef = this.db.collection('registrations').doc(regId);
-      const regSnap = await tx.get(regRef);
-      if (!regSnap.exists) {
-        throw new Error('You are not registered for this event.');
-      }
-      if (regSnap.data()?.status !== 'approved') {
-        throw new Error('Your registration is not approved.');
-      }
-
-      // 4. Check Idempotency (Already checked in)
+      // 3. Check Idempotency (Already checked in)
       const logId = `${eventId}_${actorUid}`;
       const logRef = this.db.collection('attendance_logs').doc(logId);
       const logSnap = await tx.get(logRef);
@@ -623,7 +612,21 @@ export class IEEEPlatformClient {
         return { status: 'already_checked_in', pointsAwarded: 0 };
       }
 
-      // 5. Write Attendance Log
+      // 4. Verify Registration Status (unless Booth or requiresRegistration is false)
+      const isRegistrationRequired = eventData.requiresRegistration !== false && eventData.type !== 'Booth';
+      const regId = `${eventId}_${actorUid}`;
+      const regRef = this.db.collection('registrations').doc(regId);
+      const regSnap = await tx.get(regRef);
+      if (isRegistrationRequired) {
+        if (!regSnap.exists) {
+          throw new Error('You are not registered for this event.');
+        }
+        if (!['approved', 'attended'].includes(regSnap.data()?.status)) {
+          throw new Error('Your registration is not approved.');
+        }
+      }
+
+      // 5. Write Attendance Log & Update/Create Registration
       const now = new Date();
       tx.set(logRef, {
         id: logId,
@@ -633,6 +636,31 @@ export class IEEEPlatformClient {
         verifiedByQR: true,
         tokenNonce: decodedToken.nonce,
       });
+
+      if (regSnap.exists) {
+        tx.update(regRef, {
+          attended: true,
+          attendedAt: now,
+          timestamp: regSnap.data()?.timestamp || now,
+        });
+      } else {
+        const studentSnap = await tx.get(this.db.collection('users').doc(actorUid));
+        const student = studentSnap.data() as UserProfile | undefined;
+        tx.set(regRef, {
+          id: regId,
+          eventId,
+          userId: actorUid,
+          status: 'attended',
+          attended: true,
+          isWalkIn: true,
+          timestamp: now,
+          registeredAt: now,
+          attendedAt: now,
+          userName: student?.displayName || 'Student',
+          userEmail: student?.email || '',
+          universityId: student?.universityId,
+        });
+      }
 
       // 6. Award Points Atomically
       const pointsToAward = typeof eventData.points === 'number' ? eventData.points : 0;
@@ -682,17 +710,20 @@ export class IEEEPlatformClient {
       if (!eventSnap.exists) throw new Error('Event not found.');
       const eventData = eventSnap.data() as PlatformEventData;
 
-      const regId = `${eventId}_${studentUid}`;
-      const regRef = this.db.collection('registrations').doc(regId);
-      const regSnap = await tx.get(regRef);
-      if (!regSnap.exists) throw new Error('Student is not registered for this event.');
-      if (regSnap.data()?.status !== 'approved') throw new Error('Student registration is not approved.');
-
+      const isRegistrationRequired = eventData.requiresRegistration !== false && eventData.type !== 'Booth';
       const logId = `${eventId}_${studentUid}`;
       const logRef = this.db.collection('attendance_logs').doc(logId);
       const logSnap = await tx.get(logRef);
       if (logSnap.exists) {
         return { status: 'already_checked_in', pointsAwarded: 0 };
+      }
+
+      const regId = `${eventId}_${studentUid}`;
+      const regRef = this.db.collection('registrations').doc(regId);
+      const regSnap = await tx.get(regRef);
+      if (isRegistrationRequired) {
+        if (!regSnap.exists) throw new Error('Student is not registered for this event.');
+        if (!['approved', 'attended'].includes(regSnap.data()?.status)) throw new Error('Student registration is not approved.');
       }
 
       const now = new Date();
@@ -706,6 +737,31 @@ export class IEEEPlatformClient {
         overriddenBy: adminUid,
         overrideTimestamp: now,
       });
+
+      if (regSnap.exists) {
+        tx.update(regRef, {
+          attended: true,
+          attendedAt: now,
+          timestamp: regSnap.data()?.timestamp || now,
+        });
+      } else {
+        const studentSnap = await tx.get(this.db.collection('users').doc(studentUid));
+        const student = studentSnap.data() as UserProfile | undefined;
+        tx.set(regRef, {
+          id: regId,
+          eventId,
+          userId: studentUid,
+          status: 'attended',
+          attended: true,
+          isWalkIn: true,
+          timestamp: now,
+          registeredAt: now,
+          attendedAt: now,
+          userName: student?.displayName || 'Student',
+          userEmail: student?.email || '',
+          universityId: student?.universityId,
+        });
+      }
 
       const pointsToAward = typeof eventData.points === 'number' ? eventData.points : 0;
       if (pointsToAward > 0) {
@@ -735,6 +791,58 @@ export class IEEEPlatformClient {
       }
       return result;
     });
+  }
+
+  async syncEventAttendance(adminUid: string, eventId: string): Promise<{
+    status: string;
+    repairedCount: number;
+    totalAttendance: number;
+  }> {
+    const adminUser = await this.getUser(adminUid);
+    if (!adminUser || (adminUser.role !== 'event_organizer' && adminUser.role !== 'super_admin')) {
+      throw new Error('Permission denied: Only organizers can sync attendance.');
+    }
+
+    const eventSnap = await this.db.collection('events').doc(eventId).get();
+    if (!eventSnap.exists) throw new Error('Event not found.');
+
+    const logs = (Object.values(this.db._getAllRaw('attendance_logs')) as any[]).filter(
+      (l: any) => l.eventId === eventId
+    );
+
+    let repairedCount = 0;
+    for (const log of logs) {
+      const regId = `${eventId}_${log.userId}`;
+      const regSnap = await this.db.collection('registrations').doc(regId).get();
+      const user = await this.getUser(log.userId);
+      if (!regSnap.exists) {
+        await this.db.collection('registrations').doc(regId).set({
+          id: regId,
+          eventId,
+          userId: log.userId,
+          status: 'attended',
+          attended: true,
+          isWalkIn: true,
+          timestamp: log.timestamp || new Date(),
+          registeredAt: log.timestamp || new Date(),
+          attendedAt: log.timestamp || new Date(),
+          userName: user?.displayName || 'Student',
+          userEmail: user?.email || '',
+          universityId: user?.universityId,
+        });
+        repairedCount++;
+      } else if (!regSnap.data()?.timestamp || regSnap.data()?.status !== 'attended') {
+        await this.db.collection('registrations').doc(regId).update({
+          status: 'attended',
+          attended: true,
+          timestamp: regSnap.data()?.timestamp || log.timestamp || new Date(),
+          attendedAt: regSnap.data()?.attendedAt || log.timestamp || new Date(),
+        });
+        repairedCount++;
+      }
+    }
+
+    return { status: 'success', repairedCount, totalAttendance: logs.length };
   }
 
   // ==========================================
