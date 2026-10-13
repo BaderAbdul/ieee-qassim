@@ -3,12 +3,12 @@
 import React, { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Link } from '@/i18n/routing';
-import { doc, getDoc, collection, query, where, getDocs, getCountFromServer } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, getCountFromServer, onSnapshot } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase/client';
 import { httpsCallable } from '@/lib/backend';
 import DigitalMemberCard from '@/components/ui/DigitalMemberCard';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import { AlertCircle, CheckCircle, Star, Sparkles, Award, Send, LogIn, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckCircle, Star, Sparkles, Award, Send, LogIn, Loader2, Smartphone } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { useAuth, UserData } from '@/context/AuthContext';
 import { toJsDate } from '@/lib/dateUtils';
@@ -48,6 +48,45 @@ export default function PublicPassPage({ params }: { params: Promise<{ id: strin
 
   const isOrganizer = ['organizer', 'admin', 'super_admin'].includes(currentUserData?.role || '');
   const isSelf = currentUser?.uid === userId;
+
+  // Live Sync to student phone state
+  const [waitingForStudentLive, setWaitingForStudentLive] = useState(false);
+  const [initiatingLive, setInitiatingLive] = useState(false);
+
+  useEffect(() => {
+    if (!waitingForStudentLive || !selectedEvent || !userId) return;
+    const unsub = onSnapshot(doc(db, 'pending_checkins', `${selectedEvent.id}_${userId}`), (snap) => {
+      if (snap.exists() && snap.data()?.status === 'completed') {
+        const pts = snap.data()?.points ?? selectedEvent.points ?? 0;
+        setAwardedPoints(pts);
+        setCheckinSuccess(true);
+        setIsAttended(true);
+        setWaitingForStudentLive(false);
+        setUserData(prev => prev ? { ...prev, totalPoints: (prev.totalPoints || 0) + pts } : prev);
+      }
+    });
+    return () => unsub();
+  }, [waitingForStudentLive, selectedEvent, userId]);
+
+  const handleSendToStudentPhone = async () => {
+    if (!selectedEvent || !userId || initiatingLive) return;
+    setInitiatingLive(true);
+    setCheckinError('');
+    try {
+      const initiateFn = httpsCallable<{ eventId: string; targetUserId: string }, { status: string; points: number }>(functions, 'initiatePendingCheckIn');
+      const resp = await initiateFn({ eventId: selectedEvent.id, targetUserId: userId });
+      if (resp.data.status === 'already_checked_in') {
+        setIsAttended(true);
+      } else {
+        setWaitingForStudentLive(true);
+      }
+    } catch (err: unknown) {
+      console.error(err);
+      setCheckinError(err instanceof Error ? err.message : (isAr ? 'تعذر إرسال الاستبيان لجوال الطالب.' : 'Could not send survey to student device.'));
+    } finally {
+      setInitiatingLive(false);
+    }
+  };
 
   useEffect(() => {
     if (!userId) return;
@@ -369,7 +408,53 @@ export default function PublicPassPage({ params }: { params: Promise<{ id: strin
                       <p>{isAr ? 'تسجيل حضور الأعضاء متاح للمنظمين أو لحساب العضو نفسه.' : 'Attendance check-in is available to organizers or the member.'}</p>
                     </div>
                   ) : (
-                    <form onSubmit={handleSubmitCheckinWithSurvey} className="space-y-6">
+                    <div>
+                      {isOrganizer && !isSelf && (
+                        waitingForStudentLive ? (
+                          <div className="mb-6 p-6 rounded-2xl bg-gradient-to-b from-blue-50 to-indigo-50 border-2 border-blue-200 text-center animate-in fade-in duration-200 shadow-sm">
+                            <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-2.5 animate-pulse">
+                              <Smartphone className="w-6 h-6" />
+                            </div>
+                            <h4 className="font-black text-slate-900 font-cairo text-base mb-1">
+                              {isAr ? 'تم إرسال الاستبيان لجوال الطالب بنجاح! 📱' : 'Survey Sent to Student Device! 📱'}
+                            </h4>
+                            <div className="flex items-center justify-center gap-2 text-xs font-bold text-blue-700 mb-3">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>{isAr ? 'ظهر منبثق التقييم في جوال الطالب الآن.. بانتظار إرساله' : 'Awaiting student feedback submission...'}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setWaitingForStudentLive(false)}
+                              className="text-xs font-bold text-slate-500 hover:text-slate-800 underline"
+                            >
+                              {isAr ? 'أو قيّم وحضّر الطالب من هذا الجهاز' : 'Or submit on this device'}
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+                            <div className="text-center sm:text-start">
+                              <h4 className="font-bold text-sm text-slate-900 flex items-center gap-1.5 justify-center sm:justify-start">
+                                <Smartphone className="w-4 h-4 text-blue-600" />
+                                <span>{isAr ? 'إرسال الاستبيان لجوال الطالب لحظياً' : 'Live Sync to Student Device'}</span>
+                              </h4>
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                {isAr ? 'ينبثق الاستبيان فوراً في جوال الطالب ليتمم التحضير بنفسه' : 'Pops up feedback survey directly on the student’s phone screen'}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={initiatingLive}
+                              onClick={handleSendToStudentPhone}
+                              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-md shadow-blue-600/20 flex items-center justify-center gap-1.5 shrink-0 transition-all"
+                            >
+                              {initiatingLive ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Smartphone className="w-3.5 h-3.5" />}
+                              <span>{isAr ? 'إرسال لجوال الطالب 📱' : 'Send to Student Phone 📱'}</span>
+                            </button>
+                          </div>
+                        )
+                      )}
+
+                      <form onSubmit={handleSubmitCheckinWithSurvey} className="space-y-6">
                       <div className="border-b border-slate-100 pb-4">
                         <h3 className="text-lg font-bold text-slate-900 font-cairo flex items-center gap-2">
                           <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
@@ -516,7 +601,8 @@ export default function PublicPassPage({ params }: { params: Promise<{ id: strin
                         )}
                       </button>
                     </form>
-                  )}
+                  </div>
+                )}
                 </div>
               )}
             </div>

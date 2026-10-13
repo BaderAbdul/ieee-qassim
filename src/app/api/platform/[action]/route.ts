@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { authenticate, errorResponse, limitRequests, readJson, requireAdmin } from '@/lib/server/request';
 import { ApiError } from '@/lib/server/errors';
-import { changeRegistration, documentId, recordAttendance, submitEventFeedback, type AttendanceInput } from '@/lib/server/lifecycle';
+import { changeRegistration, documentId, initiatePendingCheckIn, recordAttendance, submitEventFeedback, type AttendanceInput } from '@/lib/server/lifecycle';
 import { normalizeUniversityId, saveProfile, syncPublicProfile } from '@/lib/server/profiles';
 import { assignCertificate, authorizeCertificate, certificateDownload, renderCertificate } from '@/lib/server/certificates';
 import { processNotificationBatch, queueNotification } from '@/lib/server/notifications';
@@ -67,6 +67,13 @@ export async function POST(request: Request, context: { params: Promise<{ action
           tx.set(db.collection('event_secrets').doc(eventId), { token, expiresAt });
           audit(tx, 'attendance.rotate_token', actor.uid, eventId, { expiresAt: expiresAt.toMillis() });
         }); result = { token, expiresAt: expiresAt.toMillis() }; break;
+      }
+      case 'initiatePendingCheckIn': {
+        requireAdmin(actor);
+        const eventId = documentId(data.eventId, 'eventId');
+        const targetUserId = documentId(data.targetUserId, 'userId').replace('ieee-qu-user:', '');
+        result = await initiatePendingCheckIn({ eventId, targetUserId, actorUid: actor.uid });
+        break;
       }
       case 'submitCheckIn': {
         const override = data.targetUserId !== undefined;

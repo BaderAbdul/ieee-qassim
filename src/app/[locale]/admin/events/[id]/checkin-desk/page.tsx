@@ -2,13 +2,13 @@
 
 import React, { useEffect, useState, use, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase/client';
 import { httpsCallable } from '@/lib/backend';
 import { QRCodeSVG } from 'qrcode.react';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
-import { Loader2, ArrowRight, QrCode, Link as LinkIcon, UserCheck, ShieldCheck, CheckCircle2, XCircle, Camera, RefreshCw, Star, X, Send } from 'lucide-react';
+import { Loader2, ArrowRight, QrCode, Link as LinkIcon, UserCheck, ShieldCheck, CheckCircle2, XCircle, Camera, RefreshCw, Star, X, Send, Smartphone } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 interface CheckInResult {
@@ -50,6 +50,30 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
   const [surveyRating, setSurveyRating] = useState(5);
   const [surveyHoverRating, setSurveyHoverRating] = useState(0);
   const [surveyAnswers, setSurveyAnswers] = useState<Record<string, string>>({});
+
+  // Real-time live sync: waiting for student to complete feedback on their device
+  const [waitingStudent, setWaitingStudent] = useState<{
+    targetUserId: string;
+    eventTitle?: string;
+    points?: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!waitingStudent) return;
+    const unsub = onSnapshot(doc(db, 'pending_checkins', `${eventId}_${waitingStudent.targetUserId}`), (snap) => {
+      if (snap.exists() && snap.data()?.status === 'completed') {
+        const pts = snap.data()?.points ?? waitingStudent.points ?? 0;
+        setScanResult({
+          status: 'success',
+          message: `تم إكمال الاستبيان وتأكيد حضور الطالب (${waitingStudent.targetUserId}) عبر جواله بنجاح! (+${pts} نقطة)`
+        });
+        setRecent(prev => [{ id: crypto.randomUUID(), message: `${waitingStudent.targetUserId}: تم التحضير بالتقييم اللحظي (+${pts})` }, ...prev].slice(0, 10));
+        setWaitingStudent(null);
+      }
+    }, (err) => console.warn('Desk pending listener:', err));
+
+    return () => unsub();
+  }, [waitingStudent, eventId]);
 
   // Self Check-in Link
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
@@ -145,9 +169,31 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
     if (!targetUserId) return;
 
     if (requireSurvey && !skipSurveyPrompt && event?.state === 'Ongoing') {
-      setPendingSurveyStudentId(targetUserId);
-      setSurveyRating(5);
-      setSurveyAnswers({});
+      try {
+        setIsSubmitting(true);
+        const initiateFn = httpsCallable<{ eventId: string; targetUserId: string }, { status: string; eventTitle: string; points: number }>(functions, 'initiatePendingCheckIn');
+        const resp = await initiateFn({ eventId, targetUserId });
+        if (resp.data.status === 'already_checked_in') {
+          setScanResult({ status: 'already_checked_in', message: 'الطالب محضر مسبقاً في هذه الفعالية.' });
+          setManualInput('');
+          return;
+        }
+        setWaitingStudent({
+          targetUserId,
+          eventTitle: resp.data.eventTitle || event.title,
+          points: resp.data.points || event.points || 0
+        });
+        setScanResult({ status: null, message: '' });
+        setManualInput('');
+      } catch (err) {
+        console.error('Failed to initiate pending check-in', err);
+        // Fallback to local desk survey if remote initiate fails
+        setPendingSurveyStudentId(targetUserId);
+        setSurveyRating(5);
+        setSurveyAnswers({});
+      } finally {
+        setIsSubmitting(false);
+      }
       return;
     }
 
@@ -335,9 +381,44 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
                 onChange={(e) => setRequireSurvey(e.target.checked)}
                 className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
               />
-              <span>طلب استبيان وتقييم الفعالية عند المسح ⭐</span>
+              <span>طلب استبيان وتقييم الفعالية في جوال الطالب عند المسح ⭐</span>
             </label>
           </div>
+
+          {waitingStudent && (
+            <div className="mb-8 p-6 rounded-3xl bg-gradient-to-b from-blue-50 to-indigo-50 border-2 border-blue-200 text-center animate-in fade-in zoom-in-95 duration-200 shadow-md">
+              <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3 animate-pulse shadow-sm">
+                <Smartphone className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-black font-cairo text-slate-900 mb-1">
+                تم مسح بطاقة الطالب بنجاح! 📱
+              </h3>
+              <p className="text-slate-600 text-xs sm:text-sm mb-2">
+                المعرف: <span className="font-mono font-bold text-blue-700 bg-white px-2 py-0.5 rounded-lg border border-blue-200">{waitingStudent.targetUserId}</span>
+              </p>
+              <div className="flex items-center justify-center gap-2 text-xs font-bold text-blue-700 mb-5 bg-white/70 py-2 px-4 rounded-xl max-w-sm mx-auto">
+                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                <span>ظهر استبيان التقييم في جوال الطالب الآن.. بانتظار إرساله</span>
+              </div>
+              
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => executeCheckIn(waitingStudent.targetUserId)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-600/20"
+                >
+                  تحضير فوري ومباشر (تخطي جوال الطالب)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWaitingStudent(null)}
+                  className="bg-white hover:bg-slate-100 text-slate-600 px-4 py-2.5 rounded-xl text-xs font-bold transition-colors border border-slate-200"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleManualSubmit} className="max-w-md mx-auto relative">
             <div className="relative">

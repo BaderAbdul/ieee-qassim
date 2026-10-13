@@ -10,6 +10,7 @@ import ProfileGuard from '@/components/auth/ProfileGuard';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import IdeaFloatingButton from '@/components/ui/IdeaFloatingButton';
+import PendingAttendanceModal from '@/components/events/PendingAttendanceModal';
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import "../globals.css";
@@ -110,6 +111,7 @@ export default async function RootLayout({
                 </main>
                 <Footer />
                 <IdeaFloatingButton />
+                <PendingAttendanceModal />
               </div>
             </ProfileGuard>
           </AuthProvider>

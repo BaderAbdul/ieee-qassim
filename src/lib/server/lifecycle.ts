@@ -140,6 +140,54 @@ export async function submitEventFeedback(uid: string, eventId: string, feedback
   });
 }
 
+export async function initiatePendingCheckIn({ eventId, targetUserId, actorUid }: { eventId: string; targetUserId: string; actorUid: string }) {
+  const db = getFirestore();
+  const eventRef = db.collection('events').doc(documentId(eventId, 'eventId'));
+  const userRef = db.collection('users').doc(documentId(targetUserId, 'userId'));
+  const logRef = db.collection('attendance_logs').doc(`${eventId}_${targetUserId}`);
+  const regRef = db.collection('registrations').doc(`${eventId}_${targetUserId}`);
+  const pendingRef = db.collection('pending_checkins').doc(`${eventId}_${targetUserId}`);
+
+  const [eventSnap, userSnap, logSnap, regSnap] = await Promise.all([
+    eventRef.get(),
+    userRef.get(),
+    logRef.get(),
+    regRef.get()
+  ]);
+
+  const event = eventSnap.data();
+  if (!event || event.state !== 'Ongoing') throw new ApiError('failed-precondition', 'Event must be Ongoing.');
+  if (!userSnap.exists || userSnap.data()?.isRestricted) throw new ApiError('permission-denied', 'Student account is unavailable.');
+  if (logSnap.exists) return { status: 'already_checked_in', eventId, targetUserId };
+
+  const isRegistrationRequired = event.requiresRegistration !== false && event.type !== 'Booth';
+  if (isRegistrationRequired && (!regSnap.exists || !['approved', 'attended'].includes(regSnap.data()?.status))) {
+    throw new ApiError('failed-precondition', 'An approved registration is required.');
+  }
+
+  const pendingData = {
+    eventId,
+    userId: targetUserId,
+    eventTitle: event.title,
+    eventTitleEn: event.titleEn || null,
+    points: event.points || 0,
+    feedbackQuestions: event.feedbackQuestions || [],
+    status: 'pending',
+    scannedBy: actorUid,
+    scannedAt: FieldValue.serverTimestamp(),
+    expiresAt: new Date(Date.now() + 15 * 60 * 1000)
+  };
+
+  await pendingRef.set(pendingData);
+  return {
+    status: 'pending_feedback',
+    eventId,
+    targetUserId,
+    eventTitle: event.title,
+    points: event.points || 0
+  };
+}
+
 export async function recordAttendance(input: AttendanceInput) {
   const { eventId, userId, actorUid } = input;
   const db = getFirestore();
@@ -147,12 +195,14 @@ export async function recordAttendance(input: AttendanceInput) {
   const regRef = db.collection('registrations').doc(`${eventId}_${documentId(userId, 'userId')}`);
   const logRef = db.collection('attendance_logs').doc(`${eventId}_${userId}`);
   const pointRef = db.collection('point_transactions').doc(`attendance_${eventId}_${userId}`);
+  const pendingRef = db.collection('pending_checkins').doc(`${eventId}_${userId}`);
   return db.runTransaction(async tx => {
     const eventSnap = await tx.get(eventRef);
-    const [regSnap, logSnap, pointSnap, userSnap, secretSnap, pastAttendance] = await Promise.all([
+    const [regSnap, logSnap, pointSnap, userSnap, secretSnap, pastAttendance, pendingSnap] = await Promise.all([
       tx.get(regRef), tx.get(logRef), tx.get(pointRef), tx.get(db.collection('users').doc(userId)),
       tx.get(db.collection('event_secrets').doc(eventId)),
       tx.get(db.collection('attendance_logs').where('userId', '==', userId).limit(4)),
+      tx.get(pendingRef),
     ]);
     const event = eventSnap.data();
     if (!event) throw new ApiError('not-found', 'Event not found.');
@@ -160,7 +210,11 @@ export async function recordAttendance(input: AttendanceInput) {
     if (!input.admin && event.state !== 'Ongoing') throw new ApiError('failed-precondition', 'Event is not accepting attendance.');
     if (input.admin && !['Ongoing', 'Completed'].includes(event.state)) throw new ApiError('failed-precondition', 'Start the event before recording attendance.');
     const secret = secretSnap.data();
-    if (!input.admin && (!input.token || secret?.token !== input.token || !secret.expiresAt || secret.expiresAt.toMillis() <= Date.now())) throw new ApiError('permission-denied', 'Invalid or expired check-in token.');
+    const isPendingVerified = pendingSnap.exists && pendingSnap.data()?.status === 'pending';
+    const isTokenVerified = input.token && secret?.token === input.token && secret?.expiresAt && secret.expiresAt.toMillis() > Date.now();
+    if (!input.admin && !isPendingVerified && !isTokenVerified) {
+      throw new ApiError('permission-denied', 'Invalid or expired check-in verification.');
+    }
     const isRegistrationRequired = event.requiresRegistration !== false && event.type !== 'Booth';
     if (isRegistrationRequired && (!regSnap.exists || !['approved', 'attended'].includes(regSnap.data()?.status))) {
       throw new ApiError('failed-precondition', 'An approved registration is required.');
@@ -189,6 +243,13 @@ export async function recordAttendance(input: AttendanceInput) {
     }
     tx.update(eventRef, { attendanceCount: FieldValue.increment(1) });
     if (feedback) tx.set(db.collection('event_feedback').doc(`${eventId}_${userId}`), { eventId, userId, userEmail: userSnap.data()?.email || '', rating: feedback.rating, answers: feedback.answers || {}, createdAt: FieldValue.serverTimestamp() });
+    if (pendingSnap.exists) {
+      tx.update(pendingRef, {
+        status: 'completed',
+        completedAt: FieldValue.serverTimestamp(),
+        rating: feedback?.rating || null
+      });
+    }
     if (points > 0 && !pointSnap.exists) tx.create(pointRef, { userId, amount: points, source: 'attendance', reason: `Attendance: ${event.title || eventId}`, sourceEventId: eventId, createdBy: input.admin ? actorUid : 'system', createdAt: FieldValue.serverTimestamp(), aggregatedAt: FieldValue.serverTimestamp() });
     queueNotification(tx, `attendance_${eventId}_${userId}`, userData.email, `تم تأكيد حضورك، النقاط: ${awardedPoints}. / Attendance confirmed, points: ${awardedPoints}.`, event.title);
     audit(tx, input.admin ? 'attendance.manual' : 'attendance.checkin', actorUid, logRef.id, { eventId, awardedPoints });
