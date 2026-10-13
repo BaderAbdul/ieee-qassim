@@ -9,10 +9,12 @@ import { useState, useEffect } from 'react';
 import { eventTemplates, eventTemplatePatch } from '@/lib/eventTemplates';
 import { useRouter } from '@/i18n/routing';
 import { EventType, RegistrationMode, CustomQuestion } from '@/lib/types';
-import { ArrowRight, Save, Plus, Trash2, Archive, Bookmark, Check } from 'lucide-react';
+import { ArrowRight, Save, Plus, Trash2, Archive, Bookmark, Check, Layers, BookmarkPlus } from 'lucide-react';
 import { Link } from '@/i18n/routing';
 import QuestionBankModal from '@/components/admin/QuestionBankModal';
+import EventTemplatesModal from '@/components/admin/EventTemplatesModal';
 import { getArchivedQuestions, saveQuestionToBank, saveMultipleQuestionsToBank } from '@/lib/feedbackQuestionBank';
+import { CustomEventTemplate, getCustomEventTemplates } from '@/lib/customEventTemplates';
 
 export default function CreateEventPage() {
   const router = useRouter();
@@ -60,14 +62,56 @@ export default function CreateEventPage() {
   const [bankCount, setBankCount] = useState(0);
   const [savedSuccessId, setSavedSuccessId] = useState<string | null>(null);
 
+  // Custom Event Templates State
+  const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false);
+  const [templatesCount, setTemplatesCount] = useState(0);
+
   useEffect(() => {
     const updateCount = () => {
       setBankCount(getArchivedQuestions().length);
     };
+    const updateTemplatesCount = () => {
+      setTemplatesCount(getCustomEventTemplates().length);
+    };
     updateCount();
+    updateTemplatesCount();
     window.addEventListener('ieee-question-bank-updated', updateCount);
-    return () => window.removeEventListener('ieee-question-bank-updated', updateCount);
+    window.addEventListener('ieee-event-templates-updated', updateTemplatesCount);
+    return () => {
+      window.removeEventListener('ieee-question-bank-updated', updateCount);
+      window.removeEventListener('ieee-event-templates-updated', updateTemplatesCount);
+    };
   }, []);
+
+  const handleApplyTemplate = (template: CustomEventTemplate) => {
+    setFormData(prev => ({
+      ...prev,
+      description: template.description || prev.description,
+      descriptionEn: template.descriptionEn || prev.descriptionEn,
+      type: template.type || prev.type,
+      durationHours: template.durationHours ?? prev.durationHours,
+      capacity: template.capacity ?? prev.capacity,
+      isUnlimitedCapacity: !!template.isUnlimitedCapacity,
+      hideExactCapacity: !!template.hideExactCapacity,
+      points: template.points ?? prev.points,
+      hasCertificate: !!template.hasCertificate,
+      requiresRegistration: template.requiresRegistration !== false && template.type !== 'Booth',
+      isUnlisted: !!template.isUnlisted,
+      registrationMode: template.registrationMode || prev.registrationMode,
+      location: template.location || prev.location,
+      locationEn: template.locationEn || prev.locationEn,
+      gains: template.gains ? template.gains.join('\n') : prev.gains,
+      gainsEn: template.gainsEn ? template.gainsEn.join('\n') : prev.gainsEn,
+      speakers: template.speakers ? template.speakers.join(', ') : prev.speakers,
+    }));
+
+    if (template.feedbackQuestions && template.feedbackQuestions.length > 0) {
+      setFeedbackQuestions(template.feedbackQuestions.map(q => ({
+        ...q,
+        id: `q_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      })));
+    }
+  };
 
   const addFeedbackQuestion = () => {
     const newQ: CustomQuestion = {
@@ -186,14 +230,39 @@ export default function CreateEventPage() {
 
       <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 space-y-8">
         {saveError && <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-700">{saveError}</p>}
-        <section aria-labelledby="preparation-template" className="space-y-3 rounded-xl border border-purple-100 bg-purple-50 p-4">
-          <h2 id="preparation-template" className="font-bold">قالب تجهيز / Preparation preset</h2>
-          <p className="text-sm text-slate-600">يغيّر النوع والمدة وآلية الموافقة فقط. لا ينشر الفعالية ولا يغير عنوانها أو موعدها أو نقاطها أو شهاداتها.</p>
-          <div className="flex flex-wrap gap-3">
-            <select aria-label="قالب تجهيز الفعالية / Event preparation preset" value={templateId} onChange={event => setTemplateId(event.target.value)} className="min-w-0 rounded-lg border bg-white px-3 py-2">
-              {eventTemplates.map(template => <option key={template.id} value={template.id}>{template.label} / {template.labelEn} — {template.durationHours}h — {template.registrationMode}</option>)}
-            </select>
-            <button type="button" disabled={loading} onClick={() => { if (confirm('تطبيق النوع والمدة وآلية الموافقة من القالب؟ بقية بياناتك ستبقى كما هي.')) setFormData(previous => ({ ...previous, ...eventTemplatePatch(templateId) })); }} className="rounded-lg bg-purple-600 px-4 py-2 font-bold text-white disabled:opacity-50">تطبيق القالب / Apply preset</button>
+        {/* Custom Event Templates Banner */}
+        <section className="bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-50 border border-purple-200/80 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-purple-600 text-white rounded-xl shadow-sm">
+              <Layers className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-sm sm:text-base font-bold text-slate-900 font-cairo">
+                قوالب الفعاليات المخصصة
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                استورد تفاصيل كاملة من قوالبك أو من أي فعالية سابقة، ثم عدّل ما تراه مناسباً.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 self-stretch sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setIsTemplatesModalOpen(true)}
+              className="flex-1 sm:flex-none bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
+            >
+              <Layers className="w-4 h-4" />
+              <span>قوالب الفعاليات ({templatesCount})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsTemplatesModalOpen(true)}
+              className="bg-white hover:bg-slate-50 text-purple-700 border border-purple-200 text-xs font-bold px-3.5 py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm"
+              title="حفظ بيانات النموذج الحالي كقالب للرجوع له لاحقاً"
+            >
+              <BookmarkPlus className="w-4 h-4" />
+              <span>حفظ كقالب جديد</span>
+            </button>
           </div>
         </section>
         
@@ -544,6 +613,15 @@ export default function CreateEventPage() {
         onClose={() => setIsBankOpen(false)}
         onImportQuestion={handleImportQuestion}
         currentEventQuestions={feedbackQuestions}
+      />
+
+      {/* Custom Event Templates Modal */}
+      <EventTemplatesModal
+        isOpen={isTemplatesModalOpen}
+        onClose={() => setIsTemplatesModalOpen(false)}
+        onApplyTemplate={handleApplyTemplate}
+        currentFormData={formData}
+        currentQuestions={feedbackQuestions}
       />
     </div>
   );

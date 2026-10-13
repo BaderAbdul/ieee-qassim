@@ -10,15 +10,17 @@ import { doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { useRouter } from '@/i18n/routing';
 import { EventType, RegistrationMode, CustomQuestion } from '@/lib/types';
-import { ArrowRight, Save, Plus, Trash2, Archive, Bookmark, Check } from 'lucide-react';
+import { ArrowRight, Save, Plus, Trash2, Archive, Bookmark, Check, Layers, BookmarkPlus } from 'lucide-react';
 import { Link } from '@/i18n/routing';
 import QuestionBankModal from '@/components/admin/QuestionBankModal';
+import EventTemplatesModal from '@/components/admin/EventTemplatesModal';
 import { 
   getArchivedQuestions, 
   saveQuestionToBank, 
   saveMultipleQuestionsToBank, 
   harvestQuestionsFromEvents 
 } from '@/lib/feedbackQuestionBank';
+import { CustomEventTemplate, getCustomEventTemplates } from '@/lib/customEventTemplates';
 
 export default function EditEventPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -62,14 +64,56 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   const [bankCount, setBankCount] = useState(0);
   const [savedSuccessId, setSavedSuccessId] = useState<string | null>(null);
 
+  // Custom Event Templates State
+  const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false);
+  const [templatesCount, setTemplatesCount] = useState(0);
+
   useEffect(() => {
     const updateCount = () => {
       setBankCount(getArchivedQuestions().length);
     };
+    const updateTemplatesCount = () => {
+      setTemplatesCount(getCustomEventTemplates().length);
+    };
     updateCount();
+    updateTemplatesCount();
     window.addEventListener('ieee-question-bank-updated', updateCount);
-    return () => window.removeEventListener('ieee-question-bank-updated', updateCount);
+    window.addEventListener('ieee-event-templates-updated', updateTemplatesCount);
+    return () => {
+      window.removeEventListener('ieee-question-bank-updated', updateCount);
+      window.removeEventListener('ieee-event-templates-updated', updateTemplatesCount);
+    };
   }, []);
+
+  const handleApplyTemplate = (template: CustomEventTemplate) => {
+    setFormData(prev => ({
+      ...prev,
+      description: template.description || prev.description,
+      descriptionEn: template.descriptionEn || prev.descriptionEn,
+      type: template.type || prev.type,
+      durationHours: template.durationHours ?? prev.durationHours,
+      capacity: template.capacity ?? prev.capacity,
+      isUnlimitedCapacity: !!template.isUnlimitedCapacity,
+      hideExactCapacity: !!template.hideExactCapacity,
+      points: template.points ?? prev.points,
+      hasCertificate: !!template.hasCertificate,
+      requiresRegistration: template.requiresRegistration !== false && template.type !== 'Booth',
+      isUnlisted: !!template.isUnlisted,
+      registrationMode: template.registrationMode || prev.registrationMode,
+      location: template.location || prev.location,
+      locationEn: template.locationEn || prev.locationEn,
+      gains: template.gains ? template.gains.join('\n') : prev.gains,
+      gainsEn: template.gainsEn ? template.gainsEn.join('\n') : prev.gainsEn,
+      speakers: template.speakers ? template.speakers.join(', ') : prev.speakers,
+    }));
+
+    if (template.feedbackQuestions && template.feedbackQuestions.length > 0) {
+      setFeedbackQuestions(template.feedbackQuestions.map(q => ({
+        ...q,
+        id: `q_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      })));
+    }
+  };
 
   const addFeedbackQuestion = () => {
     const newQ: CustomQuestion = {
@@ -234,11 +278,32 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
 
   return (
     <div className="max-w-4xl mx-auto pb-12">
-      <div className="flex items-center mb-6">
-        <Link href="/admin/events" className="text-gray-500 hover:text-gray-900 me-4">
-          <ArrowRight className="h-6 w-6 rtl:-scale-x-100" />
-        </Link>
-        <h1 className="text-3xl font-bold text-gray-900 font-cairo">تعديل الفعالية</h1>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div className="flex items-center">
+          <Link href="/admin/events" className="text-gray-500 hover:text-gray-900 me-4">
+            <ArrowRight className="h-6 w-6 rtl:-scale-x-100" />
+          </Link>
+          <h1 className="text-3xl font-bold text-gray-900 font-cairo">تعديل الفعالية</h1>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsTemplatesModalOpen(true)}
+            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold px-3.5 py-2.5 rounded-xl transition-all flex items-center gap-1.5 shadow-sm"
+          >
+            <Layers className="w-4 h-4 text-indigo-600" />
+            <span>قوالب الفعاليات ({templatesCount})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsTemplatesModalOpen(true)}
+            className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-3.5 py-2.5 rounded-xl transition-all flex items-center gap-1.5 shadow-sm"
+          >
+            <BookmarkPlus className="w-4 h-4" />
+            <span>حفظ كقالب جديد</span>
+          </button>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 space-y-8">
@@ -598,6 +663,15 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         onClose={() => setIsBankOpen(false)}
         onImportQuestion={handleImportQuestion}
         currentEventQuestions={feedbackQuestions}
+      />
+
+      {/* Custom Event Templates Modal */}
+      <EventTemplatesModal
+        isOpen={isTemplatesModalOpen}
+        onClose={() => setIsTemplatesModalOpen(false)}
+        onApplyTemplate={handleApplyTemplate}
+        currentFormData={formData}
+        currentQuestions={feedbackQuestions}
       />
     </div>
   );
