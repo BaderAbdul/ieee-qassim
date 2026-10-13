@@ -295,39 +295,17 @@ export default function MemberDetail({ id }: { id: string }) {
           </Link>
         ) : <span />}
 
-        {/* Direct Point Revocation Options on Positive Ledger Entries */}
+        {/* Unified Point Revocation on Positive Ledger Entries */}
         {section === 'points' && summary && !summary.member.isRestricted && entry.amount !== undefined && entry.amount > 0 && (
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void handleVoidTransaction(entry)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-sm transition-all"
-              title={lang === 0 ? 'سحب وإلغاء هذه العملية نهائياً دون تسجيل خصم' : 'Void completely without creating a deduction record'}
-            >
-              <span>🗑️</span>
-              <span>{lang === 0 ? `سحب بالكامل دون خصم (-${entry.amount})` : `Void Completely (-${entry.amount})`}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsPointsModalOpen(true);
-                setPointsAction('deduct');
-                setPointsAmount(entry.amount || 10);
-                setPointsReason(
-                  lang === 0
-                    ? `خصم نقاط (${entry.amount}): ${entry.eventTitle || entry.reason || 'العملية السابقة'}`
-                    : `Deduct points (${entry.amount}): ${entry.eventTitle || entry.reason || 'previous transaction'}`
-                );
-                setPointsError(null);
-                setPointsSuccessMsg(null);
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 shadow-sm transition-all"
-              title={lang === 0 ? 'تسجيل حركة خصم يدوية' : 'Record manual deduction'}
-            >
-              <span className="text-sm font-mono leading-none">−</span>
-              <span>{lang === 0 ? 'تسجيل خصم' : 'Deduct'}</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => void handleVoidTransaction(entry)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 shadow-sm transition-all"
+            title={lang === 0 ? 'إلغاء وسحب هذه العملية بالكامل من رصيد العضو دون تسجيل خصم' : 'Revoke and void these points from member balance completely'}
+          >
+            <span>🗑️</span>
+            <span>{lang === 0 ? `إلغاء وسحب النقاط (-${entry.amount})` : `Revoke Points (-${entry.amount})`}</span>
+          </button>
         )}
       </div>
     </li>)}</ul>

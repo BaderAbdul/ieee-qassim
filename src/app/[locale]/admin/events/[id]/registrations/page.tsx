@@ -510,18 +510,27 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
           </div>
           <div className="flex flex-wrap gap-2">
             <button 
-              disabled={isUpdatingBulk || isAwarding}
-              onClick={() => { pointsBatch.current = null; setPointsAction('add'); setShowPointsModal(true); }}
-              className="bg-yellow-500 hover:bg-yellow-600 text-white px-3.5 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition-colors"
+              disabled={isUpdatingBulk}
+              onClick={() => handleBulkUpdateStatus('attended')}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition-colors disabled:opacity-50"
             >
-              <Trophy size={16} /> رصد نقاط
+              <UserCheck size={16} /> تحضير (حضور)
             </button>
             <button 
               disabled={isUpdatingBulk || isAwarding}
-              onClick={() => { pointsBatch.current = null; setPointsAction('deduct'); setShowPointsModal(true); }}
-              className="bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition-colors"
+              onClick={handleBulkCancelAttendance}
+              className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition-colors disabled:opacity-50"
+              title="إلغاء تحضير الحضور المحددين وسحب نقاطهم بالكامل دون تسجيل خصم"
             >
-              <span className="text-base leading-none font-mono">−</span> سحب نقاط
+              <UserX size={16} /> إلغاء التحضير
+            </button>
+            <button 
+              disabled={isUpdatingBulk || isAwarding}
+              onClick={() => { pointsBatch.current = null; setPointsAction('add'); setShowPointsModal(true); }}
+              className="bg-yellow-500 hover:bg-yellow-600 text-white px-3.5 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition-colors"
+              title="رصد نقاط إضافية أو بونص للمحددين"
+            >
+              <Trophy size={16} /> رصد نقاط إضافية (بونص)
             </button>
             {!isBoothOrWalkIn && (
               <>
@@ -548,21 +557,6 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
                 </button>
               </>
             )}
-            <button 
-              disabled={isUpdatingBulk}
-              onClick={() => handleBulkUpdateStatus('attended')}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition-colors disabled:opacity-50"
-            >
-              <UserCheck size={16} /> تحضير (حضور)
-            </button>
-            <button 
-              disabled={isUpdatingBulk || isAwarding}
-              onClick={handleBulkCancelAttendance}
-              className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition-colors disabled:opacity-50"
-              title="إلغاء تحضير الحضور المحددين وسحب نقاطهم بالكامل دون تسجيل خصم"
-            >
-              <UserX size={16} /> إلغاء التحضير
-            </button>
           </div>
         </div>
       )}
@@ -712,6 +706,17 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
                               <span>إلغاء التحضير</span>
                             </button>
                           </div>
+                        ) : isBoothOrWalkIn ? (
+                          <button
+                            disabled={isUpdatingBulk || isAwarding}
+                            aria-label={`تحضير ${reg.userName}`}
+                            onClick={() => handleUpdateStatus(reg.id, 'attended')}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors"
+                            title="تحضير هذا الزائر"
+                          >
+                            <UserCheck size={14} />
+                            <span>تحضير</span>
+                          </button>
                         ) : (
                           <>
                             {reg.status !== 'approved' && (
