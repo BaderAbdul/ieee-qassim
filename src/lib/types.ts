@@ -1,6 +1,6 @@
 import { Timestamp } from 'firebase/firestore';
 
-export type EventType = 'Workshop' | 'Camp' | 'Lecture' | 'Competition' | 'Meetup' | 'Challenge' | 'Other';
+export type EventType = 'Workshop' | 'Camp' | 'Lecture' | 'Competition' | 'Meetup' | 'Challenge' | 'Booth' | 'Other';
 export type EventState = 'Draft' | 'Published' | 'Registration Open' | 'Registration Closed' | 'Ongoing' | 'Completed' | 'Archived';
 export type RegistrationMode = 'Auto' | 'Manual';
 
@@ -35,6 +35,8 @@ export interface PlatformEvent {
   capacity: number;
   isUnlimitedCapacity?: boolean;
   hideExactCapacity?: boolean;
+  requiresRegistration?: boolean; // false for walk-in booths / visits
+  isUnlisted?: boolean; // hidden from public event listings but accessible via direct link/QR
   registeredCount?: number;
   attendanceCount?: number;
   points: number;

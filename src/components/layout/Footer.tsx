@@ -3,7 +3,18 @@
 import React from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Link, usePathname } from '@/i18n/routing';
-import { Calendar, Trophy, UserCircle } from 'lucide-react';
+import Image from 'next/image';
+import { 
+  Calendar, 
+  Trophy, 
+  UserCircle, 
+  Users, 
+  Heart, 
+  Sparkles, 
+  ExternalLink,
+  ShieldCheck,
+  HelpCircle
+} from 'lucide-react';
 
 function TwitterIcon({ className }: { className?: string }) {
   return (
@@ -34,81 +45,158 @@ export default function Footer() {
   }
 
   return (
-    <footer className="bg-slate-900 text-slate-300 border-t border-slate-800 transition-colors">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-28 sm:pb-10">
-        <div className="flex flex-col items-center justify-center gap-6">
-          {/* Social Links */}
-          <div className="flex items-center gap-4">
-            <a href="https://x.com/ieeeqaasim?s=11" target="_blank" rel="noopener noreferrer" className="p-2.5 rounded-full bg-slate-800 text-slate-400 hover:text-[#1DA1F2] hover:bg-slate-700 transition-all" title="X (Twitter)">
-              <TwitterIcon className="h-5 w-5" />
-            </a>
-            <a href="https://www.linkedin.com/company/ieee-qassim/" target="_blank" rel="noopener noreferrer" className="p-2.5 rounded-full bg-slate-800 text-slate-400 hover:text-[#0A66C2] hover:bg-slate-700 transition-all" title="LinkedIn">
-              <LinkedinIcon className="h-5 w-5" />
-            </a>
+    <footer className="relative bg-gradient-to-b from-slate-900 via-slate-950 to-black text-slate-300 border-t border-slate-800/80 transition-colors overflow-hidden">
+      {/* Decorative Glow */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 max-w-4xl h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent pointer-events-none" />
+      <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-28 sm:pb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 pb-12 border-b border-slate-800/70">
+          
+          {/* Col 1: Identity & About */}
+          <div className="lg:col-span-5 space-y-4 text-center lg:text-start">
+            <div className="flex items-center justify-center lg:justify-start gap-3">
+              <div className="relative w-28 h-10 brightness-0 invert opacity-90">
+                <Image 
+                  src="/logo.png" 
+                  alt="IEEE Qassim Logo" 
+                  fill
+                  className="object-contain"
+                />
+              </div>
+              <span className="text-xs font-mono font-semibold px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                Qassim Branch
+              </span>
+            </div>
+            
+            <p className="text-sm text-slate-400 leading-relaxed max-w-md mx-auto lg:mx-0">
+              {isAr
+                ? 'المنصة الرسمية لمجتمع IEEE الطلابي بجامعة القصيم. نُمكّن العقول الهندسية والتقنية عبر ورش العمل، التحديات، والتطوير المستمر.'
+                : 'The official platform for IEEE Student Branch at Qassim University. Empowering engineering and technology minds through workshops, challenges, and growth.'}
+            </p>
+
+            {/* Social channels */}
+            <div className="flex items-center justify-center lg:justify-start gap-3 pt-2">
+              <a 
+                href="https://x.com/ieeeqaasim?s=11" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="p-2.5 rounded-xl bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700 hover:border-slate-600 border border-slate-800 transition-all shadow-sm" 
+                title="X (Twitter)"
+                aria-label="X (Twitter)"
+              >
+                <TwitterIcon className="h-4 w-4" />
+              </a>
+              <a 
+                href="https://www.linkedin.com/company/ieee-qassim/" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="p-2.5 rounded-xl bg-slate-800/80 text-slate-400 hover:text-[#0A66C2] hover:bg-slate-700 hover:border-slate-600 border border-slate-800 transition-all shadow-sm" 
+                title="LinkedIn"
+                aria-label="LinkedIn"
+              >
+                <LinkedinIcon className="h-4 w-4" />
+              </a>
+            </div>
           </div>
 
-          {/* Primary Quick Links */}
-          <ul className="grid grid-cols-3 sm:flex sm:flex-wrap justify-center gap-x-4 gap-y-1 sm:gap-6 text-sm font-medium text-center [&_a]:inline-flex [&_a]:py-2 [&_a]:justify-center">
-            <li>
-              <Link href="/" className="hover:text-blue-400 transition-colors">
-                {t('home')}
-              </Link>
-            </li>
-            <li>
-              <Link href="/events" className="hover:text-blue-400 transition-colors inline-flex items-center gap-1.5">
-                <Calendar className="h-4 w-4 text-slate-500" />
-                <span>{t('events')}</span>
-              </Link>
-            </li>
-            <li>
-              <Link href="/leaderboard" className="hover:text-blue-400 transition-colors inline-flex items-center gap-1.5">
-                <Trophy className="h-4 w-4 text-slate-500" />
-                <span>{t('leaderboard')}</span>
-              </Link>
-            </li>
-            <li>
-              <Link href="/structure" className="hover:text-blue-400 transition-colors">
-                {isAr ? 'الهيكلة' : 'Structure'}
-              </Link>
-            </li>
-            <li>
-              <Link href="/profile" className="hover:text-blue-400 transition-colors inline-flex items-center gap-1.5">
-                <UserCircle className="h-4 w-4 text-slate-500" />
-                <span>{t('profile')}</span>
-              </Link>
-            </li>
-          </ul>
-
-          {/* Local Policy Links */}
-          <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-2 text-xs text-slate-400 pt-2 border-t border-slate-800/60 w-full max-w-4xl text-center [&_a]:inline-flex [&_a]:py-1.5">
-            <Link href="/help" className="hover:text-slate-200 transition-colors">{isAr ? 'المساعدة والتواصل' : 'Help and contact'}</Link>
-            <Link href="/privacy" className="hover:text-slate-200 transition-colors">
-              {isAr ? 'سياسة الخصوصية' : 'Privacy Policy'}
-            </Link>
-            <Link href="/terms" className="hover:text-slate-200 transition-colors">
-              {isAr ? 'الشروط والأحكام' : 'Terms & Conditions'}
-            </Link>
+          {/* Col 2: Navigation Links */}
+          <div className="lg:col-span-4 text-center lg:text-start">
+            <h4 className="text-xs font-bold tracking-wider uppercase text-slate-400 mb-4 flex items-center justify-center lg:justify-start gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+              <span>{isAr ? 'روابط المنصة' : 'Platform Navigation'}</span>
+            </h4>
+            <ul className="grid grid-cols-2 gap-y-2.5 gap-x-4 text-sm font-medium">
+              <li>
+                <Link href="/" className="text-slate-300 hover:text-white hover:translate-x-0.5 transition-all inline-flex items-center gap-1.5">
+                  <span>{t('home')}</span>
+                </Link>
+              </li>
+              <li>
+                <Link href="/events" className="text-slate-300 hover:text-white hover:translate-x-0.5 transition-all inline-flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-slate-500" />
+                  <span>{t('events')}</span>
+                </Link>
+              </li>
+              <li>
+                <Link href="/leaderboard" className="text-slate-300 hover:text-white hover:translate-x-0.5 transition-all inline-flex items-center gap-1.5">
+                  <Trophy className="h-3.5 w-3.5 text-slate-500" />
+                  <span>{t('leaderboard')}</span>
+                </Link>
+              </li>
+              <li>
+                <Link href="/structure" className="text-slate-300 hover:text-white hover:translate-x-0.5 transition-all inline-flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5 text-slate-500" />
+                  <span>{isAr ? 'الهيكلة الإدارية' : 'Structure'}</span>
+                </Link>
+              </li>
+              <li>
+                <Link href="/profile" className="text-slate-300 hover:text-white hover:translate-x-0.5 transition-all inline-flex items-center gap-1.5">
+                  <UserCircle className="h-3.5 w-3.5 text-slate-500" />
+                  <span>{t('profile')}</span>
+                </Link>
+              </li>
+              <li>
+                <Link href="/help" className="text-slate-300 hover:text-white hover:translate-x-0.5 transition-all inline-flex items-center gap-1.5">
+                  <HelpCircle className="h-3.5 w-3.5 text-slate-500" />
+                  <span>{isAr ? 'الدعم والمساعدة' : 'Help & Support'}</span>
+                </Link>
+              </li>
+            </ul>
           </div>
+
+          {/* Col 3: Legal & Privacy */}
+          <div className="lg:col-span-3 text-center lg:text-start">
+            <h4 className="text-xs font-bold tracking-wider uppercase text-slate-400 mb-4 flex items-center justify-center lg:justify-start gap-2">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{isAr ? 'السياسات والشروط' : 'Policies & Terms'}</span>
+            </h4>
+            <ul className="space-y-2.5 text-sm font-medium">
+              <li>
+                <Link href="/privacy" className="text-slate-300 hover:text-white transition-colors">
+                  {isAr ? 'سياسة الخصوصية' : 'Privacy Policy'}
+                </Link>
+              </li>
+              <li>
+                <Link href="/terms" className="text-slate-300 hover:text-white transition-colors">
+                  {isAr ? 'الشروط والأحكام' : 'Terms & Conditions'}
+                </Link>
+              </li>
+              <li className="pt-2 text-xs text-slate-500">
+                <span>{isAr ? 'جامعة القصيم • كلية الهندسة' : 'Qassim University • College of Engineering'}</span>
+              </li>
+            </ul>
+          </div>
+
         </div>
 
-        {/* Bottom Disclaimer & Copyright */}
-        <div className="mt-8 pt-6 border-t border-slate-800/80 text-center space-y-2.5 text-xs text-slate-500 max-w-4xl mx-auto">
-          <p className="leading-relaxed">
+        {/* Bottom Section: Developer Attribution & Copyright */}
+        <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500 text-center md:text-start">
+          
+          {/* IEEE Statement */}
+          <p className="max-w-xl leading-relaxed text-slate-500">
             {isAr 
-              ? `© حقوق النشر ${currentYear} لجمعية IEEE – جميع الحقوق محفوظة. تعتبر IEEE أكبر منظمة مهنية تقنية عالمية غير ربحية مكرسة لتقدم التكنولوجيا لخدمة البشرية.`
-              : `© Copyright ${currentYear} IEEE – All rights reserved. A public charity, IEEE is the world’s largest technical professional organization dedicated to advancing technology for the benefit of humanity.`}
+              ? `© ${currentYear} فرع IEEE الطلابي بجامعة القصيم – جميع الحقوق محفوظة.`
+              : `© ${currentYear} IEEE Student Branch at Qassim University – All rights reserved.`}
           </p>
-          <p className="text-[11px] text-slate-400/80 pt-1 flex items-center justify-center gap-1.5">
-            <span>{isAr ? 'تطوير وتصميم:' : 'Developed & Designed by:'}</span>
+
+          {/* Passionate Developer Credit */}
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-slate-900/90 border border-slate-800 text-slate-400 shadow-inner">
+            <Heart className="w-3.5 h-3.5 text-rose-500 animate-pulse fill-rose-500/30" />
+            <span>
+              {isAr ? 'تم تطوير المنصة بشغف بواسطة:' : 'Crafted with passion by:'}
+            </span>
             <a 
-              href="https://www.linkedin.com/in/bader-aldukhailallah" 
+              href="https://www.linkedin.com/in/bader-aldkhilallah-209650224" 
               target="_blank" 
               rel="noopener noreferrer" 
-              className="text-blue-400 hover:text-blue-300 font-semibold transition-colors underline underline-offset-4 decoration-blue-500/40 hover:decoration-blue-400"
+              className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 font-bold transition-colors underline underline-offset-4 decoration-blue-500/40 hover:decoration-blue-400"
             >
-              {isAr ? 'بدر الدخيل الله' : 'Bader Al-Dukhailallah'}
+              <span>{isAr ? 'بدر الدخيل الله' : 'Bader Al-Dkhilallah'}</span>
+              <ExternalLink className="w-3 h-3 opacity-70" />
             </a>
-          </p>
+          </div>
+
         </div>
       </div>
     </footer>

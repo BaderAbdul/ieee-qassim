@@ -190,6 +190,19 @@ export default function AdminStructurePage() {
       await updateCommitteesInDB(updated);
     }
   };
+  const moveMember = async (committeeId: string, memberIndex: number, direction: 'up' | 'down') => {
+    const updated = committees.map(c => {
+      if (c.id !== committeeId) return c;
+      const members = [...c.members];
+      if (direction === 'up' && memberIndex === 0) return c;
+      if (direction === 'down' && memberIndex === members.length - 1) return c;
+      const targetIndex = direction === 'up' ? memberIndex - 1 : memberIndex + 1;
+      [members[memberIndex], members[targetIndex]] = [members[targetIndex], members[memberIndex]];
+      return { ...c, members };
+    });
+    await updateCommitteesInDB(updated);
+  };
+
   const moveCommittee = async (index: number, direction: 'up' | 'down') => {
     if (
       (direction === 'up' && index === 0) || 
@@ -265,19 +278,41 @@ export default function AdminStructurePage() {
                 </button>
               </div>
               <div className="space-y-2 max-h-48 overflow-y-auto">
-                {committee.members.map(member => (
-                  <div key={member.userId} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold overflow-hidden">
+                {committee.members.map((member, memberIdx) => (
+                  <div key={member.userId || memberIdx} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-gray-100 hover:border-gray-200 transition-colors">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex flex-col gap-0.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => moveMember(committee.id, memberIdx, 'up')}
+                          disabled={memberIdx === 0}
+                          title="تحريك لأعلى"
+                          aria-label="تحريك العضو لأعلى"
+                          className="p-0.5 text-gray-400 hover:text-blue-600 disabled:opacity-20 hover:bg-white rounded transition-colors"
+                        >
+                          <ArrowUp size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveMember(committee.id, memberIdx, 'down')}
+                          disabled={memberIdx === committee.members.length - 1}
+                          title="تحريك لأسفل"
+                          aria-label="تحريك العضو لأسفل"
+                          className="p-0.5 text-gray-400 hover:text-blue-600 disabled:opacity-20 hover:bg-white rounded transition-colors"
+                        >
+                          <ArrowDown size={12} />
+                        </button>
+                      </div>
+                      <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold overflow-hidden shrink-0">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         {member.avatar ? <img src={member.avatar} alt={member.name} className="h-full w-full object-cover" /> : member.name.charAt(0)}
                       </div>
-                      <div>
-                        <div className="text-sm font-bold text-gray-900">{member.name} {member.englishName ? `(${member.englishName})` : ''}</div>
-                        <div className="text-xs text-gray-500">{member.role} {member.englishRole ? `- ${member.englishRole}` : ''}</div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold text-gray-900 truncate">{member.name} {member.englishName ? `(${member.englishName})` : ''}</div>
+                        <div className="text-xs text-gray-500 truncate">{member.role} {member.englishRole ? `- ${member.englishRole}` : ''}</div>
                       </div>
                     </div>
-                    <button onClick={() => handleRemoveMember(committee.id, member.userId)} className="text-red-400 hover:text-red-600 p-1"><X size={14} /></button>
+                    <button onClick={() => handleRemoveMember(committee.id, member.userId)} className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded transition-colors" title="إزالة العضو"><X size={14} /></button>
                   </div>
                 ))}
                 {committee.members.length === 0 && (

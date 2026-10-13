@@ -161,7 +161,10 @@ export async function recordAttendance(input: AttendanceInput) {
     if (input.admin && !['Ongoing', 'Completed'].includes(event.state)) throw new ApiError('failed-precondition', 'Start the event before recording attendance.');
     const secret = secretSnap.data();
     if (!input.admin && (!input.token || secret?.token !== input.token || !secret.expiresAt || secret.expiresAt.toMillis() <= Date.now())) throw new ApiError('permission-denied', 'Invalid or expired check-in token.');
-    if (!regSnap.exists || !['approved', 'attended'].includes(regSnap.data()?.status)) throw new ApiError('failed-precondition', 'An approved registration is required.');
+    const isRegistrationRequired = event.requiresRegistration !== false && event.type !== 'Booth';
+    if (isRegistrationRequired && (!regSnap.exists || !['approved', 'attended'].includes(regSnap.data()?.status))) {
+      throw new ApiError('failed-precondition', 'An approved registration is required.');
+    }
     if (logSnap.exists) return { status: 'already_checked_in', userId, awardedPoints: 0 };
 
     const feedback = input.feedback;
@@ -179,7 +182,11 @@ export async function recordAttendance(input: AttendanceInput) {
     tx.update(userSnap.ref, { totalPoints, badges: nextBadges });
     tx.set(db.collection('public_profiles').doc(userId), publicProfile({ ...userData, totalPoints, badges: nextBadges }));
     tx.create(logRef, { eventId, userId, timestamp: FieldValue.serverTimestamp(), verifiedByAdmin: input.admin ? actorUid : false });
-    tx.update(regRef, { status: 'attended', attended: true, attendedAt: FieldValue.serverTimestamp() });
+    if (regSnap.exists) {
+      tx.update(regRef, { status: 'attended', attended: true, attendedAt: FieldValue.serverTimestamp() });
+    } else {
+      tx.set(regRef, { eventId, userId, status: 'attended', attended: true, registeredAt: FieldValue.serverTimestamp(), attendedAt: FieldValue.serverTimestamp() });
+    }
     tx.update(eventRef, { attendanceCount: FieldValue.increment(1) });
     if (feedback) tx.set(db.collection('event_feedback').doc(`${eventId}_${userId}`), { eventId, userId, userEmail: userSnap.data()?.email || '', rating: feedback.rating, answers: feedback.answers || {}, createdAt: FieldValue.serverTimestamp() });
     if (points > 0 && !pointSnap.exists) tx.create(pointRef, { userId, amount: points, source: 'attendance', reason: `Attendance: ${event.title || eventId}`, sourceEventId: eventId, createdBy: input.admin ? actorUid : 'system', createdAt: FieldValue.serverTimestamp(), aggregatedAt: FieldValue.serverTimestamp() });

@@ -64,7 +64,13 @@ export default function Navbar() {
     const name = fullName || fallback || (isAr ? 'عضو' : 'Student');
     const parts = name.trim().split(/\s+/).filter(Boolean);
     if (parts.length <= 2) return name;
-    return `${parts[0]} ${parts[parts.length - 1]}`;
+    // Handle composite family names like "الدخيل الله" or "آل سعود"
+    const last = parts[parts.length - 1];
+    const prev = parts[parts.length - 2];
+    if (['الله', 'الدين', 'الرحمن', 'سعود'].includes(last) || ['آل', 'ال', 'ابن', 'بن', 'عبد'].includes(prev)) {
+      return `${parts[0]} ${prev} ${last}`;
+    }
+    return `${parts[0]} ${last}`;
   };
 
   const displayName = getFirstAndLastName(userData?.arabicFullName, user?.displayName);

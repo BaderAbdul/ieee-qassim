@@ -41,6 +41,8 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
     attendanceCount: 0,
     points: 10,
     hasCertificate: false,
+    requiresRegistration: true,
+    isUnlisted: false,
     registrationMode: 'Auto' as RegistrationMode,
     gains: '',
     gainsEn: '',
@@ -98,6 +100,8 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
             attendanceCount: data.attendanceCount || 0,
             points: data.points ?? 10,
             hasCertificate: data.hasCertificate || false,
+            requiresRegistration: data.requiresRegistration !== false && data.type !== 'Booth',
+            isUnlisted: data.isUnlisted || false,
             registrationMode: data.registrationMode || 'Auto',
             gains: data.gains ? data.gains.join('\n') : '',
             gainsEn: data.gainsEn ? data.gainsEn.join('\n') : '',
@@ -166,6 +170,8 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         hideExactCapacity: formData.hideExactCapacity,
         points: formData.points,
         hasCertificate: formData.hasCertificate,
+        requiresRegistration: formData.requiresRegistration,
+        isUnlisted: formData.isUnlisted,
         registrationMode: formData.registrationMode,
         coverUrl: formData.coverUrl,
         gains: formData.gains.split('\n').filter(g => g.trim()),
@@ -231,6 +237,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                 <option value="Competition">مسابقة (Competition)</option>
                 <option value="Meetup">لقاء (Meetup)</option>
                 <option value="Challenge">تحدي (Challenge)</option>
+                <option value="Booth">بوث / زيارة جناح (Booth / Visit)</option>
                 <option value="Other">أخرى (Other)</option>
               </select>
             </div>
@@ -332,11 +339,41 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
               <label className="block text-sm font-medium text-gray-700 mb-1">النقاط المكتسبة للحضور</label>
               <input required type="number" min="0" name="points" value={formData.points} onChange={handleChange} className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500" />
             </div>
-            <div className="flex items-center pt-6">
-              <input type="checkbox" id="hasCertificate" name="hasCertificate" checked={formData.hasCertificate} onChange={handleChange} className="h-5 w-5 text-purple-600 focus:ring-purple-500 border-gray-300 rounded" />
-              <label htmlFor="hasCertificate" className="ms-2 block text-sm font-medium text-gray-700">
-                إصدار شهادات حضور تلقائية
-              </label>
+            <div className="flex flex-col gap-3 pt-4">
+              <div className="flex items-center">
+                <input type="checkbox" id="hasCertificate" name="hasCertificate" checked={formData.hasCertificate} onChange={handleChange} className="h-5 w-5 text-purple-600 focus:ring-purple-500 border-gray-300 rounded" />
+                <label htmlFor="hasCertificate" className="ms-2 block text-sm font-medium text-gray-700">
+                  إصدار شهادات حضور تلقائية
+                </label>
+              </div>
+
+              <div className="flex items-center">
+                <input 
+                  type="checkbox" 
+                  id="requiresRegistration" 
+                  name="requiresRegistration" 
+                  checked={formData.requiresRegistration} 
+                  onChange={handleChange} 
+                  className="h-5 w-5 text-purple-600 focus:ring-purple-500 border-gray-300 rounded" 
+                />
+                <label htmlFor="requiresRegistration" className="ms-2 block text-sm font-medium text-gray-700">
+                  يتطلب تسجيلاً مسبقاً (ألغِ التحديد للبوثات والزيارات المباشرة بدون تسجيل)
+                </label>
+              </div>
+
+              <div className="flex items-center">
+                <input 
+                  type="checkbox" 
+                  id="isUnlisted" 
+                  name="isUnlisted" 
+                  checked={formData.isUnlisted} 
+                  onChange={handleChange} 
+                  className="h-5 w-5 text-purple-600 focus:ring-purple-500 border-gray-300 rounded" 
+                />
+                <label htmlFor="isUnlisted" className="ms-2 block text-sm font-medium text-gray-700">
+                  إخفاء الفعالية من القائمة العامة (تظل جارية ومتاحة عبر الرابط المباشر أو الـ QR فقط)
+                </label>
+              </div>
             </div>
           </div>
         </div>

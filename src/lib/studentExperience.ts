@@ -25,7 +25,8 @@ const eventStates: Record<string, [string, string]> = {
 };
 const eventTypes: Record<string, [string, string]> = {
   Workshop: ['ورشة عمل', 'Workshop'], Camp: ['معسكر', 'Camp'], Lecture: ['محاضرة', 'Lecture'],
-  Competition: ['مسابقة', 'Competition'], Meetup: ['لقاء', 'Meetup'], Challenge: ['تحدٍّ', 'Challenge'], Other: ['أخرى', 'Other'],
+  Competition: ['مسابقة', 'Competition'], Meetup: ['لقاء', 'Meetup'], Challenge: ['تحدٍّ', 'Challenge'],
+  Booth: ['بوث / جناح', 'Booth / Visit'], Other: ['أخرى', 'Other'],
 };
 const registrations: Record<string, [string, string]> = {
   pending: ['قيد المراجعة', 'Pending review'], approved: ['تم قبول التسجيل', 'Approved'],

@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { functions } from '@/lib/firebase/client';
 import { httpsCallable } from '@/lib/backend';
 import { useAuth } from '@/context/AuthContext';
-import { Search, Trophy, Shield, ShieldAlert, Trash2, Edit3, Lock, Unlock } from 'lucide-react';
+import { Search, Trophy, Shield, ShieldAlert, Trash2, Edit3, Lock, Unlock, Filter, ArrowUpDown } from 'lucide-react';
 import type { MemberSearchResult } from '@/lib/adminTypes';
 import { AdminError } from '@/components/admin/AdminData';
 import { Link } from '@/i18n/routing';
@@ -28,6 +28,8 @@ export default function AdminUsersPage() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'student' | 'event_organizer' | 'super_admin' | 'restricted'>('all');
+  const [sortBy, setSortBy] = useState<'points_desc' | 'points_asc' | 'name_asc' | 'default'>('default');
   const [revision, setRevision] = useState(0);
   const [truncated, setTruncated] = useState(false);
   const pointOperation = useRef<{ key: string; id: string } | null>(null);
@@ -155,7 +157,31 @@ export default function AdminUsersPage() {
     }
   };
 
-  const filteredUsers = users;
+  const filteredUsers = useMemo(() => {
+    let result = [...users];
+
+    // Role / status filter
+    if (roleFilter === 'restricted') {
+      result = result.filter(u => u.isRestricted === true);
+    } else if (roleFilter !== 'all') {
+      result = result.filter(u => (u.role || 'student') === roleFilter && !u.isRestricted);
+    }
+
+    // Sort order
+    if (sortBy === 'points_desc') {
+      result.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
+    } else if (sortBy === 'points_asc') {
+      result.sort((a, b) => (a.totalPoints || 0) - (b.totalPoints || 0));
+    } else if (sortBy === 'name_asc') {
+      result.sort((a, b) => {
+        const nameA = a.arabicFullName || a.displayName || a.id;
+        const nameB = b.arabicFullName || b.displayName || b.id;
+        return nameA.localeCompare(nameB, 'ar');
+      });
+    }
+
+    return result;
+  }, [users, roleFilter, sortBy]);
 
   const isAuthorized = userData && (userData.role === 'super_admin' || userData.role === 'event_organizer');
 
@@ -179,19 +205,62 @@ export default function AdminUsersPage() {
       {loadError && <AdminError message={loadError.message} retry={() => setRevision(value => value + 1)} />}
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-4 border-b border-gray-100">
-          <div className="relative">
-            <Search className="absolute end-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input 
-              type="text" 
-              placeholder="بداية الاسم أو البريد، أو الرقم الجامعي/معرف الحساب…"
-              aria-label="البحث في الأعضاء"
-              value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); setPageCursor(null); setUsers([]); }}
-              className="w-full ps-4 pe-10 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-600 focus:border-transparent outline-none"
-            />
+        <div className="p-4 border-b border-gray-100 space-y-3">
+          <div className="flex flex-col md:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute end-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <input 
+                type="text" 
+                placeholder="بداية الاسم أو البريد، أو الرقم الجامعي/معرف الحساب…"
+                aria-label="البحث في الأعضاء"
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setPageCursor(null); setUsers([]); }}
+                className="w-full ps-4 pe-10 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-600 focus:border-transparent outline-none text-sm"
+              />
+            </div>
+
+            {/* Filter by Role / Status */}
+            <div className="flex items-center gap-2">
+              <div className="relative min-w-[140px]">
+                <Filter className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                <select
+                  aria-label="تصفية حسب الدور"
+                  value={roleFilter}
+                  onChange={(e) => setRoleFilter(e.target.value as typeof roleFilter)}
+                  className="w-full ps-9 pe-8 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer transition-colors appearance-none"
+                >
+                  <option value="all">جميع الأدوار</option>
+                  <option value="student">الطلاب فقط</option>
+                  <option value="event_organizer">منظمو الفعاليات</option>
+                  <option value="super_admin">المدراء العامون</option>
+                  <option value="restricted">المقيدون / المؤرشفون</option>
+                </select>
+              </div>
+
+              {/* Sort By */}
+              <div className="relative min-w-[140px]">
+                <ArrowUpDown className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                <select
+                  aria-label="ترتيب الأعضاء"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                  className="w-full ps-9 pe-8 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer transition-colors appearance-none"
+                >
+                  <option value="default">الترتيب الافتراضي</option>
+                  <option value="points_desc">الأعلى نقاطاً ↓</option>
+                  <option value="points_asc">الأقل نقاطاً ↑</option>
+                  <option value="name_asc">أبجدياً (أ - ي)</option>
+                </select>
+              </div>
+            </div>
           </div>
-          <p className="mt-2 text-xs text-slate-500" role="status">{loading ? 'جارٍ البحث…' : truncated ? 'نتائج محدودة؛ اكتب عبارة أدق. البحث من بداية الاسم أو البريد، أو رقم جامعي/معرف مطابق.' : 'البحث من بداية الاسم أو البريد، أو رقم جامعي/معرف مطابق.'}</p>
+
+          <div className="flex items-center justify-between text-xs text-slate-500">
+            <p role="status">{loading ? 'جارٍ البحث…' : truncated ? 'نتائج محدودة؛ اكتب عبارة أدق. البحث من بداية الاسم أو البريد، أو رقم جامعي/معرف مطابق.' : 'البحث من بداية الاسم أو البريد، أو رقم جامعي/معرف مطابق.'}</p>
+            <span className="font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+              المعروض: {filteredUsers.length} من {users.length}
+            </span>
+          </div>
         </div>
 
         <div className="overflow-x-auto">

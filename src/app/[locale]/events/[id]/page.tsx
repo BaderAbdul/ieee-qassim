@@ -336,7 +336,25 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                       </div>
                     ) : (
                       <>
-                        {!registrationStatus || registrationStatus === 'cancelled' ? (
+                        {event.requiresRegistration === false || event.type === 'Booth' ? (
+                          <div className="space-y-3">
+                            <div className="p-4 rounded-2xl text-center bg-blue-500/20 border border-blue-400/30 text-blue-50">
+                              <div className="font-bold text-sm mb-1">
+                                {isAr ? 'زيارة مباشرة بدون تسجيل مسبق' : 'Walk-in visit (No registration required)'}
+                              </div>
+                              <div className="text-xs opacity-90 leading-relaxed">
+                                {isAr ? 'حضورك يُسجّل مباشرة عند مسح رمز QR في البوث.' : 'Check-in is recorded on-site by scanning the booth QR code.'}
+                              </div>
+                            </div>
+                            <Link
+                              href={`/events/${event.id}/checkin`}
+                              className="w-full inline-flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-3.5 px-6 rounded-2xl font-bold shadow-lg transition-transform transform hover:-translate-y-1"
+                            >
+                              <QrCode className="h-4 w-4 text-white" />
+                              <span>{isAr ? 'صفحة التحضير للبوث' : 'Booth check-in page'}</span>
+                            </Link>
+                          </div>
+                        ) : !registrationStatus || registrationStatus === 'cancelled' ? (
                           <button 
                             onClick={handleRegister} 
                             disabled={!isRegistrationOpen || isRegistering}

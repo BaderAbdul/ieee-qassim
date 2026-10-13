@@ -30,14 +30,35 @@ interface StructureAccordionProps {
   isAr: boolean;
 }
 
-// Helper function to extract a suitable display name
+const compoundPrefixes = ['آل', 'ال', 'ابن', 'بن', 'ولد', 'عبد', 'أبو', 'ابو', 'أم', 'ام', 'ذو', 'ذي'];
+const compoundSuffixes = ['الله', 'الدين', 'الإسلام', 'الاسلام', 'الرحمن', 'الرحيم', 'الملك', 'القدوس', 'السلام', 'المؤمن', 'المهيمن', 'العزيز', 'الجبار', 'المتكبر', 'الخالق', 'البارئ', 'المصور', 'الغفار', 'القهار', 'الوهاب', 'الرزاق', 'الفتاح', 'العليم', 'القابض', 'الباسط', 'الخافض', 'الرافع', 'المعز', 'المذل', 'السميع', 'البصير', 'الحكم', 'العدل', 'اللطيف', 'الخبير', 'الحليم', 'العظيم', 'الغفور', 'الشكور', 'العلي', 'الكبير', 'الحفيظ', 'المقيت', 'الحسيب', 'الجليل', 'الكريم', 'الرقيب', 'المجيب', 'الواسع', 'الحكيم', 'الودود', 'المجيد', 'الباعث', 'الشهيد', 'الحق', 'الوكيل', 'القوي', 'المتين', 'الولي', 'الحميد', 'المحصي', 'المبدئ', 'المعيد', 'المحيي', 'المميت', 'الحي', 'القيوم', 'الواجد', 'الماجد', 'الواحد', 'الأحد', 'الصمد', 'القادر', 'المقتدر', 'المقدم', 'المؤخر', 'الأول', 'الآخر', 'الظاهر', 'الباطن', 'الوالي', 'المتعالي', 'البر', 'التواب', 'المنتقم', 'العفو', 'الرؤوف', 'مالك', 'النور', 'الهادي', 'البديع', 'الباقي', 'الوارث', 'الرشيد', 'الصبور'];
+
+// Helper function to extract first and family name (e.g. "بدر الدخيل الله" instead of "بدر عبدالله")
 function getShortName(fullName: string): string {
   if (!fullName) return '';
-  const parts = fullName.trim().split(/\s+/);
-  if (parts.length <= 2) return fullName;
-  // For Arabic names, taking the first two words is usually safer than first and last, 
-  // to avoid breaking names like "بدر الدخيل الله" into "بدر الله".
-  return `${parts[0]} ${parts[1]}`;
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) return fullName.trim();
+  if (parts.length === 2) return fullName.trim();
+
+  // First name detection (handles "عبد الله" as compound first name)
+  let firstIdx = 0;
+  let firstName = parts[0];
+  if (parts.length > 2 && (compoundPrefixes.includes(parts[0]) || compoundSuffixes.includes(parts[1]))) {
+    firstName = `${parts[0]} ${parts[1]}`;
+    firstIdx = 1;
+  }
+
+  // Family name detection from tail (handles "الدخيل الله", "آل سعود", etc.)
+  const familyIdx = parts.length - 1;
+  let familyName = parts[familyIdx];
+  if (familyIdx > firstIdx + 1) {
+    const prev = parts[familyIdx - 1];
+    if (compoundPrefixes.includes(prev) || compoundSuffixes.includes(familyName)) {
+      familyName = `${prev} ${familyName}`;
+    }
+  }
+
+  return `${firstName} ${familyName}`;
 }
 
 export default function StructureAccordion({ committees, isAr }: StructureAccordionProps) {

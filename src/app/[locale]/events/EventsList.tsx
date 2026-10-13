@@ -72,6 +72,8 @@ export default function EventsList({ events: initialEvents, nextCursor = null, i
       const past = ['Completed', 'Archived'].includes(event.state) || (toJsDate(event.date)?.getTime() ?? 0) < now;
       if (view === 'upcoming' && past) return false;
       if (view === 'past' && !past) return false;
+      // Hide unlisted events (e.g. secret booth visits or internal events) from general list
+      if (event.isUnlisted && !searchQuery.trim()) return false;
       if (view === 'open' && event.state !== 'Registration Open') return false;
       // Type filter
       if (selectedType !== 'ALL' && event.type !== selectedType) {
@@ -159,9 +161,10 @@ export default function EventsList({ events: initialEvents, nextCursor = null, i
               <option value="Camp">{t('filterCamp')}</option>
               <option value="Lecture">{t('filterLecture')}</option>
               <option value="Competition">{t('filterCompetition')}</option>
-              <option value="Other">{t('filterOther')}</option>
               <option value="Meetup">{eventTypeLabel('Meetup', isAr)}</option>
               <option value="Challenge">{eventTypeLabel('Challenge', isAr)}</option>
+              <option value="Booth">{eventTypeLabel('Booth', isAr)}</option>
+              <option value="Other">{t('filterOther')}</option>
             </select>
           </div>
           
