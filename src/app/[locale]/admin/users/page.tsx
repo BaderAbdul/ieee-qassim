@@ -368,14 +368,45 @@ export default function AdminUsersPage() {
               )}
               
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">النقاط (يمكن أن تكون سالبة لخصم النقاط)</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1.5">نوع العملية:</label>
+                <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl mb-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof amount === 'number' && amount < 0) setAmount(Math.abs(amount));
+                    }}
+                    className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                      typeof amount !== 'number' || amount >= 0 ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    + إضافة نقاط
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof amount === 'number' && amount > 0) setAmount(-amount);
+                      else if (typeof amount !== 'number' || amount === 0) setAmount(-10);
+                    }}
+                    className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                      typeof amount === 'number' && amount < 0 ? 'bg-white text-rose-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    - سحب / خصم نقاط
+                  </button>
+                </div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-xs font-bold text-gray-700">النقاط (موجبة للإضافة، سالبة للخصم)</label>
+                  <span className="text-xs text-gray-500 font-mono">
+                    الرصيد الحالي: <strong>{selectedUser.totalPoints || 0}</strong>
+                  </span>
+                </div>
                 <div className="relative">
                   <input 
                     type="number" 
                     value={amount}
                     onChange={(e) => setAmount(e.target.value === '' ? '' : parseInt(e.target.value))}
                     placeholder="مثال: 50 أو -10"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-600 focus:border-transparent outline-none"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-600 focus:border-transparent outline-none font-mono"
                     dir="ltr"
                     required
                   />

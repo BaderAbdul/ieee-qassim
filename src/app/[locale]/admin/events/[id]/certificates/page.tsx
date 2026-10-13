@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, getDoc, doc, updateDoc } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase/client';
 import { httpsCallable } from '@/lib/backend';
 import { downloadCSV, parseCSV, secureCertificateURL } from '@/lib/csv';
@@ -38,6 +38,24 @@ export default function CertificatesManagementPage() {
   const [issueRetryIds, setIssueRetryIds] = useState<string[]>([]);
   const role = userData?.role;
   const canIssue = event?.state === 'Completed' && event?.hasCertificate === true;
+  const canAttachExternal = ['Ongoing', 'Completed'].includes(event?.state || '');
+
+  const handleCompleteEventAndEnableCertificates = async () => {
+    setProcessing(true);
+    setError(null);
+    try {
+      if (event?.state !== 'Completed') {
+        await httpsCallable(functions, 'changeEventState')({ eventId, state: 'Completed' });
+      }
+      await updateDoc(doc(db, 'events', eventId), { hasCertificate: true });
+      setEvent(prev => prev ? { ...prev, state: 'Completed', hasCertificate: true } : null);
+      setReloadKey(k => k + 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'تعذر إنهاء الفعالية وتفعيل الشهادات');
+    } finally {
+      setProcessing(false);
+    }
+  };
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rendering = useRef(false);
@@ -321,11 +339,11 @@ export default function CertificatesManagementPage() {
               onChange={handleImportCSV} 
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               ref={fileInputRef}
-              disabled={uploadingCSV || !canIssue || processing}
+              disabled={uploadingCSV || !canAttachExternal || processing}
               aria-label="اختيار ملف CSV لمعاينة روابط الشهادات"
             />
             <button
-              disabled={uploadingCSV || !canIssue || processing}
+              disabled={uploadingCSV || !canAttachExternal || processing}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold disabled:opacity-50 transition-colors flex items-center gap-2 shadow-sm"
             >
               <Upload className="h-4 w-4" />
@@ -347,12 +365,33 @@ export default function CertificatesManagementPage() {
       {error && <div className="bg-red-50 text-red-600 p-4 rounded-xl">{error}</div>}
       {issueRetryIds.length > 0 && <button disabled={processing || !canIssue} onClick={() => handleIssueCertificates(issueRetryIds)} className="rounded-xl bg-purple-600 px-4 py-3 text-white disabled:opacity-50">إعادة إرسال دفعات الإصدار المتعثرة فقط</button>}
       {results.length > 0 && <section className="rounded-xl border bg-white p-4" aria-live="polite"><p>نجح {results.filter(row => row.success).length} / {results.length}.</p>{results.filter(row => !row.success).map(row => <p key={row.id} className="text-red-700">{row.name}: {row.message}</p>)}<button className="mt-2 underline" onClick={() => downloadCSV('certificate-operation-results.csv', [['Name', 'Success', 'Message'], ...results.map(row => [row.name, row.success, row.message || ''])])}>تنزيل تقرير النتائج</button>{retryRows.length > 0 && <button disabled={uploadingCSV} className="ms-4 rounded bg-blue-600 px-4 py-2 text-white" onClick={() => applyImport(retryRows)}>إعادة محاولة الفاشل فقط ({retryRows.length})</button>}</section>}
-      {importRows.length > 0 && <section className="rounded-xl border bg-blue-50 p-4"><h2 className="font-bold">معاينة قبل الحفظ — لم يُطبّق أي رابط بعد</h2><p>صالح {importRows.filter(row => !row.problem).length}، يحتاج مراجعة {importRows.filter(row => row.problem).length}.</p><div className="max-h-64 overflow-auto mt-3">{importRows.map(row => <p key={row.id} className={row.problem ? 'text-red-700' : 'text-green-800'}>صف {row.id}: {row.email} — {row.problem || 'جاهز للربط'}</p>)}</div><button disabled={uploadingCSV || !canIssue || !importRows.some(row => !row.problem)} onClick={() => applyImport(importRows)} className="mt-3 rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-50">تطبيق الصفوف الصالحة فقط</button><button disabled={uploadingCSV} onClick={() => setImportRows([])} className="ms-3 underline">إلغاء الاستيراد</button></section>}
+      {importRows.length > 0 && <section className="rounded-xl border bg-blue-50 p-4"><h2 className="font-bold">معاينة قبل الحفظ — لم يُطبّق أي رابط بعد</h2><p>صالح {importRows.filter(row => !row.problem).length}، يحتاج مراجعة {importRows.filter(row => row.problem).length}.</p><div className="max-h-64 overflow-auto mt-3">{importRows.map(row => <p key={row.id} className={row.problem ? 'text-red-700' : 'text-green-800'}>صف {row.id}: {row.email} — {row.problem || 'جاهز للربط'}</p>)}</div><button disabled={uploadingCSV || !canAttachExternal || !importRows.some(row => !row.problem)} onClick={() => applyImport(importRows)} className="mt-3 rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-50">تطبيق الصفوف الصالحة فقط</button><button disabled={uploadingCSV} onClick={() => setImportRows([])} className="ms-3 underline">إلغاء الاستيراد</button></section>}
       
       {!canIssue && (
-        <div className="bg-yellow-50 text-yellow-800 p-4 rounded-xl flex items-center gap-3">
-          <AlertCircle className="h-5 w-5" />
-          يلزم اكتمال الفعالية وتفعيل الشهادات قبل إصدار PDF أو ربط شهادات خارجية.
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="h-6 w-6 text-amber-600 shrink-0" />
+            <div>
+              <p className="font-bold text-sm">
+                {event?.state !== 'Completed' && !event?.hasCertificate
+                  ? 'الفعالية جارية ولم يتم تفعيل خيار الشهادات بعد.'
+                  : event?.state !== 'Completed'
+                  ? 'الفعالية لا تزال جارية (Ongoing) ولم تكتمل بعد.'
+                  : 'لم يتم تفعيل خيار الشهادات لهذه الفعالية.'}
+              </p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                يمكنك إنهاء الفعالية وتفعيل الشهادات بنقرة واحدة لتمكين التوليد الآلي، كما يمكنك إرفاق روابط الشهادات الخارجية للحضور مباشرة.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleCompleteEventAndEnableCertificates}
+            disabled={processing}
+            className="bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all shrink-0 flex items-center gap-2 disabled:opacity-50"
+          >
+            <CheckCircle className="w-4 h-4" />
+            إنهاء الفعالية وتفعيل الشهادات الآن
+          </button>
         </div>
       )}
 
@@ -367,7 +406,7 @@ export default function CertificatesManagementPage() {
               <th className="py-4 px-6 font-medium">الإجراءات</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y border-gray-100">
             {attendees.map(attendee => (
               <tr key={attendee.userId} className="hover:bg-gray-50 transition-colors">
                 <td className="py-4 px-6 font-bold">{attendee.name}</td>
@@ -405,7 +444,7 @@ export default function CertificatesManagementPage() {
                       إلغاء الشهادة
                     </button>
                   )}
-                  {canIssue && attendee.eligible && (!attendee.certificate || attendee.certificate.status === 'Failed') && (
+                  {canAttachExternal && attendee.eligible && (!attendee.certificate || attendee.certificate.status === 'Failed') && (
                     <div className="flex gap-2 items-center mt-2">
                       <input 
                         type="url" 

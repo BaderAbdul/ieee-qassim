@@ -8,13 +8,22 @@ import { httpsCallable } from '@/lib/backend';
 import { QRCodeSVG } from 'qrcode.react';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
-import { Loader2, ArrowRight, QrCode, Link as LinkIcon, UserCheck, ShieldCheck, CheckCircle2, XCircle, Camera, RefreshCw, Star, X, Send, Smartphone } from 'lucide-react';
+import { Loader2, ArrowRight, QrCode, Link as LinkIcon, UserCheck, ShieldCheck, CheckCircle2, XCircle, Camera, RefreshCw, Star, X, Send, Smartphone, Search } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 interface CheckInResult {
   status?: 'success' | 'already_checked_in' | 'error';
   awardedPoints?: number;
   message?: string;
+}
+
+interface SearchStudent {
+  id: string;
+  displayName?: string;
+  arabicFullName?: string;
+  email?: string;
+  universityId?: string;
+  totalPoints?: number;
 }
 
 const Scanner = dynamic(() => import('@yudiel/react-qr-scanner').then((mod) => mod.Scanner), {
@@ -37,12 +46,18 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
   const [scanResult, setScanResult] = useState<{ status: 'success' | 'error' | 'already_checked_in' | null, message: string }>({ status: null, message: '' });
   const [showCamera, setShowCamera] = useState(false);
   const [isGeneratingToken, setIsGeneratingToken] = useState(false);
+  const [tokenDurationMinutes, setTokenDurationMinutes] = useState<number>(15);
   const [tokenExpiry, setTokenExpiry] = useState<number | null>(null);
   const [now, setNow] = useState(0);
   const [message, setMessage] = useState('');
   const [recent, setRecent] = useState<{ id: string; message: string }[]>([]);
   const submitting = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Live Student Search State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchStudent[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   // Survey / Feedback State on Checkin Desk
   const [requireSurvey, setRequireSurvey] = useState(true);
@@ -84,13 +99,25 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
     return () => window.clearInterval(timer);
   }, []);
 
-  const handleGenerateToken = async () => {
+  const formatTimeLeft = (sec: number) => {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    if (h > 0) return `${h} ساعة و ${m} دقيقة و ${s} ث`;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  };
+
+  const handleGenerateToken = async (customMinutes?: number) => {
+    const mins = customMinutes ?? tokenDurationMinutes;
     setIsGeneratingToken(true);
     try {
-      const generate = httpsCallable<{ eventId: string }, { token: string; expiresAt: number }>(functions, 'generateCheckInToken');
-      const { data } = await generate({ eventId });
+      const generate = httpsCallable<{ eventId: string; durationMinutes?: number }, { token: string; expiresAt: number; durationMinutes?: number }>(functions, 'generateCheckInToken');
+      const { data } = await generate({ eventId, durationMinutes: mins });
       setEvent(prev => prev ? { ...prev, checkinToken: data.token } : null);
-      setTokenExpiry(data.expiresAt); setNow(Date.now()); setMessage('تم توليد رمز صالح لمدة 15 دقيقة.');
+      setTokenExpiry(data.expiresAt);
+      setNow(Date.now());
+      const label = mins >= 60 ? `${Math.round(mins / 60)} ساعة` : `${mins} دقيقة`;
+      setMessage(`تم توليد رمز صالح لمدة ${label}.`);
     } catch (error) {
       console.error("Error generating check-in token:", error);
       setMessage(error instanceof Error ? error.message : 'تعذر توليد رمز التحضير');
@@ -98,6 +125,31 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
       setIsGeneratingToken(false);
     }
   };
+
+  // Live Debounced Member Search for Check-in
+  useEffect(() => {
+    const term = searchQuery.trim();
+    if (term.length < 2) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    const timeout = setTimeout(async () => {
+      try {
+        const searchFn = httpsCallable<{ query: string }, { users: SearchStudent[] }>(functions, 'searchMembers');
+        const res = await searchFn({ query: term });
+        setSearchResults(res.data.users || []);
+      } catch (err) {
+        console.error('Member search failed:', err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [searchQuery]);
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -255,7 +307,7 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
           
           <div className="p-4 sm:p-12 flex flex-col items-center bg-slate-50 relative">
             {message && <p role="status" className="mb-4 text-sm text-slate-700">{message}</p>}
-            {selfCheckinUrl && <p className="mb-4 font-bold" aria-live="off">ينتهي الرمز خلال {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}</p>}
+            {selfCheckinUrl && <p className="mb-4 font-bold" aria-live="off">ينتهي الرمز خلال {formatTimeLeft(secondsLeft)}</p>}
             {selfCheckinUrl ? (
               <>
                 <div className="bg-white p-4 sm:p-6 rounded-3xl shadow-xl mb-8 border border-slate-100 relative group max-w-full">
@@ -273,8 +325,8 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
                   </div>
                 </div>
                 
-                <div className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-3">
-                  <div className="flex-1 overflow-hidden">
+                <div className="w-full max-w-xl bg-white border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-3">
+                  <div className="flex-1 overflow-hidden w-full">
                     <p className="text-xs font-bold text-slate-500 mb-1 text-start">رابط التحضير المباشر (للمشاركة في الواتساب)</p>
                     <input 
                       type="text" 
@@ -294,18 +346,34 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
                     <LinkIcon className="w-4 h-4 me-2" />
                     نسخ الرابط
                   </button>
-                  <button 
-                    onClick={() => {
-                      if (confirm('هل أنت متأكد من إنشاء رمز تحضير جديد؟ الرابط الحالي سيتوقف عن العمل.')) {
-                        handleGenerateToken();
-                      }
-                    }}
-                    disabled={isGeneratingToken}
-                    className="shrink-0 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors flex items-center shadow-sm w-full sm:w-auto justify-center disabled:opacity-50"
-                  >
-                    <RefreshCw className={`w-4 h-4 me-2 ${isGeneratingToken ? 'animate-spin' : ''}`} />
-                    تحديث الرمز
-                  </button>
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <select
+                      value={tokenDurationMinutes}
+                      onChange={(e) => setTokenDurationMinutes(Number(e.target.value))}
+                      className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold text-slate-700 outline-none"
+                      aria-label="تحديد مدة الرمز الجديد"
+                    >
+                      <option value={15}>15 د</option>
+                      <option value={30}>30 د</option>
+                      <option value={60}>1 س</option>
+                      <option value={120}>2 س</option>
+                      <option value={240}>4 س</option>
+                      <option value={480}>8 س</option>
+                      <option value={1440}>24 س</option>
+                    </select>
+                    <button 
+                      onClick={() => {
+                        if (confirm('هل أنت متأكد من إنشاء رمز تحضير جديد؟ الرابط الحالي سيتوقف عن العمل.')) {
+                          handleGenerateToken();
+                        }
+                      }}
+                      disabled={isGeneratingToken}
+                      className="shrink-0 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors flex items-center shadow-sm w-full sm:w-auto justify-center disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-4 h-4 me-2 ${isGeneratingToken ? 'animate-spin' : ''}`} />
+                      تحديث الرمز
+                    </button>
+                  </div>
                 </div>
               </>
             ) : (
@@ -314,9 +382,27 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
                   <QrCode className="w-8 h-8" />
                 </div>
                 <h3 className="text-lg font-bold text-slate-800 mb-2 font-cairo">{tokenExpiry ? 'انتهت صلاحية الرمز — ولّد رمزًا جديدًا' : 'لم يتم إنشاء رمز تحضير لهذه الفعالية بعد'}</h3>
-                <p className="text-sm text-slate-500 mb-6">قم بتوليد رمز التحضير الذاتي ليتمكن الحضور من مسح رمز QR أو استخدام رابط التحضير المباشر.</p>
+                <p className="text-sm text-slate-500 mb-4">قم بتوليد رمز التحضير الذاتي ليتمكن الحضور من مسح رمز QR أو استخدام رابط التحضير المباشر.</p>
+                
+                <div className="flex flex-col items-center gap-2 mb-6 w-full max-w-xs mx-auto text-start">
+                  <label className="text-xs font-bold text-slate-700 w-full">تحديد مدة صلاحية الرابط / الرمز:</label>
+                  <select
+                    value={tokenDurationMinutes}
+                    onChange={(e) => setTokenDurationMinutes(Number(e.target.value))}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 shadow-sm outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                  >
+                    <option value={15}>15 دقيقة (افتراضي)</option>
+                    <option value={30}>30 دقيقة</option>
+                    <option value={60}>ساعة واحدة (60 دقيقة)</option>
+                    <option value={120}>ساعتان (120 دقيقة)</option>
+                    <option value={240}>4 ساعات</option>
+                    <option value={480}>8 ساعات</option>
+                    <option value={1440}>24 ساعة (يوم كامل)</option>
+                  </select>
+                </div>
+
                 <button
-                  onClick={handleGenerateToken}
+                  onClick={() => handleGenerateToken()}
                   disabled={isGeneratingToken || event.state !== 'Ongoing'}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold text-sm transition-colors shadow-md shadow-blue-600/20 flex items-center mx-auto disabled:opacity-50"
                 >
@@ -425,13 +511,13 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
               <input
                 type="text"
                 ref={inputRef}
-                aria-label="معرّف الطالب أو رابط البطاقة الرقمية"
+                aria-label="الرقم الجامعي أو البريد أو معرّف الطالب"
                 autoFocus
-                placeholder="امسح الـ QR أو اكتب معرّف الطالب (ID)"
+                placeholder="امسح الـ QR أو اكتب الرقم الجامعي / البريد / المعرف"
                 value={manualInput}
                 onChange={(e) => setManualInput(e.target.value)}
                 disabled={isSubmitting}
-                className="w-full bg-slate-50 border-2 border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-2xl p-4 text-center font-mono text-slate-700 text-lg transition-all outline-none disabled:opacity-50"
+                className="w-full bg-slate-50 border-2 border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-2xl p-4 text-center font-mono text-slate-700 text-base sm:text-lg transition-all outline-none disabled:opacity-50"
               />
               {isSubmitting && (
                 <div className="absolute right-4 top-1/2 -translate-y-1/2">
@@ -469,6 +555,86 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
               تحضير الطالب
             </button>
           </form>
+
+          {/* Live Search by Name / University ID / Email */}
+          <div className="mt-8 pt-8 border-t border-slate-100 text-start max-w-lg mx-auto">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <Search className="w-4 h-4 text-blue-600" />
+                بحث بالاسم أو الرقم الجامعي للتحضير السريع
+              </h3>
+              {isSearching && <Loader2 className="w-4 h-4 animate-spin text-blue-600" />}
+            </div>
+            
+            <div className="relative mb-3">
+              <input
+                type="text"
+                placeholder="ابحث بالاسم (مثال: بدر الدخيل الله) أو الرقم الجامعي أو البريد..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl py-2.5 px-4 text-sm transition-all outline-none"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => { setSearchQuery(''); setSearchResults([]); }}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Search Results List */}
+            {searchResults.length > 0 && (
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                {searchResults.map((st) => (
+                  <div
+                    key={st.id}
+                    className="p-3 bg-slate-50 hover:bg-blue-50/50 border border-slate-200 rounded-xl flex items-center justify-between gap-3 transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-bold text-slate-900 text-sm truncate">
+                        {st.arabicFullName || st.displayName || 'طالب'}
+                      </p>
+                      <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+                        {st.universityId && <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200 font-bold">{st.universityId}</span>}
+                        <span className="truncate">{st.email}</span>
+                        <span className="text-blue-700 font-bold shrink-0">({st.totalPoints || 0} نقطة)</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        disabled={isSubmitting}
+                        onClick={() => handleManualSubmit(undefined, st.id)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1"
+                      >
+                        <UserCheck className="w-3.5 h-3.5" />
+                        تحضير
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isSubmitting}
+                        onClick={() => executeCheckIn(st.id)}
+                        title="تحضير فوري بدون استبيان جوال"
+                        className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all"
+                      >
+                        فوري
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {searchQuery.trim().length >= 2 && !isSearching && searchResults.length === 0 && (
+              <p className="text-center text-xs text-slate-500 py-3 bg-slate-50 rounded-xl">
+                لم يتم العثور على طالب يطابق البحث &quot;{searchQuery}&quot;.
+              </p>
+            )}
+          </div>
           
           <div className="mt-8 pt-8 border-t border-slate-100 text-xs font-bold text-slate-400">
             يعود التركيز لحقل المعرف بعد كل عملية تحضير.

@@ -1,5 +1,5 @@
 import { ApiError } from './errors';
-import { publicProfile } from './profiles';
+import { publicProfile, normalizeUniversityId } from './profiles';
 import { queueNotification } from './notifications';
 import { randomUUID } from 'node:crypto';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
@@ -140,13 +140,54 @@ export async function submitEventFeedback(uid: string, eventId: string, feedback
   });
 }
 
+export async function resolveStudentUid(identifier: string): Promise<string> {
+  const raw = String(identifier || '').replace(/^ieee-qu-user:/, '').trim();
+  if (!raw) throw new ApiError('invalid-argument', 'Invalid student identifier.');
+  
+  let cleanId = raw;
+  if (cleanId.includes('/pass/')) {
+    cleanId = cleanId.split('/pass/')[1].split('/')[0].split('?')[0];
+  }
+
+  const db = getFirestore();
+  // 1. Direct doc lookup by UID
+  if (!cleanId.includes('/') && cleanId.length <= 128) {
+    const directSnap = await db.collection('users').doc(cleanId).get();
+    if (directSnap.exists) return directSnap.id;
+  }
+
+  // 2. Lookup by universityId
+  const uniClean = cleanId.replace(/\s+/g, '');
+  const uniSnap = await db.collection('users').where('universityId', '==', uniClean).limit(1).get();
+  if (!uniSnap.empty) return uniSnap.docs[0].id;
+
+  const uniMappingSnap = await db.collection('university_ids').doc(uniClean).get();
+  if (uniMappingSnap.exists && uniMappingSnap.data()?.userId) {
+    return uniMappingSnap.data()!.userId;
+  }
+
+  // 3. Lookup by email
+  const emailSnap = await db.collection('users').where('email', '==', cleanId.toLowerCase()).limit(1).get();
+  if (!emailSnap.empty) return emailSnap.docs[0].id;
+
+  // 4. Normalized university ID (handling Arabic/Persian numerals)
+  const normalizedUni = normalizeUniversityId(cleanId);
+  if (normalizedUni && normalizedUni !== uniClean) {
+    const normSnap = await db.collection('users').where('universityId', '==', normalizedUni).limit(1).get();
+    if (!normSnap.empty) return normSnap.docs[0].id;
+  }
+
+  return cleanId;
+}
+
 export async function initiatePendingCheckIn({ eventId, targetUserId, actorUid }: { eventId: string; targetUserId: string; actorUid: string }) {
+  const resolvedUserId = await resolveStudentUid(targetUserId);
   const db = getFirestore();
   const eventRef = db.collection('events').doc(documentId(eventId, 'eventId'));
-  const userRef = db.collection('users').doc(documentId(targetUserId, 'userId'));
-  const logRef = db.collection('attendance_logs').doc(`${eventId}_${targetUserId}`);
-  const regRef = db.collection('registrations').doc(`${eventId}_${targetUserId}`);
-  const pendingRef = db.collection('pending_checkins').doc(`${eventId}_${targetUserId}`);
+  const userRef = db.collection('users').doc(documentId(resolvedUserId, 'userId'));
+  const logRef = db.collection('attendance_logs').doc(`${eventId}_${resolvedUserId}`);
+  const regRef = db.collection('registrations').doc(`${eventId}_${resolvedUserId}`);
+  const pendingRef = db.collection('pending_checkins').doc(`${eventId}_${resolvedUserId}`);
 
   const [eventSnap, userSnap, logSnap, regSnap] = await Promise.all([
     eventRef.get(),
@@ -158,7 +199,7 @@ export async function initiatePendingCheckIn({ eventId, targetUserId, actorUid }
   const event = eventSnap.data();
   if (!event || event.state !== 'Ongoing') throw new ApiError('failed-precondition', 'Event must be Ongoing.');
   if (!userSnap.exists || userSnap.data()?.isRestricted) throw new ApiError('permission-denied', 'Student account is unavailable.');
-  if (logSnap.exists) return { status: 'already_checked_in', eventId, targetUserId };
+  if (logSnap.exists) return { status: 'already_checked_in', eventId, targetUserId: resolvedUserId };
 
   const isRegistrationRequired = event.requiresRegistration !== false && event.type !== 'Booth';
   if (isRegistrationRequired && (!regSnap.exists || !['approved', 'attended'].includes(regSnap.data()?.status))) {
@@ -167,7 +208,7 @@ export async function initiatePendingCheckIn({ eventId, targetUserId, actorUid }
 
   const pendingData = {
     eventId,
-    userId: targetUserId,
+    userId: resolvedUserId,
     eventTitle: event.title,
     eventTitleEn: event.titleEn || null,
     points: event.points || 0,
@@ -182,14 +223,15 @@ export async function initiatePendingCheckIn({ eventId, targetUserId, actorUid }
   return {
     status: 'pending_feedback',
     eventId,
-    targetUserId,
+    targetUserId: resolvedUserId,
     eventTitle: event.title,
     points: event.points || 0
   };
 }
 
 export async function recordAttendance(input: AttendanceInput) {
-  const { eventId, userId, actorUid } = input;
+  const { eventId, actorUid } = input;
+  const userId = input.admin ? await resolveStudentUid(input.userId) : input.userId;
   const db = getFirestore();
   const eventRef = db.collection('events').doc(documentId(eventId, 'eventId'));
   const regRef = db.collection('registrations').doc(`${eventId}_${documentId(userId, 'userId')}`);

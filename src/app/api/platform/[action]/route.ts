@@ -60,13 +60,14 @@ export async function POST(request: Request, context: { params: Promise<{ action
         result = await changeRegistration(documentId(data.userId, 'userId'), documentId(data.eventId, 'eventId'), data.action as 'approve' | 'reject' | 'cancel' | 'waitlist', actor.uid); break;
       case 'generateCheckInToken': {
         requireAdmin(actor); const eventId = documentId(data.eventId, 'eventId');
-        const token = randomBytes(32).toString('hex'); const expiresAt = Timestamp.fromMillis(Date.now() + 15 * 60000);
+        const durationMinutes = Math.min(1440, Math.max(1, Number(data.durationMinutes) || 15));
+        const token = randomBytes(32).toString('hex'); const expiresAt = Timestamp.fromMillis(Date.now() + durationMinutes * 60000);
         await db.runTransaction(async tx => {
           const event = await tx.get(db.collection('events').doc(eventId));
           if (event.data()?.state !== 'Ongoing') throw new ApiError('failed-precondition', 'Event must be Ongoing.');
-          tx.set(db.collection('event_secrets').doc(eventId), { token, expiresAt });
-          audit(tx, 'attendance.rotate_token', actor.uid, eventId, { expiresAt: expiresAt.toMillis() });
-        }); result = { token, expiresAt: expiresAt.toMillis() }; break;
+          tx.set(db.collection('event_secrets').doc(eventId), { token, expiresAt, durationMinutes });
+          audit(tx, 'attendance.rotate_token', actor.uid, eventId, { expiresAt: expiresAt.toMillis(), durationMinutes });
+        }); result = { token, expiresAt: expiresAt.toMillis(), durationMinutes }; break;
       }
       case 'initiatePendingCheckIn': {
         requireAdmin(actor);

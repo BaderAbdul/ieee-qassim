@@ -23,7 +23,12 @@ export async function assignCertificate(actor: string, eventId: string, userId: 
       tx.get(db.collection('events').doc(eventId)), tx.get(db.collection('attendance_logs').doc(`${eventId}_${userId}`)),
       tx.get(db.collection('users').doc(userId)), tx.get(ref),
     ]);
-    if (event.data()?.state !== 'Completed' || event.data()?.hasCertificate !== true || !log.exists || !user.exists || user.data()?.isRestricted) throw new ApiError('failed-precondition', 'Completed event and verified attendance required.');
+    const eventData = event.data();
+    const isExternal = !!url;
+    const validState = isExternal ? ['Ongoing', 'Completed'].includes(eventData?.state) : eventData?.state === 'Completed';
+    if (!validState || !log.exists || !user.exists || user.data()?.isRestricted) throw new ApiError('failed-precondition', 'Completed event and verified attendance required.');
+    if (!isExternal && eventData?.hasCertificate !== true) throw new ApiError('failed-precondition', 'Completed event and verified attendance required.');
+    if (isExternal && eventData?.hasCertificate !== true) tx.update(db.collection('events').doc(eventId), { hasCertificate: true });
     if (['Revoked', 'Generating'].includes(previous.data()?.status)) {
       if (url) throw new ApiError('failed-precondition', 'Certificate cannot be replaced in this state.');
       return { id, queued: false };

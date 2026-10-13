@@ -24,6 +24,61 @@ export default function MemberDetail({ id }: { id: string }) {
   const [summaryError, setSummaryError] = useState<string | null>(null); const [revision, setRevision] = useState(0);
   const [syncing, setSyncing] = useState(false); const [syncError, setSyncError] = useState<string | null>(null);
 
+  // Points adjustment modal state
+  const [isPointsModalOpen, setIsPointsModalOpen] = useState(false);
+  const [pointsAction, setPointsAction] = useState<'add' | 'deduct'>('deduct');
+  const [pointsAmount, setPointsAmount] = useState<number | ''>(10);
+  const [pointsReason, setPointsReason] = useState('');
+  const [pointsSubmitting, setPointsSubmitting] = useState(false);
+  const [pointsError, setPointsError] = useState<string | null>(null);
+  const [pointsSuccessMsg, setPointsSuccessMsg] = useState<string | null>(null);
+
+  const handleAdjustPoints = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (typeof pointsAmount !== 'number' || pointsAmount <= 0) {
+      setPointsError(lang === 0 ? 'يرجى إدخال عدد نقاط موجب أكبر من صفر.' : 'Please enter a positive number of points.');
+      return;
+    }
+    if (!pointsReason.trim()) {
+      setPointsError(lang === 0 ? 'يرجى كتابة سبب التعديل (إلزامي للتوثيق).' : 'Please enter an adjustment reason.');
+      return;
+    }
+    const currentBal = Math.max(0, Number(summary?.member.totalPoints) || 0);
+    const signedAmount = pointsAction === 'deduct' ? -pointsAmount : pointsAmount;
+    if (pointsAction === 'deduct' && pointsAmount > currentBal) {
+      setPointsError(lang === 0 ? `الخصم (${pointsAmount}) يتجاوز الرصيد الحالي (${currentBal}).` : `Deduction exceeds current balance (${currentBal}).`);
+      return;
+    }
+
+    setPointsSubmitting(true);
+    setPointsError(null);
+    try {
+      const res = await httpsCallable<{ studentUid: string; amount: number; reason: string; operationId: string }, { totalPoints: number }>(null, 'addManualPoints')({
+        studentUid: id,
+        amount: signedAmount,
+        reason: pointsReason.trim(),
+        operationId: crypto.randomUUID(),
+      });
+      if (summary) {
+        setSummary({
+          ...summary,
+          member: { ...summary.member, totalPoints: res.data.totalPoints },
+        });
+      }
+      setPointsSuccessMsg(lang === 0 ? `تمت العملية بنجاح! الرصيد الجديد: ${res.data.totalPoints}` : `Success! New balance: ${res.data.totalPoints}`);
+      setRevision(v => v + 1);
+      setTimeout(() => {
+        setIsPointsModalOpen(false);
+        setPointsSuccessMsg(null);
+        setPointsReason('');
+      }, 1200);
+    } catch (err) {
+      setPointsError(err instanceof Error ? err.message : 'Error adjusting points');
+    } finally {
+      setPointsSubmitting(false);
+    }
+  };
+
   const refreshProjection = async () => {
     if (syncing || !summary || summary.member.isRestricted) return;
     if (!confirm(lang === 0 ? 'تحديث الملف العام من بيانات الحساب الحالية؟ لا يغير هذا نقاط الحساب أو سجلاته.' : 'Refresh the public profile from the current account? This does not change account points or history.')) return;
@@ -58,8 +113,28 @@ export default function MemberDetail({ id }: { id: string }) {
   if (!authorized) return <AdminError message={lang === 0 ? 'غير مصرح بالوصول.' : 'Access denied.'} />;
 
   return <div className="space-y-6">
-    <Link href="/admin/users" className="inline-block rounded-xl border px-4 py-2">{lang === 0 ? 'العودة للأعضاء' : 'Back to members'}</Link>
-    <h1 className="text-2xl font-bold">{summary?.member.arabicFullName || summary?.member.displayName || (lang === 0 ? 'ملف العضو' : 'Member detail')}</h1>
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div>
+        <Link href="/admin/users" className="inline-block rounded-xl border px-4 py-2 text-sm mb-2">{lang === 0 ? 'العودة للأعضاء' : 'Back to members'}</Link>
+        <h1 className="text-2xl font-bold">{summary?.member.arabicFullName || summary?.member.displayName || (lang === 0 ? 'ملف العضو' : 'Member detail')}</h1>
+      </div>
+      {summary && !summary.member.isRestricted && (
+        <button
+          type="button"
+          onClick={() => {
+            setIsPointsModalOpen(true);
+            setPointsAction('deduct');
+            setPointsAmount(10);
+            setPointsReason('');
+            setPointsError(null);
+            setPointsSuccessMsg(null);
+          }}
+          className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center gap-2 shrink-0"
+        >
+          {lang === 0 ? 'إضافة أو سحب / خصم نقاط' : 'Add or Deduct Points'}
+        </button>
+      )}
+    </div>
     {summaryError && <AdminError message={summaryError} retry={() => setRevision(value => value + 1)} />}
     {summary && <>
       <dl className="grid gap-4 rounded-2xl border bg-white p-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -90,5 +165,141 @@ export default function MemberDetail({ id }: { id: string }) {
       {(entry.eventId || entry.sourceEventId) && <Link href={`/admin/events/${encodeURIComponent(entry.eventId || entry.sourceEventId!)}`} className="inline-block text-sm font-bold text-purple-700">{lang === 0 ? 'فتح الفعالية' : 'Open event'}</Link>}
     </li>)}</ul>
     {nextCursor && <button disabled={loading} type="button" onClick={() => { setLoading(true); setCursor(nextCursor); }} className="rounded-xl border bg-white px-5 py-3 font-bold disabled:opacity-50">{lang === 0 ? 'تحميل المزيد' : 'Load more'}</button>}
+
+    {/* Adjust / Deduct Points Modal */}
+    {isPointsModalOpen && (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
+          <div className="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+            <div>
+              <h2 className="text-lg font-bold font-cairo text-slate-900">
+                {lang === 0 ? 'تعديل نقاط العضو' : 'Adjust Member Points'}
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {summary?.member.arabicFullName || summary?.member.displayName} ({summary?.member.universityId || summary?.member.email})
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsPointsModalOpen(false)}
+              className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+            >
+              ✕
+            </button>
+          </div>
+
+          <form onSubmit={handleAdjustPoints} className="p-6 space-y-4">
+            {pointsError && (
+              <div className="bg-red-50 text-red-600 p-3 rounded-xl text-xs font-bold border border-red-200">
+                {pointsError}
+              </div>
+            )}
+            {pointsSuccessMsg && (
+              <div className="bg-green-50 text-green-700 p-3 rounded-xl text-xs font-bold border border-green-200">
+                {pointsSuccessMsg}
+              </div>
+            )}
+
+            {/* Action Type Toggle */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                {lang === 0 ? 'نوع العملية:' : 'Operation Type:'}
+              </label>
+              <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setPointsAction('add')}
+                  className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                    pointsAction === 'add' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {lang === 0 ? '+ إضافة نقاط' : '+ Add Points'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPointsAction('deduct')}
+                  className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                    pointsAction === 'deduct' ? 'bg-white text-rose-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {lang === 0 ? '- سحب / خصم نقاط' : '- Deduct Points'}
+                </button>
+              </div>
+            </div>
+
+            {/* Points Amount */}
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-xs font-bold text-slate-700">
+                  {lang === 0 ? 'عدد النقاط:' : 'Points Amount:'}
+                </label>
+                <span className="text-xs text-slate-500 font-mono">
+                  {lang === 0 ? 'الرصيد الحالي: ' : 'Current balance: '}
+                  <strong className="text-slate-800">{summary?.member.totalPoints || 0}</strong>
+                </span>
+              </div>
+              <input
+                type="number"
+                min={1}
+                max={100000}
+                value={pointsAmount}
+                onChange={(e) => setPointsAmount(e.target.value === '' ? '' : Math.abs(parseInt(e.target.value)))}
+                placeholder="10"
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none text-base font-bold font-mono"
+                dir="ltr"
+                required
+              />
+              {typeof pointsAmount === 'number' && pointsAmount > 0 && summary && (
+                <p className="text-xs text-slate-500 mt-1">
+                  {lang === 0 ? 'الرصيد بعد العملية: ' : 'New balance after: '}
+                  <strong className={pointsAction === 'deduct' ? 'text-rose-600' : 'text-emerald-600'}>
+                    {Math.max(0, (summary.member.totalPoints || 0) + (pointsAction === 'deduct' ? -pointsAmount : pointsAmount))}
+                  </strong>
+                </p>
+              )}
+            </div>
+
+            {/* Reason */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                {lang === 0 ? 'السبب (إلزامي للتوثيق والتدقيق):' : 'Reason (Required for audit):'}
+              </label>
+              <textarea
+                value={pointsReason}
+                onChange={(e) => setPointsReason(e.target.value)}
+                placeholder={lang === 0 ? (pointsAction === 'deduct' ? 'مثال: إلغاء نقاط حضور بالخطأ أو مخالفة الشروط' : 'مثال: مساهمة متميزة في تنظيم الفعالية') : 'Reason for adjustment'}
+                className="w-full px-3.5 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none text-sm"
+                rows={3}
+                required
+              />
+            </div>
+
+            <div className="pt-2 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setIsPointsModalOpen(false)}
+                disabled={pointsSubmitting}
+                className="flex-1 px-4 py-2.5 text-slate-600 bg-slate-100 rounded-xl font-bold text-sm hover:bg-slate-200 transition-colors"
+              >
+                {lang === 0 ? 'إلغاء' : 'Cancel'}
+              </button>
+              <button
+                type="submit"
+                disabled={pointsSubmitting || !pointsAmount || !pointsReason.trim()}
+                className={`flex-1 px-4 py-2.5 text-white rounded-xl font-bold text-sm transition-colors disabled:opacity-50 ${
+                  pointsAction === 'deduct' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-purple-600 hover:bg-purple-700'
+                }`}
+              >
+                {pointsSubmitting
+                  ? (lang === 0 ? 'جاري التنفيذ...' : 'Processing...')
+                  : pointsAction === 'deduct'
+                  ? (lang === 0 ? 'تأكيد الخصم' : 'Confirm Deduction')
+                  : (lang === 0 ? 'تأكيد الإضافة' : 'Confirm Addition')}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
   </div>;
 }
