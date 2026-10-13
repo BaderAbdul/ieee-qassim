@@ -10,8 +10,15 @@ import { doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { useRouter } from '@/i18n/routing';
 import { EventType, RegistrationMode, CustomQuestion } from '@/lib/types';
-import { ArrowRight, Save, Plus, Trash2 } from 'lucide-react';
+import { ArrowRight, Save, Plus, Trash2, Archive, Bookmark, Check } from 'lucide-react';
 import { Link } from '@/i18n/routing';
+import QuestionBankModal from '@/components/admin/QuestionBankModal';
+import { 
+  getArchivedQuestions, 
+  saveQuestionToBank, 
+  saveMultipleQuestionsToBank, 
+  harvestQuestionsFromEvents 
+} from '@/lib/feedbackQuestionBank';
 
 export default function EditEventPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -51,6 +58,18 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   });
 
   const [feedbackQuestions, setFeedbackQuestions] = useState<CustomQuestion[]>([]);
+  const [isBankOpen, setIsBankOpen] = useState(false);
+  const [bankCount, setBankCount] = useState(0);
+  const [savedSuccessId, setSavedSuccessId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const updateCount = () => {
+      setBankCount(getArchivedQuestions().length);
+    };
+    updateCount();
+    window.addEventListener('ieee-question-bank-updated', updateCount);
+    return () => window.removeEventListener('ieee-question-bank-updated', updateCount);
+  }, []);
 
   const addFeedbackQuestion = () => {
     const newQ: CustomQuestion = {
@@ -69,6 +88,20 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
 
   const updateFeedbackQuestion = (id: string, field: keyof CustomQuestion, value: CustomQuestion[keyof CustomQuestion]) => {
     setFeedbackQuestions(prev => prev.map(q => q.id === id ? { ...q, [field]: value } : q));
+  };
+
+  const handleImportQuestion = (q: CustomQuestion) => {
+    setFeedbackQuestions(prev => [...prev, q]);
+  };
+
+  const handleSaveQuestionToBank = (q: CustomQuestion) => {
+    if (!q.title.trim()) {
+      alert('يرجى كتابة نص السؤال أولاً قبل حفظه في الأرشيف');
+      return;
+    }
+    saveQuestionToBank(q, 'user');
+    setSavedSuccessId(q.id);
+    setTimeout(() => setSavedSuccessId(null), 2000);
   };
 
   useEffect(() => {
@@ -111,6 +144,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
 
           if (data.feedbackQuestions && Array.isArray(data.feedbackQuestions)) {
             setFeedbackQuestions(data.feedbackQuestions);
+            harvestQuestionsFromEvents([{ feedbackQuestions: data.feedbackQuestions }]);
           }
         }
       } catch (error) {
@@ -180,6 +214,9 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         feedbackQuestions: feedbackQuestions.filter(q => q.title.trim().length > 0),
         updatedAt: serverTimestamp(),
       };
+
+      // Automatically remember feedback questions in the organizer bank
+      saveMultipleQuestionsToBank(updatedEvent.feedbackQuestions, 'event');
 
       await httpsCallable(null, 'saveEvent')({ eventId, expectedUpdatedAt: eventRevision, ...updatedEvent });
       router.push('/admin/events');
@@ -407,7 +444,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
 
         {/* Section 5: Custom Feedback Questions */}
         <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div>
               <h2 className="text-xl font-bold text-slate-900 font-cairo flex items-center gap-2">
                 <span>أسئلة التقييم والانطباع عند التحضير ⭐</span>
@@ -416,14 +453,24 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                 تظهر هذه الأسئلة للمشترك فور مسح رمز QR أو رابط التحضير لتسجيل الحضور والحصول على النقاط.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={addFeedbackQuestion}
-              className="bg-purple-600 text-white text-xs font-bold px-3.5 py-2 rounded-xl hover:bg-purple-700 transition-colors flex items-center gap-1.5 shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              <span>إضافة سؤال</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsBankOpen(true)}
+                className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 text-xs font-bold px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 shadow-sm"
+              >
+                <Archive className="w-4 h-4 text-indigo-600" />
+                <span>أرشيف الأسئلة ({bankCount})</span>
+              </button>
+              <button
+                type="button"
+                onClick={addFeedbackQuestion}
+                className="bg-purple-600 text-white text-xs font-bold px-3.5 py-2 rounded-xl hover:bg-purple-700 transition-colors flex items-center gap-1.5 shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                <span>إضافة سؤال</span>
+              </button>
+            </div>
           </div>
 
           <div className="space-y-4">
@@ -431,14 +478,34 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
               <div key={q.id} className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-xs font-bold text-slate-400">سؤال #{idx + 1}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeFeedbackQuestion(q.id)}
-                    className="text-red-500 hover:text-red-700 p-1 rounded-lg hover:bg-red-50 transition-colors"
-                    title="حذف السؤال"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleSaveQuestionToBank(q)}
+                      className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1"
+                      title="حفظ هذا السؤال في الأرشيف لاستخدامه في فعاليات أخرى"
+                    >
+                      {savedSuccessId === q.id ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          <span className="text-emerald-700">تم الحفظ!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Bookmark className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>حفظ بالأرشيف</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeFeedbackQuestion(q.id)}
+                      className="text-red-500 hover:text-red-700 p-1 rounded-lg hover:bg-red-50 transition-colors"
+                      title="حذف السؤال"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -524,6 +591,14 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
           </button>
         </div>
       </form>
+
+      {/* Survey Question Bank Modal */}
+      <QuestionBankModal
+        isOpen={isBankOpen}
+        onClose={() => setIsBankOpen(false)}
+        onImportQuestion={handleImportQuestion}
+        currentEventQuestions={feedbackQuestions}
+      />
     </div>
   );
 }
