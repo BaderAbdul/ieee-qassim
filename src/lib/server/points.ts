@@ -34,3 +34,37 @@ export async function adjustPoints(actorUid: string, input: Record<string, unkno
     return { status: 'success', transactionId: id, totalPoints, replayed: false };
   });
 }
+
+export async function voidPointTransaction(actorUid: string, input: Record<string, unknown>) {
+  const transactionId = documentId(input.transactionId, 'transactionId');
+  const uid = documentId(input.studentUid, 'studentUid');
+  const db = getFirestore();
+  const txRef = db.collection('point_transactions').doc(transactionId);
+  const userRef = db.collection('users').doc(uid);
+
+  return db.runTransaction(async tx => {
+    const [txSnap, userSnap] = await Promise.all([
+      tx.get(txRef),
+      tx.get(userRef)
+    ]);
+
+    if (!txSnap.exists) throw new ApiError('not-found', 'Transaction not found.');
+    const txData = txSnap.data()!;
+    if (txData.userId !== uid) throw new ApiError('invalid-argument', 'Transaction does not belong to this user.');
+    if (!userSnap.exists) throw new ApiError('not-found', 'Student not found.');
+
+    const amount = Number(txData.amount) || 0;
+    // Delete the point transaction document completely so it does not leave any deduction record!
+    tx.delete(txRef);
+
+    // Adjust user balance
+    const currentPoints = Number(userSnap.data()?.totalPoints) || 0;
+    const totalPoints = Math.max(0, currentPoints - amount);
+    const badges = [...new Set(userSnap.data()?.badges || [])];
+    tx.update(userRef, { totalPoints, badges });
+    tx.set(db.collection('public_profiles').doc(uid), publicProfile({ ...userSnap.data(), totalPoints, badges }));
+
+    audit(tx, 'points.void', actorUid, uid, { transactionId, amount, previousBalance: currentPoints, newBalance: totalPoints });
+    return { status: 'success', transactionId, totalPoints, revokedAmount: amount };
+  });
+}

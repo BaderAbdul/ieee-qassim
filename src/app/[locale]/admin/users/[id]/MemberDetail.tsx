@@ -79,6 +79,33 @@ export default function MemberDetail({ id }: { id: string }) {
     }
   };
 
+  const handleVoidTransaction = async (entry: MemberActivityEntry) => {
+    if (!confirm(lang === 0
+      ? `هل أنت متأكد من سحب وإلغاء هذه العملية نهائياً؟\nسيتم حذف العملية من السجل وسحب ${entry.amount} نقطة من الرصيد مباشرة دون إنشاء سجل خصم.`
+      : `Are you sure you want to completely void this transaction?\nThe entry will be deleted and ${entry.amount} points will be subtracted from balance without creating a deduction record.`
+    )) return;
+
+    setLoading(true);
+    try {
+      const res = await httpsCallable<{ transactionId: string; studentUid: string }, { totalPoints: number; revokedAmount: number }>(null, 'voidPointTransaction')({
+        transactionId: entry.id,
+        studentUid: id,
+      });
+      if (summary) {
+        setSummary({
+          ...summary,
+          member: { ...summary.member, totalPoints: res.data.totalPoints },
+        });
+      }
+      setEntries(prev => prev.filter(e => e.id !== entry.id));
+      setRevision(v => v + 1);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error voiding transaction');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const refreshProjection = async () => {
     if (syncing || !summary || summary.member.isRestricted) return;
     if (!confirm(lang === 0 ? 'تحديث الملف العام من بيانات الحساب الحالية؟ لا يغير هذا نقاط الحساب أو سجلاته.' : 'Refresh the public profile from the current account? This does not change account points or history.')) return;
@@ -268,28 +295,39 @@ export default function MemberDetail({ id }: { id: string }) {
           </Link>
         ) : <span />}
 
-        {/* Direct Point Revocation Button on Positive Ledger Entries */}
+        {/* Direct Point Revocation Options on Positive Ledger Entries */}
         {section === 'points' && summary && !summary.member.isRestricted && entry.amount !== undefined && entry.amount > 0 && (
-          <button
-            type="button"
-            onClick={() => {
-              setIsPointsModalOpen(true);
-              setPointsAction('deduct');
-              setPointsAmount(entry.amount || 10);
-              setPointsReason(
-                lang === 0
-                  ? `سحب/إلغاء نقاط (${entry.amount}): ${entry.eventTitle || entry.reason || 'العملية السابقة'}`
-                  : `Revoke points (${entry.amount}): ${entry.eventTitle || entry.reason || 'previous transaction'}`
-              );
-              setPointsError(null);
-              setPointsSuccessMsg(null);
-            }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 shadow-sm transition-all"
-            title={lang === 0 ? 'سحب هذه النقاط من رصيد العضو' : 'Revoke these points from member balance'}
-          >
-            <span className="text-sm font-mono leading-none">−</span>
-            <span>{lang === 0 ? `سحب هذه النقاط (${entry.amount}-)` : `Revoke these points (-${entry.amount})`}</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handleVoidTransaction(entry)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-sm transition-all"
+              title={lang === 0 ? 'سحب وإلغاء هذه العملية نهائياً دون تسجيل خصم' : 'Void completely without creating a deduction record'}
+            >
+              <span>🗑️</span>
+              <span>{lang === 0 ? `سحب بالكامل دون خصم (-${entry.amount})` : `Void Completely (-${entry.amount})`}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsPointsModalOpen(true);
+                setPointsAction('deduct');
+                setPointsAmount(entry.amount || 10);
+                setPointsReason(
+                  lang === 0
+                    ? `خصم نقاط (${entry.amount}): ${entry.eventTitle || entry.reason || 'العملية السابقة'}`
+                    : `Deduct points (${entry.amount}): ${entry.eventTitle || entry.reason || 'previous transaction'}`
+                );
+                setPointsError(null);
+                setPointsSuccessMsg(null);
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 shadow-sm transition-all"
+              title={lang === 0 ? 'تسجيل حركة خصم يدوية' : 'Record manual deduction'}
+            >
+              <span className="text-sm font-mono leading-none">−</span>
+              <span>{lang === 0 ? 'تسجيل خصم' : 'Deduct'}</span>
+            </button>
+          </div>
         )}
       </div>
     </li>)}</ul>

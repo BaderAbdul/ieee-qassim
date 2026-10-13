@@ -438,3 +438,80 @@ export async function syncEventAttendance(eventId: string, actorUid: string) {
   return { status: 'success', repairedCount, totalAttendance: logsSnap.size };
 }
 
+export async function cancelAttendance(input: { eventId: string; targetUserId: string; actorUid: string }) {
+  const { eventId, actorUid } = input;
+  const userId = await resolveStudentUid(input.targetUserId);
+  const db = getFirestore();
+  const eventRef = db.collection('events').doc(documentId(eventId, 'eventId'));
+  const regRef = db.collection('registrations').doc(`${eventId}_${documentId(userId, 'userId')}`);
+  const logRef = db.collection('attendance_logs').doc(`${eventId}_${userId}`);
+  const pointRef = db.collection('point_transactions').doc(`attendance_${eventId}_${userId}`);
+  const pendingRef = db.collection('pending_checkins').doc(`${eventId}_${userId}`);
+  const feedbackRef = db.collection('event_feedback').doc(`${eventId}_${userId}`);
+
+  return db.runTransaction(async tx => {
+    const [eventSnap, regSnap, logSnap, pointSnap, userSnap] = await Promise.all([
+      tx.get(eventRef),
+      tx.get(regRef),
+      tx.get(logRef),
+      tx.get(pointRef),
+      tx.get(db.collection('users').doc(userId)),
+    ]);
+
+    const event = eventSnap.data();
+    if (!event) throw new ApiError('not-found', 'Event not found.');
+    if (!logSnap.exists && (!regSnap.exists || regSnap.data()?.status !== 'attended')) {
+      throw new ApiError('not-found', 'No attendance record found for this user.');
+    }
+
+    // 1. Delete attendance log
+    if (logSnap.exists) {
+      tx.delete(logRef);
+    }
+
+    // 2. Revoke attendance points completely ("سحب كامل ما يطلع خصم")
+    let revokedPoints = 0;
+    if (pointSnap.exists) {
+      revokedPoints = Number(pointSnap.data()?.amount) || 0;
+      tx.delete(pointRef);
+    }
+
+    if (userSnap.exists) {
+      const userData = userSnap.data()!;
+      const currentPoints = Number(userData.totalPoints) || 0;
+      const totalPoints = Math.max(0, currentPoints - revokedPoints);
+      tx.update(userSnap.ref, { totalPoints });
+      tx.set(db.collection('public_profiles').doc(userId), publicProfile({ ...userData, totalPoints }));
+    }
+
+    // 3. Update or remove registration
+    const isRegistrationRequired = event.requiresRegistration !== false && event.type !== 'Booth';
+    if (regSnap.exists) {
+      const regData = regSnap.data() || {};
+      if (regData.isWalkIn || !isRegistrationRequired) {
+        tx.delete(regRef);
+      } else {
+        tx.update(regRef, {
+          status: 'approved',
+          attended: false,
+          attendedAt: FieldValue.delete(),
+          updatedBy: actorUid,
+        });
+      }
+    }
+
+    // 4. Decrement event attendanceCount
+    const currentAttendance = Number(event.attendanceCount) || 0;
+    if (currentAttendance > 0) {
+      tx.update(eventRef, { attendanceCount: FieldValue.increment(-1) });
+    }
+
+    // 5. Clean up pending check-in / feedback if any
+    tx.delete(pendingRef);
+    tx.delete(feedbackRef);
+
+    audit(tx, 'attendance.cancel', actorUid, logRef.id, { eventId, userId, revokedPoints });
+    return { status: 'success', eventId, userId, revokedPoints };
+  }, { maxAttempts: 10 });
+}
+

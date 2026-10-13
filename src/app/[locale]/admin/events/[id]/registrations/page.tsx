@@ -8,7 +8,7 @@ import { db, functions } from '@/lib/firebase/client';
 import { httpsCallable } from '@/lib/backend';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
-import { ArrowRight, Download, Users, Check, X, Clock, UserCheck, CheckSquare, Square, Trophy, QrCode, RefreshCw } from 'lucide-react';
+import { ArrowRight, Download, Users, Check, X, Clock, UserCheck, UserX, CheckSquare, Square, Trophy, QrCode, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -220,6 +220,48 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
   const handleBulkUpdateStatus = async (newStatus: string) => {
     if (!selectedIds.length || !confirm(`تحديث ${selectedIds.length} تسجيل؟`)) return;
     await performJob({ status: newStatus, items: registrations.filter(item => selectedIds.includes(item.id)) });
+  };
+
+  const handleCancelAttendance = async (reg: RegistrationData) => {
+    if (!confirm(`هل أنت متأكد من إلغاء تحضير ${reg.userName}؟ سيتم سحب نقاط الفعالية وإلغاء حضوره بالكامل دون تسجيل خصم.`)) return;
+    setIsUpdatingBulk(true);
+    try {
+      const cancelFn = httpsCallable<{ eventId: string; targetUserId: string }, { status: string; revokedPoints: number }>(functions, 'cancelAttendance');
+      const res = await cancelFn({ eventId, targetUserId: reg.userId });
+      setResults([{
+        id: reg.id,
+        name: reg.userName,
+        success: true,
+        message: `تم إلغاء التحضير بنجاح وسحب ${res.data.revokedPoints} نقطة.`
+      }]);
+      setReloadKey(k => k + 1);
+    } catch (err) {
+      setResults([{
+        id: reg.id,
+        name: reg.userName,
+        success: false,
+        message: err instanceof Error ? err.message : 'تعذر إلغاء التحضير'
+      }]);
+    } finally {
+      setIsUpdatingBulk(false);
+    }
+  };
+
+  const handleBulkCancelAttendance = async () => {
+    if (!selectedIds.length || !confirm(`هل أنت متأكد من إلغاء تحضير ${selectedIds.length} من الحضور؟ سيتم سحب نقاطهم بالكامل دون تسجيل خصم.`)) return;
+    setIsUpdatingBulk(true);
+    try {
+      const cancelFn = httpsCallable<{ eventId: string; targetUserId: string }, { status: string; revokedPoints: number }>(functions, 'cancelAttendance');
+      const selectedItems = registrations.filter(r => selectedIds.includes(r.id));
+      const outcome = await runOperations(selectedItems.map(item => ({ ...item, name: item.userName })), async item => {
+        await cancelFn({ eventId, targetUserId: item.userId });
+      });
+      setResults(outcome);
+      setSelectedIds([]);
+      setReloadKey(k => k + 1);
+    } finally {
+      setIsUpdatingBulk(false);
+    }
   };
 
   const performJob = async (job: NonNullable<typeof retryJob>) => {
@@ -513,6 +555,14 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
             >
               <UserCheck size={16} /> تحضير (حضور)
             </button>
+            <button 
+              disabled={isUpdatingBulk || isAwarding}
+              onClick={handleBulkCancelAttendance}
+              className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition-colors disabled:opacity-50"
+              title="إلغاء تحضير الحضور المحددين وسحب نقاطهم بالكامل دون تسجيل خصم"
+            >
+              <UserX size={16} /> إلغاء التحضير
+            </button>
           </div>
         </div>
       )}
@@ -648,9 +698,20 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
                     <td className="px-6 py-4 whitespace-nowrap text-start text-sm font-medium">
                       <div className="flex items-center gap-2">
                         {reg.status === 'attended' ? (
-                          <span className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200">
-                            تم التحضير بنجاح
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200">
+                              تم التحضير بنجاح
+                            </span>
+                            <button
+                              disabled={isUpdatingBulk || isAwarding}
+                              onClick={() => handleCancelAttendance(reg)}
+                              className="text-xs font-bold text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-md transition-colors flex items-center gap-1 shadow-sm"
+                              title="إلغاء تحضير هذا الزائر وسحب نقاطه بالكامل دون تسجيل خصم"
+                            >
+                              <UserX size={14} />
+                              <span>إلغاء التحضير</span>
+                            </button>
+                          </div>
                         ) : (
                           <>
                             {reg.status !== 'approved' && (

@@ -274,6 +274,7 @@ export class IEEEPlatformClient {
       ...eventData,
       id: eventId,
       registeredCount: 0,
+      attendanceCount: 0,
       createdAt: now,
       updatedAt: now,
     };
@@ -685,6 +686,9 @@ export class IEEEPlatformClient {
         });
       }
 
+      const curAtt = Number(eventData.attendanceCount) || 0;
+      tx.update(eventRef, { attendanceCount: curAtt + 1 });
+
       return { status: 'success', pointsAwarded: pointsToAward };
     }).then(async (result) => {
       // Evaluate badge milestones post-transaction
@@ -892,6 +896,100 @@ export class IEEEPlatformClient {
 
     await this.evaluateBadgeMilestones(studentUid);
     return { status: 'success', newTotal };
+  }
+
+  async cancelAttendance(
+    adminUid: string,
+    eventId: string,
+    studentUid: string
+  ): Promise<{ status: 'success'; revokedPoints: number }> {
+    const adminUser = await this.getUser(adminUid);
+    if (!adminUser || !['super_admin', 'event_organizer'].includes(adminUser.role || '')) {
+      throw new Error('Permission denied.');
+    }
+
+    const logId = `${eventId}_${studentUid}`;
+    const logRef = this.db.collection('attendance_logs').doc(logId);
+    const regRef = this.db.collection('registrations').doc(`${eventId}_${studentUid}`);
+    const userRef = this.db.collection('users').doc(studentUid);
+    const eventRef = this.db.collection('events').doc(eventId);
+    const pointTxRef = this.db.collection('point_transactions').doc(`attendance_${eventId}_${studentUid}`);
+
+    let revokedPoints = 0;
+    await this.db.runTransaction(async (tx) => {
+      const [logSnap, regSnap, pointSnap, userSnap, eventSnap] = await Promise.all([
+        tx.get(logRef),
+        tx.get(regRef),
+        tx.get(pointTxRef),
+        tx.get(userRef),
+        tx.get(eventRef),
+      ]);
+
+      if (logSnap.exists) {
+        tx.delete(logRef);
+      }
+
+      if (pointSnap.exists) {
+        revokedPoints = Number(pointSnap.data()?.amount) || 0;
+        tx.delete(pointTxRef);
+      }
+
+      if (userSnap.exists) {
+        const cur = Number(userSnap.data()?.totalPoints) || 0;
+        tx.update(userRef, { totalPoints: Math.max(0, cur - revokedPoints) });
+      }
+
+      if (regSnap.exists) {
+        const rData = regSnap.data();
+        if (rData?.isWalkIn) {
+          tx.delete(regRef);
+        } else {
+          tx.update(regRef, { status: 'approved', attended: false });
+        }
+      }
+
+      if (eventSnap.exists) {
+        const curAtt = Number(eventSnap.data()?.attendanceCount) || 0;
+        if (curAtt > 0) tx.update(eventRef, { attendanceCount: curAtt - 1 });
+      }
+    });
+
+    return { status: 'success', revokedPoints };
+  }
+
+  async voidPointTransaction(
+    adminUid: string,
+    studentUid: string,
+    transactionId: string
+  ): Promise<{ status: 'success'; newTotal: number; revokedAmount: number }> {
+    const adminUser = await this.getUser(adminUid);
+    if (!adminUser || !['super_admin', 'event_organizer'].includes(adminUser.role || '')) {
+      throw new Error('Permission denied.');
+    }
+
+    const txRef = this.db.collection('point_transactions').doc(transactionId);
+    const userRef = this.db.collection('users').doc(studentUid);
+
+    let revokedAmount = 0;
+    let newTotal = 0;
+    await this.db.runTransaction(async (tx) => {
+      const [pointSnap, userSnap] = await Promise.all([
+        tx.get(txRef),
+        tx.get(userRef),
+      ]);
+
+      if (!pointSnap.exists) throw new Error('Transaction not found.');
+      revokedAmount = Number(pointSnap.data()?.amount) || 0;
+      tx.delete(txRef);
+
+      if (userSnap.exists) {
+        const cur = Number(userSnap.data()?.totalPoints) || 0;
+        newTotal = Math.max(0, cur - revokedAmount);
+        tx.update(userRef, { totalPoints: newTotal });
+      }
+    });
+
+    return { status: 'success', newTotal, revokedAmount };
   }
 
   async evaluateBadgeMilestones(userId: string): Promise<string[]> {

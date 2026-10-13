@@ -149,3 +149,115 @@ test('Student can be checked in and verified attendance allows certificate attac
   const certDocs = await client.db.collection('certificates').where('eventId', '==', event.id).where('userId', '==', student.uid).get();
   assert.equal(certDocs.empty, false);
 });
+
+test('cancelAttendance completely voids attendance and points without leaving a deduction record', async () => {
+  const client = new IEEEPlatformClient();
+  const admin = await client.createUser({
+    uid: 'admin_cancel_att',
+    displayName: 'Organizer',
+    email: 'admin_ca@qu.edu.sa',
+    role: 'super_admin'
+  });
+
+  const event = await client.createEvent(admin.uid, {
+    title: 'ركن IEEE Day',
+    titleEn: 'IEEE Day Booth',
+    type: 'Booth',
+    requiresRegistration: false,
+    points: 15,
+    state: 'Ongoing',
+    capacity: 100,
+    durationHours: 3,
+    location: 'بهو الكلية',
+    locationEn: 'College Hall',
+  });
+
+  const student = await client.createUser({
+    uid: 'student_booth_visitor',
+    displayName: 'نجود الفواز',
+    email: 'njood@qu.edu.sa',
+    role: 'student'
+  });
+
+  // Check in at booth
+  const { token } = await client.generateCheckInToken(admin.uid, event.id, 900);
+  const checkinRes = await client.processCheckIn(student.uid, event.id, token);
+  assert.equal(checkinRes.status, 'success');
+
+  // Verify attendance log and points exist
+  let logDoc = await client.db.collection('attendance_logs').doc(`${event.id}_${student.uid}`).get();
+  assert.equal(logDoc.exists, true);
+
+  let user = await client.getUser(student.uid);
+  assert.equal(user?.totalPoints, 15);
+
+  let eventDoc = (await client.db.collection('events').doc(event.id).get()).data();
+  assert.equal(eventDoc?.attendanceCount, 1);
+
+  // Now Cancel Attendance
+  const cancelResult = await client.cancelAttendance(admin.uid, event.id, student.uid);
+  assert.equal(cancelResult.status, 'success');
+  assert.equal(cancelResult.revokedPoints, 15);
+
+  // Verify attendance log is deleted
+  logDoc = await client.db.collection('attendance_logs').doc(`${event.id}_${student.uid}`).get();
+  assert.equal(logDoc.exists, false);
+
+  // Verify user points decreased back to 0
+  user = await client.getUser(student.uid);
+  assert.equal(user?.totalPoints, 0);
+
+  // Verify attendanceCount decremented
+  eventDoc = (await client.db.collection('events').doc(event.id).get()).data();
+  assert.equal(eventDoc?.attendanceCount, 0);
+
+  // Verify that point_transactions has NO negative deduction entry created
+  const txSnap = await client.db.collection('point_transactions').where('userId', '==', student.uid).get();
+  const txs = txSnap.docs.map(d => d.data());
+  const negativeTx = txs.find(t => t.amount < 0);
+  assert.equal(negativeTx, undefined, 'No negative deduction transaction should be created');
+});
+
+test('voidPointTransaction completely deletes transaction and updates balance without creating a deduction record', async () => {
+  const client = new IEEEPlatformClient();
+  const admin = await client.createUser({
+    uid: 'admin_void_mgr',
+    displayName: 'Super Admin',
+    email: 'admin_void@qu.edu.sa',
+    role: 'super_admin'
+  });
+
+  const student = await client.createUser({
+    uid: 'student_void_target',
+    displayName: 'فهد المطيري',
+    email: 'fahad@qu.edu.sa',
+    role: 'student'
+  });
+
+  // Add 25 points
+  await client.addManualPoints(admin.uid, student.uid, 25, 'مشاركة استثنائية');
+  let user = await client.getUser(student.uid);
+  assert.equal(user?.totalPoints, 25);
+
+  const txSnap = await client.db.collection('point_transactions').where('userId', '==', student.uid).get();
+  assert.equal(txSnap.empty, false);
+  const txId = txSnap.docs[0].id;
+
+  // Void the transaction completely
+  const voidRes = await client.voidPointTransaction(admin.uid, student.uid, txId);
+  assert.equal(voidRes.status, 'success');
+  assert.equal(voidRes.revokedAmount, 25);
+  assert.equal(voidRes.newTotal, 0);
+
+  user = await client.getUser(student.uid);
+  assert.equal(user?.totalPoints, 0);
+
+  // Transaction should be completely deleted
+  const voidedTxDoc = await client.db.collection('point_transactions').doc(txId).get();
+  assert.equal(voidedTxDoc.exists, false);
+
+  // No deduction record created
+  const allTxs = (await client.db.collection('point_transactions').where('userId', '==', student.uid).get()).docs;
+  assert.equal(allTxs.length, 0);
+});
+
