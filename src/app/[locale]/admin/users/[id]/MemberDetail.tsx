@@ -119,20 +119,38 @@ export default function MemberDetail({ id }: { id: string }) {
         <h1 className="text-2xl font-bold">{summary?.member.arabicFullName || summary?.member.displayName || (lang === 0 ? 'ملف العضو' : 'Member detail')}</h1>
       </div>
       {summary && !summary.member.isRestricted && (
-        <button
-          type="button"
-          onClick={() => {
-            setIsPointsModalOpen(true);
-            setPointsAction('deduct');
-            setPointsAmount(10);
-            setPointsReason('');
-            setPointsError(null);
-            setPointsSuccessMsg(null);
-          }}
-          className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center gap-2 shrink-0"
-        >
-          {lang === 0 ? 'إضافة أو سحب / خصم نقاط' : 'Add or Deduct Points'}
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              setIsPointsModalOpen(true);
+              setPointsAction('deduct');
+              setPointsAmount(10);
+              setPointsReason('');
+              setPointsError(null);
+              setPointsSuccessMsg(null);
+            }}
+            className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center gap-1.5"
+          >
+            <span className="font-mono text-base leading-none">−</span>
+            <span>{lang === 0 ? 'سحب / خصم نقاط' : 'Revoke Points'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsPointsModalOpen(true);
+              setPointsAction('add');
+              setPointsAmount(10);
+              setPointsReason('');
+              setPointsError(null);
+              setPointsSuccessMsg(null);
+            }}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center gap-1.5"
+          >
+            <span className="font-mono text-base leading-none">+</span>
+            <span>{lang === 0 ? 'إضافة نقاط' : 'Add Points'}</span>
+          </button>
+        </div>
       )}
     </div>
     {summaryError && <AdminError message={summaryError} retry={() => setRevision(value => value + 1)} />}
@@ -154,15 +172,126 @@ export default function MemberDetail({ id }: { id: string }) {
     <nav aria-label={lang === 0 ? 'سجلات العضو' : 'Member activity'} className="flex flex-wrap gap-2">
       {sections.map(key => <button key={key} type="button" aria-pressed={key === section} onClick={() => { if (key !== section) { setLoading(true); setEntries([]); setNextCursor(null); setCursor(null); setSection(key); } }} className={`rounded-xl px-4 py-3 text-sm font-bold ${key === section ? 'bg-purple-600 text-white' : 'border bg-white'}`}>{labels[key][lang]}{summary ? ` (${summary.counts[key]})` : ''}</button>)}
     </nav>
+
+    {/* Dedicated Points Ledger Management Banner */}
+    {section === 'points' && summary && !summary.member.isRestricted && (
+      <div className="rounded-2xl border border-rose-100 bg-gradient-to-r from-rose-50 via-white to-purple-50 p-4 sm:p-5 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-100 text-rose-700 font-bold text-sm">
+                💳
+              </span>
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm sm:text-base font-cairo">
+                  {lang === 0 ? 'إدارة وسحب نقاط العضو' : 'Manage & Revoke Member Points'}
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {lang === 0
+                    ? `الرصيد المتاح للسحب أو الخصم: ${summary.member.totalPoints || 0} نقطة`
+                    : `Current balance available for deduction: ${summary.member.totalPoints || 0} pts`}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                setIsPointsModalOpen(true);
+                setPointsAction('deduct');
+                setPointsAmount(10);
+                setPointsReason('');
+                setPointsError(null);
+                setPointsSuccessMsg(null);
+              }}
+              className="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-rose-600 hover:bg-rose-700 text-white shadow-sm transition-all flex items-center gap-1.5"
+            >
+              <span className="font-mono text-base leading-none">−</span>
+              <span>{lang === 0 ? 'سحب / خصم نقاط' : 'Revoke Points'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsPointsModalOpen(true);
+                setPointsAction('add');
+                setPointsAmount(10);
+                setPointsReason('');
+                setPointsError(null);
+                setPointsSuccessMsg(null);
+              }}
+              className="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-purple-600 hover:bg-purple-700 text-white shadow-sm transition-all flex items-center gap-1.5"
+            >
+              <span className="font-mono text-base leading-none">+</span>
+              <span>{lang === 0 ? 'إضافة نقاط' : 'Add Points'}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
     <p className="text-sm text-slate-500">{lang === 0 ? 'السجلات مرتبة حسب معرّف ثابت، وليست حسب التاريخ؛ يشمل ذلك السجلات القديمة التي بلا تاريخ. لا نعيد حساب الرصيد من هذه الصفحة.' : 'Stable record-ID order, not date order; includes legacy records without dates. This page does not recalculate balances.'}</p>
     {error && <AdminError message={error} retry={() => setRevision(value => value + 1)} />}
     {loading && <AdminLoading />}
     {!loading && !error && entries.length === 0 && <p className="rounded-xl border bg-white p-6 text-slate-500">{lang === 0 ? 'لا توجد سجلات في هذا القسم.' : 'No records in this section.'}</p>}
-    <ul className="space-y-3">{entries.map(entry => <li key={entry.id} className="space-y-2 rounded-xl border bg-white p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3"><p className="font-bold">{entry.eventTitle || entry.reason || (lang === 0 ? 'حركة نقاط' : 'Points entry')}</p>{entry.status && <span className="rounded-lg bg-slate-100 px-3 py-1 text-sm">{statuses[entry.status]?.[lang] || entry.status}</span>}{entry.amount !== undefined && <span className={entry.amount >= 0 ? 'font-bold text-green-700' : 'font-bold text-red-700'} dir="ltr">{entry.amount > 0 ? '+' : ''}{entry.amount}</span>}</div>
-      <p className="text-sm text-slate-500">{formatAdminDate(entry.timestamp || entry.issueDate || entry.createdAt, locale)}</p>
-      {entry.balanceBefore !== undefined && entry.balanceAfter !== undefined && <p className="text-sm">{lang === 0 ? 'الرصيد قبل / بعد' : 'Balance before / after'}: {entry.balanceBefore} / {entry.balanceAfter}</p>}
-      {(entry.eventId || entry.sourceEventId) && <Link href={`/admin/events/${encodeURIComponent(entry.eventId || entry.sourceEventId!)}`} className="inline-block text-sm font-bold text-purple-700">{lang === 0 ? 'فتح الفعالية' : 'Open event'}</Link>}
+    <ul className="space-y-3">{entries.map(entry => <li key={entry.id} className="space-y-3 rounded-2xl border bg-white p-4 shadow-sm hover:border-slate-300 transition-all">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="space-y-0.5">
+          <p className="font-bold text-slate-900">{entry.eventTitle || entry.reason || (lang === 0 ? 'حركة نقاط' : 'Points entry')}</p>
+          {entry.reason && entry.eventTitle && (
+            <p className="text-xs text-slate-500">{entry.reason}</p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {entry.status && <span className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-semibold">{statuses[entry.status]?.[lang] || entry.status}</span>}
+          {entry.amount !== undefined && (
+            <span className={`text-base font-bold font-mono px-2.5 py-0.5 rounded-lg ${entry.amount >= 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`} dir="ltr">
+              {entry.amount > 0 ? '+' : ''}{entry.amount}
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+        <span>{formatAdminDate(entry.timestamp || entry.issueDate || entry.createdAt, locale)}</span>
+        {entry.balanceBefore !== undefined && entry.balanceAfter !== undefined && (
+          <span className="font-mono">
+            {lang === 0 ? 'الرصيد: ' : 'Balance: '}
+            {entry.balanceBefore} → <strong>{entry.balanceAfter}</strong>
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+        {(entry.eventId || entry.sourceEventId) ? (
+          <Link href={`/admin/events/${encodeURIComponent(entry.eventId || entry.sourceEventId!)}`} className="inline-block text-xs font-bold text-purple-700 hover:text-purple-900 hover:underline">
+            {lang === 0 ? '← فتح الفعالية' : '← Open event'}
+          </Link>
+        ) : <span />}
+
+        {/* Direct Point Revocation Button on Positive Ledger Entries */}
+        {section === 'points' && summary && !summary.member.isRestricted && entry.amount !== undefined && entry.amount > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              setIsPointsModalOpen(true);
+              setPointsAction('deduct');
+              setPointsAmount(entry.amount || 10);
+              setPointsReason(
+                lang === 0
+                  ? `سحب/إلغاء نقاط (${entry.amount}): ${entry.eventTitle || entry.reason || 'العملية السابقة'}`
+                  : `Revoke points (${entry.amount}): ${entry.eventTitle || entry.reason || 'previous transaction'}`
+              );
+              setPointsError(null);
+              setPointsSuccessMsg(null);
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 shadow-sm transition-all"
+            title={lang === 0 ? 'سحب هذه النقاط من رصيد العضو' : 'Revoke these points from member balance'}
+          >
+            <span className="text-sm font-mono leading-none">−</span>
+            <span>{lang === 0 ? `سحب هذه النقاط (${entry.amount}-)` : `Revoke these points (-${entry.amount})`}</span>
+          </button>
+        )}
+      </div>
     </li>)}</ul>
     {nextCursor && <button disabled={loading} type="button" onClick={() => { setLoading(true); setCursor(nextCursor); }} className="rounded-xl border bg-white px-5 py-3 font-bold disabled:opacity-50">{lang === 0 ? 'تحميل المزيد' : 'Load more'}</button>}
 
@@ -173,7 +302,9 @@ export default function MemberDetail({ id }: { id: string }) {
           <div className="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
             <div>
               <h2 className="text-lg font-bold font-cairo text-slate-900">
-                {lang === 0 ? 'تعديل نقاط العضو' : 'Adjust Member Points'}
+                {pointsAction === 'deduct'
+                  ? (lang === 0 ? 'سحب / خصم نقاط من العضو' : 'Revoke / Deduct Member Points')
+                  : (lang === 0 ? 'إضافة نقاط للعضو' : 'Add Points to Member')}
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
                 {summary?.member.arabicFullName || summary?.member.displayName} ({summary?.member.universityId || summary?.member.email})
@@ -208,6 +339,15 @@ export default function MemberDetail({ id }: { id: string }) {
               <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl">
                 <button
                   type="button"
+                  onClick={() => setPointsAction('deduct')}
+                  className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                    pointsAction === 'deduct' ? 'bg-white text-rose-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {lang === 0 ? '− سحب / خصم نقاط' : '− Deduct Points'}
+                </button>
+                <button
+                  type="button"
                   onClick={() => setPointsAction('add')}
                   className={`py-2 rounded-lg text-xs font-bold transition-all ${
                     pointsAction === 'add' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
@@ -215,26 +355,17 @@ export default function MemberDetail({ id }: { id: string }) {
                 >
                   {lang === 0 ? '+ إضافة نقاط' : '+ Add Points'}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setPointsAction('deduct')}
-                  className={`py-2 rounded-lg text-xs font-bold transition-all ${
-                    pointsAction === 'deduct' ? 'bg-white text-rose-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  {lang === 0 ? '- سحب / خصم نقاط' : '- Deduct Points'}
-                </button>
               </div>
             </div>
 
-            {/* Points Amount */}
+            {/* Points Amount & Quick Presets */}
             <div>
               <div className="flex justify-between items-center mb-1">
                 <label className="text-xs font-bold text-slate-700">
-                  {lang === 0 ? 'عدد النقاط:' : 'Points Amount:'}
+                  {lang === 0 ? 'عدد النقاط المراد خصمها / إضافتها:' : 'Points Amount:'}
                 </label>
                 <span className="text-xs text-slate-500 font-mono">
-                  {lang === 0 ? 'الرصيد الحالي: ' : 'Current balance: '}
+                  {lang === 0 ? 'الرصيد الحالي: ' : 'Current: '}
                   <strong className="text-slate-800">{summary?.member.totalPoints || 0}</strong>
                 </span>
               </div>
@@ -249,13 +380,39 @@ export default function MemberDetail({ id }: { id: string }) {
                 dir="ltr"
                 required
               />
+
+              {/* Quick Preset Buttons */}
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {[5, 10, 15, 20, 25].map(preset => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setPointsAmount(preset)}
+                    className="px-2.5 py-1 text-xs font-mono font-bold rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors"
+                  >
+                    {preset}
+                  </button>
+                ))}
+                {pointsAction === 'deduct' && (summary?.member.totalPoints || 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setPointsAmount(summary?.member.totalPoints || 0)}
+                    className="px-2.5 py-1 text-xs font-bold rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors"
+                  >
+                    {lang === 0 ? `كامل الرصيد (${summary?.member.totalPoints})` : `Full Balance (${summary?.member.totalPoints})`}
+                  </button>
+                )}
+              </div>
+
               {typeof pointsAmount === 'number' && pointsAmount > 0 && summary && (
-                <p className="text-xs text-slate-500 mt-1">
+                <div className={`mt-2 p-2.5 rounded-xl border text-xs font-medium ${
+                  pointsAction === 'deduct' ? 'bg-rose-50/70 border-rose-100 text-rose-800' : 'bg-emerald-50/70 border-emerald-100 text-emerald-800'
+                }`}>
                   {lang === 0 ? 'الرصيد بعد العملية: ' : 'New balance after: '}
-                  <strong className={pointsAction === 'deduct' ? 'text-rose-600' : 'text-emerald-600'}>
-                    {Math.max(0, (summary.member.totalPoints || 0) + (pointsAction === 'deduct' ? -pointsAmount : pointsAmount))}
-                  </strong>
-                </p>
+                  <span className="font-mono font-bold" dir="ltr">
+                    {summary.member.totalPoints || 0} → {Math.max(0, (summary.member.totalPoints || 0) + (pointsAction === 'deduct' ? -pointsAmount : pointsAmount))}
+                  </span>
+                </div>
               )}
             </div>
 
@@ -267,7 +424,7 @@ export default function MemberDetail({ id }: { id: string }) {
               <textarea
                 value={pointsReason}
                 onChange={(e) => setPointsReason(e.target.value)}
-                placeholder={lang === 0 ? (pointsAction === 'deduct' ? 'مثال: إلغاء نقاط حضور بالخطأ أو مخالفة الشروط' : 'مثال: مساهمة متميزة في تنظيم الفعالية') : 'Reason for adjustment'}
+                placeholder={lang === 0 ? (pointsAction === 'deduct' ? 'مثال: إلغاء نقاط حضور بالخطأ أو سحب نقاط فعالية' : 'مثال: مساهمة متميزة في تنظيم الفعالية') : 'Reason for adjustment'}
                 className="w-full px-3.5 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none text-sm"
                 rows={3}
                 required
@@ -287,13 +444,13 @@ export default function MemberDetail({ id }: { id: string }) {
                 type="submit"
                 disabled={pointsSubmitting || !pointsAmount || !pointsReason.trim()}
                 className={`flex-1 px-4 py-2.5 text-white rounded-xl font-bold text-sm transition-colors disabled:opacity-50 ${
-                  pointsAction === 'deduct' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-purple-600 hover:bg-purple-700'
+                  pointsAction === 'deduct' ? 'bg-rose-600 hover:bg-rose-700 shadow-sm' : 'bg-purple-600 hover:bg-purple-700 shadow-sm'
                 }`}
               >
                 {pointsSubmitting
                   ? (lang === 0 ? 'جاري التنفيذ...' : 'Processing...')
                   : pointsAction === 'deduct'
-                  ? (lang === 0 ? 'تأكيد الخصم' : 'Confirm Deduction')
+                  ? (lang === 0 ? 'تأكيد سحب النقاط' : 'Confirm Revocation')
                   : (lang === 0 ? 'تأكيد الإضافة' : 'Confirm Addition')}
               </button>
             </div>

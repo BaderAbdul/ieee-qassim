@@ -57,8 +57,9 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
   const [isUpdatingBulk, setIsUpdatingBulk] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
-  // Points Awarding Modal State
+  // Points Awarding / Deduction Modal State
   const [showPointsModal, setShowPointsModal] = useState(false);
+  const [pointsAction, setPointsAction] = useState<'add' | 'deduct'>('add');
   const [pointsAmount, setPointsAmount] = useState<number>(5);
   const [pointsDesc, setPointsDesc] = useState('');
   const [isAwarding, setIsAwarding] = useState(false);
@@ -244,10 +245,11 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
     if (!selectedIds.length || !Number.isSafeInteger(pointsAmount) || pointsAmount <= 0 || !pointsDesc.trim()) return;
     setIsAwarding(true);
     try {
+      const signedAmount = pointsAction === 'deduct' ? -pointsAmount : pointsAmount;
       const items = registrations.filter(item => selectedIds.includes(item.id));
-      const key = JSON.stringify([items.map(item => item.id).sort(), pointsAmount, pointsDesc.trim()]);
+      const key = JSON.stringify([items.map(item => item.id).sort(), signedAmount, pointsDesc.trim()]);
       if (pointsBatch.current?.key !== key) pointsBatch.current = { key, operationIds: Object.fromEntries(items.map(item => [item.id, crypto.randomUUID()])) };
-      await performJob({ items, points: { amount: pointsAmount, reason: pointsDesc.trim(), operationIds: pointsBatch.current.operationIds } });
+      await performJob({ items, points: { amount: signedAmount, reason: pointsDesc.trim(), operationIds: pointsBatch.current.operationIds } });
       setShowPointsModal(false);
       setSelectedIds([]);
       setPointsDesc('');
@@ -467,10 +469,17 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
           <div className="flex flex-wrap gap-2">
             <button 
               disabled={isUpdatingBulk || isAwarding}
-              onClick={() => { pointsBatch.current = null; setShowPointsModal(true); }}
-              className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition-colors"
+              onClick={() => { pointsBatch.current = null; setPointsAction('add'); setShowPointsModal(true); }}
+              className="bg-yellow-500 hover:bg-yellow-600 text-white px-3.5 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition-colors"
             >
               <Trophy size={16} /> رصد نقاط
+            </button>
+            <button 
+              disabled={isUpdatingBulk || isAwarding}
+              onClick={() => { pointsBatch.current = null; setPointsAction('deduct'); setShowPointsModal(true); }}
+              className="bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition-colors"
+            >
+              <span className="text-base leading-none font-mono">−</span> سحب نقاط
             </button>
             {!isBoothOrWalkIn && (
               <>
@@ -680,10 +689,12 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
       {showPointsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div ref={pointsDialog} role="dialog" aria-modal="true" aria-labelledby="points-dialog-title" className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
-            <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 p-4 flex justify-between items-center text-white">
+            <div className={`p-4 flex justify-between items-center text-white ${
+              pointsAction === 'deduct' ? 'bg-gradient-to-r from-rose-600 to-rose-700' : 'bg-gradient-to-r from-yellow-400 to-yellow-500'
+            }`}>
               <h3 id="points-dialog-title" className="text-xl font-bold font-cairo flex items-center gap-2">
                 <Trophy size={20} />
-                رصد نقاط للمسجلين ({selectedIds.length})
+                {pointsAction === 'deduct' ? `سحب / خصم نقاط (${selectedIds.length})` : `رصد نقاط (${selectedIds.length})`}
               </h3>
               <button disabled={isAwarding} aria-label="إغلاق نافذة النقاط" onClick={() => setShowPointsModal(false)} className="hover:bg-white/20 p-1 rounded-lg transition-colors">
                 <X size={20} />
@@ -691,34 +702,63 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
             </div>
             <form onSubmit={handleAwardPoints} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">عدد النقاط</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1.5">نوع العملية</label>
+                <div className="grid grid-cols-2 gap-2 bg-gray-100 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setPointsAction('add')}
+                    className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                      pointsAction === 'add' ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    + رصد / إضافة نقاط
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPointsAction('deduct')}
+                    className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                      pointsAction === 'deduct' ? 'bg-white text-rose-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    − سحب / خصم نقاط
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">
+                  {pointsAction === 'deduct' ? 'عدد النقاط المراد سحبها' : 'عدد النقاط المراد رصدها'}
+                </label>
                 <input 
                   type="number" 
                   required
                   min="1"
+                  max="100000"
                   value={pointsAmount}
                   onChange={e => setPointsAmount(Number(e.target.value))}
-                  className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-yellow-500 outline-none"
+                  className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-yellow-500 outline-none font-mono font-bold"
+                  dir="ltr"
                 />
               </div>
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">الوصف (يظهر للمستخدم)</label>
+                <label className="block text-sm font-bold text-gray-700 mb-1">السبب / الوصف (يظهر للمستخدم)</label>
                 <input 
                   type="text" 
                   required
-                  placeholder="مثال: حضور الفعالية وتفاعل مميز"
+                  placeholder={pointsAction === 'deduct' ? 'مثال: إلغاء نقاط حضور بالخطأ' : 'مثال: حضور الفعالية وتفاعل مميز'}
                   value={pointsDesc}
                   onChange={e => setPointsDesc(e.target.value)}
-                  className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-yellow-500 outline-none"
+                  className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-yellow-500 outline-none text-sm"
                 />
               </div>
               <div className="flex gap-2 pt-4">
                 <button 
                   type="submit" 
-                  disabled={isAwarding}
-                  className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 rounded-xl disabled:opacity-50 transition-colors"
+                  disabled={isAwarding || !pointsAmount || !pointsDesc.trim()}
+                  className={`flex-1 font-bold py-3 rounded-xl disabled:opacity-50 transition-colors text-white ${
+                    pointsAction === 'deduct' ? 'bg-rose-600 hover:bg-rose-700 shadow-sm' : 'bg-yellow-500 hover:bg-yellow-600 shadow-sm'
+                  }`}
                 >
-                  {isAwarding ? 'جاري الرصد...' : 'رصد النقاط الآن'}
+                  {isAwarding ? (pointsAction === 'deduct' ? 'جاري سحب النقاط...' : 'جاري الرصد...') : (pointsAction === 'deduct' ? 'سحب النقاط الآن' : 'رصد النقاط الآن')}
                 </button>
                 <button 
                   type="button"
