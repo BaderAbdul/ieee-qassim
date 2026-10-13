@@ -41,6 +41,11 @@ export default function AdminStructurePage() {
   const [currentCommittee, setCurrentCommittee] = useState<Committee | null>(null);
   
   const [showMemberModal, setShowMemberModal] = useState<{ committeeId: string } | null>(null);
+  const [editingMember, setEditingMember] = useState<{
+    committeeId: string;
+    memberIndex: number;
+    member: CommitteeMember;
+  } | null>(null);
   const [memberRole, setMemberRole] = useState('عضو');
   const [memberEnglishRole, setMemberEnglishRole] = useState('Member');
   const [memberEnglishName, setMemberEnglishName] = useState('');
@@ -179,6 +184,29 @@ export default function AdminStructurePage() {
     setMemberEnglishName('');
   };
 
+  const handleSaveEditedMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMember) return;
+    const { committeeId, memberIndex, member } = editingMember;
+    const updated = committees.map(c => {
+      if (c.id !== committeeId) return c;
+      const members = [...c.members];
+      members[memberIndex] = {
+        ...members[memberIndex],
+        name: member.name.trim() || 'بدون اسم',
+        role: member.role.trim() || 'عضو',
+        englishName: member.englishName?.trim() || undefined,
+        englishRole: member.englishRole?.trim() || undefined,
+        linkedin: member.linkedin?.trim() || undefined,
+        avatar: member.avatar?.trim() || undefined,
+      };
+      return { ...c, members };
+    });
+    if (await updateCommitteesInDB(updated)) {
+      setEditingMember(null);
+    }
+  };
+
   const handleRemoveMember = async (committeeId: string, userId: string) => {
     if(confirm('هل أنت متأكد من إزالة هذا العضو؟')) {
       const updated = committees.map(c => {
@@ -312,7 +340,30 @@ export default function AdminStructurePage() {
                         <div className="text-xs text-gray-500 truncate">{member.role} {member.englishRole ? `- ${member.englishRole}` : ''}</div>
                       </div>
                     </div>
-                    <button onClick={() => handleRemoveMember(committee.id, member.userId)} className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded transition-colors" title="إزالة العضو"><X size={14} /></button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setEditingMember({
+                          committeeId: committee.id,
+                          memberIndex: memberIdx,
+                          member: { ...member }
+                        })}
+                        className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 p-1.5 rounded transition-colors"
+                        title="تعديل العضو"
+                        aria-label="تعديل بيانات العضو"
+                      >
+                        <Edit2 size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMember(committee.id, member.userId)}
+                        className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded transition-colors"
+                        title="إزالة العضو"
+                        aria-label="إزالة العضو"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
                   </div>
                 ))}
                 {committee.members.length === 0 && (
@@ -419,6 +470,128 @@ export default function AdminStructurePage() {
                 <div className="text-center text-gray-500 py-8 text-sm">لا توجد نتائج مطابقة</div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Member Modal */}
+      {editingMember && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold font-cairo text-gray-900">تعديل بيانات العضو</h2>
+              <button
+                type="button"
+                onClick={() => setEditingMember(null)}
+                className="text-gray-400 hover:text-gray-600 p-1"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleSaveEditedMember} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700">الاسم (عربي / العرض)</label>
+                <input
+                  required
+                  type="text"
+                  value={editingMember.member.name}
+                  onChange={e => setEditingMember({
+                    ...editingMember,
+                    member: { ...editingMember.member, name: e.target.value }
+                  })}
+                  className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700">الاسم بالإنجليزي (English Name)</label>
+                <input
+                  type="text"
+                  value={editingMember.member.englishName || ''}
+                  onChange={e => setEditingMember({
+                    ...editingMember,
+                    member: { ...editingMember.member, englishName: e.target.value }
+                  })}
+                  className="w-full border rounded-lg p-2.5 text-sm text-left focus:ring-2 focus:ring-blue-500 outline-none"
+                  dir="ltr"
+                  placeholder="Ex: Bader Al-Dkhilallah"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">صفة العضو (عربي)</label>
+                  <input
+                    required
+                    type="text"
+                    value={editingMember.member.role}
+                    onChange={e => setEditingMember({
+                      ...editingMember,
+                      member: { ...editingMember.member, role: e.target.value }
+                    })}
+                    className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="مثال: رئيس اللجنة"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">صفة العضو (English)</label>
+                  <input
+                    type="text"
+                    value={editingMember.member.englishRole || ''}
+                    onChange={e => setEditingMember({
+                      ...editingMember,
+                      member: { ...editingMember.member, englishRole: e.target.value }
+                    })}
+                    className="w-full border rounded-lg p-2.5 text-sm text-left focus:ring-2 focus:ring-blue-500 outline-none"
+                    dir="ltr"
+                    placeholder="Ex: Committee Chair"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700">رابط لينكد إن (اختياري)</label>
+                <input
+                  type="url"
+                  value={editingMember.member.linkedin || ''}
+                  onChange={e => setEditingMember({
+                    ...editingMember,
+                    member: { ...editingMember.member, linkedin: e.target.value }
+                  })}
+                  className="w-full border rounded-lg p-2.5 text-sm text-left focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="https://linkedin.com/in/..."
+                  dir="ltr"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700">رابط الصورة الرمزية (اختياري)</label>
+                <input
+                  type="url"
+                  value={editingMember.member.avatar || ''}
+                  onChange={e => setEditingMember({
+                    ...editingMember,
+                    member: { ...editingMember.member, avatar: e.target.value }
+                  })}
+                  className="w-full border rounded-lg p-2.5 text-sm text-left focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="https://..."
+                  dir="ltr"
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setEditingMember(null)}
+                  className="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-bold transition-colors"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-5 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg font-bold text-sm transition-colors flex items-center gap-1.5"
+                >
+                  {saving ? <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" /> : <Save size={16} />}
+                  حفظ التعديلات
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

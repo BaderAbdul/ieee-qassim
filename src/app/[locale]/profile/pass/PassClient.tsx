@@ -84,7 +84,7 @@ export default function PassClient() {
             <div className="bg-white p-4 rounded-3xl shadow-lg w-full max-w-[240px] aspect-square flex items-center justify-center mx-auto mb-6 relative group">
               <div className="absolute inset-0 bg-blue-500/10 rounded-3xl blur-xl group-hover:bg-blue-500/20 transition-colors"></div>
               <QRCodeSVG 
-                value={`ieee-qu-user:${user.uid}`} 
+                value={typeof window !== 'undefined' ? `${window.location.origin}/pass/${user.uid}` : `https://ieeequ.online/pass/${user.uid}`} 
                 size={180}
                 bgColor={"#ffffff"}
                 fgColor={"#0f172a"}
