@@ -148,11 +148,18 @@ export default function CreateEventPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : 
-              type === 'number' ? Number(value) : value
-    }));
+    setFormData(prev => {
+      const next = {
+        ...prev,
+        [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : 
+                type === 'number' ? Number(value) : value
+      };
+      if (name === 'type' && value === 'Booth') {
+        next.requiresRegistration = false;
+        next.isUnlimitedCapacity = true;
+      }
+      return next;
+    });
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -199,6 +206,7 @@ export default function CreateEventPage() {
         requiresRegistration: formData.requiresRegistration,
         isUnlisted: formData.isUnlisted,
         registrationMode: formData.registrationMode,
+        state: (formData.type === 'Booth' || !formData.requiresRegistration) ? 'Ongoing' : 'Draft',
         coverUrl: formData.coverUrl,
         gains: formData.gains.split('\n').filter(g => g.trim()),
         gainsEn: formData.gainsEn.split('\n').filter(g => g.trim()),

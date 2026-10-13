@@ -7,10 +7,13 @@ import { audit } from './audit';
 
 const states = ['Draft', 'Published', 'Registration Open', 'Registration Closed', 'Ongoing', 'Completed', 'Archived'] as const;
 const transitions: Record<EventState, readonly EventState[]> = {
-  Draft: ['Published', 'Archived'], Published: ['Draft', 'Registration Open', 'Archived'],
-  'Registration Open': ['Registration Closed', 'Ongoing', 'Archived'],
-  'Registration Closed': ['Registration Open', 'Ongoing', 'Archived'],
-  Ongoing: ['Completed'], Completed: ['Archived'], Archived: [],
+  Draft: ['Published', 'Registration Open', 'Ongoing', 'Archived'],
+  Published: ['Draft', 'Registration Open', 'Ongoing', 'Archived'],
+  'Registration Open': ['Draft', 'Published', 'Registration Closed', 'Ongoing', 'Archived'],
+  'Registration Closed': ['Registration Open', 'Ongoing', 'Completed', 'Archived'],
+  Ongoing: ['Registration Open', 'Completed', 'Archived'],
+  Completed: ['Ongoing', 'Archived'],
+  Archived: ['Draft', 'Published', 'Registration Open', 'Ongoing', 'Completed'],
 };
 const dateString = (value: unknown): string | undefined => {
   const date = value instanceof Timestamp ? value.toDate() : value instanceof Date ? value : typeof value === 'string' ? new Date(value) : null;

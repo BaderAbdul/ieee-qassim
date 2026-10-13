@@ -45,13 +45,13 @@ import {
 } from '@/lib/customEventTemplates';
 
 const transitions: Record<EventState, EventState[]> = {
-  Draft: ['Published', 'Archived'],
-  Published: ['Draft', 'Registration Open', 'Archived'],
-  'Registration Open': ['Registration Closed', 'Ongoing', 'Archived'],
-  'Registration Closed': ['Registration Open', 'Ongoing', 'Archived'],
-  Ongoing: ['Completed'],
-  Completed: ['Archived'],
-  Archived: [],
+  Draft: ['Published', 'Registration Open', 'Ongoing', 'Archived'],
+  Published: ['Draft', 'Registration Open', 'Ongoing', 'Archived'],
+  'Registration Open': ['Published', 'Registration Closed', 'Ongoing', 'Archived'],
+  'Registration Closed': ['Registration Open', 'Ongoing', 'Completed', 'Archived'],
+  Ongoing: ['Registration Open', 'Completed', 'Archived'],
+  Completed: ['Ongoing', 'Archived'],
+  Archived: ['Draft', 'Published', 'Registration Open', 'Ongoing', 'Completed'],
 };
 
 const stateBadgeColors: Record<EventState, { bg: string; text: string; border: string }> = {
@@ -559,20 +559,32 @@ export default function AdminEventsPage() {
 
                   {/* Status Transition Selector */}
                   {transitions[event.state]?.length ? (
-                    <select
-                      aria-label={isAr ? `تغيير حالة ${event.title}` : `Change ${event.title} state`}
-                      value={event.state}
-                      disabled={busy !== null}
-                      onChange={e => void changeState(event, e.target.value as EventState)}
-                      className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
-                    >
-                      <option value={event.state}>{eventStateLabel(event.state, isAr)}</option>
-                      {transitions[event.state].map(st => (
-                        <option key={st} value={st}>
-                          {eventStateLabel(st, isAr)}
+                    <div className="flex items-center gap-1.5">
+                      <select
+                        aria-label={isAr ? `تغيير حالة ${event.title}` : `Change ${event.title} state`}
+                        value={event.state}
+                        disabled={busy !== null}
+                        onChange={e => void changeState(event, e.target.value as EventState)}
+                        className={`rounded-xl border px-2.5 py-1.5 text-xs font-bold focus:ring-2 focus:ring-purple-500 disabled:opacity-50 transition-all ${
+                          event.state === 'Archived'
+                            ? 'border-amber-300 bg-amber-50 text-amber-900 shadow-xs hover:bg-amber-100'
+                            : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                        }`}
+                      >
+                        <option value={event.state}>
+                          {event.state === 'Archived'
+                            ? (isAr ? '📦 مؤرشفة (اختر للاستعادة)' : '📦 Archived (select to restore)')
+                            : eventStateLabel(event.state, isAr)}
                         </option>
-                      ))}
-                    </select>
+                        {transitions[event.state].map(st => (
+                          <option key={st} value={st}>
+                            {event.state === 'Archived'
+                              ? (isAr ? `🔄 استعادة إلى: ${eventStateLabel(st, isAr)}` : `🔄 Restore to: ${st}`)
+                              : eventStateLabel(st, isAr)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   ) : (
                     <span className="text-xs text-slate-400">
                       {isAr ? 'مؤرشفة' : 'Archived'}

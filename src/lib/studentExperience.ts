@@ -18,10 +18,13 @@ export function normalizeStudentId(value: string): string {
 }
 
 const eventStates: Record<string, [string, string]> = {
-  Draft: ['مسودة', 'Draft'], Published: ['التسجيل قريبًا', 'Registration soon'],
+  Draft: ['مسودة', 'Draft'],
+  Published: ['قريبًا (لم يفتح التسجيل بعد)', 'Coming soon (Registration not open)'],
   'Registration Open': ['التسجيل مفتوح', 'Registration open'],
   'Registration Closed': ['التسجيل مغلق', 'Registration closed'],
-  Ongoing: ['جارية', 'Ongoing'], Completed: ['مكتملة', 'Completed'], Archived: ['مؤرشفة', 'Archived'],
+  Ongoing: ['جارية', 'Ongoing'],
+  Completed: ['مكتملة', 'Completed'],
+  Archived: ['مؤرشفة', 'Archived'],
 };
 const eventTypes: Record<string, [string, string]> = {
   Workshop: ['ورشة عمل', 'Workshop'], Camp: ['معسكر', 'Camp'], Lecture: ['محاضرة', 'Lecture'],

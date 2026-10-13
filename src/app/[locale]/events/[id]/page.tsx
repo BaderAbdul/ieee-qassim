@@ -372,7 +372,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                                 <span>{t('registering')}</span>
                               </>
                             ) : event.state === 'Published' ? (
-                              isAr ? 'التسجيل قريباً' : 'Registration Soon'
+                              isAr ? 'قريبًا (لم يفتح التسجيل بعد)' : 'Coming Soon (Registration Not Open)'
                             ) : !isRegistrationOpen ? (
                               t('registrationClosed')
                             ) : isFull ? (

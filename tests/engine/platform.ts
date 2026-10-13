@@ -766,6 +766,8 @@ export class IEEEPlatformClient {
           universityId: student?.universityId,
         });
       }
+      const curAtt = Number(eventData.attendanceCount) || 0;
+      tx.update(eventRef, { attendanceCount: curAtt + 1 });
 
       const pointsToAward = typeof eventData.points === 'number' ? eventData.points : 0;
       if (pointsToAward > 0) {
@@ -845,6 +847,8 @@ export class IEEEPlatformClient {
         repairedCount++;
       }
     }
+
+    await this.db.collection('events').doc(eventId).update({ attendanceCount: logs.length });
 
     return { status: 'success', repairedCount, totalAttendance: logs.length };
   }

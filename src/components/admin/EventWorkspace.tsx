@@ -11,7 +11,15 @@ import { AdminError, AdminLoading } from './AdminData';
 
 const EventContext = createContext<PlatformEvent | null>(null);
 export const useAdminEvent = () => useContext(EventContext);
-const arabicStates: Record<EventState, string> = { Draft: 'مسودة', Published: 'منشورة', 'Registration Open': 'التسجيل مفتوح', 'Registration Closed': 'التسجيل مغلق', Ongoing: 'جارية', Completed: 'مكتملة', Archived: 'مؤرشفة' };
+const arabicStates: Record<EventState, string> = {
+  Draft: 'مسودة',
+  Published: 'قريبًا (لم يفتح التسجيل)',
+  'Registration Open': 'التسجيل مفتوح',
+  'Registration Closed': 'التسجيل مغلق',
+  Ongoing: 'جارية',
+  Completed: 'مكتملة',
+  Archived: 'مؤرشفة',
+};
 export const eventStateLabel = (state: EventState, isAr: boolean) => isAr ? arabicStates[state] || state : state;
 
 export default function EventWorkspace({ children }: { children: React.ReactNode }) {

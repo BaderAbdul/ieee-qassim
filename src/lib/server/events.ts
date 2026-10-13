@@ -1,4 +1,5 @@
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
+import type { EventState } from '../types';
 import { ApiError } from './errors';
 import { documentId } from './lifecycle';
 import { audit } from './audit';
@@ -42,7 +43,14 @@ export async function saveEvent(actorUid: string, input: Record<string, unknown>
     if (!date || !Number.isFinite(date.getTime())) throw new ApiError('invalid-argument', 'Invalid event date.');
     const update = { ...Object.fromEntries(fields.filter(field => data[field] !== undefined).map(field => [field, data[field]])), date: Timestamp.fromDate(date), updatedAt: FieldValue.serverTimestamp(), updatedBy: actorUid };
     if (snap.exists) tx.update(ref, update);
-    else tx.create(ref, { ...update, state: 'Draft', registeredCount: 0, attendanceCount: 0, createdAt: FieldValue.serverTimestamp(), createdBy: actorUid });
+    else {
+      const allowedStates: readonly EventState[] = ['Draft', 'Published', 'Registration Open', 'Registration Closed', 'Ongoing', 'Completed', 'Archived'];
+      const defaultState = (data.type === 'Booth' || data.requiresRegistration === false) ? 'Ongoing' : 'Draft';
+      const initialState = (typeof input.state === 'string' && allowedStates.includes(input.state as EventState))
+        ? (input.state as EventState)
+        : defaultState;
+      tx.create(ref, { ...update, state: initialState, registeredCount: 0, attendanceCount: 0, createdAt: FieldValue.serverTimestamp(), createdBy: actorUid });
+    }
     audit(tx, snap.exists ? 'event.update' : 'event.create', actorUid, ref.id, { fields: fields.filter(field => input[field] !== undefined) });
     return { status: 'success', eventId: ref.id };
   });
