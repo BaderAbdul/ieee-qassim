@@ -12,7 +12,29 @@ npm ci --prefix functions
 npm run dev
 ```
 
-Configure the Firebase public values listed in CLOUD_FUNCTIONS_REPORT.md in .env.local. Never commit secret keys. The hosted privileged homepage read path optionally uses private Admin credentials.
+Configure Firebase in `.env.local` in the repository root. The `NEXT_PUBLIC_FIREBASE_*` settings configure the browser. The authenticated server endpoints (including admin events, registration, attendance and ratings) also require these private settings when connecting to your existing Firebase project:
+
+```dotenv
+FIREBASE_PROJECT_ID="project_id from the service-account JSON"
+FIREBASE_CLIENT_EMAIL="client_email from the service-account JSON"
+FIREBASE_PRIVATE_KEY="private_key from the service-account JSON, with escaped newlines"
+```
+
+Use a service account from the same project as `NEXT_PUBLIC_FIREBASE_PROJECT_ID`. Obtain it from Firebase Console → Project settings → Service accounts → Firebase Admin SDK. Keep these values server-only: never prefix them with `NEXT_PUBLIC_`, commit the JSON key, or share it in chat. Restart the development server after changing `.env.local`. Public Firebase configuration alone cannot authenticate the server endpoints; missing server credentials produce `Server configuration is unavailable.`
+
+For isolated local development without private credentials, enable the demo Firebase emulators instead. All settings below must be configured together; do not combine a live project ID with emulator settings:
+
+```dotenv
+NEXT_PUBLIC_FIREBASE_API_KEY=demo-build-key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=demo-ieee-qu.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-ieee-qu
+NEXT_PUBLIC_FIREBASE_APP_ID=demo-build-app
+NEXT_PUBLIC_FIREBASE_EMULATORS=true
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
+FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099
+```
+
+With Java 21 installed, start `npx firebase emulators:start --project demo-ieee-qu --only auth,firestore` in one terminal. In another, run `node --env-file=.env.local scripts/seed-demo.mjs` followed by `npm run dev`. Open `/ar/dev-signin` to sign in with a seeded demo account. This demo sign-in page is available only in development with an explicitly configured demo project.
 
 ## Verification
 

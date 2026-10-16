@@ -16,6 +16,10 @@ The badge-history range query runs outside the critical transaction. Its advisor
 
 Only organizer screens and completed public events subscribe to shard changes. Admin lists/overview use sum aggregation. Each student listens to at most one of their own pending feedback tasks, rather than all attendees. Camera scanning stays open, pauses during confirmation, and suppresses repeated detection of the same QR.
 
+The admin event list loads a bounded page of 25 events and their aggregated counters through the authenticated `getAdminEvents` API. The server checks the organizer role before using the Admin SDK; browser permission to read attendance shards is not required for this list. Dates are returned as ISO strings and pagination uses document IDs. Public live totals and the required-feedback listener still need the deployed Firestore rules and indexes below.
+
+`EventCard` is a client entry point because it calls the live attendance hook. Verify the landing page with populated events after builds; an empty event collection does not exercise this server/client boundary. The Firebase regression test named `Admin event list` explicitly denies browser shard reads and checks the authenticated list, totals, date serialization, pagination, and authorization.
+
 ## Deployment
 
 1. Deploy `firestore.rules` and `firestore.indexes.json` to the configured Firebase project, and wait for the new `pending_checkins(userId, status)` index to be ready.

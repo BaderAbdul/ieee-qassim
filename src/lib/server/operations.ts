@@ -1,6 +1,6 @@
-import { AggregateField, FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
-import type { AdminOverview, EventReport } from '../adminTypes';
-import type { EventState } from '../types';
+import { AggregateField, FieldPath, FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
+import type { AdminEventsPage, AdminOverview, EventReport } from '../adminTypes';
+import type { EventState, PlatformEvent } from '../types';
 import { ApiError } from './errors';
 import { documentId } from './lifecycle';
 import { audit } from './audit';
@@ -20,6 +20,25 @@ const dateString = (value: unknown): string | undefined => {
   return date && Number.isFinite(date.getTime()) ? date.toISOString() : undefined;
 };
 const count = async (query: FirebaseFirestore.Query) => (await query.count().get()).data().count;
+
+export async function getAdminEvents(input: Record<string, unknown>): Promise<AdminEventsPage> {
+  let query = getFirestore().collection('events').orderBy(FieldPath.documentId()).limit(26);
+  if (input.cursor !== undefined) query = query.startAfter(documentId(input.cursor, 'cursor'));
+  const snapshot = await query.get();
+  const page = snapshot.docs.slice(0, 25);
+  // Privileged reads stay behind requireAdmin, including the new counter subcollection.
+  // A web deployment can safely precede the matching Firestore rules deployment.
+  const events = await Promise.all(page.map(async doc => {
+    const data = doc.data() as PlatformEvent;
+    const shards = await doc.ref.collection('attendance_shards').aggregate({ count: AggregateField.sum('count') }).get();
+    return {
+      ...data, id: doc.id,
+      date: dateString(data.date), createdAt: dateString(data.createdAt), updatedAt: dateString(data.updatedAt),
+      attendanceCount: Math.max(0, (Number(data.attendanceCount) || 0) + (Number(shards.data().count) || 0)),
+    } as PlatformEvent;
+  }));
+  return { events, nextCursor: snapshot.size > 25 ? page.at(-1)!.id : null };
+}
 
 export async function getAdminOverview(): Promise<AdminOverview> {
   const db = getFirestore();

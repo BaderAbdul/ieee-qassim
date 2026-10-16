@@ -1,4 +1,6 @@
-import type { EventState } from './types';
+import type { EventState, PlatformEvent } from './types';
+
+export interface AdminEventsPage { events: PlatformEvent[]; nextCursor: string | null }
 
 export interface AdminEventSummary {
   id: string; title: string; titleEn?: string; state: EventState; date?: string;
