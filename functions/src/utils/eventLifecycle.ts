@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import * as functions from 'firebase-functions/v1';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 
@@ -95,12 +96,13 @@ export async function recordAttendance(input: AttendanceInput) {
   const regRef = db.collection('registrations').doc(`${eventId}_${documentId(userId, 'userId')}`);
   const logRef = db.collection('attendance_logs').doc(`${eventId}_${userId}`);
   const pointRef = db.collection('point_transactions').doc(`attendance_${eventId}_${userId}`);
+  // Badge history is advisory; keep range-query locks out of the admission transaction.
+  const pastAttendance = await db.collection('attendance_logs').where('userId', '==', userId).limit(4).get();
   return db.runTransaction(async tx => {
     const eventSnap = await tx.get(eventRef);
-    const [regSnap, logSnap, pointSnap, userSnap, secretSnap, pastAttendance] = await Promise.all([
+    const [regSnap, logSnap, pointSnap, userSnap, secretSnap] = await Promise.all([
       tx.get(regRef), tx.get(logRef), tx.get(pointRef), tx.get(db.collection('users').doc(userId)),
       tx.get(db.collection('event_secrets').doc(eventId)),
-      tx.get(db.collection('attendance_logs').where('userId', '==', userId).limit(4)),
     ]);
     const event = eventSnap.data();
     if (!event) throw new functions.https.HttpsError('not-found', 'Event not found.');
@@ -112,7 +114,7 @@ export async function recordAttendance(input: AttendanceInput) {
     if (!regSnap.exists || !['approved', 'attended'].includes(regSnap.data()?.status)) throw new functions.https.HttpsError('failed-precondition', 'An approved registration is required.');
     if (logSnap.exists) return { status: 'already_checked_in', userId, awardedPoints: 0 };
 
-    const feedback = input.feedback;
+    const feedback = input.admin ? undefined : input.feedback;
     if (feedback) {
       if (!Number.isFinite(feedback.rating) || feedback.rating! < 1 || feedback.rating! > 5) throw new functions.https.HttpsError('invalid-argument', 'Invalid rating.');
       for (const [key, value] of Object.entries(feedback.answers || {})) {
@@ -129,7 +131,9 @@ export async function recordAttendance(input: AttendanceInput) {
     tx.update(db.collection('users').doc(userId), { badges: FieldValue.arrayUnion(...badges) });
     tx.create(logRef, { eventId, userId, timestamp: FieldValue.serverTimestamp(), verifiedByAdmin: input.admin ? actorUid : false });
     tx.update(regRef, { status: 'attended', attended: true, attendedAt: FieldValue.serverTimestamp() });
-    tx.update(eventRef, { attendanceCount: FieldValue.increment(1) });
+    const shard = String(createHash('sha256').update(userId).digest()[0] % 64);
+    tx.set(eventRef.collection('attendance_shards').doc(shard), { count: FieldValue.increment(1) }, { merge: true });
+    tx.set(db.collection('pending_checkins').doc(`${eventId}_${userId}`), { eventId, userId, eventTitle: event.title, eventTitleEn: event.titleEn || null, points, feedbackQuestions: event.feedbackQuestions || [], attendanceRecorded: true, status: feedback ? 'completed' : 'pending', scannedAt: FieldValue.serverTimestamp() });
     if (feedback) tx.set(db.collection('event_feedback').doc(`${eventId}_${userId}`), { eventId, userId, userEmail: userSnap.data()?.email || '', rating: feedback.rating, answers: feedback.answers || {}, createdAt: FieldValue.serverTimestamp() });
     if (points > 0 && !pointSnap.exists) tx.create(pointRef, { userId, amount: points, source: 'attendance', reason: `Attendance: ${event.title || eventId}`, sourceEventId: eventId, createdBy: input.admin ? actorUid : 'system', createdAt: FieldValue.serverTimestamp() });
     return { status: 'success', userId, awardedPoints: pointSnap.exists ? 0 : points };

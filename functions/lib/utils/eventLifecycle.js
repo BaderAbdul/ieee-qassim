@@ -37,6 +37,7 @@ exports.hasCapacity = exports.reserved = void 0;
 exports.documentId = documentId;
 exports.changeRegistration = changeRegistration;
 exports.recordAttendance = recordAttendance;
+const node_crypto_1 = require("node:crypto");
 const functions = __importStar(require("firebase-functions/v1"));
 const firestore_1 = require("firebase-admin/firestore");
 function documentId(value, label) {
@@ -134,13 +135,14 @@ async function recordAttendance(input) {
     const regRef = db.collection('registrations').doc(`${eventId}_${documentId(userId, 'userId')}`);
     const logRef = db.collection('attendance_logs').doc(`${eventId}_${userId}`);
     const pointRef = db.collection('point_transactions').doc(`attendance_${eventId}_${userId}`);
+    // Badge history is advisory; keep range-query locks out of the admission transaction.
+    const pastAttendance = await db.collection('attendance_logs').where('userId', '==', userId).limit(4).get();
     return db.runTransaction(async (tx) => {
         var _a, _b, _c, _d, _e;
         const eventSnap = await tx.get(eventRef);
-        const [regSnap, logSnap, pointSnap, userSnap, secretSnap, pastAttendance] = await Promise.all([
+        const [regSnap, logSnap, pointSnap, userSnap, secretSnap] = await Promise.all([
             tx.get(regRef), tx.get(logRef), tx.get(pointRef), tx.get(db.collection('users').doc(userId)),
             tx.get(db.collection('event_secrets').doc(eventId)),
-            tx.get(db.collection('attendance_logs').where('userId', '==', userId).limit(4)),
         ]);
         const event = eventSnap.data();
         if (!event)
@@ -158,7 +160,7 @@ async function recordAttendance(input) {
             throw new functions.https.HttpsError('failed-precondition', 'An approved registration is required.');
         if (logSnap.exists)
             return { status: 'already_checked_in', userId, awardedPoints: 0 };
-        const feedback = input.feedback;
+        const feedback = input.admin ? undefined : input.feedback;
         if (feedback) {
             if (!Number.isFinite(feedback.rating) || feedback.rating < 1 || feedback.rating > 5)
                 throw new functions.https.HttpsError('invalid-argument', 'Invalid rating.');
@@ -180,7 +182,9 @@ async function recordAttendance(input) {
         tx.update(db.collection('users').doc(userId), { badges: firestore_1.FieldValue.arrayUnion(...badges) });
         tx.create(logRef, { eventId, userId, timestamp: firestore_1.FieldValue.serverTimestamp(), verifiedByAdmin: input.admin ? actorUid : false });
         tx.update(regRef, { status: 'attended', attended: true, attendedAt: firestore_1.FieldValue.serverTimestamp() });
-        tx.update(eventRef, { attendanceCount: firestore_1.FieldValue.increment(1) });
+        const shard = String((0, node_crypto_1.createHash)('sha256').update(userId).digest()[0] % 64);
+        tx.set(eventRef.collection('attendance_shards').doc(shard), { count: firestore_1.FieldValue.increment(1) }, { merge: true });
+        tx.set(db.collection('pending_checkins').doc(`${eventId}_${userId}`), { eventId, userId, eventTitle: event.title, eventTitleEn: event.titleEn || null, points, feedbackQuestions: event.feedbackQuestions || [], attendanceRecorded: true, status: feedback ? 'completed' : 'pending', scannedAt: firestore_1.FieldValue.serverTimestamp() });
         if (feedback)
             tx.set(db.collection('event_feedback').doc(`${eventId}_${userId}`), { eventId, userId, userEmail: ((_e = userSnap.data()) === null || _e === void 0 ? void 0 : _e.email) || '', rating: feedback.rating, answers: feedback.answers || {}, createdAt: firestore_1.FieldValue.serverTimestamp() });
         if (points > 0 && !pointSnap.exists)

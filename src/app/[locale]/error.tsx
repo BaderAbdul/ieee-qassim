@@ -7,10 +7,10 @@ import { Link } from '@/i18n/routing';
 
 export default function RootErrorBoundary({
   error,
-  reset,
+  retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry: () => void;
 }) {
   const locale = useLocale();
   const isAr = locale === 'ar';
@@ -44,7 +44,7 @@ export default function RootErrorBoundary({
 
         <div className="flex flex-col sm:flex-row gap-3 pt-2">
           <button
-            onClick={() => reset()}
+            onClick={() => retry()}
             className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-6 rounded-xl shadow-md shadow-blue-500/20 transition-all transform hover:-translate-y-0.5 cursor-pointer"
           >
             <RefreshCw className="h-4 w-4" />

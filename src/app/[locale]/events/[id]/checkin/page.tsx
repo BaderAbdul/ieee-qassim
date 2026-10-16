@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, use, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { db, functions } from '@/lib/firebase/client';
 import { httpsCallable } from '@/lib/backend';
@@ -9,23 +9,24 @@ import { useSearchParams } from 'next/navigation';
 import { Link } from '@/i18n/routing';
 import { CheckCircle, XCircle, Loader2, Star, Sparkles, Award, Send } from 'lucide-react';
 import { PlatformEvent } from '@/lib/types';
-import { registrationLabel } from '@/lib/studentExperience';
+import { useFeedbackDraft } from '@/lib/useFeedbackDraft';
+import { FeedbackPageFrame } from '@/components/events/RequiredFeedbackDialog';
+import { eventCache } from '@/lib/eventCache';
 
 export default function SelfCheckinPage({ params }: { params: Promise<{ id: string; locale: string }> }) {
   const { id: eventId, locale } = use(params);
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
-  const feedbackMode = searchParams.get('feedback') === '1';
+  const [feedbackMode, setFeedbackMode] = useState(searchParams.get('feedback') === '1');
   const { user, login, loading: authLoading } = useAuth();
   const isAr = locale === 'ar';
 
-  const [event, setEvent] = useState<PlatformEvent | null>(null);
-  const [eventLoading, setEventLoading] = useState(true);
+  const [event, setEvent] = useState<PlatformEvent | null>(() => eventCache.get(eventId) || null);
+  const [eventLoading, setEventLoading] = useState(() => !eventCache.has(eventId));
 
   // Form states
-  const [rating, setRating] = useState<number>(0);
+  const { rating, setRating, answers, setAnswers, clearDraft } = useFeedbackDraft(user ? `feedback:${user.uid}:${eventId}` : null);
   const [hoverRating, setHoverRating] = useState<number>(0);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // View status
@@ -38,13 +39,51 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
   const [formError, setFormError] = useState('');
   const [awardedPoints, setAwardedPoints] = useState<number>(0);
 
+  const attendanceRequest = useRef<{ key: string; promise: Promise<unknown> } | null>(null);
+  const ensureAttendance = useCallback(() => {
+    if (!token || !user) return Promise.resolve();
+    const key = `${eventId}:${user.uid}:${token}`;
+    if (attendanceRequest.current?.key === key) return attendanceRequest.current.promise;
+    const promise = httpsCallable(functions, 'submitCheckIn')({ eventId, token }).then(result => {
+      setFeedbackMode(true);
+      return result;
+    }).catch(error => { attendanceRequest.current = null; throw error; });
+    attendanceRequest.current = { key, promise };
+    return promise;
+  }, [eventId, token, user]);
+
+  // Confirmation runs behind the visible, editable rating form.
+  useEffect(() => {
+    if (!token || !user) return;
+    let active = true;
+    void ensureAttendance().catch(() => {
+      if (active) setFormError(isAr ? 'لم يتأكد الحضور بعد. اضغط إرسال لإعادة المحاولة؛ إجاباتك محفوظة.' : 'Attendance is not confirmed yet. Submit to retry; your answers are kept.');
+    });
+    return () => { active = false; };
+  }, [ensureAttendance, token, user, isAr]);
+
+  // Opening the instruction link after a manual scan should still expose feedback.
+  useEffect(() => {
+    if (!user || token || feedbackMode) return;
+    let active = true;
+    void getDoc(doc(db, 'registrations', `${eventId}_${user.uid}`)).then(registration => {
+      if (active && registration.data()?.status === 'attended') {
+        setFeedbackMode(true);
+        setStatus('idle_form');
+      }
+    }).catch(() => { /* Instruction page remains available if this optional lookup fails. */ });
+    return () => { active = false; };
+  }, [user, token, feedbackMode, eventId]);
+
   // Fetch Event Details
   useEffect(() => {
     const fetchEvent = async () => {
       try {
         const evSnap = await getDoc(doc(db, 'events', eventId));
         if (evSnap.exists()) {
-          setEvent({ id: evSnap.id, ...evSnap.data() } as PlatformEvent);
+          const current = { id: evSnap.id, ...evSnap.data() } as PlatformEvent;
+          eventCache.set(eventId, current);
+          setEvent(current);
         } else { setStatus('error'); setErrorMessage(isAr ? 'هذه الفعالية غير متاحة.' : 'This event is unavailable.'); }
       } catch (err) {
         console.error("Error loading event for check-in", err);
@@ -57,22 +96,16 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
   }, [eventId, isAr]);
 
   useEffect(() => {
-    if (!feedbackMode || !user) return;
+    if (token || !feedbackMode || !user) return;
     let active = true;
-    void Promise.all([
-      getDoc(doc(db, 'registrations', `${eventId}_${user.uid}`)),
-      getDoc(doc(db, 'event_feedback', `${eventId}_${user.uid}`)),
-    ]).then(([registration, feedback]) => {
-      if (!active) return;
-      if (!registration.exists() || registration.data().status !== 'attended') {
-        setStatus('error');
-        setErrorMessage(isAr ? `التقييم متاح بعد تأكيد الحضور. حالتك: ${registrationLabel(registration.data()?.status || 'pending', true)}` : 'Feedback is available after attendance is confirmed.');
-      } else if (feedback.exists()) {
-        setRating(feedback.data().rating || 0); setAnswers(feedback.data().answers || {});
+    // Authorization is enforced by the feedback endpoint; avoid a redundant registration read.
+    void getDoc(doc(db, 'event_feedback', `${eventId}_${user.uid}`)).then(feedback => {
+      if (active && feedback.exists()) {
+        setRating(feedback.data().rating || 5); setAnswers(feedback.data().answers || {});
       }
-    }).catch(() => { if (active) { setStatus('error'); setErrorMessage(isAr ? 'تعذر تحميل التقييم السابق. أعد المحاولة.' : 'Could not load previous feedback. Retry.'); } });
+    }).catch(() => { /* The editable draft remains usable; submission validates eligibility. */ });
     return () => { active = false; };
-  }, [feedbackMode, user, eventId, isAr]);
+  }, [token, feedbackMode, user, eventId, setRating, setAnswers]);
 
   const handleSelectChoice = (questionId: string, value: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }));
@@ -92,7 +125,7 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
 
   const handleConfirmCheckin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if ((!token && !feedbackMode) || !user || isSubmitting) return;
+    if ((!feedbackMode && !token) || !user || isSubmitting || eventLoading) return;
     setFormError('');
     if (rating < 1 || rating > 5) { setFormError(isAr ? 'اختر تقييمك من نجمة إلى خمس نجوم.' : 'Choose a rating from one to five stars.'); return; }
 
@@ -110,7 +143,8 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
     setStatus('submitting');
 
     try {
-      const submitCheckInFn = httpsCallable(functions, feedbackMode ? 'submitEventFeedback' : 'submitCheckIn');
+      await ensureAttendance();
+      const submitCheckInFn = httpsCallable(functions, 'submitEventFeedback');
       const response = await submitCheckInFn({
         eventId,
         ...(feedbackMode ? {} : { token }),
@@ -120,6 +154,7 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
         }
       });
 
+      clearDraft();
       const result = response.data as { status?: string; message?: string; awardedPoints?: number };
 
       if (result.status === 'already_checked_in') {
@@ -130,29 +165,17 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
       }
     } catch (error) {
       console.error('Check-in failed', error);
-      setStatus('error');
-      setErrorMessage(isAr
-        ? 'تعذر تسجيل الحضور. تأكد من قبول تسجيلك وصلاحية الرابط ثم أعد المحاولة أو تواصل مع المنظم.'
-        : 'Check-in failed. Check your approval and link, then retry or contact the organizer.');
-      if (feedbackMode) setErrorMessage(isAr ? 'تعذر حفظ التقييم. أعد المحاولة أو تواصل مع المنظم.' : 'Could not save feedback. Retry or contact the organizer.');
+      setStatus('idle_form');
+      setFormError(isAr ? 'تعذر حفظ التقييم. إجاباتك محفوظة؛ أعد الإرسال.' : 'Could not save feedback. Your answers are kept; submit again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (authLoading || eventLoading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full text-center">
-          <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-slate-600 font-bold text-sm">{isAr ? 'جاري تجهيز صفحة التحضير...' : 'Loading check-in page...'}</p>
-        </div>
-      </div>
-    );
-  }
 
+  const requiresRating = status !== 'success' && (!!token || feedbackMode) && (!!user || authLoading);
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+    <FeedbackPageFrame required={requiresRating} eventId={eventId}>
       <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full text-center">
         {status === 'instructions' && <div className="space-y-4 text-start">
           <h1 className="text-2xl font-bold text-slate-900">{isAr ? 'كيف تسجل حضورك؟' : 'How do you check in?'}</h1>
@@ -180,13 +203,13 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
           </div>
         )}
 
-        {user && (status === 'idle_form' || status === 'submitting') && (
+        {(user || authLoading) && (status === 'idle_form' || status === 'submitting') && (
           <form onSubmit={handleConfirmCheckin} className="text-start">
             {/* Header & Event info */}
             <div className="text-center mb-6">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 text-blue-700 text-xs font-bold mb-3 border border-blue-100">
                 <Sparkles className="w-3.5 h-3.5" />
-                {feedbackMode ? (isAr ? 'تقييم الفعالية' : 'Event feedback') : (isAr ? 'التحضير السريع والانطباع' : 'Check-in & feedback')}
+                {feedbackMode ? (isAr ? 'تم تسجيل الحضور — التقييم مطلوب' : 'Attendance recorded — feedback required') : (isAr ? 'التحضير السريع والانطباع' : 'Check-in & feedback')}
               </div>
               <h2 className="text-2xl font-black text-slate-900 font-cairo mb-1">
                 {(isAr ? event?.title : event?.titleEn || event?.title) || (isAr ? 'تحضير الفعالية' : 'Event Check-in')}
@@ -239,6 +262,7 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
               </div>
             </div>
 
+            {eventLoading && <p role="status" className="mb-4 text-sm text-slate-500">{isAr ? 'جاري تحميل أسئلة الفعالية؛ يمكنك تعديل النجوم الآن.' : 'Loading event questions; you can adjust your stars now.'}</p>}
             {/* 2. Custom Configured Questions */}
             {event?.feedbackQuestions && event.feedbackQuestions.length > 0 && (
               <div className="space-y-4 mb-6">
@@ -311,7 +335,7 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
             {/* Submit Action */}
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || eventLoading || !user}
               className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-3.5 px-6 rounded-2xl font-black shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
             >
               {isSubmitting ? (
@@ -388,15 +412,15 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
               {errorMessage}
             </p>
             <button onClick={() => { setStatus('idle_form'); setErrorMessage(''); }} className="mb-3 w-full rounded-xl bg-blue-600 text-white p-3 font-bold">{isAr ? 'إعادة المحاولة' : 'Retry'}</button>
-            <Link
+            {!requiresRating && <Link
               href={`/events/${eventId}`}
               className="w-full bg-slate-100 text-slate-800 py-3 px-6 rounded-xl font-bold hover:bg-slate-200 transition-colors block text-center text-sm"
             >
               {locale === 'ar' ? 'العودة لصفحة الفعالية' : 'Back to Event Page'}
-            </Link>
+            </Link>}
           </div>
         )}
       </div>
-    </div>
+    </FeedbackPageFrame>
   );
 }

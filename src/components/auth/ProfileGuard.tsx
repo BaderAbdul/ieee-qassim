@@ -6,7 +6,7 @@ import { useRouter, usePathname } from '@/i18n/routing';
 import { safeReturnTo } from '@/lib/studentExperience';
 
 export default function ProfileGuard({ children }: { children: React.ReactNode }) {
-  const { user, userData, loading, error, logout } = useAuth();
+  const { user, userData, loading, error, logout, retry } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -15,7 +15,7 @@ export default function ProfileGuard({ children }: { children: React.ReactNode }
       // Super admins do not need to complete profile
       if (userData.role === 'super_admin') {
         if (pathname.includes('/complete-profile')) {
-          router.replace('/');
+          router.replace(safeReturnTo(new URLSearchParams(window.location.search).get('returnTo')));
         }
         return;
       }
@@ -37,7 +37,7 @@ export default function ProfileGuard({ children }: { children: React.ReactNode }
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 text-center" role="alert">
         <p>{error || 'حسابك مقيد. تواصل مع الإدارة. / Your account is restricted. Contact the organizer.'}</p>
-        <button className="rounded-xl bg-blue-600 px-5 py-3 text-white" onClick={() => error ? window.location.reload() : void logout()}>
+        <button className="rounded-xl bg-blue-600 px-5 py-3 text-white" onClick={() => error ? retry() : void logout()}>
           {error ? 'إعادة المحاولة / Retry' : 'تسجيل الخروج / Sign out'}
         </button>
       </div>
@@ -47,8 +47,9 @@ export default function ProfileGuard({ children }: { children: React.ReactNode }
   // Prevent flashing of unauthorized content
   if (!loading && user && userData && userData.role !== 'super_admin' && userData?.profileCompleted === false && !pathname.includes('/complete-profile')) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
         <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <p role="status">جاري فتح صفحة إكمال الملف / Opening your profile setup...</p>
       </div>
     );
   }

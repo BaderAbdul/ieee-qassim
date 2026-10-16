@@ -97,6 +97,7 @@ test('Token rotation, invalid attendance, duplicate check-ins and atomic points'
   assert.ok(results.every(r => r.status === 200));
   assert.equal((await db.collection('users').doc('alice').get()).data().totalPoints, 20);
   assert.equal((await db.collection('public_profiles').doc('alice').get()).data().totalPoints, 20);
+  assert.equal((await call('alice', 'submitEventFeedback', { eventId: 'attendance', feedbackData: { rating: 5 } })).status, 200);
   assert.ok((await db.collection('point_transactions').doc('attendance_attendance_alice').get()).data().aggregatedAt);
 });
 test('Manual deductions reject excess amounts and preserve ledger/balance equality', async () => {
@@ -403,4 +404,95 @@ test('Member activity includes undated legacy records, stable pagination and no 
   for (const field of ['cloudinaryPublicId', 'externalUrl', 'lease', 'downloadToken']) assert.equal(certs.data.entries[0][field], undefined);
   const summary = await call('organizer', 'getMemberOverview', { userId: 'activity-member' });
   assert.equal(summary.data.counts.registrations, 65); assert.equal(summary.data.counts.certificates, 1);
+});
+
+
+test('Attendance commits before mandatory feedback, including manual scans and cancellation', async () => {
+  const { recordAttendance, submitEventFeedback, cancelAttendance } = require('../../.spark-test/lib/server/lifecycle.js');
+  const eventId = 'independent-feedback';
+  await db.collection('events').doc(eventId).set({ ...event('Ongoing', 300), type: 'Booth', attendanceCount: 7 });
+  const first = await recordAttendance({ eventId, userId: 'dan', actorUid: 'organizer', admin: true, feedback: { rating: 5 } });
+  assert.equal(first.status, 'success');
+  const pendingRef = db.collection('pending_checkins').doc(`${eventId}_dan`);
+  assert.equal((await pendingRef.get()).data().status, 'pending', 'Admin cannot satisfy student feedback');
+  assert.ok((await db.collection('attendance_logs').doc(`${eventId}_dan`).get()).exists);
+  const pointsBefore = (await db.collection('users').doc('dan').get()).data().totalPoints;
+  await assert.rejects(submitEventFeedback('dan', eventId, { rating: 0 }));
+  assert.equal((await pendingRef.get()).data().status, 'pending');
+  await submitEventFeedback('dan', eventId, { rating: 4 });
+  assert.equal((await pendingRef.get()).data().status, 'completed');
+  assert.equal((await db.collection('users').doc('dan').get()).data().totalPoints, pointsBefore);
+  await cancelAttendance({ eventId, targetUserId: 'dan', actorUid: 'organizer' });
+  assert.equal((await pendingRef.get()).exists, false);
+  await recordAttendance({ eventId, userId: 'dan', actorUid: 'organizer', admin: true });
+  assert.equal((await pendingRef.get()).data().status, 'pending');
+  const shards = await db.collection('events').doc(eventId).collection('attendance_shards').get();
+  assert.equal(shards.docs.reduce((sum, doc) => sum + doc.data().count, 0), 1);
+  assert.equal((await db.collection('events').doc(eventId).get()).data().attendanceCount, 7, 'Legacy baseline stays unchanged');
+});
+
+test('300 simultaneous QR check-ins and ratings keep attendance and points exactly once', { timeout: 180000 }, async () => {
+  const { recordAttendance, submitEventFeedback } = require('../../.spark-test/lib/server/lifecycle.js');
+  const eventId = 'burst-300';
+  const uids = Array.from({ length: 300 }, (_, i) => `burst-student-${i}`);
+  const batch = db.batch();
+  batch.set(db.collection('events').doc(eventId), { ...event('Ongoing', 300), type: 'Booth' });
+  batch.set(db.collection('event_secrets').doc(eventId), { token: 'shared-room-qr', expiresAt: new Date(Date.now() + 300000) });
+  for (const uid of uids) batch.set(db.collection('users').doc(uid), { role: 'student', displayName: uid, totalPoints: 0 });
+  await batch.commit();
+  const started = performance.now();
+  const results = await Promise.all(uids.map(async userId => {
+    const result = await recordAttendance({ eventId, userId, actorUid: userId, admin: false, token: 'shared-room-qr' });
+    // Each phone rates as soon as its own attendance commits; no batch-wide barrier.
+    await submitEventFeedback(userId, eventId, { rating: 4 });
+    return result;
+  }));
+  assert.ok(results.every(result => result.status === 'success'));
+  await Promise.all(uids.slice(0, 10).map(userId => recordAttendance({ eventId, userId, actorUid: userId, admin: false, token: 'shared-room-qr' })));
+  const [logs, feedback, points, pending, shards] = await Promise.all([
+    db.collection('attendance_logs').where('eventId', '==', eventId).get(),
+    db.collection('event_feedback').where('eventId', '==', eventId).get(),
+    db.collection('point_transactions').where('sourceEventId', '==', eventId).get(),
+    db.collection('pending_checkins').where('eventId', '==', eventId).get(),
+    db.collection('events').doc(eventId).collection('attendance_shards').get(),
+  ]);
+  assert.equal(logs.size, 300); assert.equal(feedback.size, 300); assert.equal(points.size, 300);
+  assert.equal(pending.size, 300); assert.ok(pending.docs.every(doc => doc.data().status === 'completed'));
+  assert.equal(shards.docs.reduce((sum, doc) => sum + doc.data().count, 0), 300);
+  const users = await db.getAll(...uids.map(uid => db.collection('users').doc(uid)));
+  assert.ok(users.every(doc => doc.data().totalPoints === 20));
+  console.log(`300 check-ins + ratings + duplicate retries: ${Math.round(performance.now() - started)}ms (local emulator)`);
+});
+
+
+test('Attendance sync restores old manual feedback tasks and retries survive expired tokens', async () => {
+  const { recordAttendance, submitEventFeedback, syncEventAttendance } = require('../../.spark-test/lib/server/lifecycle.js');
+  const eventId = 'legacy-feedback-recovery';
+  await db.collection('events').doc(eventId).set(event('Completed', 30));
+  await db.collection('attendance_logs').doc(`${eventId}_carol`).set({ eventId, userId: 'carol', timestamp: new Date() });
+  await syncEventAttendance(eventId, 'organizer');
+  const taskRef = db.collection('pending_checkins').doc(`${eventId}_carol`);
+  assert.equal((await taskRef.get()).data().status, 'pending');
+  const retry = await recordAttendance({ eventId, userId: 'carol', actorUid: 'carol', admin: false, token: 'expired' });
+  assert.equal(retry.status, 'already_checked_in'); assert.equal(retry.awardedPoints, 0);
+  await submitEventFeedback('carol', eventId, { rating: 3 });
+  await syncEventAttendance(eventId, 'organizer');
+  assert.equal((await taskRef.get()).data().status, 'completed', 'Repair must not reopen submitted feedback');
+});
+
+
+test('Required feedback blocks student activity while organizers keep scanning', async () => {
+  const eventId = 'required-feedback-gate';
+  await db.collection('events').doc(eventId).set({ ...event('Ongoing', 300), type: 'Booth' });
+  assert.equal((await call('organizer', 'submitCheckIn', { eventId, targetUserId: 'dan' })).status, 200);
+  const blocked = await call('dan', 'registerForEvent', { eventId: 'anything' });
+  assert.equal(blocked.status, 409); assert.equal(blocked.error.code, 'feedback-required');
+  // A pending rating does not hold the organizer's scanner or another student's attendance.
+  assert.equal((await call('organizer', 'submitCheckIn', { eventId, targetUserId: 'bob' })).status, 200);
+  assert.equal((await call('dan', 'submitEventFeedback', { eventId, feedbackData: { rating: 5 } })).status, 200);
+  // Resolve the older task created by the cancellation test if that test also ran.
+  const tasks = await db.collection('pending_checkins').where('userId', '==', 'dan').where('status', '==', 'pending').get();
+  for (const task of tasks.docs) await call('dan', 'submitEventFeedback', { eventId: task.data().eventId, feedbackData: { rating: 5 } });
+  const unblocked = await call('dan', 'registerForEvent', { eventId: 'nonexistent' });
+  assert.notEqual(unblocked.error?.code, 'feedback-required');
 });

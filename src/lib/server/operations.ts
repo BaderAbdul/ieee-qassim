@@ -37,7 +37,7 @@ export async function getAdminOverview(): Promise<AdminOverview> {
   return {
     counts: { users: counts[0], activeEvents: counts[1], registrations: counts[2], availableCertificates: counts[3], pendingRegistrations: counts[4], attendedRegistrations: counts[5], failedCertificates: counts[6], queuedCertificates: counts[7] },
     notifications: { pending: counts[8], failed: counts[9], review: counts[10], delivered: counts[11] },
-    events: events.docs.map(doc => { const data = doc.data(); return { id: doc.id, title: data.title || '', titleEn: data.titleEn || '', state: data.state, date: dateString(data.date), registeredCount: data.registeredCount || 0, attendanceCount: data.attendanceCount || 0, capacity: data.capacity || 0, isUnlimitedCapacity: data.isUnlimitedCapacity === true }; }),
+    events: await Promise.all(events.docs.map(async doc => { const data = doc.data(); const shards = await doc.ref.collection('attendance_shards').aggregate({ count: AggregateField.sum('count') }).get(); return { id: doc.id, title: data.title || '', titleEn: data.titleEn || '', state: data.state, date: dateString(data.date), registeredCount: data.registeredCount || 0, attendanceCount: Math.max(0, (data.attendanceCount || 0) + (Number(shards.data().count) || 0)), capacity: data.capacity || 0, isUnlimitedCapacity: data.isUnlimitedCapacity === true }; })),
     generatedAt: new Date().toISOString(),
   };
 }

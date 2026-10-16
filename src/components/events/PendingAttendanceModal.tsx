@@ -1,15 +1,19 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useFeedbackDraft } from '@/lib/useFeedbackDraft';
 import { useAuth } from '@/context/AuthContext';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, limit } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase/client';
 import { httpsCallable } from '@/lib/backend';
 import { useLocale } from 'next-intl';
-import { Star, Sparkles, Award, Send, CheckCircle2, AlertCircle, Loader2, X } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { RequiredFeedbackDialog, useFeedbackSurface } from './RequiredFeedbackDialog';
+import { Star, Sparkles, Award, Send, AlertCircle, Loader2 } from 'lucide-react';
 
 interface PendingCheckinDoc {
   id: string;
+  userId: string;
   eventId: string;
   eventTitle: string;
   eventTitleEn?: string;
@@ -28,41 +32,38 @@ interface PendingCheckinDoc {
 }
 
 export default function PendingAttendanceModal() {
-  const { user } = useAuth();
+  const { user, userData, loading: authLoading } = useAuth();
+  const pathname = usePathname();
   const locale = useLocale();
+  const surface = useFeedbackSurface();
   const isAr = locale === 'ar';
 
   const [pendingDoc, setPendingDoc] = useState<PendingCheckinDoc | null>(null);
-  const [rating, setRating] = useState<number>(5);
+  const { rating, setRating, answers, setAnswers, clearDraft } = useFeedbackDraft(user && pendingDoc ? `feedback:${user.uid}:${pendingDoc.eventId}` : null);
   const [hoverRating, setHoverRating] = useState<number>(0);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [awardedPoints, setAwardedPoints] = useState<number>(0);
   const [errorMessage, setErrorMessage] = useState('');
+  const [verification, setVerification] = useState<{ uid: string; error: boolean } | null>(null);
+  const [retry, setRetry] = useState(0);
 
   // Real-time listener for pending attendance scans on student's device
   useEffect(() => {
-    if (!user) {
-      setPendingDoc(null);
-      return;
-    }
+    if (!user) return;
 
     const q = query(
       collection(db, 'pending_checkins'),
       where('userId', '==', user.uid),
-      where('status', '==', 'pending')
+      where('status', '==', 'pending'),
+      limit(1)
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
+      if (!snapshot.metadata.fromCache) setVerification({ uid: user.uid, error: false });
       if (!snapshot.empty) {
         const docSnap = snapshot.docs[0];
         const data = docSnap.data() as PendingCheckinDoc;
         setPendingDoc({ ...data, id: docSnap.id });
-        setIsSuccess(false);
         setErrorMessage('');
-        setRating(5);
-        setAnswers({});
 
         // Subtle haptic vibration if supported on mobile
         if (typeof window !== 'undefined' && 'vibrate' in navigator) {
@@ -77,12 +78,29 @@ export default function PendingAttendanceModal() {
       }
     }, (error) => {
       console.warn('Pending checkins listener:', error);
+      setVerification({ uid: user.uid, error: true });
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, retry]);
 
-  if (!pendingDoc) return null;
+  if (!user && authLoading && !pathname.endsWith('/checkin')) {
+    return <RequiredFeedbackDialog eventId="session-verification"><div className="w-full max-w-md rounded-3xl bg-white p-8 text-center" role="status"><Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-blue-600" /><p>{isAr ? 'جاري التحقق من الجلسة والتقييمات المطلوبة...' : 'Checking your session and required feedback...'}</p></div></RequiredFeedbackDialog>;
+  }
+  if (!user) return null;
+  // Organizer controls remain independent even if an organizer attended an event too.
+  if (userData && userData.role !== 'student' && pathname.includes('/admin')) return null;
+  if (surface.eventId) return null; // The dedicated rating page already makes the site inert.
+  if ((!pendingDoc || pendingDoc.userId !== user.uid) && (verification?.uid !== user.uid || verification.error)) {
+    return <RequiredFeedbackDialog eventId="feedback-verification">
+      <div className="w-full max-w-md rounded-3xl bg-white p-8 text-center" role="status">
+        <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-blue-600" />
+        <p>{verification?.error ? (isAr ? 'تعذر التحقق من التقييمات المطلوبة. تحقق من الاتصال وأعد المحاولة.' : 'Could not check required feedback. Check your connection and retry.') : (isAr ? 'جاري التحقق من التقييمات المطلوبة...' : 'Checking required feedback...')}</p>
+        {verification?.error && <button onClick={() => setRetry(value => value + 1)} className="mt-4 rounded-xl bg-blue-600 px-5 py-3 font-bold text-white">{isAr ? 'إعادة المحاولة' : 'Retry'}</button>}
+      </div>
+    </RequiredFeedbackDialog>;
+  }
+  if (!pendingDoc || pendingDoc.userId !== user.uid) return null;
 
   const handleSelectChoice = (questionId: string, value: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }));
@@ -123,8 +141,8 @@ export default function PendingAttendanceModal() {
     setIsSubmitting(true);
 
     try {
-      const submitCheckInFn = httpsCallable(functions, 'submitCheckIn');
-      const response = await submitCheckInFn({
+      const submitCheckInFn = httpsCallable(functions, 'submitEventFeedback');
+      await submitCheckInFn({
         eventId: pendingDoc.eventId,
         feedbackData: {
           rating,
@@ -132,28 +150,12 @@ export default function PendingAttendanceModal() {
         }
       });
 
-      const result = response.data as { status?: string; message?: string; awardedPoints?: number };
-      const pts = result.awardedPoints ?? pendingDoc.points ?? 0;
-      setAwardedPoints(pts);
-      setIsSuccess(true);
-
-      // Auto close after 3.5 seconds
-      setTimeout(() => {
-        setPendingDoc(null);
-        setIsSuccess(false);
-      }, 3500);
+      clearDraft();
 
     } catch (err: unknown) {
       console.error('Failed to submit check-in with survey:', err);
-      const msg = err instanceof Error ? err.message : '';
-      if (msg.includes('already_checked_in') || msg.includes('attended')) {
-        setIsSuccess(true);
-        setTimeout(() => setPendingDoc(null), 2500);
-      } else {
-        setErrorMessage(isAr
-          ? 'تعذر تأكيد التحضير. أعد المحاولة أو تواصل مع المنظم في الموقع.'
-          : 'Failed to confirm check-in. Please retry or contact the event organizer.');
-      }
+      setErrorMessage(isAr ? 'تعذر حفظ التقييم. إجاباتك محفوظة على هذا الجهاز، أعد المحاولة.' : 'Could not save feedback. Your answers are kept on this device; please retry.');
+
     } finally {
       setIsSubmitting(false);
     }
@@ -162,7 +164,7 @@ export default function PendingAttendanceModal() {
   const eventTitle = isAr ? pendingDoc.eventTitle : (pendingDoc.eventTitleEn || pendingDoc.eventTitle);
 
   return (
-    <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[120] flex items-center justify-center p-4 overflow-y-auto">
+    <RequiredFeedbackDialog eventId={pendingDoc.eventId}>
       <div className="bg-white rounded-[2rem] w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-300">
         
         {/* Header Ribbon */}
@@ -180,8 +182,8 @@ export default function PendingAttendanceModal() {
 
           <p className="text-blue-100 text-xs sm:text-sm">
             {isAr
-              ? 'أكمل التقييم السريع لتأكيد حضورك واستلام نقاط الفعالية ⭐'
-              : 'Complete the quick feedback to confirm attendance and receive points ⭐'}
+              ? 'تم تسجيل حضورك ونقاطك. أكمل تقييم الفعالية المطلوب ⭐'
+              : 'Your attendance and points are recorded. Complete the required event feedback ⭐'}
           </p>
 
           {pendingDoc.points ? (
@@ -194,34 +196,6 @@ export default function PendingAttendanceModal() {
 
         {/* Content Area */}
         <div className="p-6 sm:p-8">
-          {isSuccess ? (
-            <div className="py-8 text-center animate-in zoom-in-95 duration-200">
-              <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
-                <CheckCircle2 className="w-10 h-10" />
-              </div>
-              <h3 className="text-2xl font-black text-slate-900 font-cairo mb-2">
-                {isAr ? 'تم تأكيد حضورك بنجاح! 🎉' : 'Checked In Successfully! 🎉'}
-              </h3>
-              <p className="text-slate-600 text-sm mb-6">
-                {isAr
-                  ? `شكراً لمشاركتك انطباعك. تمت إضافة ${awardedPoints} نقطة إلى رصيدك فوراً!`
-                  : `Thank you for your feedback. ${awardedPoints} points have been added to your profile!`}
-              </p>
-              <div className="inline-flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md shadow-emerald-600/20">
-                <Award className="w-4 h-4" />
-                <span>+{awardedPoints} {isAr ? 'نقطة تميز مضافة' : 'Points Added'}</span>
-              </div>
-              <div className="mt-6">
-                <button
-                  type="button"
-                  onClick={() => setPendingDoc(null)}
-                  className="text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors"
-                >
-                  {isAr ? 'إغلاق النافذة' : 'Close'}
-                </button>
-              </div>
-            </div>
-          ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
               
               {/* Star Rating */}
@@ -343,23 +317,22 @@ export default function PendingAttendanceModal() {
                 {isSubmitting ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>{isAr ? 'جاري تأكيد التحضير...' : 'Confirming...'}</span>
+                    <span>{isAr ? 'جاري حفظ التقييم...' : 'Saving feedback...'}</span>
                   </>
                 ) : (
                   <>
                     <Send className="w-4 h-4" />
                     <span>
                       {isAr
-                        ? `تأكيد التحضير واستلام النقاط (+${pendingDoc.points || 0})`
-                        : `Confirm Attendance & Points (+${pendingDoc.points || 0})`}
+                        ? 'إرسال التقييم المطلوب'
+                        : 'Submit required feedback'}
                     </span>
                   </>
                 )}
               </button>
             </form>
-          )}
         </div>
       </div>
-    </div>
+    </RequiredFeedbackDialog>
   );
 }

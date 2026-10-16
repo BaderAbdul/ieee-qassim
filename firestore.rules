@@ -75,6 +75,10 @@ service cloud.firestore {
       // Creation, content edits and lifecycle changes are validated and audited by Vercel.
       allow write: if false;
     }
+    match /events/{eventId}/attendance_shards/{shardId} {
+      allow read: if get(/databases/$(database)/documents/events/$(eventId)).data.state in ['Published', 'Registration Open', 'Registration Closed', 'Ongoing', 'Completed', 'Archived'] || organizer();
+      allow write: if false;
+    }
     match /event_secrets/{eventId} {
       allow read: if organizer();
       allow write: if false;

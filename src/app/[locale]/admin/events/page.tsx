@@ -1,4 +1,5 @@
 'use client';
+import { readAttendanceCount } from '@/lib/attendanceCount';
 
 import { useEffect, useState, useMemo } from 'react';
 import { 
@@ -113,7 +114,11 @@ export default function AdminEventsPage() {
           )
         );
         if (!active) return;
-        const page = result.docs.map(item => ({ id: item.id, ...item.data() } as PlatformEvent));
+        const page = await Promise.all(result.docs.map(async item => {
+          const event = { id: item.id, ...item.data() } as PlatformEvent;
+          return { ...event, attendanceCount: await readAttendanceCount(item.id, event.attendanceCount || 0) };
+        }));
+        if (!active) return;
         setEvents(prev => cursor ? [...prev.filter(item => !page.some(next => next.id === item.id)), ...page] : page);
         setNextCursor(result.docs.at(-1) || null);
         setHasMore(result.size === 25);

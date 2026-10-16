@@ -1,4 +1,5 @@
 'use client';
+import { useAttendanceCount } from '@/lib/attendanceCount';
 
 import React, { useEffect, useState, use } from 'react';
 import Image from 'next/image';
@@ -45,6 +46,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
   // Instant load from memory cache if available, eliminating skeleton flicker on navigation
   const cached = typeof window !== 'undefined' ? eventCache.get(eventId) : null;
   const [event, setEvent] = useState<PlatformEvent | null>(cached || null);
+  const attendanceCount = useAttendanceCount(eventId, event?.attendanceCount || 0, !!event && ['Completed', 'Archived'].includes(event.state));
   const [loading, setLoading] = useState<boolean>(!cached);
   const [loadError, setLoadError] = useState<Error | null>(null);
   
@@ -293,7 +295,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                         <Users className="w-5 h-5 text-blue-300" />
                         <div>
                           <div className="text-[10px] text-blue-200 font-bold">{t('capacity')}</div>
-                          <div className="text-sm font-bold text-white">{eventCapacityLabel({ ...event, registeredCount: attendeeCount }, isAr)}</div>
+                          <div className="text-sm font-bold text-white">{eventCapacityLabel({ ...event, attendanceCount, registeredCount: attendeeCount }, isAr)}</div>
                         </div>
                       </div>
                       

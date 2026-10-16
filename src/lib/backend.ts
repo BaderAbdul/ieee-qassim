@@ -2,20 +2,25 @@
 
 import { auth } from './firebase/client';
 import { readBackendResponse } from './backendResponse';
+import { retryAttendanceRequest } from './retryAttendanceRequest';
 
 // Compatible return shape with the old callable clients, but same-origin Vercel transport.
 export function httpsCallable<Input = unknown, Output = unknown>(_unused: unknown, action: string) {
   return async (data?: Input): Promise<{ data: Output }> => {
     const user = auth.currentUser;
     if (!user) throw new Error('Sign in first. / سجّل دخولك أولًا.');
-    const response = await fetch(`/api/platform/${encodeURIComponent(action)}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
-      body: JSON.stringify(data ?? {}),
-      signal: AbortSignal.timeout(['renderCertificate', 'issueCertificates'].includes(action) ? 165000 : action === 'processNotifications' ? 65000 : 45000),
-    });
-    const result = await readBackendResponse(response);
-    if (!('data' in result)) throw new Error('Invalid server response. / رد الخادم غير صالح.');
-    return { data: result.data as Output };
+    const attendanceAction = ['submitCheckIn', 'submitEventFeedback', 'initiatePendingCheckIn'].includes(action);
+    const send = async () => {
+      const response = await fetch(`/api/platform/${encodeURIComponent(action)}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
+        body: JSON.stringify(data ?? {}),
+        signal: AbortSignal.timeout(attendanceAction ? 15000 : ['renderCertificate', 'issueCertificates'].includes(action) ? 165000 : action === 'processNotifications' ? 65000 : 45000),
+      });
+      const result = await readBackendResponse(response);
+      if (!('data' in result)) throw new Error('Invalid server response. / رد الخادم غير صالح.');
+      return { data: result.data as Output };
+    };
+    return attendanceAction ? retryAttendanceRequest(send) : send();
   };
 }
 

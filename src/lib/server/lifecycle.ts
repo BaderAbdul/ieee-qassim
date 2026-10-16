@@ -1,7 +1,7 @@
+import { createHash, randomUUID } from 'node:crypto';
 import { ApiError } from './errors';
 import { publicProfile, normalizeUniversityId } from './profiles';
 import { queueNotification } from './notifications';
-import { randomUUID } from 'node:crypto';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { audit } from './audit';
 
@@ -135,6 +135,7 @@ export async function submitEventFeedback(uid: string, eventId: string, feedback
     ]);
     if (!event.exists || !attendance.exists) throw new ApiError('failed-precondition', 'Verified attendance is required to leave feedback.');
     validateFeedback(event.data()!, feedback);
+    tx.set(db.collection('pending_checkins').doc(`${eventId}_${uid}`), { eventId, userId: uid, status: 'completed', completedAt: FieldValue.serverTimestamp() }, { merge: true });
     tx.set(db.collection('event_feedback').doc(`${eventId}_${uid}`), { eventId, userId: uid, rating: feedback!.rating, answers: feedback!.answers || {}, createdAt: previous.data()?.createdAt || FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
     return { status: 'success' };
   });
@@ -181,52 +182,9 @@ export async function resolveStudentUid(identifier: string): Promise<string> {
 }
 
 export async function initiatePendingCheckIn({ eventId, targetUserId, actorUid }: { eventId: string; targetUserId: string; actorUid: string }) {
-  const resolvedUserId = await resolveStudentUid(targetUserId);
-  const db = getFirestore();
-  const eventRef = db.collection('events').doc(documentId(eventId, 'eventId'));
-  const userRef = db.collection('users').doc(documentId(resolvedUserId, 'userId'));
-  const logRef = db.collection('attendance_logs').doc(`${eventId}_${resolvedUserId}`);
-  const regRef = db.collection('registrations').doc(`${eventId}_${resolvedUserId}`);
-  const pendingRef = db.collection('pending_checkins').doc(`${eventId}_${resolvedUserId}`);
-
-  const [eventSnap, userSnap, logSnap, regSnap] = await Promise.all([
-    eventRef.get(),
-    userRef.get(),
-    logRef.get(),
-    regRef.get()
-  ]);
-
-  const event = eventSnap.data();
-  if (!event || event.state !== 'Ongoing') throw new ApiError('failed-precondition', 'Event must be Ongoing.');
-  if (!userSnap.exists || userSnap.data()?.isRestricted) throw new ApiError('permission-denied', 'Student account is unavailable.');
-  if (logSnap.exists) return { status: 'already_checked_in', eventId, targetUserId: resolvedUserId };
-
-  const isRegistrationRequired = event.requiresRegistration !== false && event.type !== 'Booth';
-  if (isRegistrationRequired && (!regSnap.exists || !['approved', 'attended'].includes(regSnap.data()?.status))) {
-    throw new ApiError('failed-precondition', 'An approved registration is required.');
-  }
-
-  const pendingData = {
-    eventId,
-    userId: resolvedUserId,
-    eventTitle: event.title,
-    eventTitleEn: event.titleEn || null,
-    points: event.points || 0,
-    feedbackQuestions: event.feedbackQuestions || [],
-    status: 'pending',
-    scannedBy: actorUid,
-    scannedAt: FieldValue.serverTimestamp(),
-    expiresAt: new Date(Date.now() + 15 * 60 * 1000)
-  };
-
-  await pendingRef.set(pendingData);
-  return {
-    status: 'pending_feedback',
-    eventId,
-    targetUserId: resolvedUserId,
-    eventTitle: event.title,
-    points: event.points || 0
-  };
+  // Compatibility name: scans now commit attendance immediately.
+  const result = await recordAttendance({ eventId, userId: targetUserId, actorUid, admin: true });
+  return { ...result, eventId, targetUserId: result.userId };
 }
 
 export async function recordAttendance(input: AttendanceInput) {
@@ -238,21 +196,35 @@ export async function recordAttendance(input: AttendanceInput) {
   const logRef = db.collection('attendance_logs').doc(`${eventId}_${userId}`);
   const pointRef = db.collection('point_transactions').doc(`attendance_${eventId}_${userId}`);
   const pendingRef = db.collection('pending_checkins').doc(`${eventId}_${userId}`);
+  const notificationId = randomUUID();
+  // Badge history is advisory; keep range-query locks out of the admission transaction.
+  const pastAttendance = await db.collection('attendance_logs').where('userId', '==', userId).limit(4).get();
   return db.runTransaction(async tx => {
-    const eventSnap = await tx.get(eventRef);
-    const [regSnap, logSnap, pointSnap, userSnap, secretSnap, pastAttendance, pendingSnap] = await Promise.all([
+    const [eventSnap, regSnap, logSnap, pointSnap, userSnap, secretSnap, pendingSnap, feedbackSnap] = await Promise.all([
+      tx.get(eventRef),
       tx.get(regRef), tx.get(logRef), tx.get(pointRef), tx.get(db.collection('users').doc(userId)),
       tx.get(db.collection('event_secrets').doc(eventId)),
-      tx.get(db.collection('attendance_logs').where('userId', '==', userId).limit(4)),
-      tx.get(pendingRef),
+      tx.get(pendingRef), tx.get(db.collection('event_feedback').doc(`${eventId}_${userId}`)),
     ]);
     const event = eventSnap.data();
     if (!event) throw new ApiError('not-found', 'Event not found.');
     if (!userSnap.exists || userSnap.data()?.isRestricted) throw new ApiError('permission-denied', 'Student account is unavailable.');
+    // A retry may arrive after token expiry or event closure. Attendance remains confirmed.
+    if (logSnap.exists) {
+      if (!feedbackSnap.exists && pendingSnap.data()?.status !== 'pending') {
+        tx.set(pendingRef, {
+          eventId, userId, eventTitle: event.title, eventTitleEn: event.titleEn || null,
+          points: event.points || 0, feedbackQuestions: event.feedbackQuestions || [],
+          status: 'pending', attendanceRecorded: true, scannedAt: FieldValue.serverTimestamp(),
+        });
+      }
+      return { status: 'already_checked_in', userId, awardedPoints: 0 };
+    }
+
     if (!input.admin && event.state !== 'Ongoing') throw new ApiError('failed-precondition', 'Event is not accepting attendance.');
     if (input.admin && !['Ongoing', 'Completed'].includes(event.state)) throw new ApiError('failed-precondition', 'Start the event before recording attendance.');
     const secret = secretSnap.data();
-    const isPendingVerified = pendingSnap.exists && pendingSnap.data()?.status === 'pending';
+    const isPendingVerified = pendingSnap.exists && pendingSnap.data()?.status === 'pending' && pendingSnap.data()?.expiresAt?.toMillis?.() > Date.now();
     const isTokenVerified = input.token && secret?.token === input.token && secret?.expiresAt && secret.expiresAt.toMillis() > Date.now();
     if (!input.admin && !isPendingVerified && !isTokenVerified) {
       throw new ApiError('permission-denied', 'Invalid or expired check-in verification.');
@@ -261,9 +233,8 @@ export async function recordAttendance(input: AttendanceInput) {
     if (isRegistrationRequired && (!regSnap.exists || !['approved', 'attended'].includes(regSnap.data()?.status))) {
       throw new ApiError('failed-precondition', 'An approved registration is required.');
     }
-    if (logSnap.exists) return { status: 'already_checked_in', userId, awardedPoints: 0 };
 
-    const feedback = input.feedback;
+    const feedback = input.admin ? undefined : input.feedback;
     if (feedback) validateFeedback(event, feedback);
     const points = Number.isSafeInteger(event.points) && event.points > 0 ? event.points : 0;
     const badges = ['ieee_starter'];
@@ -304,17 +275,18 @@ export async function recordAttendance(input: AttendanceInput) {
         ...(userData.universityId ? { universityId: userData.universityId } : {}),
       });
     }
-    tx.update(eventRef, { attendanceCount: FieldValue.increment(1) });
+    // Independent shards avoid serializing every attendee on one event write.
+    tx.set(eventRef.collection('attendance_shards').doc(attendanceShard(userId)), { count: FieldValue.increment(1) }, { merge: true });
     if (feedback) tx.set(db.collection('event_feedback').doc(`${eventId}_${userId}`), { eventId, userId, userEmail: userSnap.data()?.email || '', rating: feedback.rating, answers: feedback.answers || {}, createdAt: FieldValue.serverTimestamp() });
-    if (pendingSnap.exists) {
-      tx.update(pendingRef, {
-        status: 'completed',
-        completedAt: FieldValue.serverTimestamp(),
-        rating: feedback?.rating || null
-      });
-    }
+    tx.set(pendingRef, {
+      eventId, userId, eventTitle: event.title, eventTitleEn: event.titleEn || null,
+      points, feedbackQuestions: event.feedbackQuestions || [],
+      status: feedback ? 'completed' : 'pending',
+      attendanceRecorded: true, scannedBy: actorUid, scannedAt: FieldValue.serverTimestamp(),
+      ...(feedback ? { completedAt: FieldValue.serverTimestamp() } : {}),
+    });
     if (points > 0 && !pointSnap.exists) tx.create(pointRef, { userId, amount: points, source: 'attendance', reason: `Attendance: ${event.title || eventId}`, sourceEventId: eventId, createdBy: input.admin ? actorUid : 'system', createdAt: FieldValue.serverTimestamp(), aggregatedAt: FieldValue.serverTimestamp() });
-    queueNotification(tx, `attendance_${eventId}_${userId}`, userData.email, `تم تأكيد حضورك، النقاط: ${awardedPoints}. / Attendance confirmed, points: ${awardedPoints}.`, event.title);
+    queueNotification(tx, `attendance_${eventId}_${userId}_${notificationId}`, userData.email, `تم تأكيد حضورك، النقاط: ${awardedPoints}. / Attendance confirmed, points: ${awardedPoints}.`, event.title);
     audit(tx, input.admin ? 'attendance.manual' : 'attendance.checkin', actorUid, logRef.id, { eventId, awardedPoints });
     return { status: 'success', userId, awardedPoints };
   }, { maxAttempts: 10 });
@@ -325,9 +297,11 @@ export async function syncEventAttendance(eventId: string, actorUid: string) {
   const eventDoc = await db.collection('events').doc(documentId(eventId, 'eventId')).get();
   if (!eventDoc.exists) throw new ApiError('not-found', 'Event not found.');
 
-  const [logsSnap, regsSnap] = await Promise.all([
+  const [logsSnap, regsSnap, feedbackSnap, pendingSnap] = await Promise.all([
     db.collection('attendance_logs').where('eventId', '==', eventId).get(),
     db.collection('registrations').where('eventId', '==', eventId).get(),
+    db.collection('event_feedback').where('eventId', '==', eventId).get(),
+    db.collection('pending_checkins').where('eventId', '==', eventId).get(),
   ]);
 
   const existingRegMap = new Map<string, FirebaseFirestore.DocumentData>();
@@ -429,6 +403,29 @@ export async function syncEventAttendance(eventId: string, actorUid: string) {
     await Promise.all(batches.map(b => b.commit()));
   }
 
+  // Restore feedback obligations lost by the old manual-attendance flow.
+  // Recheck each candidate atomically so concurrent feedback or cancellation wins.
+  const rated = new Set(feedbackSnap.docs.map(doc => doc.data().userId));
+  const pending = new Set(pendingSnap.docs.filter(doc => doc.data().status === 'pending' && doc.data().attendanceRecorded === true).map(doc => doc.data().userId));
+  const candidates = logsSnap.docs.filter(doc => !rated.has(doc.data().userId) && !pending.has(doc.data().userId));
+  for (let offset = 0; offset < candidates.length; offset += 20) {
+    const results = await Promise.all(candidates.slice(offset, offset + 20).map(log => db.runTransaction(async tx => {
+      const userId = log.data().userId;
+      const taskRef = db.collection('pending_checkins').doc(`${eventId}_${userId}`);
+      const [attendance, feedback, task, currentEvent] = await Promise.all([
+        tx.get(log.ref), tx.get(db.collection('event_feedback').doc(`${eventId}_${userId}`)),
+        tx.get(taskRef), tx.get(eventDoc.ref),
+      ]);
+      if (!attendance.exists || feedback.exists || !currentEvent.exists || (task.data()?.status === 'pending' && task.data()?.attendanceRecorded === true)) return 0;
+      const event = currentEvent.data()!;
+      tx.set(taskRef, { eventId, userId, eventTitle: event.title, eventTitleEn: event.titleEn || null,
+        points: event.points || 0, feedbackQuestions: event.feedbackQuestions || [], status: 'pending',
+        attendanceRecorded: true, scannedAt: FieldValue.serverTimestamp() });
+      return 1;
+    })));
+    repairedCount += results.reduce((sum: number, value) => sum + value, 0);
+  }
+
   if (repairedCount > 0) {
     await db.runTransaction(async tx => {
       audit(tx, 'attendance.sync', actorUid, eventId, { repairedCount, totalLogs: logsSnap.size });
@@ -501,10 +498,7 @@ export async function cancelAttendance(input: { eventId: string; targetUserId: s
     }
 
     // 4. Decrement event attendanceCount
-    const currentAttendance = Number(event.attendanceCount) || 0;
-    if (currentAttendance > 0) {
-      tx.update(eventRef, { attendanceCount: FieldValue.increment(-1) });
-    }
+    if (logSnap.exists) tx.set(eventRef.collection('attendance_shards').doc(attendanceShard(userId)), { count: FieldValue.increment(-1) }, { merge: true });
 
     // 5. Clean up pending check-in / feedback if any
     tx.delete(pendingRef);
@@ -515,3 +509,7 @@ export async function cancelAttendance(input: { eventId: string; targetUserId: s
   }, { maxAttempts: 10 });
 }
 
+
+function attendanceShard(userId: string): string {
+  return String(createHash('sha256').update(userId).digest()[0] % 64);
+}

@@ -6,10 +6,12 @@ import { Cairo, Inter } from 'next/font/google';
 import localFont from 'next/font/local';
 import { routing } from '@/i18n/routing';
 import { AuthProvider } from '@/context/AuthContext';
+import SessionRecoveryBoundary from '@/components/auth/SessionRecoveryBoundary';
 import ProfileGuard from '@/components/auth/ProfileGuard';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import IdeaFloatingButton from '@/components/ui/IdeaFloatingButton';
+import { FeedbackSurfaceProvider } from '@/components/events/RequiredFeedbackDialog';
 import PendingAttendanceModal from '@/components/events/PendingAttendanceModal';
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
@@ -102,7 +104,9 @@ export default async function RootLayout({
         className={`${cairo.variable} ${inter.variable} ${thmanyah.variable} font-sans antialiased bg-gray-50 text-gray-900`}
       >
         <NextIntlClientProvider messages={messages}>
+          <SessionRecoveryBoundary>
           <AuthProvider>
+            <FeedbackSurfaceProvider>
             <ProfileGuard>
               <div className="flex flex-col min-h-screen">
                 <Navbar />
@@ -114,7 +118,9 @@ export default async function RootLayout({
                 <PendingAttendanceModal />
               </div>
             </ProfileGuard>
+            </FeedbackSurfaceProvider>
           </AuthProvider>
+          </SessionRecoveryBoundary>
         </NextIntlClientProvider>
         <SpeedInsights />
         <Analytics />

@@ -1,4 +1,5 @@
 'use client';
+import { useAttendanceCount } from '@/lib/attendanceCount';
 
 import { formatDateSafe, parseRiyadhInput, toJsDate } from '@/lib/dateUtils';
 
@@ -58,6 +59,8 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
     speakers: '',
     coverUrl: ''
   });
+
+  const attendanceCount = useAttendanceCount(eventId, formData.attendanceCount);
 
   const [feedbackQuestions, setFeedbackQuestions] = useState<CustomQuestion[]>([]);
   const [isBankOpen, setIsBankOpen] = useState(false);
@@ -502,7 +505,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">عدد الحضور الفعلي (بعد انتهاء الفعالية)</label>
-              <input type="number" name="attendanceCount" value={formData.attendanceCount} readOnly aria-label="إجمالي الحضور — محسوب تلقائيًا" className="w-full border-gray-300 bg-gray-100 rounded-lg shadow-sm" />
+              <input type="number" name="attendanceCount" value={attendanceCount} readOnly aria-label="إجمالي الحضور — محسوب تلقائيًا" className="w-full border-gray-300 bg-gray-100 rounded-lg shadow-sm" />
             </div>
           </div>
         </div>

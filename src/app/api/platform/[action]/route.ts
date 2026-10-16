@@ -31,9 +31,15 @@ export async function POST(request: Request, context: { params: Promise<{ action
     const actor = await authenticate(request);
     const { action } = await context.params;
     const data = await readJson(request);
-    await limitRequests(actor.uid, 'platform', ['event_organizer', 'super_admin'].includes(actor.role) ? 300 : 60);
+    await limitRequests(actor.uid, ['submitCheckIn', 'initiatePendingCheckIn'].includes(action) ? 'attendance' : 'platform', ['event_organizer', 'super_admin'].includes(actor.role) ? 1200 : 60);
     const db = getFirestore();
     const admin = ['event_organizer', 'super_admin'].includes(actor.role);
+    // Feedback gates student activity, never organizer scanning or independent check-ins.
+    if (!admin && !['submitCheckIn', 'submitEventFeedback', 'saveProfile', 'syncPublicProfile'].includes(action)) {
+      const pending = await db.collection('pending_checkins').where('userId', '==', actor.uid).where('status', '==', 'pending').limit(1).get();
+      if (!pending.empty) throw new ApiError('feedback-required', 'أكمل تقييم الفعالية أولاً. / Complete your required event feedback first.');
+    }
+
     let result: unknown;
     switch (action) {
       case 'getAdminOverview': requireAdmin(actor); result = await getAdminOverview(); break;
@@ -167,7 +173,7 @@ export async function POST(request: Request, context: { params: Promise<{ action
         requireAdmin(actor);
         result = await reviewShowcaseApplication(actor.uid, {
           applicationId: String(data.applicationId),
-          status: data.status as any,
+          status: data.status as Parameters<typeof reviewShowcaseApplication>[1]['status'],
           adminNotes: typeof data.adminNotes === 'string' ? data.adminNotes : undefined
         });
         break;
