@@ -28,7 +28,7 @@ npm run test:spark
 npm test runs domain simulations and source contracts. test:firebase exercises actual rules, backend handlers and PDF rendering on a demo project; it never connects test writes to production. Java 21 and Node 24 are used for local testing. Deployed Functions target Node 22.
 
 ## Source map
-
+n
 - src/app/[locale]: public, student and organizer routes
 - src/context/AuthContext.tsx: Google sign-in and private user profile subscription
 - src/i18n and messages: Arabic/English routing and translations
