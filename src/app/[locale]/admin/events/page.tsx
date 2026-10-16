@@ -1,20 +1,8 @@
 'use client';
-import { readAttendanceCount } from '@/lib/attendanceCount';
-
 import { useEffect, useState, useMemo } from 'react';
-import { 
-  collection, 
-  query, 
-  getDocs, 
-  orderBy, 
-  documentId, 
-  startAfter, 
-  limit, 
-  type QueryDocumentSnapshot, 
-  type DocumentData 
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
 import { httpsCallable } from '@/lib/backend';
+import type { AdminEventsPage as AdminEventsResult } from '@/lib/adminTypes';
+import { toJsDate } from '@/lib/dateUtils';
 import type { PlatformEvent, EventState, EventType } from '@/lib/types';
 import { Link } from '@/i18n/routing';
 import { useLocale } from 'next-intl';
@@ -72,8 +60,8 @@ export default function AdminEventsPage() {
   const [events, setEvents] = useState<PlatformEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [cursor, setCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
-  const [nextCursor, setNextCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [revision, setRevision] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
@@ -105,23 +93,12 @@ export default function AdminEventsPage() {
       setLoading(true);
       setError(null);
       try {
-        const result = await getDocs(
-          query(
-            collection(db, 'events'),
-            orderBy(documentId()),
-            ...(cursor ? [startAfter(cursor)] : []),
-            limit(25)
-          )
-        );
+        const { data } = await httpsCallable<unknown, AdminEventsResult>(null, 'getAdminEvents')(cursor ? { cursor } : {});
         if (!active) return;
-        const page = await Promise.all(result.docs.map(async item => {
-          const event = { id: item.id, ...item.data() } as PlatformEvent;
-          return { ...event, attendanceCount: await readAttendanceCount(item.id, event.attendanceCount || 0) };
-        }));
-        if (!active) return;
+        const page = data.events;
         setEvents(prev => cursor ? [...prev.filter(item => !page.some(next => next.id === item.id)), ...page] : page);
-        setNextCursor(result.docs.at(-1) || null);
-        setHasMore(result.size === 25);
+        setNextCursor(data.nextCursor);
+        setHasMore(data.nextCursor !== null);
       } catch (reason) {
         if (active) setError(reason instanceof Error ? reason.message : 'Unable to load events');
       } finally {
@@ -206,8 +183,8 @@ export default function AdminEventsPage() {
           return (b.registeredCount || 0) - (a.registeredCount || 0);
         }
         // Default: by date
-        const dateA = a.date instanceof Date ? a.date.getTime() : a.date?.toDate?.()?.getTime() || 0;
-        const dateB = b.date instanceof Date ? b.date.getTime() : b.date?.toDate?.()?.getTime() || 0;
+        const dateA = toJsDate(a.date)?.getTime() || 0;
+        const dateB = toJsDate(b.date)?.getTime() || 0;
         return dateB - dateA;
       });
   }, [events, statusFilter, typeFilter, search, sortBy]);
@@ -410,7 +387,7 @@ export default function AdminEventsPage() {
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
           {visible.map(event => {
-            const date = event.date instanceof Date ? event.date : event.date?.toDate?.();
+            const date = toJsDate(event.date);
             const badge = stateBadgeColors[event.state] || stateBadgeColors.Draft;
             const isJustSavedTemplate = savedAsTemplateSuccessId === event.id;
 

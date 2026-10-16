@@ -1,3 +1,5 @@
+'use client';
+
 import { useAttendanceCount } from '@/lib/attendanceCount';
 import React from 'react';
 import Image from 'next/image';

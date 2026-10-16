@@ -7,7 +7,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { doc as clientDoc, updateDoc as clientUpdate, deleteDoc as clientDelete } from 'firebase/firestore';
+import { doc as clientDoc, getDoc as clientGet, updateDoc as clientUpdate, deleteDoc as clientDelete } from 'firebase/firestore';
 
 if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST) throw new Error('Demo Firestore/Auth emulators required.');
 process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID = 'demo-ieee-qu';
@@ -70,6 +70,48 @@ async function call(uid, action, data = {}) {
   return { status: response.status, ...(await response.json()) };
 }
 const event = (state = 'Registration Open', capacity = 1) => ({ title: 'فعالية تجريبية', state, capacity, registrationMode: 'Auto', registeredCount: 0, attendanceCount: 0, points: 20, hasCertificate: true, type: 'Workshop' });
+
+test('Admin event list works with older rules denying attendance shards, with accurate counts and pagination', async () => {
+  const refs = Array.from({ length: 27 }, (_, i) => db.collection('events').doc(`000-admin-list-${String(i).padStart(2, '0')}`));
+  const date = new Date('2026-10-16T12:00:00.000Z');
+  const batch = db.batch();
+  for (const ref of refs) batch.set(ref, { ...event('Draft'), attendanceCount: 7, date, createdAt: date, updatedAt: date });
+  batch.set(refs[0].collection('attendance_shards').doc('0'), { count: 3 });
+  batch.set(refs[0].collection('attendance_shards').doc('1'), { count: -1 });
+  batch.set(refs[1].collection('attendance_shards').doc('0'), { count: -10 });
+  await batch.commit();
+  // Reproduce deploying the web app before its new subcollection rules.
+  const testEnv = await initializeTestEnvironment({ projectId: 'demo-ieee-qu', firestore: { host: '127.0.0.1', port: 8080, rules: `rules_version = '2'; service cloud.firestore { match /databases/{database}/documents { match /events/{eventId} { allow read: if request.auth.uid == 'organizer'; } } }` } });
+  try {
+    const client = testEnv.authenticatedContext('organizer').firestore();
+    await assertSucceeds(clientGet(clientDoc(client, refs[0].path)));
+    await assertFails(clientGet(clientDoc(client, `${refs[0].path}/attendance_shards/0`)));
+    assert.equal((await call(null, 'getAdminEvents')).status, 401);
+    assert.equal((await call('carol', 'getAdminEvents')).status, 403);
+    assert.equal((await call('organizer', 'getAdminEvents', { cursor: 'bad/cursor' })).status, 400);
+    const first = await call('organizer', 'getAdminEvents');
+    assert.equal(first.status, 200, JSON.stringify(first));
+    assert.equal(first.data.events.length, 25);
+    assert.equal(first.data.nextCursor, refs[24].id);
+    assert.equal(first.data.events[0].attendanceCount, 9);
+    assert.equal(first.data.events[1].attendanceCount, 0);
+    assert.equal(first.data.events[2].attendanceCount, 7);
+    assert.equal(first.data.events[0].state, 'Draft');
+    assert.equal(first.data.events[0].date, date.toISOString());
+    assert.equal(first.data.events[0].updatedAt, date.toISOString());
+    const second = await call('organizer', 'getAdminEvents', { cursor: first.data.nextCursor });
+    assert.equal(second.status, 200, JSON.stringify(second));
+    assert.deepEqual(second.data.events.filter(e => e.id.startsWith('000-admin-list-')).map(e => e.id), refs.slice(25).map(ref => ref.id));
+    assert.ok(second.data.events.every(e => !first.data.events.some(previous => previous.id === e.id)));
+    const end = await call('organizer', 'getAdminEvents', { cursor: '\uffff' });
+    assert.deepEqual(end.data, { events: [], nextCursor: null });
+  } finally {
+    await testEnv.cleanup();
+    const restored = await initializeTestEnvironment({ projectId: 'demo-ieee-qu', firestore: { host: '127.0.0.1', port: 8080, rules: readFileSync('firestore.rules', 'utf8') } });
+    await restored.cleanup();
+    await Promise.all(refs.map(ref => db.recursiveDelete(ref)));
+  }
+});
 
 test('Vercel API rejects missing/forged bearer tokens and student organizer operations', async () => {
   assert.equal((await call(null, 'registerForEvent')).status, 401);

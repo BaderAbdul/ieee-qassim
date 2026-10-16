@@ -25,7 +25,7 @@ export interface PlatformEvent {
   descriptionEn: string;
   coverUrl?: string;
   type: EventType;
-  date: Timestamp | Date;
+  date: Timestamp | Date | string;
   location: string;
   locationEn: string;
   durationHours: number;
@@ -46,8 +46,8 @@ export interface PlatformEvent {
   checkinToken?: string;
   feedbackQuestions?: CustomQuestion[];
   isPinned?: boolean;
-  createdAt: Timestamp | Date;
-  updatedAt: Timestamp | Date;
+  createdAt: Timestamp | Date | string;
+  updatedAt: Timestamp | Date | string;
 }
 
 export interface EventFeedbackResponse {

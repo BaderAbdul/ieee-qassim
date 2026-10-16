@@ -8,7 +8,7 @@ import { assignCertificate, authorizeCertificate, certificateDownload, renderCer
 import { processNotificationBatch, queueNotification } from '@/lib/server/notifications';
 import { adjustPoints, voidPointTransaction } from '@/lib/server/points';
 import { getMemberActivity, getMemberOverview, manageUser, searchMembers } from '@/lib/server/members';
-import { changeEventState, getAdminOverview, getAuditLog, getEventReport, getOperations, retryNotification } from '@/lib/server/operations';
+import { changeEventState, getAdminEvents, getAdminOverview, getAuditLog, getEventReport, getOperations, retryNotification } from '@/lib/server/operations';
 import { audit } from '@/lib/server/audit';
 import { saveHomepage } from '@/lib/server/content';
 import { saveEvent } from '@/lib/server/events';
@@ -42,6 +42,7 @@ export async function POST(request: Request, context: { params: Promise<{ action
 
     let result: unknown;
     switch (action) {
+      case 'getAdminEvents': requireAdmin(actor); result = await getAdminEvents(data); break;
       case 'getAdminOverview': requireAdmin(actor); result = await getAdminOverview(); break;
       case 'getOperations': requireAdmin(actor); result = await getOperations(); break;
       case 'getEventReport': requireAdmin(actor); result = await getEventReport(documentId(data.eventId, 'eventId')); break;
