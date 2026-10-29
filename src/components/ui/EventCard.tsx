@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Image from 'next/image';
+import cloudinaryLoader, { isCloudinaryImage } from '@/lib/cloudinaryLoader';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
 import { ar, enUS } from 'date-fns/locale';
@@ -64,9 +65,10 @@ export default function EventCard({ event }: EventCardProps) {
         {event.coverUrl ? (
           <Image
             src={event.coverUrl}
+            loader={isCloudinaryImage(event.coverUrl) ? cloudinaryLoader : undefined}
             alt={title}
             fill
-            quality={85}
+            quality={75}
             className={`object-cover transition-transform duration-700 group-hover:scale-110 ${isCompleted ? 'grayscale-[30%] group-hover:grayscale-0' : ''}`}
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 50vw, 33vw"
           />
@@ -173,3 +175,4 @@ export default function EventCard({ event }: EventCardProps) {
     </div>
   );
 }
+
