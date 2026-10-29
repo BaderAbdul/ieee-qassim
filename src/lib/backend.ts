@@ -39,7 +39,7 @@ export async function apiGet<Output = unknown>(path: string, params?: Record<str
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     signal: AbortSignal.timeout(20000),
   });
-  const result = await readBackendResponse(response);
+  const result = await readBackendResponse(response, true);
   return result as Output;
 }
 
@@ -77,3 +77,4 @@ export async function uploadImage(file: File, purpose: 'avatar' | 'event') {
   if (typeof result.url !== 'string' || !result.url.startsWith('https://')) throw new Error('Invalid upload response. / رد رفع الصورة غير صالح.');
   return result.url;
 }
+

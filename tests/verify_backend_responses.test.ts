@@ -15,3 +15,8 @@ test('Structured backend errors and successful payloads retain their meaning', a
   await assert.rejects(readBackendResponse(Response.json({ error: { code: 'failed-precondition', message: 'Registration closed.' } }, { status: 409 })), /Registration closed/);
   assert.deepEqual(await readBackendResponse(Response.json({ data: { status: 'approved' } })), { data: { status: 'approved' } });
 });
+
+test('GET endpoints can accept bare arrays while action responses stay strict', async () => {
+  assert.deepEqual(await readBackendResponse(Response.json([{ id: 'member-1' }]), true), [{ id: 'member-1' }]);
+  await assert.rejects(readBackendResponse(Response.json([])), /HTTP 200/);
+});
