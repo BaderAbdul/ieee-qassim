@@ -29,7 +29,7 @@ interface PendingCheckinDoc {
 }
 
 export default function PendingAttendanceModal() {
-  const { user, userData, loading: authLoading } = useAuth();
+  const { user, userData } = useAuth();
   const pathname = usePathname();
   const locale = useLocale();
   const surface = useFeedbackSurface();
@@ -82,9 +82,6 @@ export default function PendingAttendanceModal() {
     return () => { active = false; if (timer) clearTimeout(timer); };
   }, [user, retry]);
 
-  if (!user && authLoading && !pathname.endsWith('/checkin')) {
-    return <RequiredFeedbackDialog eventId="session-verification"><div className="w-full max-w-md rounded-3xl bg-white p-8 text-center" role="status"><Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-blue-600" /><p>{isAr ? 'جاري التحقق من الجلسة والتقييمات المطلوبة...' : 'Checking your session and required feedback...'}</p></div></RequiredFeedbackDialog>;
-  }
   if (!user) return null;
   // Organizer controls remain independent even if an organizer attended an event too.
   if (userData && userData.role !== 'student' && pathname.includes('/admin')) return null;
@@ -334,3 +331,4 @@ export default function PendingAttendanceModal() {
     </RequiredFeedbackDialog>
   );
 }
+

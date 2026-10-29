@@ -75,6 +75,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const loadedFor = useRef<string | null>(null);
+  const [authTimedOut, setAuthTimedOut] = useState(false);
+  useEffect(() => {
+    if (userLoaded) return;
+    const timer = window.setTimeout(() => setAuthTimedOut(true), 12000);
+    return () => window.clearTimeout(timer);
+  }, [userLoaded]);
 
   useEffect(() => {
     if (!userLoaded) return;
@@ -113,6 +119,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   } : null;
 
   const login = async () => {
+    if (!userLoaded) {
+      setAuthTimedOut(true);
+      return;
+    }
     await clerk.openSignIn({});
   };
 
@@ -133,9 +143,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <AuthContext.Provider value={{ user, userData, loading, error, login, logout, retry }}>
+      {!userLoaded && authTimedOut && (
+        <div role="status" dir="auto" className="fixed bottom-4 inset-x-4 z-50 mx-auto max-w-lg rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 shadow-lg">
+          تعذر تحميل تسجيل الدخول. يمكنك تصفح الموقع وإعادة تحميل الصفحة للمحاولة مجددًا.
+          <br />Sign-in could not load. You can keep browsing and reload to retry.
+          <button type="button" className="ms-3 underline" onClick={() => window.location.reload()}>إعادة المحاولة / Retry</button>
+        </div>
+      )}
       {children}
     </AuthContext.Provider>
   );
 };
 
 export const useAuth = () => useContext(AuthContext);
+
