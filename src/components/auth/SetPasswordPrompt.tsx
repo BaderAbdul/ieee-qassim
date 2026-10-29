@@ -1,45 +1,27 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useLocale } from 'next-intl';
-import { useUser, useReverification } from '@clerk/nextjs';
-import { KeyRound, X, Loader2, ShieldCheck } from 'lucide-react';
+import { useClerk, useUser, useReverification } from '@clerk/nextjs';
+import { Eye, EyeOff, KeyRound, Loader2 } from 'lucide-react';
 
 export default function SetPasswordPrompt() {
-  const locale = useLocale();
-  const isAr = locale === 'ar';
-  const { isLoaded, isSignedIn, user } = useUser();
-  const [dismissed, setDismissed] = useState(true);
-  const [open, setOpen] = useState(false);
+  const isAr = useLocale() === 'ar';
+  const { user } = useUser();
+  const clerk = useClerk();
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [visible, setVisible] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState(false);
+  const updatePassword = useReverification((password: string) => {
+    if (!user) throw new Error('Please sign in again.');
+    return user.updatePassword({ newPassword: password, signOutOfOtherSessions: false });
+  });
 
-  const updatePassword = useReverification((newPw: string) =>
-    user?.updatePassword({ newPassword: newPw, signOutOfOtherSessions: false })
-  );
-
-  useEffect(() => {
-    if (!isLoaded || !isSignedIn || !user) { setDismissed(true); return; }
-    if (user.passwordEnabled) { setDismissed(true); return; }
-    try {
-      setDismissed(sessionStorage.getItem(`set-password-dismissed:${user.id}`) === '1');
-    } catch {
-      setDismissed(false);
-    }
-  }, [isLoaded, isSignedIn, user]);
-
-  if (!isLoaded || !isSignedIn || !user || user.passwordEnabled || dismissed) return null;
-
-  const handleDismiss = () => {
-    try { sessionStorage.setItem(`set-password-dismissed:${user.id}`, '1'); } catch { /* best-effort */ }
-    setDismissed(true);
-  };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (submitting) return;
     setError('');
     if (newPassword.length < 8) {
       setError(isAr ? 'يجب أن تتكون كلمة المرور من 8 أحرف على الأقل.' : 'Password must be at least 8 characters.');
@@ -51,9 +33,14 @@ export default function SetPasswordPrompt() {
     }
     setSubmitting(true);
     try {
-      await updatePassword(newPassword);
-      setDone(true);
-      setTimeout(handleDismiss, 1500);
+      const updated = await updatePassword(newPassword);
+      // Cancelled reverification must never unlock the site. The parent gate
+      // only releases when Clerk's user resource reports passwordEnabled.
+      if (!updated?.passwordEnabled) {
+        setError(isAr ? 'لم يتم إنشاء كلمة المرور. أكمل التحقق ثم أعد المحاولة.' : 'Password was not created. Complete verification and try again.');
+        return;
+      }
+      await user?.reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : (isAr ? 'تعذر إنشاء كلمة المرور. حاول مرة أخرى.' : 'Could not set password. Please try again.'));
     } finally {
@@ -61,70 +48,32 @@ export default function SetPasswordPrompt() {
     }
   };
 
-  if (!open) {
-    return (
-      <div className="fixed bottom-4 inset-x-4 sm:inset-x-auto sm:end-4 sm:w-96 z-[2147483000]">
-        <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 p-4 flex items-start gap-3">
-          <div className="shrink-0 h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-            <KeyRound className="w-5 h-5" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-slate-900">{isAr ? 'أضف كلمة مرور لحسابك' : 'Add a password to your account'}</p>
-            <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
-              {isAr ? 'دخلت بحساب Google فقط. أضف كلمة مرور لتتمكن من الدخول حتى بدونه.' : 'You signed in with Google only. Add a password so you can sign in even without it.'}
-            </p>
-            <div className="flex items-center gap-2 mt-3">
-              <button onClick={() => setOpen(true)} className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition-colors">
-                {isAr ? 'إنشاء كلمة مرور' : 'Create password'}
-              </button>
-              <button onClick={handleDismiss} className="text-xs font-bold text-slate-500 hover:text-slate-700 px-2 py-1.5">
-                {isAr ? 'لاحقاً' : 'Later'}
-              </button>
-            </div>
-          </div>
-          <button onClick={handleDismiss} aria-label={isAr ? 'إغلاق' : 'Close'} className="shrink-0 text-slate-400 hover:text-slate-600">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div role="dialog" aria-modal="true" className="fixed inset-0 z-[2147483000] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-sm p-6">
-        {done ? (
-          <div className="text-center py-4">
-            <ShieldCheck className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
-            <p className="font-bold text-slate-900">{isAr ? 'تم إنشاء كلمة المرور بنجاح!' : 'Password created successfully!'}</p>
+    <section dir={isAr ? 'rtl' : 'ltr'} aria-labelledby="required-password-title" className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-slate-50 px-4 py-8 flex items-safe-center justify-center">
+      <form onSubmit={handleSubmit} className="my-auto w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-xl text-start space-y-5">
+        <KeyRound className="h-9 w-9 text-blue-600" aria-hidden="true" />
+        <div>
+          <h1 id="required-password-title" className="text-xl font-black text-slate-900">{isAr ? 'إنشاء كلمة مرور مطلوب' : 'Create a password to continue'}</h1>
+          <p className="mt-2 text-sm text-slate-600">{isAr ? 'يجب إنشاء كلمة مرور قبل استخدام الموقع، حتى عند تسجيل الدخول باستخدام Google.' : 'You must create a password before using the website, including when signing in with Google.'}</p>
+        </div>
+        <div>
+          <label htmlFor="required-password" className="mb-1 block text-sm font-bold text-slate-700">{isAr ? 'كلمة المرور الجديدة' : 'New password'}</label>
+          <div className="relative">
+            <input id="required-password" type={visible ? 'text' : 'password'} autoComplete="new-password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full rounded-xl border border-slate-200 p-3 pe-12 outline-none focus:ring-2 focus:ring-blue-500" minLength={8} required autoFocus disabled={submitting} />
+            <button type="button" onClick={() => setVisible(value => !value)} aria-label={visible ? (isAr ? 'إخفاء كلمة المرور' : 'Hide password') : (isAr ? 'إظهار كلمة المرور' : 'Show password')} aria-pressed={visible} className="absolute end-0 top-0 p-3 text-slate-500">{visible ? <EyeOff /> : <Eye />}</button>
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <h3 className="font-black text-slate-900 font-cairo">{isAr ? 'إنشاء كلمة مرور' : 'Create a password'}</h3>
-              <p className="text-xs text-slate-500 mt-1">{isAr ? 'سجلت دخولك بحساب Google. أضف كلمة مرور احتياطية.' : 'You signed in via Google. Add a backup password.'}</p>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">{isAr ? 'كلمة المرور الجديدة' : 'New password'}</label>
-              <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full text-sm p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none" minLength={8} required autoFocus />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">{isAr ? 'تأكيد كلمة المرور' : 'Confirm password'}</label>
-              <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full text-sm p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none" minLength={8} required />
-            </div>
-            {error && <p className="text-xs font-bold text-red-600">{error}</p>}
-            <div className="flex items-center gap-2">
-              <button type="submit" disabled={submitting} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-50 flex items-center justify-center gap-2">
-                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                {isAr ? 'حفظ' : 'Save'}
-              </button>
-              <button type="button" onClick={() => setOpen(false)} className="text-sm font-bold text-slate-500 hover:text-slate-700 px-3">
-                {isAr ? 'رجوع' : 'Back'}
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
+        </div>
+        <div>
+          <label htmlFor="required-password-confirm" className="mb-1 block text-sm font-bold text-slate-700">{isAr ? 'تأكيد كلمة المرور' : 'Confirm password'}</label>
+          <input id="required-password-confirm" type={visible ? 'text' : 'password'} autoComplete="new-password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full rounded-xl border border-slate-200 p-3 outline-none focus:ring-2 focus:ring-blue-500" minLength={8} required disabled={submitting} />
+        </div>
+        {error && <p role="alert" className="text-sm font-bold text-red-600">{error}</p>}
+        <button type="submit" disabled={submitting} className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 font-bold text-white hover:bg-blue-700 disabled:opacity-50">
+          {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+          {isAr ? 'إنشاء كلمة المرور والمتابعة' : 'Create password and continue'}
+        </button>
+        <button type="button" disabled={submitting} onClick={() => { void clerk.signOut().catch(() => setError(isAr ? 'تعذر تسجيل الخروج. حاول مرة أخرى.' : 'Could not sign out. Please try again.')); }} className="w-full text-sm font-bold text-slate-500 disabled:opacity-50">{isAr ? 'تسجيل الخروج' : 'Sign out'}</button>
+      </form>
+    </section>
   );
 }

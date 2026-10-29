@@ -122,6 +122,7 @@ export default async function RootLayout({
           <SessionRecoveryBoundary>
           <AuthProvider>
             <FeedbackSurfaceProvider>
+            <AccountEnhancements>
             <ProfileGuard>
               <div className="flex flex-col min-h-screen">
                 <Navbar />
@@ -131,10 +132,10 @@ export default async function RootLayout({
                 <Footer />
                 <IdeaFloatingButton />
                 <PendingAttendanceModal />
-                <AccountEnhancements />
                 <ClerkScrollLockFix />
               </div>
             </ProfileGuard>
+            </AccountEnhancements>
             </FeedbackSurfaceProvider>
           </AuthProvider>
           </SessionRecoveryBoundary>
