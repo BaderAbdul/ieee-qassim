@@ -22,7 +22,7 @@ FIREBASE_PRIVATE_KEY="private_key from the service-account JSON, with escaped ne
 
 Use a service account from the same project as `NEXT_PUBLIC_FIREBASE_PROJECT_ID`. Obtain it from Firebase Console → Project settings → Service accounts → Firebase Admin SDK. Keep these values server-only: never prefix them with `NEXT_PUBLIC_`, commit the JSON key, or share it in chat. Restart the development server after changing `.env.local`. Public Firebase configuration alone cannot authenticate the server endpoints; missing server credentials produce `Server configuration is unavailable.`
 
-For isolated local development without private credentials, enable the demo Firebase emulators instead. All settings below must be configured together; do not combine a live project ID with emulator settings:
+For isolated local  development without private credentials, enable the demo Firebase emulators instead. All settings below must be configured together; do not combine a live project ID with emulator settings:
 
 ```dotenv
 NEXT_PUBLIC_FIREBASE_API_KEY=demo-build-key
@@ -50,7 +50,7 @@ npm run test:spark
 npm test runs domain simulations and source contracts. test:firebase exercises actual rules, backend handlers and PDF rendering on a demo project; it never connects test writes to production. Java 21 and Node 24 are used for local testing. Deployed Functions target Node 22.
 
 ## Source map
-
+n
 - src/app/[locale]: public, student and organizer routes
 - src/context/AuthContext.tsx: Google sign-in and private user profile subscription
 - src/i18n and messages: Arabic/English routing and translations
