@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { get } from '@vercel/edge-config';
+import { get } from '@vercel/global-config';
 import { ApiError } from './errors';
 
 export const MAINTENANCE_BYPASS_COOKIE = 'ieee_maintenance_bypass';
@@ -30,15 +30,15 @@ export function verifyBypassCookieValue(value: string | undefined, secret: strin
 
 // Never reads the app database: the flag must stay readable even while Firestore/Postgres is down.
 export async function isMaintenanceOn(): Promise<boolean> {
-  if (!process.env.EDGE_CONFIG) return false;
+  if (!process.env.GLOBAL_CONFIG && !process.env.EDGE_CONFIG) return false;
   try { return (await get('maintenanceMode')) === true; }
   catch (error) { console.error('Maintenance flag read failed', error); return false; }
 }
 
 export async function setMaintenanceMode(on: boolean): Promise<void> {
-  const { EDGE_CONFIG_ID, VERCEL_API_TOKEN, VERCEL_TEAM_ID } = process.env;
-  if (!EDGE_CONFIG_ID || !VERCEL_API_TOKEN) throw new ApiError('unavailable', 'Maintenance mode is not configured (missing Edge Config credentials).');
-  const url = new URL(`https://api.vercel.com/v1/edge-config/${EDGE_CONFIG_ID}/items`);
+  const { GLOBAL_CONFIG_ID, VERCEL_API_TOKEN, VERCEL_TEAM_ID } = process.env;
+  if (!GLOBAL_CONFIG_ID || !VERCEL_API_TOKEN) throw new ApiError('unavailable', 'Maintenance mode is not configured (missing Global Config credentials).');
+  const url = new URL(`https://api.vercel.com/v1/global-config/${GLOBAL_CONFIG_ID}/items`);
   if (VERCEL_TEAM_ID) url.searchParams.set('teamId', VERCEL_TEAM_ID);
   const response = await fetch(url, {
     method: 'PATCH',
