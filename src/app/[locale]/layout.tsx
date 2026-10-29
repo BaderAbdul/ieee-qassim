@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from '@clerk/nextjs';
+import { getClerkLocalization } from '@/lib/clerkLocalization';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { notFound } from 'next/navigation';
@@ -9,6 +10,8 @@ import { routing } from '@/i18n/routing';
 import { AuthProvider } from '@/context/AuthContext';
 import SessionRecoveryBoundary from '@/components/auth/SessionRecoveryBoundary';
 import ProfileGuard from '@/components/auth/ProfileGuard';
+import ClerkScrollLockFix from '@/components/auth/ClerkScrollLockFix';
+import SetPasswordPrompt from '@/components/auth/SetPasswordPrompt';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import IdeaFloatingButton from '@/components/ui/IdeaFloatingButton';
@@ -16,6 +19,7 @@ import { FeedbackSurfaceProvider } from '@/components/events/RequiredFeedbackDia
 import PendingAttendanceModal from '@/components/events/PendingAttendanceModal';
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
+import { clerkAppearance } from '@/lib/clerkAppearance';
 import "../globals.css";
 
 const thmanyah = localFont({
@@ -104,7 +108,7 @@ export default async function RootLayout({
       <body
         className={`${cairo.variable} ${inter.variable} ${thmanyah.variable} font-sans antialiased bg-gray-50 text-gray-900`}
       >
-        <ClerkProvider>
+        <ClerkProvider appearance={clerkAppearance} localization={getClerkLocalization(locale)}>
         <NextIntlClientProvider messages={messages}>
           <SessionRecoveryBoundary>
           <AuthProvider>
@@ -118,6 +122,8 @@ export default async function RootLayout({
                 <Footer />
                 <IdeaFloatingButton />
                 <PendingAttendanceModal />
+                <SetPasswordPrompt />
+                <ClerkScrollLockFix />
               </div>
             </ProfileGuard>
             </FeedbackSurfaceProvider>
