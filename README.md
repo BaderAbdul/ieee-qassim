@@ -61,7 +61,7 @@ n
 - tests/firebase: real local integration/security tests
 - functions/scripts/prepareRelease.cjs: read-only-by-default existing-data preparation
 
-## Release status
+## Release status 
 
 The owner has chosen to keep Firebase on Spark. Core operations now use authenticated same-origin Vercel endpoints. Event/avatar images use server-validated Cloudinary uploads, and generated PDFs use authenticated Cloudinary assets with short-lived downloads. External certificate links remain supported. Certificate generation is driven one-at-a-time by the open organizer certificate page, not a Firebase trigger. Transactional notifications and bounded Resend retries are opt-in and run while the organizer dashboard is open; scheduled event reminders are still not ported. Read SPARK_RELEASE_REPORT.md before merging or deploying; the Cloud Functions report below is historical.
 
