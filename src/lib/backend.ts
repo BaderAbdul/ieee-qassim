@@ -39,7 +39,7 @@ export async function apiGet<Output = unknown>(path: string, params?: Record<str
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     signal: AbortSignal.timeout(20000),
   });
-  const result = await readBackendResponse(response, true);
+  const result = await readBackendResponse(response, true, true);
   return result as Output;
 }
 

@@ -1,10 +1,13 @@
 // Hosting/runtime failures can return an empty body or HTML instead of JSON.
 // Never turn that into a misleading JSON parsing exception in the student UI.
-export async function readBackendResponse(response: Response, allowArray = false): Promise<Record<string, unknown>> {
+export function readBackendResponse(response: Response, allowArray?: boolean, allowNull?: false): Promise<Record<string, unknown>>;
+export function readBackendResponse(response: Response, allowArray: boolean, allowNull: true): Promise<Record<string, unknown> | null>;
+export async function readBackendResponse(response: Response, allowArray = false, allowNull = false): Promise<Record<string, unknown> | null> {
   const message = `تعذر الاتصال بالخادم. حاول لاحقًا أو تواصل مع المنظم. / Server unavailable. Please retry or contact the organizer. (HTTP ${response.status})`;
   let result: Record<string, unknown>;
   try {
     const value = JSON.parse(await response.text());
+    if (value === null && allowNull && response.ok) return null;
     if (!value || typeof value !== 'object' || (Array.isArray(value) && !allowArray)) throw new Error();
     result = value;
   } catch {

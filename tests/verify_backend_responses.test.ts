@@ -20,3 +20,8 @@ test('GET endpoints can accept bare arrays while action responses stay strict', 
   assert.deepEqual(await readBackendResponse(Response.json([{ id: 'member-1' }]), true), [{ id: 'member-1' }]);
   await assert.rejects(readBackendResponse(Response.json([])), /HTTP 200/);
 });
+
+test('Nullable GET responses represent no pending feedback without an error', async () => {
+  assert.equal(await readBackendResponse(Response.json(null), true, true), null);
+  await assert.rejects(readBackendResponse(Response.json(null)), /HTTP 200/);
+});

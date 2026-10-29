@@ -40,8 +40,6 @@ export default function PendingAttendanceModal() {
   const [hoverRating, setHoverRating] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [verification, setVerification] = useState<{ uid: string; error: boolean } | null>(null);
-  const [retry, setRetry] = useState(0);
 
   // Polls for a pending attendance scan on the student's device (no server push available).
   useEffect(() => {
@@ -53,7 +51,6 @@ export default function PendingAttendanceModal() {
       try {
         const data = await apiGet<PendingCheckinDoc | null>('/api/me/pending-checkin');
         if (!active) return;
-        setVerification({ uid: user.uid, error: false });
         if (data) {
           setPendingDoc(data);
           setErrorMessage('');
@@ -72,7 +69,6 @@ export default function PendingAttendanceModal() {
       } catch (error) {
         if (!active) return;
         console.warn('Pending checkin poll:', error);
-        setVerification({ uid: user.uid, error: true });
       } finally {
         if (active) timer = setTimeout(poll, 4000);
       }
@@ -80,21 +76,12 @@ export default function PendingAttendanceModal() {
 
     poll();
     return () => { active = false; if (timer) clearTimeout(timer); };
-  }, [user, retry]);
+  }, [user]);
 
   if (!user) return null;
   // Organizer controls remain independent even if an organizer attended an event too.
   if (userData && userData.role !== 'student' && pathname.includes('/admin')) return null;
   if (surface.eventId) return null; // The dedicated rating page already makes the site inert.
-  if (!pendingDoc && (verification?.uid !== user.uid || verification.error)) {
-    return <RequiredFeedbackDialog eventId="feedback-verification">
-      <div className="w-full max-w-md rounded-3xl bg-white p-8 text-center" role="status">
-        <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-blue-600" />
-        <p>{verification?.error ? (isAr ? 'تعذر التحقق من التقييمات المطلوبة. تحقق من الاتصال وأعد المحاولة.' : 'Could not check required feedback. Check your connection and retry.') : (isAr ? 'جاري التحقق من التقييمات المطلوبة...' : 'Checking required feedback...')}</p>
-        {verification?.error && <button onClick={() => setRetry(value => value + 1)} className="mt-4 rounded-xl bg-blue-600 px-5 py-3 font-bold text-white">{isAr ? 'إعادة المحاولة' : 'Retry'}</button>}
-      </div>
-    </RequiredFeedbackDialog>;
-  }
   if (!pendingDoc) return null;
 
   const handleSelectChoice = (questionId: string, value: string) => {
