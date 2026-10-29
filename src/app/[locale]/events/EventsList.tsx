@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { PlatformEvent } from '@/lib/types';
-import { Calendar, Search, Filter, Lightbulb, CheckCircle2, Sparkles } from 'lucide-react';
+import { Calendar, Search, Filter, Lightbulb, CheckCircle2 } from 'lucide-react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import EventCard from '@/components/ui/EventCard';
@@ -43,6 +43,21 @@ export default function EventsList({ events: initialEvents, nextCursor = null, i
     const timer = window.setInterval(() => setNow(Date.now()), 60000);
     return () => window.clearInterval(timer);
   }, []);
+
+  // URL filters do not require a server render. Restore deep links and browser history.
+  useEffect(() => {
+    const restore = () => {
+      const params = new URLSearchParams(window.location.search);
+      setSearchQuery(params.get('q') ?? initialSearch);
+      setSelectedType(params.get('type') ?? initialType);
+      const category = params.get('view') ?? initialView;
+      setView(['all', 'upcoming', 'past', 'open'].includes(category) ? category : 'all');
+      setNow(Date.now());
+    };
+    restore();
+    window.addEventListener('popstate', restore);
+    return () => window.removeEventListener('popstate', restore);
+  }, [initialSearch, initialType, initialView]);
 
   const persistFilters = (q: string, type: string, category: string) => {
     const params = new URLSearchParams(window.location.search);
@@ -232,9 +247,9 @@ export default function EventsList({ events: initialEvents, nextCursor = null, i
               </span>
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-6 lg:gap-8">
-              {activeEvents.map((event) => (
+              {activeEvents.map((event, index) => (
                 <div key={event.id} className="transition-transform duration-300 h-full">
-                  <EventCard event={event} />
+                  <EventCard event={event} priority={index === 0} />
                 </div>
               ))}
             </div>
@@ -265,9 +280,9 @@ export default function EventsList({ events: initialEvents, nextCursor = null, i
       ) : (
         /* Standard Events Grid: 2 columns on mobile (portrait), 3 on desktop */
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-6 lg:gap-8">
-          {filteredEvents.map((event) => (
+          {filteredEvents.map((event, index) => (
             <div key={event.id} className="transition-transform duration-300 h-full">
-              <EventCard event={event} />
+              <EventCard event={event} priority={index === 0} />
             </div>
           ))}
         </div>

@@ -14,9 +14,10 @@ import { eventCache } from '@/lib/eventCache';
 
 interface EventCardProps {
   event: PlatformEvent;
+  priority?: boolean;
 }
 
-export default function EventCard({ event }: EventCardProps) {
+export default function EventCard({ event, priority = false }: EventCardProps) {
   if (typeof window !== 'undefined' && event?.id) {
     eventCache.set(event.id, event);
   }
@@ -69,6 +70,8 @@ export default function EventCard({ event }: EventCardProps) {
             alt={title}
             fill
             quality={75}
+            loading={priority ? 'eager' : 'lazy'}
+            fetchPriority={priority ? 'high' : 'auto'}
             className={`object-cover transition-transform duration-700 group-hover:scale-110 ${isCompleted ? 'grayscale-[30%] group-hover:grayscale-0' : ''}`}
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 50vw, 33vw"
           />
@@ -175,4 +178,3 @@ export default function EventCard({ event }: EventCardProps) {
     </div>
   );
 }
-
