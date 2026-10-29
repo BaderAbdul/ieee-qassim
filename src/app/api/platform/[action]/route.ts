@@ -10,6 +10,7 @@ import { adjustPoints, voidPointTransaction } from '@/lib/server/points';
 import { getMemberActivity, getMemberOverview, manageUser, searchMembers } from '@/lib/server/members';
 import { changeEventState, getAdminEvents, getAdminOverview, getAuditLog, getEventReport, getOperations, retryNotification } from '@/lib/server/operations';
 import { audit } from '@/lib/server/audit';
+import { isMaintenanceOn, setMaintenanceMode } from '@/lib/server/maintenance';
 import { saveHomepage } from '@/lib/server/content';
 import { saveEvent } from '@/lib/server/events';
 import { 
@@ -45,6 +46,13 @@ export async function POST(request: Request, context: { params: Promise<{ action
       case 'getAdminEvents': requireAdmin(actor); result = await getAdminEvents(data); break;
       case 'getAdminOverview': requireAdmin(actor); result = await getAdminOverview(); break;
       case 'getOperations': requireAdmin(actor); result = await getOperations(); break;
+      case 'getMaintenanceStatus': requireAdmin(actor); result = { on: await isMaintenanceOn() }; break;
+      case 'setMaintenanceMode': {
+        if (actor.role !== 'super_admin') throw new ApiError('permission-denied', 'Super admin required.');
+        if (typeof data.on !== 'boolean') throw new ApiError('invalid-argument', 'Invalid maintenance flag.');
+        await setMaintenanceMode(data.on);
+        result = { status: 'success', on: data.on }; break;
+      }
       case 'getEventReport': requireAdmin(actor); result = await getEventReport(documentId(data.eventId, 'eventId')); break;
       case 'searchMembers': requireAdmin(actor); result = await searchMembers(data); break;
       case 'getMemberOverview': requireAdmin(actor); result = await getMemberOverview(data); break;

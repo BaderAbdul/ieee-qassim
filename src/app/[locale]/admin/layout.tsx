@@ -15,6 +15,7 @@ import {
   ChevronRight,
   ShieldAlert,
   Home,
+  Wrench,
   Settings,
   Activity,
   BarChart3,
@@ -110,6 +111,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: isAr ? 'مركز المهام' : 'Operations', href: '/admin/operations', icon: <Activity size={20} /> },
     { name: isAr ? 'التقارير' : 'Reports', href: '/admin/reports', icon: <BarChart3 size={20} /> },
     ...(userData.role === 'super_admin' ? [{ name: isAr ? 'سجل الإجراءات' : 'Audit log', href: '/admin/audit', icon: <ClipboardList size={20} /> }] : []),
+    ...(userData.role === 'super_admin' ? [{ name: isAr ? 'وضع الصيانة' : 'Maintenance mode', href: '/admin/maintenance', icon: <Wrench size={20} /> }] : []),
   ];
 
   return (
