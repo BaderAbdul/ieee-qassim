@@ -32,7 +32,7 @@ export function httpsCallable<Input = unknown, Output = unknown>(_unused: unknow
 }
 
 export async function apiGet<Output = unknown>(path: string, params?: Record<string, string | undefined>): Promise<Output> {
-  const token = await window.Clerk?.session?.getToken().catch(() => null);
+  const token = path.startsWith('/api/public/') ? null : await window.Clerk?.session?.getToken().catch(() => null);
   const url = new URL(`${API_BASE_URL}${path}`);
   for (const [key, value] of Object.entries(params ?? {})) if (value !== undefined) url.searchParams.set(key, value);
   const response = await fetch(url, {
@@ -77,4 +77,5 @@ export async function uploadImage(file: File, purpose: 'avatar' | 'event') {
   if (typeof result.url !== 'string' || !result.url.startsWith('https://')) throw new Error('Invalid upload response. / رد رفع الصورة غير صالح.');
   return result.url;
 }
+
 

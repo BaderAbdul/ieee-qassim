@@ -11,7 +11,7 @@ import { AuthProvider } from '@/context/AuthContext';
 import SessionRecoveryBoundary from '@/components/auth/SessionRecoveryBoundary';
 import ProfileGuard from '@/components/auth/ProfileGuard';
 import ClerkScrollLockFix from '@/components/auth/ClerkScrollLockFix';
-import SetPasswordPrompt from '@/components/auth/SetPasswordPrompt';
+import AccountEnhancements from '@/components/auth/AccountEnhancements';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import IdeaFloatingButton from '@/components/ui/IdeaFloatingButton';
@@ -29,6 +29,7 @@ const thmanyah = localFont({
     { path: '../../fonts/thmanyah-serif-display-bold.woff2', weight: '700', style: 'normal' },
     { path: '../../fonts/thmanyah-serif-display-black.woff2', weight: '900', style: 'normal' }
   ],
+  preload: false,
   variable: '--font-thmanyah',
   display: 'swap',
 });
@@ -41,9 +42,13 @@ const cairo = Cairo({
 
 const inter = Inter({
   subsets: ['latin'],
+  preload: false,
   variable: '--font-inter',
   display: 'swap',
 });
+
+// Frankfurt keeps server rendering closer to the Riyadh API than the default US region.
+export const preferredRegion = 'fra1';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://www.ieeequ.online'),
@@ -122,7 +127,7 @@ export default async function RootLayout({
                 <Footer />
                 <IdeaFloatingButton />
                 <PendingAttendanceModal />
-                <SetPasswordPrompt />
+                <AccountEnhancements />
                 <ClerkScrollLockFix />
               </div>
             </ProfileGuard>
@@ -137,3 +142,4 @@ export default async function RootLayout({
     </html>
   );
 }
+
