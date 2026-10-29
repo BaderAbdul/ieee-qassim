@@ -117,7 +117,7 @@ export default async function RootLayout({
       <body
         className={`${cairo.variable} ${inter.variable} ${thmanyah.variable} font-sans antialiased bg-gray-50 text-gray-900`}
       >
-        <ClerkProvider prefetchUI={false} appearance={clerkAppearance} localization={getClerkLocalization(locale)}>
+        <ClerkProvider appearance={clerkAppearance} localization={getClerkLocalization(locale)}>
         <NextIntlClientProvider messages={messages}>
           <SessionRecoveryBoundary>
           <AuthProvider>
