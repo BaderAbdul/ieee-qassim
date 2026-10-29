@@ -6,8 +6,7 @@ import { Calendar, Search, Filter, Lightbulb, CheckCircle2, Sparkles } from 'luc
 import { useTranslations, useLocale } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import EventCard from '@/components/ui/EventCard';
-import { collection, doc, getDoc, getDocs, limit, orderBy, query, startAfter, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
+import { apiGet } from '@/lib/backend';
 import { sortEventsByClosestDate, toJsDate } from '@/lib/dateUtils';
 import { eventTypeLabel } from '@/lib/studentExperience';
 import { eventCache } from '@/lib/eventCache';
@@ -56,12 +55,10 @@ export default function EventsList({ events: initialEvents, nextCursor = null, i
     if (!cursor || loadingMore) return;
     setLoadingMore(true); setLoadError('');
     try {
-      const cursorDoc = await getDoc(doc(db, 'events', cursor));
-      if (!cursorDoc.exists()) throw new Error('Reload the page to refresh the event list.');
-      const snap = await getDocs(query(collection(db, 'events'), where('state', 'in', ['Published', 'Registration Open', 'Registration Closed', 'Ongoing', 'Completed']), orderBy('date', 'desc'), startAfter(cursorDoc), limit(24)));
-      const more = snap.docs.map(item => ({ id: item.id, ...item.data() }) as PlatformEvent);
+      const body = await apiGet<{ events: PlatformEvent[]; nextCursor: string | null }>('/api/public/events', { cursor, limit: '24' });
+      const more = body.events;
       setEvents(previous => sortEventsByClosestDate([...previous, ...more.filter(item => !previous.some(ev => ev.id === item.id))]));
-      setCursor(snap.size === 24 ? snap.docs.at(-1)?.id ?? null : null);
+      setCursor(body.nextCursor);
     } catch { setLoadError(isAr ? 'تعذر تحميل المزيد. أعد المحاولة أو حدّث الصفحة.' : 'Could not load more. Retry or refresh the page.'); }
     finally { setLoadingMore(false); }
   };

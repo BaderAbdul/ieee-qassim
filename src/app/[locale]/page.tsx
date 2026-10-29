@@ -9,6 +9,7 @@ const HeroUserCards = dynamic(() => import('./HeroUserCards'), { ssr: true });
 const HeroActionButtons = dynamic(() => import('./HeroActionButtons'), { ssr: true });
 import EventCard from '@/components/ui/EventCard';
 import { sortEventsByClosestDate } from '@/lib/dateUtils';
+import { API_BASE_URL } from '@/lib/apiBase';
 
 export const revalidate = 60; // Enable ISR, cache for 60 seconds
 
@@ -27,109 +28,15 @@ export default async function HomePage({ params }: PageProps) {
   let latestEvent: PlatformEvent | null = null;
 
   try {
-    // Dynamic import to avoid loading admin SDK in client bundles if mistakenly tree-shaken
-    const { adminDb } = await import('@/lib/firebase/admin');
-    
-    if (adminDb) {
-      const statsDoc = await adminDb.collection('settings').doc('homepage').get();
-      if (statsDoc.exists) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        stats = { ...stats, ...(statsDoc.data() as any) };
-      }
-
-      const validStates = ['Published', 'Registration Open', 'Ongoing', 'Completed', 'Registration Closed'];
-      const eventsSnap = await adminDb.collection('events')
-        .where('state', 'in', validStates)
-        .orderBy('date', 'desc')
-        .limit(20)
-        .get();
-
-      const evs = eventsSnap.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          date: data.date?.toDate ? data.date.toDate().toISOString() : data.date,
-          createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
-          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt
-        };
-      }) as PlatformEvent[];
-
-      const sortedEvents = sortEventsByClosestDate(evs);
-      eventsList = sortedEvents.slice(0, 3);
-
-      latestEvent = sortedEvents[0] || null;
-      const featuredId = stats.featuredEventId;
-      if (featuredId) {
-        try {
-        const evDoc = await adminDb.collection('events').doc(featuredId).get();
-        if (evDoc.exists && validStates.includes(evDoc.data()?.state)) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const data = evDoc.data() as any;
-          latestEvent = {  
-            id: evDoc.id, 
-            ...data,
-            date: data.date?.toDate ? data.date.toDate().toISOString() : data.date,
-            createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
-            updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt
-          } as PlatformEvent;
-        }
-        } catch (error) { console.warn('Featured event unavailable', error); }
-      }
-    }
+    const response = await fetch(`${API_BASE_URL}/api/public/home`, { next: { revalidate: 60 } });
+    if (!response.ok) throw new Error(`home fetch failed: ${response.status}`);
+    const home = await response.json() as { settings: typeof stats; events: PlatformEvent[]; featuredEvent: PlatformEvent | null };
+    stats = { ...stats, ...home.settings };
+    const sortedEvents = sortEventsByClosestDate(home.events);
+    eventsList = sortedEvents.slice(0, 3);
+    latestEvent = home.featuredEvent || sortedEvents[0] || null;
   } catch (error) {
-    console.warn("Firebase Admin failed or threw an error. Falling back to Client SDK for homepage events.", error);
-    try {
-      const { collection, getDocs, doc, getDoc, query, where, limit, orderBy } = await import('firebase/firestore');
-      const { db } = await import('@/lib/firebase/client');
-      
-      const statsDoc = await getDoc(doc(db, 'settings', 'homepage'));
-      if (statsDoc.exists()) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        stats = { ...stats, ...(statsDoc.data() as any) };
-      }
-
-      const validStates = ['Published', 'Registration Open', 'Ongoing', 'Completed', 'Registration Closed'];
-      const eventsSnap = await getDocs(
-        query(collection(db, 'events'), where('state', 'in', validStates), orderBy('date', 'desc'), limit(20))
-      );
-
-      const evs = eventsSnap.docs.map(d => {
-        const data = d.data();
-        return {
-          id: d.id,
-          ...data,
-          date: data.date?.toDate ? data.date.toDate().toISOString() : data.date,
-          createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
-          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt
-        };
-      }) as PlatformEvent[];
-
-      const sortedEvs = sortEventsByClosestDate(evs);
-      eventsList = sortedEvs.slice(0, 3);
-      latestEvent = sortedEvs[0] || null;
-
-      const featuredId = stats.featuredEventId;
-      if (featuredId) {
-        try {
-        const evDoc = await getDoc(doc(db, 'events', featuredId));
-        if (evDoc.exists() && validStates.includes(evDoc.data().state)) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const data = evDoc.data() as any;
-          latestEvent = {  
-            id: evDoc.id, 
-            ...data,
-            date: data.date?.toDate ? data.date.toDate().toISOString() : data.date,
-            createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
-            updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt
-          } as PlatformEvent;
-        }
-        } catch (error) { console.warn('Featured event unavailable', error); }
-      }
-    } catch (fallbackError) {
-      console.error("Fallback Client SDK also failed:", fallbackError);
-      throw fallbackError;
-    }
+    console.warn('Homepage data unavailable', error);
   }
 
   return (

@@ -3,12 +3,23 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Lightbulb, X, Send, Loader2 } from 'lucide-react';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
+import { API_BASE_URL } from '@/lib/backend';
+import { readBackendResponse } from '@/lib/backendResponse';
 import { useLocale } from 'next-intl';
 
+async function postIdea(data: Record<string, unknown>) {
+  const token = await window.Clerk?.session?.getToken();
+  if (!token) throw new Error('Sign in first. / سجّل دخولك أولًا.');
+  const response = await fetch(`${API_BASE_URL}/api/ideas`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+  await readBackendResponse(response);
+}
+
 export default function IdeaFloatingButton() {
-  const { user, userData } = useAuth();
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [type, setType] = useState('idea');
   const [title, setTitle] = useState('');
@@ -27,15 +38,7 @@ export default function IdeaFloatingButton() {
 
     setIsSubmitting(true);
     try {
-      await addDoc(collection(db, 'ideas'), {
-        userId: user.uid,
-        userName: userData?.arabicFullName || user.displayName || 'Unknown',
-        type,
-        title,
-        description,
-        status: 'pending',
-        createdAt: serverTimestamp(),
-      });
+      await postIdea({ type, title, description });
       setSuccess(true);
       setTimeout(() => {
         setIsOpen(false);

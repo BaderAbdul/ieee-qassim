@@ -9,10 +9,6 @@ if (process.env.MOCK_FONTS === 'true') {
 const withNextIntl = createNextIntlPlugin();
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ['@sparticuz/chromium', 'puppeteer-core'],
-  outputFileTracingIncludes: {
-    '/api/platform/\\[action\\]': ['./functions/src/assets/fonts/*.ttf', './node_modules/@sparticuz/chromium/bin/**'],
-  },
   images: {
     remotePatterns: [
       {
@@ -24,14 +20,6 @@ const nextConfig: NextConfig = {
         hostname: '**',
       }
     ]
-  },
-  async rewrites() {
-    return [
-      {
-        source: '/__/auth/:path*',
-        destination: 'https://ieeeqassim.firebaseapp.com/__/auth/:path*',
-      },
-    ];
   },
   async redirects() {
     return [

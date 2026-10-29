@@ -8,6 +8,15 @@ import { useAuth } from '@/context/AuthContext';
 import { Trophy, UserCircle, Pin } from 'lucide-react';
 import { useLocale } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
+import { apiGet } from '@/lib/backend';
+
+interface MeSummary {
+  registrationStatus: string | null;
+  latestCertificate: { eventTitle?: string } | null;
+  latestAttendance: { eventTitle?: string; eventTitleEn?: string } | null;
+  totalPoints: number;
+  rank: number | null;
+}
 
 interface HeroUserCardsProps {
   latestEvent: (Omit<PlatformEvent, 'date'> & { date: unknown; imageUrl?: string; image?: string }) | null;
@@ -27,90 +36,28 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
   const [loadingData, setLoadingData] = useState(true);
 
   useEffect(() => {
-    if (user && latestEvent) {
-      const fetchRegStatus = async () => {
-        try {
-          const { doc, getDoc } = await import('firebase/firestore');
-          const { db } = await import('@/lib/firebase/client');
-          const regDoc = await getDoc(doc(db, 'registrations', `${latestEvent.id}_${user.uid}`));
-          if (regDoc.exists()) {
-            setLatestEventRegStatus(regDoc.data().status);
-          }
-        } catch (error) { console.warn('Could not load featured registration', error); }
-      }
-      fetchRegStatus();
-    }
-  }, [user, latestEvent]);
-
-  useEffect(() => {
-    if (user) {
-      const fetchActivityAndRank = async () => {
-        try {
-          const { collection, query, getDocs, where, limit, orderBy, getCountFromServer } = await import('firebase/firestore');
-          const { db } = await import('@/lib/firebase/client');
-
-          // Fetch Certificates
-          const certQ = query(
-            collection(db, 'certificates'),
-            where('userId', '==', user.uid),
-            orderBy('issueDate', 'desc'),
-            limit(1)
-          );
-          
-          // Fetch Attendance
-          const attQ = query(
-            collection(db, 'attendance_logs'),
-            where('userId', '==', user.uid),
-            orderBy('timestamp', 'desc'),
-            limit(1)
-          );
-
-          const [certSnap, attSnap] = await Promise.all([
-            getDocs(certQ),
-            getDocs(attQ)
-          ]);
-
-          if (!certSnap.empty) {
-            const data = certSnap.docs[0].data();
-            setLatestCert({ title: data.eventTitle || (isAr ? 'شهادة مشاركة' : 'Certificate of Participation'), date: isAr ? 'شهادة معتمدة صدرت' : 'Certificate Issued' });
-          }
-
-          if (!attSnap.empty) {
-            setLatestAttendance({ title: isAr ? 'حضور موثّق' : 'Attendance Verified', date: isAr ? 'تم توثيق حضورك بنجاح' : 'Check-in successful' });
-          }
-
-          // Fetch Rank accurately for logged-in user
-          if (user && userData) {
-            const pts = Number(userData?.totalPoints) || 0;
-            if (pts > 0) {
-              const rankQuery = query(
-                collection(db, 'public_profiles'),
-                where('totalPoints', '>', pts)
-              );
-              try {
-                const rankCountSnap = await getCountFromServer(rankQuery);
-                setUserRank(rankCountSnap.data().count + 1);
-              } catch (countErr) {
-                console.warn('getCountFromServer failed, falling back to getDocs', countErr);
-                const rankDocsSnap = await getDocs(rankQuery);
-                setUserRank(rankDocsSnap.size + 1);
-              }
-            } else {
-              setUserRank(null); // Unranked if 0 points
-            }
-          } else {
-            setUserRank(null);
-          }
-
-        } catch (e) {
-          console.error('Error fetching activity data', e);
-        } finally {
-          setLoadingData(false);
+    if (!user) return;
+    let active = true;
+    (async () => {
+      try {
+        const summary = await apiGet<MeSummary>('/api/me/summary', latestEvent ? { eventId: latestEvent.id } : undefined);
+        if (!active) return;
+        if (summary.registrationStatus) setLatestEventRegStatus(summary.registrationStatus);
+        if (summary.latestCertificate) {
+          setLatestCert({ title: summary.latestCertificate.eventTitle || (isAr ? 'شهادة مشاركة' : 'Certificate of Participation'), date: isAr ? 'شهادة معتمدة صدرت' : 'Certificate Issued' });
         }
-      };
-      fetchActivityAndRank();
-    }
-  }, [user, userData, isAr]);
+        if (summary.latestAttendance) {
+          setLatestAttendance({ title: isAr ? 'حضور موثّق' : 'Attendance Verified', date: isAr ? 'تم توثيق حضورك بنجاح' : 'Check-in successful' });
+        }
+        setUserRank(summary.rank ?? null);
+      } catch (e) {
+        console.error('Error fetching activity data', e);
+      } finally {
+        if (active) setLoadingData(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [user, latestEvent, isAr]);
 
   // Reset the mobile stack when tapping anywhere outside the cards
   useEffect(() => {

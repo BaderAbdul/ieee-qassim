@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useState, use } from 'react';
-import { db } from '@/lib/firebase/client';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { apiGet } from '@/lib/backend';
 import { PlatformEvent, EventFeedbackResponse } from '@/lib/types';
 import { Link } from '@/i18n/routing';
 import { Star, Download, ArrowRight, Loader2, MessageSquare, BarChart3, Users, Award } from 'lucide-react';
@@ -25,24 +24,13 @@ export default function EventFeedbackDashboardPage({ params }: { params: Promise
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // 1. Fetch Event
-        const evSnap = await getDoc(doc(db, 'events', eventId));
-        if (evSnap.exists()) {
-          setEvent({ id: evSnap.id, ...evSnap.data() } as PlatformEvent);
-        }
-
-        // 2. Fetch Feedback entries
-        const q = query(collection(db, 'event_feedback'), where('eventId', '==', eventId));
-        const fbSnap = await getDocs(q);
-        const list: EventFeedbackResponse[] = [];
-        fbSnap.forEach((d) => {
-          list.push({ id: d.id, ...d.data() } as EventFeedbackResponse);
-        });
-
-        // Sort latest first
-        list.sort((a, b) => getMillis(b.createdAt) - getMillis(a.createdAt));
-
-        setFeedbacks(list);
+        const [eventData, feedback] = await Promise.all([
+          apiGet<PlatformEvent>(`/api/admin/events/${eventId}`),
+          apiGet<{ responses: EventFeedbackResponse[] }>(`/api/admin/events/${eventId}/feedback`),
+        ]);
+        setEvent(eventData);
+        // Already sorted latest-first by the backend.
+        setFeedbacks(feedback.responses);
       } catch (err) {
         console.error("Error fetching event feedback analytics:", err);
         setLoadError(err instanceof Error ? err : new Error('تعذر تحميل التقييمات'));

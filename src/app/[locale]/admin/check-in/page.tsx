@@ -1,27 +1,31 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot, limit } from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
-import { PlatformEvent } from '@/lib/types';
+import { apiGetArray } from '@/lib/backendResponse';
 import { Link } from '@/i18n/routing';
 import { QrCode } from 'lucide-react';
 import { ar } from 'date-fns/locale';
 import { formatDateSafe } from '@/lib/dateUtils';
 import { AdminError } from '@/components/admin/AdminData';
 
+interface OngoingEvent {
+  id: string; title: string; titleEn: string; date: string; state: string; location: string;
+  points: number; attendanceCount: number; requiresRegistration: boolean; type: string;
+}
+
 export default function AdminCheckInDashboard() {
-  const [events, setEvents] = useState<PlatformEvent[]>([]);
+  const [events, setEvents] = useState<OngoingEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
 
   useEffect(() => {
-        const q = query(collection(db, 'events'), where('state', '==', 'Ongoing'), limit(50));
-        return onSnapshot(q, snap => {
-        const fetchedEvents = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as PlatformEvent[];
-        setEvents(fetchedEvents); setError(''); setLoading(false);
-        }, reason => { setError(reason.message); setLoading(false); });
+    let active = true;
+    setLoading(true); setError('');
+    apiGetArray<OngoingEvent>('/api/admin/events/ongoing')
+      .then(fetchedEvents => { if (active) { setEvents(fetchedEvents); setLoading(false); } })
+      .catch(reason => { if (active) { setError(reason instanceof Error ? reason.message : 'Unable to load events'); setLoading(false); } });
+    return () => { active = false; };
   }, [revision]);
 
   if (loading) {

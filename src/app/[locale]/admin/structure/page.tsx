@@ -1,10 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
 import { Plus, Trash2, Edit2, Save, X, Search, ArrowUp, ArrowDown } from 'lucide-react';
-import { httpsCallable } from '@/lib/backend';
+import { apiGet, httpsCallable } from '@/lib/backend';
 import type { MemberSearchResult } from '@/lib/adminTypes';
 
 interface CommitteeMember {
@@ -68,14 +66,10 @@ export default function AdminStructurePage() {
     const fetchData = async () => {
       setLoading(true); setError('');
       try {
-        const docSnap = await getDoc(doc(db, 'settings', 'homepage'));
+        const data = await apiGet<{ structureRevision?: number; committees?: Committee[] }>('/api/admin/settings/homepage');
         if (!active) return;
-        structureRevision.current = Number(docSnap.data()?.structureRevision || 0);
-        if (docSnap.exists() && docSnap.data().committees) {
-          setCommittees(docSnap.data().committees);
-        } else {
-          setCommittees([]);
-        }
+        structureRevision.current = Number(data?.structureRevision || 0);
+        setCommittees(data?.committees ?? []);
       } catch (e) {
         console.error(e);
         if (active) setError('تعذر تحميل الهيكلة. أعد المحاولة.');

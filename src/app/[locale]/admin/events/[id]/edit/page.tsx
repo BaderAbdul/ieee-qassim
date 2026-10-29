@@ -1,5 +1,4 @@
 'use client';
-import { useAttendanceCount } from '@/lib/attendanceCount';
 
 import { formatDateSafe, parseRiyadhInput, toJsDate } from '@/lib/dateUtils';
 
@@ -7,8 +6,7 @@ import { uploadImage, httpsCallable } from '@/lib/backend';
 import Image from 'next/image';
 
 import { useState, useEffect, use } from 'react';
-import { doc, getDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
+import { apiGet } from '@/lib/backend';
 import { useRouter } from '@/i18n/routing';
 import { EventType, RegistrationMode, CustomQuestion } from '@/lib/types';
 import { ArrowRight, Save, Plus, Trash2, Archive, Bookmark, Check, Layers, BookmarkPlus } from 'lucide-react';
@@ -60,7 +58,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
     coverUrl: ''
   });
 
-  const attendanceCount = useAttendanceCount(eventId, formData.attendanceCount);
+  const attendanceCount = formData.attendanceCount;
 
   const [feedbackQuestions, setFeedbackQuestions] = useState<CustomQuestion[]>([]);
   const [isBankOpen, setIsBankOpen] = useState(false);
@@ -154,14 +152,12 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   useEffect(() => {
     const fetchEvent = async () => {
       try {
-        const docRef = doc(db, 'events', eventId);
-        const docSnap = await getDoc(docRef);
-        
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          const eventDate = data.date?.toDate ? data.date.toDate() : new Date(data.date);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data = await apiGet<Record<string, any>>(`/api/admin/events/${eventId}`);
+        {
+          const eventDate = new Date(data.date);
           setEventRevision(toJsDate(data.updatedAt)?.getTime() || 0);
-          
+
           setFormData({
             title: data.title || '',
             titleEn: data.titleEn || '',
@@ -259,7 +255,6 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         gainsEn: formData.gainsEn.split('\n').filter(g => g.trim()),
         speakers: formData.speakers.split(',').map(s => s.trim()).filter(s => s),
         feedbackQuestions: feedbackQuestions.filter(q => q.title.trim().length > 0),
-        updatedAt: serverTimestamp(),
       };
 
       // Automatically remember feedback questions in the organizer bank

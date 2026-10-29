@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, arrayRemove, increment } from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
+import { apiGet, API_BASE_URL } from '@/lib/backend';
+import { readBackendResponse } from '@/lib/backendResponse';
 import { useAuth } from '@/context/AuthContext';
 import { Lightbulb, ThumbsUp, LogIn, ChevronRight, Rocket, Calendar } from 'lucide-react';
 import { useLocale } from 'next-intl';
@@ -14,9 +14,10 @@ type Idea = {
   description: string;
   userName: string;
   type: string;
-  votesCount?: number;
-  voters?: string[];
-  isPublic?: boolean;
+  status?: string;
+  votesCount: number;
+  hasVoted: boolean;
+  createdAt?: string;
 };
 
 export default function IdeasClient() {
@@ -28,16 +29,8 @@ export default function IdeasClient() {
 
   const fetchIdeas = async () => {
     try {
-      const q = query(collection(db, 'ideas'), where('isPublic', '==', true));
-      const snapshot = await getDocs(q);
-      const fetchedIdeas = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Idea[];
-      
-      // Sort by votesCount descending
-      fetchedIdeas.sort((a, b) => (b.votesCount || 0) - (a.votesCount || 0));
-      
+      // Already sorted by votesCount desc, server-side.
+      const fetchedIdeas = await apiGet<Idea[]>('/api/ideas');
       setIdeas(fetchedIdeas);
     } catch (error) {
       console.error('Error fetching public ideas:', error);
@@ -51,43 +44,28 @@ export default function IdeasClient() {
     fetchIdeas();
   }, []);
 
-  const handleVote = async (ideaId: string, currentVoters: string[]) => {
+  const handleVote = async (ideaId: string, hasVoted: boolean) => {
     if (!user) {
       login();
       return;
     }
 
-    const hasVoted = currentVoters?.includes(user.uid);
-    const ideaRef = doc(db, 'ideas', ideaId);
-
     // Optimistic UI update
-    setIdeas(prev => prev.map(idea => {
-      if (idea.id === ideaId) {
-        const newVoters = hasVoted 
-          ? (idea.voters || []).filter(v => v !== user.uid)
-          : [...(idea.voters || []), user.uid];
-        
-        return {
-          ...idea,
-          voters: newVoters,
-          votesCount: newVoters.length
-        };
-      }
-      return idea;
-    }));
+    setIdeas(prev => prev.map(idea => idea.id === ideaId
+      ? { ...idea, hasVoted: !hasVoted, votesCount: idea.votesCount + (hasVoted ? -1 : 1) }
+      : idea));
 
     try {
-      if (hasVoted) {
-        await updateDoc(ideaRef, {
-          voters: arrayRemove(user.uid),
-          votesCount: increment(-1)
-        });
-      } else {
-        await updateDoc(ideaRef, {
-          voters: arrayUnion(user.uid),
-          votesCount: increment(1)
-        });
-      }
+      const token = await window.Clerk?.session?.getToken();
+      if (!token) throw new Error('Sign in first. / سجّل دخولك أولًا.');
+      const response = await fetch(`${API_BASE_URL}/api/ideas/${encodeURIComponent(ideaId)}/vote`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const result = await readBackendResponse(response) as { hasVoted: boolean; votesCount: number };
+      setIdeas(prev => prev.map(idea => idea.id === ideaId
+        ? { ...idea, hasVoted: result.hasVoted, votesCount: result.votesCount }
+        : idea));
     } catch (error) {
       console.error('Error voting:', error);
       // Revert on error by re-fetching
@@ -158,18 +136,18 @@ export default function IdeasClient() {
       ) : (
         <div className="grid gap-6">
           {ideas.map((idea) => {
-            const hasVoted = user ? idea.voters?.includes(user.uid) : false;
-            
+            const hasVoted = idea.hasVoted;
+
             return (
               <div key={idea.id} className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-100 hover:shadow-md transition-shadow flex flex-col sm:flex-row gap-6 items-start">
-                
+
                 {/* Voting Column */}
                 <div className="flex sm:flex-col items-center gap-2 bg-slate-50 rounded-2xl p-2 min-w-[80px] shrink-0 w-full sm:w-auto justify-center">
                   <button
-                    onClick={() => handleVote(idea.id, idea.voters || [])}
+                    onClick={() => handleVote(idea.id, idea.hasVoted)}
                     className={`p-3 rounded-xl transition-colors ${
-                      hasVoted 
-                        ? 'bg-amber-100 text-amber-600 hover:bg-amber-200' 
+                      hasVoted
+                        ? 'bg-amber-100 text-amber-600 hover:bg-amber-200'
                         : 'bg-white text-slate-400 hover:bg-amber-50 hover:text-amber-500 shadow-sm border border-slate-200'
                     }`}
                   >

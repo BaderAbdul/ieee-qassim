@@ -25,8 +25,7 @@ import {
   createTemplateFromEvent 
 } from '@/lib/customEventTemplates';
 import type { PlatformEvent } from '@/lib/types';
-import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
+import { httpsCallable } from '@/lib/backend';
 
 interface EventTemplatesModalProps {
   isOpen: boolean;
@@ -82,9 +81,8 @@ export default function EventTemplatesModal({
       const fetchEvents = async () => {
         setLoadingPastEvents(true);
         try {
-          const snap = await getDocs(query(collection(db, 'events'), limit(50)));
-          const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as PlatformEvent));
-          setPastEvents(list);
+          const result = await httpsCallable<unknown, { events: PlatformEvent[] }>(null, 'getAdminEvents')({});
+          setPastEvents(result.data.events);
         } catch (e) {
           console.error('Failed to load past events for templates', e);
         } finally {

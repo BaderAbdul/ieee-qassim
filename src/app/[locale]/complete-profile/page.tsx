@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
 import { useAuth } from '@/context/AuthContext';
-import { functions } from '@/lib/firebase/client';
+
 import { httpsCallable } from '@/lib/backend';
 import { normalizeStudentId, safeReturnTo } from '@/lib/studentExperience';
 
@@ -60,7 +60,7 @@ export default function CompleteProfilePage() {
       } else {
         // Check uniqueness in Firestore
         try {
-          const check = httpsCallable<{ universityId: string }, { available: boolean }>(functions, 'checkUniversityId');
+          const check = httpsCallable<{ universityId: string }, { available: boolean }>(null, 'checkUniversityId');
           const { data } = await check({ universityId: uidNorm });
           if (!data.available) {
             newErrors.universityId = t('errors.idTaken');
@@ -113,7 +113,7 @@ export default function CompleteProfilePage() {
       }
 
       // The server owns identity validation and the unique student-ID claim.
-      await httpsCallable(functions, 'saveProfile')(updateData);
+      await httpsCallable(null, 'saveProfile')(updateData);
       
       setSuccess(true);
       // Brief pause to show success state before redirecting

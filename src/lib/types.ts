@@ -1,4 +1,3 @@
-import { Timestamp } from 'firebase/firestore';
 
 export type EventType = 'Workshop' | 'Camp' | 'Lecture' | 'Competition' | 'Meetup' | 'Challenge' | 'Booth' | 'Other';
 export type EventState = 'Draft' | 'Published' | 'Registration Open' | 'Registration Closed' | 'Ongoing' | 'Completed' | 'Archived';
@@ -25,7 +24,7 @@ export interface PlatformEvent {
   descriptionEn: string;
   coverUrl?: string;
   type: EventType;
-  date: Timestamp | Date | string;
+  date: Date | string;
   location: string;
   locationEn: string;
   durationHours: number;
@@ -46,8 +45,8 @@ export interface PlatformEvent {
   checkinToken?: string;
   feedbackQuestions?: CustomQuestion[];
   isPinned?: boolean;
-  createdAt: Timestamp | Date | string;
-  updatedAt: Timestamp | Date | string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
 }
 
 export interface EventFeedbackResponse {
@@ -71,7 +70,7 @@ export interface PointTransaction {
   reason: string;
   sourceEventId?: string;
   createdBy: string;
-  createdAt: Timestamp | Date;
+  createdAt: Date | string;
 }
 
 export type CertificateState = 'Not Issued' | 'Generating' | 'Available' | 'Failed' | 'Revoked';
@@ -86,15 +85,15 @@ export interface Certificate {
   studentName: string;
   eventTitle: string;
   eventType: EventType;
-  attendanceDate: Timestamp | Date;
-  issueDate: Timestamp | Date;
-  createdAt: Timestamp | Date;
-  updatedAt: Timestamp | Date;
+  attendanceDate: Date | string;
+  issueDate: Date | string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
   attemptCount: number;
   lastError?: string;
   issuedBy: string;
   revokedBy?: string;
-  revokedAt?: Timestamp | Date;
+  revokedAt?: Date | string;
 }
 
 export type ShowcaseCategory = 
@@ -155,9 +154,9 @@ export interface ShowcaseApplication {
   status: ShowcaseStatus;
   adminNotes?: string;
   reviewedBy?: string;
-  reviewedAt?: Timestamp | Date | string | null;
-  createdAt: Timestamp | Date | string;
-  updatedAt: Timestamp | Date | string;
+  reviewedAt?: Date | string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
 }
 
 export interface ShowcaseSettings {
@@ -165,7 +164,7 @@ export interface ShowcaseSettings {
   applicationsOpen: boolean;
   openDate?: string | null;
   closeDate?: string | null;
-  updatedAt?: Timestamp | Date | string;
+  updatedAt?: Date | string;
   updatedBy?: string;
 }
 

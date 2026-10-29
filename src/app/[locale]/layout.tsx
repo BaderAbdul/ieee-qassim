@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClerkProvider } from '@clerk/nextjs';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { notFound } from 'next/navigation';
@@ -103,6 +104,7 @@ export default async function RootLayout({
       <body
         className={`${cairo.variable} ${inter.variable} ${thmanyah.variable} font-sans antialiased bg-gray-50 text-gray-900`}
       >
+        <ClerkProvider>
         <NextIntlClientProvider messages={messages}>
           <SessionRecoveryBoundary>
           <AuthProvider>
@@ -122,6 +124,7 @@ export default async function RootLayout({
           </AuthProvider>
           </SessionRecoveryBoundary>
         </NextIntlClientProvider>
+        </ClerkProvider>
         <SpeedInsights />
         <Analytics />
       </body>

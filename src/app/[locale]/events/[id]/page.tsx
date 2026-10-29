@@ -1,11 +1,8 @@
 'use client';
-import { useAttendanceCount } from '@/lib/attendanceCount';
 
 import React, { useEffect, useState, use } from 'react';
 import Image from 'next/image';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { httpsCallable } from '@/lib/backend';
-import { db, functions } from '@/lib/firebase/client';
+import { apiGet, httpsCallable } from '@/lib/backend';
 import { PlatformEvent } from '@/lib/types';
 import { useAuth } from '@/context/AuthContext';
 import { useLocale, useTranslations } from 'next-intl';
@@ -46,7 +43,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
   // Instant load from memory cache if available, eliminating skeleton flicker on navigation
   const cached = typeof window !== 'undefined' ? eventCache.get(eventId) : null;
   const [event, setEvent] = useState<PlatformEvent | null>(cached || null);
-  const attendanceCount = useAttendanceCount(eventId, event?.attendanceCount || 0, !!event && ['Completed', 'Archived'].includes(event.state));
+  const attendanceCount = event?.attendanceCount || 0;
   const [loading, setLoading] = useState<boolean>(!cached);
   const [loadError, setLoadError] = useState<Error | null>(null);
   
@@ -74,20 +71,39 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
   }, [isPosterOpen]);
 
   useEffect(() => {
-    return onSnapshot(doc(db, 'events', eventId), snapshot => {
-      const current = snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } as PlatformEvent : null;
-      if (current) {
+    let alive = true;
+    (async () => {
+      try {
+        const current = await apiGet<PlatformEvent>(`/api/public/events/${eventId}`);
+        if (!alive) return;
         eventCache.set(eventId, current);
+        setEvent(current); setAttendeeCount(current?.registeredCount ?? 0); setLoading(false);
+      } catch (error) {
+        if (!alive) return;
+        // 404 is a normal outcome here (shows the "not found" UI below); only real failures throw.
+        if (error instanceof Error && 'code' in error && (error as { code?: string }).code === 'not-found') {
+          setEvent(null);
+        } else {
+          setLoadError(error instanceof Error ? error : new Error('Could not load event.'));
+        }
+        setLoading(false);
       }
-      setEvent(current); setAttendeeCount(current?.registeredCount ?? 0); setLoading(false);
-    }, error => { setLoadError(error); setLoading(false); });
+    })();
+    return () => { alive = false; };
   }, [eventId]);
 
   useEffect(() => {
     if (!user) return;
-    return onSnapshot(doc(db, 'registrations', `${eventId}_${user.uid}`), snapshot => {
-      setRegistrationStatus(snapshot.exists() ? snapshot.data().status : null);
-    }, () => setActionError(isAr ? 'تعذر تحديث حالة التسجيل. حدّث الصفحة قبل إعادة المحاولة.' : 'Could not refresh registration status. Refresh before retrying.'));
+    let alive = true;
+    (async () => {
+      try {
+        const current = await apiGet<{ registration: { status: string } | null }>(`/api/me/events/${eventId}`);
+        if (alive) setRegistrationStatus(current.registration?.status ?? null);
+      } catch {
+        if (alive) setActionError(isAr ? 'تعذر تحديث حالة التسجيل. حدّث الصفحة قبل إعادة المحاولة.' : 'Could not refresh registration status. Refresh before retrying.');
+      }
+    })();
+    return () => { alive = false; };
   }, [user, eventId, isAr]);
 
   const handleRegister = async () => {
@@ -96,7 +112,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
     setIsRegistering(true);
     setActionError('');
     try {
-      const register = httpsCallable<{ eventId: string }, { status: string; attendeeCount: number }>(functions, 'registerForEvent');
+      const register = httpsCallable<{ eventId: string }, { status: string; attendeeCount: number }>(null, 'registerForEvent');
       const { data } = await register({ eventId });
       setRegistrationStatus(data.status);
       setAttendeeCount(data.attendeeCount);
@@ -110,7 +126,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
     setIsRegistering(true);
     setActionError('');
     try {
-      const cancel = httpsCallable<{ eventId: string }, { status: string; attendeeCount: number }>(functions, 'cancelRegistration');
+      const cancel = httpsCallable<{ eventId: string }, { status: string; attendeeCount: number }>(null, 'cancelRegistration');
       const { data } = await cancel({ eventId });
       setRegistrationStatus(data.status);
       setAttendeeCount(data.attendeeCount);

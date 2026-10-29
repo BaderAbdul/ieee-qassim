@@ -1,3 +1,5 @@
+import { clerkMiddleware } from "@clerk/nextjs/server";
+
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import createMiddleware from 'next-intl/middleware';
@@ -7,7 +9,10 @@ import { isMaintenanceOn, MAINTENANCE_BYPASS_COOKIE, verifyBypassCookieValue } f
 const intlMiddleware = createMiddleware(routing);
 const MAINTENANCE_PATH = /\/maintenance(\/|$)/;
 
-export default async function proxy(request: NextRequest) {
+async function middleware(request: NextRequest) {
+  // Clerk's matcher now covers /api too; the maintenance rewrite must not catch API routes
+  // (especially /api/maintenance-bypass itself) or JSON callers would get an HTML page back.
+  if (/^\/(api|trpc)(\/|$)/.test(request.nextUrl.pathname)) return NextResponse.next();
   const secret = process.env.MAINTENANCE_BYPASS_SECRET;
   const hasBypass = !!secret && verifyBypassCookieValue(request.cookies.get(MAINTENANCE_BYPASS_COOKIE)?.value, secret);
   if (!hasBypass && !MAINTENANCE_PATH.test(request.nextUrl.pathname) && await isMaintenanceOn()) {
@@ -18,8 +23,13 @@ export default async function proxy(request: NextRequest) {
   }
   return intlMiddleware(request);
 }
+export default clerkMiddleware(async (auth, request) => {
+  return middleware(request);
+});
 
 export const config = {
-  // Match all pathnames except for static files, _next, api, and Firebase auth paths
-  matcher: ['/((?!api|_next|_vercel|__.*|.*\\..*).*)', '/', '/(ar|en)/:path*']
+  matcher: [
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/(api|trpc)(.*)",
+  ],
 };

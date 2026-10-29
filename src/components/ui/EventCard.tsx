@@ -1,6 +1,5 @@
 'use client';
 
-import { useAttendanceCount } from '@/lib/attendanceCount';
 import React from 'react';
 import Image from 'next/image';
 import { PlatformEvent } from '@/lib/types';
@@ -50,8 +49,7 @@ export default function EventCard({ event }: EventCardProps) {
   const location = isAr ? event.location : event.locationEn || event.location;
 
   // Capacity logic
-  const attendanceCount = useAttendanceCount(event.id, event.attendanceCount || 0, isCompleted);
-  const capacityDisplay = eventCapacityLabel({ ...event, attendanceCount }, isAr);
+  const capacityDisplay = eventCapacityLabel(event, isAr);
 
   return (
     <div className={`group h-full rounded-2xl sm:rounded-[2rem] overflow-hidden flex flex-col transition-all duration-500 hover:-translate-y-2 relative ${

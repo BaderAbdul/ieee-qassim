@@ -3,14 +3,11 @@
 import React, { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Link } from '@/i18n/routing';
-import { doc, getDoc, collection, query, where, getDocs, getCountFromServer } from 'firebase/firestore';
-import { db, functions } from '@/lib/firebase/client';
-import { httpsCallable } from '@/lib/backend';
+import { apiGet, httpsCallable } from '@/lib/backend';
 import DigitalMemberCard from '@/components/ui/DigitalMemberCard';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { AlertCircle, CheckCircle, Sparkles, Award, LogIn } from 'lucide-react';
-import { User } from 'firebase/auth';
-import { useAuth, UserData } from '@/context/AuthContext';
+import { useAuth, UserData, type AuthUser } from '@/context/AuthContext';
 import { toJsDate } from '@/lib/dateUtils';
 import { PlatformEvent } from '@/lib/types';
 
@@ -28,7 +25,7 @@ export default function PublicPassPage({ params }: { params: Promise<{ id: strin
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  const [userData, setUserData] = useState<(UserData & { name?: string }) | null>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
   const [userRank, setUserRank] = useState<number | null>(null);
 
   // Ongoing Events & Checkin State
@@ -51,7 +48,7 @@ export default function PublicPassPage({ params }: { params: Promise<{ id: strin
     setInitiatingLive(true);
     setCheckinError('');
     try {
-      const initiateFn = httpsCallable<{ eventId: string; targetUserId: string }, { status: string; awardedPoints: number }>(functions, 'initiatePendingCheckIn');
+      const initiateFn = httpsCallable<{ eventId: string; targetUserId: string }, { status: string; awardedPoints: number }>(null, 'initiatePendingCheckIn');
       const resp = await initiateFn({ eventId: selectedEvent.id, targetUserId: userId });
       if (resp.data.status === 'already_checked_in') {
         setIsAttended(true);
@@ -75,42 +72,34 @@ export default function PublicPassPage({ params }: { params: Promise<{ id: strin
       try {
         setLoading(true);
         setError(null);
-        
-        const userDocRef = doc(db, 'public_profiles', userId);
-        const userDoc = await getDoc(userDocRef);
-        
-        if (!userDoc.exists()) {
+
+        let profile: (UserData & { rank: number | null }) | null = null;
+        try {
+          profile = await apiGet<UserData & { rank: number | null }>(`/api/public/profiles/${encodeURIComponent(userId)}`);
+        } catch {
+          profile = null;
+        }
+
+        if (!profile) {
           setError(isAr ? 'لم يتم العثور على هذا العضو.' : 'Member not found.');
           setLoading(false);
           return;
         }
 
-        const data = userDoc.data();
-        setUserData(data as UserData);
+        setUserData(profile);
+        setUserRank(profile.rank);
 
-        // Fetch rank
-        const myPoints = data?.totalPoints || 0;
-        const higherPointsQuery = query(
-          collection(db, 'public_profiles'),
-          where('totalPoints', '>', myPoints)
-        );
-        // Ranking must not delay the member pass or check-in controls.
-        void getCountFromServer(higherPointsQuery).then(snapshot => setUserRank(snapshot.data().count + 1)).catch(() => setUserRank(null));
-
-        // Fetch Ongoing Events for Check-in & Survey
-        try {
-          const eventsQuery = query(
-            collection(db, 'events'),
-            where('state', '==', 'Ongoing')
-          );
-          const eventsSnap = await getDocs(eventsQuery);
-          const eventsList = eventsSnap.docs.map(d => ({ id: d.id, ...d.data() } as PlatformEvent));
-          setOngoingEvents(eventsList);
-          if (eventsList.length > 0) {
-            setSelectedEvent(eventsList[0]);
+        // Ongoing-event check-in only works for organizers (the backend endpoint is admin-only).
+        if (isOrganizer) {
+          try {
+            const eventsList = await apiGet<PlatformEvent[]>('/api/admin/events/ongoing');
+            setOngoingEvents(eventsList);
+            if (eventsList.length > 0) {
+              setSelectedEvent(eventsList[0]);
+            }
+          } catch (evErr) {
+            console.warn('Could not load ongoing events:', evErr);
           }
-        } catch (evErr) {
-          console.warn('Could not load ongoing events:', evErr);
         }
 
       } catch (err) {
@@ -122,19 +111,19 @@ export default function PublicPassPage({ params }: { params: Promise<{ id: strin
     };
 
     loadData();
-  }, [userId, isAr]);
+  }, [userId, isAr, isOrganizer]);
 
-  // Check attendance when selected event or userId changes
+  // Check attendance when selected event or userId changes (organizer-only endpoint)
   useEffect(() => {
-    if (!userId || !selectedEvent) return;
+    if (!userId || !selectedEvent || !isOrganizer) { setIsAttended(false); return; }
     let active = true;
 
     const checkLog = async () => {
       setCheckingAttendance(true);
       try {
-        const logSnap = await getDoc(doc(db, 'attendance_logs', `${selectedEvent.id}_${userId}`));
+        const status = await apiGet<{ attended: boolean }>(`/api/admin/events/${encodeURIComponent(selectedEvent.id)}/attendance/${encodeURIComponent(userId)}`);
         if (active) {
-          setIsAttended(logSnap.exists());
+          setIsAttended(status.attended);
         }
       } catch {
         // Attendance logs might be restricted to organizers or owners, ignore error
@@ -145,7 +134,7 @@ export default function PublicPassPage({ params }: { params: Promise<{ id: strin
 
     checkLog();
     return () => { active = false; };
-  }, [userId, selectedEvent]);
+  }, [userId, selectedEvent, isOrganizer]);
 
   if (loading || !userId) {
     return (
@@ -171,15 +160,17 @@ export default function PublicPassPage({ params }: { params: Promise<{ id: strin
     );
   }
 
-  // Mock User object for the component
-  const mockUser = {
+  // Mock user object for the component
+  const mockUser: AuthUser = {
     uid: userId,
+    email: userData.email ?? null,
     photoURL: userData.publicProfile?.avatar || null,
-    displayName: userData.arabicFullName || userData.name || '',
+    displayName: userData.arabicFullName || userData.displayName || '',
     metadata: {
       creationTime: toJsDate(userData.createdAt)?.toISOString() || new Date().toISOString()
-    }
-  } as User;
+    },
+    getIdToken: async () => { throw new Error('Not available for a viewed profile.'); },
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 mt-16 flex items-center justify-center">
@@ -209,8 +200,8 @@ export default function PublicPassPage({ params }: { params: Promise<{ id: strin
                 </h2>
                 <p className="text-blue-100 text-xs sm:text-sm mt-1">
                   {isAr
-                    ? `تحضير الطالب: ${userData.arabicFullName || userData.name || 'العضو'}`
-                    : `Check-in for: ${userData.arabicFullName || userData.name || 'Member'}`}
+                    ? `تحضير الطالب: ${userData.arabicFullName || userData.displayName || 'العضو'}`
+                    : `Check-in for: ${userData.arabicFullName || userData.displayName || 'Member'}`}
                 </p>
               </div>
 
@@ -254,8 +245,8 @@ export default function PublicPassPage({ params }: { params: Promise<{ id: strin
                   </h3>
                   <p className="text-slate-600 text-sm mb-4">
                     {isAr
-                      ? `شكراً لمشاركتك التقييم. تم تسجيل حضور ${userData.arabicFullName || userData.name || 'العضو'} وإضافة ${awardedPoints} نقطة إلى الرصيد.`
-                      : `Attendance confirmed for ${userData.arabicFullName || userData.name || 'Member'}, +${awardedPoints} points awarded.`}
+                      ? `شكراً لمشاركتك التقييم. تم تسجيل حضور ${userData.arabicFullName || userData.displayName || 'العضو'} وإضافة ${awardedPoints} نقطة إلى الرصيد.`
+                      : `Attendance confirmed for ${userData.arabicFullName || userData.displayName || 'Member'}, +${awardedPoints} points awarded.`}
                   </p>
                   <div className="inline-flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-emerald-600/20">
                     <Award className="w-4 h-4" />
@@ -275,7 +266,7 @@ export default function PublicPassPage({ params }: { params: Promise<{ id: strin
                   </h3>
                   <p className="text-slate-600 text-xs sm:text-sm">
                     {isAr
-                      ? `تم تأكيد حضور ${userData.arabicFullName || userData.name || 'العضو'} مسبقاً وتم احتساب النقاط.`
+                      ? `تم تأكيد حضور ${userData.arabicFullName || userData.displayName || 'العضو'} مسبقاً وتم احتساب النقاط.`
                       : `Attendance has already been recorded for this event.`}
                   </p>
                 </div>

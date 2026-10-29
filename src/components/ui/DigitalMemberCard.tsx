@@ -6,11 +6,11 @@ import { ShieldCheck, Calendar, Trophy, Zap, Edit2, LogOut, Hexagon } from 'luci
 import Image from 'next/image';
 import { useLocale } from 'next-intl';
 
-import { User } from 'firebase/auth';
+import type { AuthUser } from '@/context/AuthContext';
 import { Link as LinkIcon } from 'lucide-react'; // Added LinkIcon for linkedin
 
 interface DigitalMemberCardProps {
-  user: User;
+  user: AuthUser;
   userData: { 
     arabicFullName?: string; 
     name?: string; 

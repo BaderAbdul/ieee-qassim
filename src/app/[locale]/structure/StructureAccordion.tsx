@@ -3,8 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Link as LinkIcon, ExternalLink, X, Users } from 'lucide-react';
 import Image from 'next/image';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
+import { apiGet } from '@/lib/backend';
 
 export interface CommitteeMember {
   userId: string;
@@ -70,13 +69,10 @@ export default function StructureAccordion({ committees, isAr }: StructureAccord
   useEffect(() => {
     let active = true;
     if (selectedMember && selectedMember.userId) {
-      getDoc(doc(db, 'public_profiles', selectedMember.userId))
-        .then((snap) => {
-          if (active && snap.exists()) {
-            const data = snap.data();
-            if (data.publicProfile) {
-              setRichProfile(data.publicProfile);
-            }
+      apiGet<{ publicProfile?: { avatar?: string; linkedin?: string; bio?: string } }>(`/api/public/profiles/${selectedMember.userId}`)
+        .then((data) => {
+          if (active && data.publicProfile) {
+            setRichProfile(data.publicProfile);
           }
           if (active) setIsLoadingProfile(false);
         })

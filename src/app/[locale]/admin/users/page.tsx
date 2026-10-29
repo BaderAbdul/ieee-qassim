@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { functions } from '@/lib/firebase/client';
+
 import { httpsCallable } from '@/lib/backend';
 import { useAuth } from '@/context/AuthContext';
 import { Search, Trophy, Shield, ShieldAlert, Trash2, Edit3, Lock, Unlock, Filter, ArrowUpDown } from 'lucide-react';
@@ -90,7 +90,7 @@ export default function AdminUsersPage() {
     setError(null);
 
     try {
-      const addManualPoints = httpsCallable(functions, 'addManualPoints');
+      const addManualPoints = httpsCallable(null, 'addManualPoints');
       const key = JSON.stringify([selectedUser.id, amount, reason.trim()]);
       if (pointOperation.current?.key !== key) pointOperation.current = { key, id: crypto.randomUUID() };
       const response = await addManualPoints({
@@ -124,7 +124,7 @@ export default function AdminUsersPage() {
     if (userData?.role !== 'super_admin') return alert('غير مصرح لك بتغيير الصلاحيات');
     if (!confirm('هل أنت متأكد من تغيير صلاحية هذا المستخدم؟')) return;
     try {
-      await httpsCallable(functions, 'manageUser')({ userId, change: 'role', role: newRole });
+      await httpsCallable(null, 'manageUser')({ userId, change: 'role', role: newRole });
       setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
     } catch (err) {
       console.error(err);
@@ -137,7 +137,7 @@ export default function AdminUsersPage() {
     const actionStr = currentRestricted ? 'فك التقييد عن' : 'تقييد';
     if (!confirm(`هل أنت متأكد من ${actionStr} هذا المستخدم؟`)) return;
     try {
-      await httpsCallable(functions, 'manageUser')({ userId, change: 'restriction', isRestricted: !currentRestricted });
+      await httpsCallable(null, 'manageUser')({ userId, change: 'restriction', isRestricted: !currentRestricted });
       setUsers(users.map(u => u.id === userId ? { ...u, isRestricted: !currentRestricted } : u));
     } catch (err) {
       console.error(err);
@@ -149,7 +149,7 @@ export default function AdminUsersPage() {
     if (userData?.role !== 'super_admin') return alert('غير مصرح لك بحذف الحسابات');
     if (!confirm('أرشفة هذا الحساب ومنعه من استخدام المنصة؟ ستُحفظ سجلاته السابقة ويمكن فك التقييد لاحقًا.')) return;
     try {
-      await httpsCallable(functions, 'manageUser')({ userId, change: 'delete' });
+      await httpsCallable(null, 'manageUser')({ userId, change: 'delete' });
       setUsers(users.map(u => u.id === userId ? { ...u, isRestricted: true } : u));
     } catch (err) {
       console.error(err);

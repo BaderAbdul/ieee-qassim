@@ -1,11 +1,9 @@
 'use client';
-import { useAttendanceCount } from '@/lib/attendanceCount';
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useParams, usePathname } from 'next/navigation';
 import { useLocale } from 'next-intl';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
+import { apiGet } from '@/lib/backend';
 import { Link } from '@/i18n/routing';
 import type { PlatformEvent, EventState } from '@/lib/types';
 import { AdminError, AdminLoading } from './AdminData';
@@ -26,16 +24,21 @@ export const eventStateLabel = (state: EventState, isAr: boolean) => isAr ? arab
 export default function EventWorkspace({ children }: { children: React.ReactNode }) {
   const { id } = useParams<{ id: string }>(); const pathname = usePathname(); const isAr = useLocale() === 'ar';
   const [event, setEvent] = useState<PlatformEvent | null>(null);
-  const attendanceCount = useAttendanceCount(id, event?.attendanceCount || 0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true); const [revision, setRevision] = useState(0);
   useEffect(() => {
-    const unsubscribe = onSnapshot(doc(db, 'events', id), snapshot => {
+    let active = true;
+    setLoading(true);
+    apiGet<PlatformEvent>(`/api/admin/events/${encodeURIComponent(id)}`).then(data => {
+      if (!active) return;
+      setLoading(false); setError(null); setEvent(data);
+    }).catch(reason => {
+      if (!active) return;
       setLoading(false);
-      if (!snapshot.exists()) { setError(isAr ? 'الفعالية غير موجودة أو لم تعد متاحة.' : 'Event not found or no longer available.'); setEvent(null); return; }
-      setError(null); setEvent({ id: snapshot.id, ...snapshot.data() } as PlatformEvent);
-    }, reason => { setLoading(false); setError(reason.message); });
-    return unsubscribe;
+      setError(reason instanceof Error ? reason.message : (isAr ? 'الفعالية غير موجودة أو لم تعد متاحة.' : 'Event not found or no longer available.'));
+      setEvent(null);
+    });
+    return () => { active = false; };
   }, [id, isAr, revision]);
   const base = '/admin/events/' + id;
   const tabs = [
@@ -48,8 +51,8 @@ export default function EventWorkspace({ children }: { children: React.ReactNode
   ];
   if (loading) return <AdminLoading />;
   if (error || !event) return <AdminError message={error || 'Event unavailable'} retry={() => { setLoading(true); setRevision(value => value + 1); }} />;
-  return <EventContext.Provider value={{ ...event, attendanceCount }}><div className="space-y-6">
-    <header className="rounded-2xl border border-purple-100 bg-white p-5 shadow-sm"><Link href="/admin/events" className="text-sm font-bold text-purple-600">{isAr ? '← جميع الفعاليات' : '← All events'}</Link><div className="mt-3 flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-black font-cairo text-slate-900">{!isAr && event.titleEn ? event.titleEn : event.title}</h1><p className="mt-2 text-sm text-slate-500">{eventStateLabel(event.state, isAr)} · {isAr ? 'المسجلون:' : 'Registered:'} {event.registeredCount || 0} · {isAr ? 'الحضور:' : 'Attended:'} {attendanceCount}</p></div><Link href={`/events/${id}`} className="rounded-lg border px-3 py-2 text-sm font-bold">{isAr ? 'عرض صفحة الطالب' : 'View student page'}</Link></div>
+  return <EventContext.Provider value={event}><div className="space-y-6">
+    <header className="rounded-2xl border border-purple-100 bg-white p-5 shadow-sm"><Link href="/admin/events" className="text-sm font-bold text-purple-600">{isAr ? '← جميع الفعاليات' : '← All events'}</Link><div className="mt-3 flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-black font-cairo text-slate-900">{!isAr && event.titleEn ? event.titleEn : event.title}</h1><p className="mt-2 text-sm text-slate-500">{eventStateLabel(event.state, isAr)} · {isAr ? 'المسجلون:' : 'Registered:'} {event.registeredCount || 0} · {isAr ? 'الحضور:' : 'Attended:'} {event.attendanceCount || 0}</p></div><Link href={`/events/${id}`} className="rounded-lg border px-3 py-2 text-sm font-bold">{isAr ? 'عرض صفحة الطالب' : 'View student page'}</Link></div>
       <nav aria-label={isAr ? 'مساحة عمل الفعالية' : 'Event workspace'} className="mt-5 flex flex-wrap gap-2 border-t pt-4">{tabs.map(tab => {
         const active = tab.path ? pathname.endsWith(base + tab.path) : pathname.endsWith(base);
         return <Link key={tab.path} href={base + tab.path} aria-current={active ? 'page' : undefined} className={`rounded-lg px-3 py-2 text-sm font-bold ${active ? 'bg-purple-600 text-white' : 'bg-slate-50 text-slate-600 hover:bg-purple-50'}`}>{tab.label}</Link>;

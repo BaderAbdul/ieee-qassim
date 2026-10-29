@@ -3,17 +3,13 @@
 import React, { useEffect, useState } from 'react';
 import { useFeedbackDraft } from '@/lib/useFeedbackDraft';
 import { useAuth } from '@/context/AuthContext';
-import { collection, query, where, onSnapshot, limit } from 'firebase/firestore';
-import { db, functions } from '@/lib/firebase/client';
-import { httpsCallable } from '@/lib/backend';
+import { apiGet, httpsCallable } from '@/lib/backend';
 import { useLocale } from 'next-intl';
 import { usePathname } from 'next/navigation';
 import { RequiredFeedbackDialog, useFeedbackSurface } from './RequiredFeedbackDialog';
 import { Star, Sparkles, Award, Send, AlertCircle, Loader2 } from 'lucide-react';
 
 interface PendingCheckinDoc {
-  id: string;
-  userId: string;
   eventId: string;
   eventTitle: string;
   eventTitleEn?: string;
@@ -28,7 +24,8 @@ interface PendingCheckinDoc {
     quickChips?: string[];
   }[];
   status: 'pending' | 'completed' | 'cancelled';
-  expiresAt?: { toMillis?: () => number } | string;
+  attendanceRecorded?: boolean;
+  scannedAt?: string | null;
 }
 
 export default function PendingAttendanceModal() {
@@ -46,42 +43,43 @@ export default function PendingAttendanceModal() {
   const [verification, setVerification] = useState<{ uid: string; error: boolean } | null>(null);
   const [retry, setRetry] = useState(0);
 
-  // Real-time listener for pending attendance scans on student's device
+  // Polls for a pending attendance scan on the student's device (no server push available).
   useEffect(() => {
     if (!user) return;
+    let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
-    const q = query(
-      collection(db, 'pending_checkins'),
-      where('userId', '==', user.uid),
-      where('status', '==', 'pending'),
-      limit(1)
-    );
+    const poll = async () => {
+      try {
+        const data = await apiGet<PendingCheckinDoc | null>('/api/me/pending-checkin');
+        if (!active) return;
+        setVerification({ uid: user.uid, error: false });
+        if (data) {
+          setPendingDoc(data);
+          setErrorMessage('');
 
-    const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
-      if (!snapshot.metadata.fromCache) setVerification({ uid: user.uid, error: false });
-      if (!snapshot.empty) {
-        const docSnap = snapshot.docs[0];
-        const data = docSnap.data() as PendingCheckinDoc;
-        setPendingDoc({ ...data, id: docSnap.id });
-        setErrorMessage('');
-
-        // Subtle haptic vibration if supported on mobile
-        if (typeof window !== 'undefined' && 'vibrate' in navigator) {
-          try {
-            navigator.vibrate([100, 50, 100]);
-          } catch {
-            // Haptics optional
+          // Subtle haptic vibration if supported on mobile
+          if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+            try {
+              navigator.vibrate([100, 50, 100]);
+            } catch {
+              // Haptics optional
+            }
           }
+        } else {
+          setPendingDoc(null);
         }
-      } else {
-        setPendingDoc(null);
+      } catch (error) {
+        if (!active) return;
+        console.warn('Pending checkin poll:', error);
+        setVerification({ uid: user.uid, error: true });
+      } finally {
+        if (active) timer = setTimeout(poll, 4000);
       }
-    }, (error) => {
-      console.warn('Pending checkins listener:', error);
-      setVerification({ uid: user.uid, error: true });
-    });
+    };
 
-    return () => unsubscribe();
+    poll();
+    return () => { active = false; if (timer) clearTimeout(timer); };
   }, [user, retry]);
 
   if (!user && authLoading && !pathname.endsWith('/checkin')) {
@@ -91,7 +89,7 @@ export default function PendingAttendanceModal() {
   // Organizer controls remain independent even if an organizer attended an event too.
   if (userData && userData.role !== 'student' && pathname.includes('/admin')) return null;
   if (surface.eventId) return null; // The dedicated rating page already makes the site inert.
-  if ((!pendingDoc || pendingDoc.userId !== user.uid) && (verification?.uid !== user.uid || verification.error)) {
+  if (!pendingDoc && (verification?.uid !== user.uid || verification.error)) {
     return <RequiredFeedbackDialog eventId="feedback-verification">
       <div className="w-full max-w-md rounded-3xl bg-white p-8 text-center" role="status">
         <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-blue-600" />
@@ -100,7 +98,7 @@ export default function PendingAttendanceModal() {
       </div>
     </RequiredFeedbackDialog>;
   }
-  if (!pendingDoc || pendingDoc.userId !== user.uid) return null;
+  if (!pendingDoc) return null;
 
   const handleSelectChoice = (questionId: string, value: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }));
@@ -141,7 +139,7 @@ export default function PendingAttendanceModal() {
     setIsSubmitting(true);
 
     try {
-      const submitCheckInFn = httpsCallable(functions, 'submitEventFeedback');
+      const submitCheckInFn = httpsCallable(null, 'submitEventFeedback');
       await submitCheckInFn({
         eventId: pendingDoc.eventId,
         feedbackData: {

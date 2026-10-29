@@ -2,9 +2,7 @@
 
 import { useEffect, useState, use, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { db, functions } from '@/lib/firebase/client';
-import { httpsCallable } from '@/lib/backend';
-import { doc, getDoc } from 'firebase/firestore';
+import { apiGet, httpsCallable } from '@/lib/backend';
 import { useSearchParams } from 'next/navigation';
 import { Link } from '@/i18n/routing';
 import { CheckCircle, XCircle, Loader2, Star, Sparkles, Award, Send } from 'lucide-react';
@@ -44,7 +42,7 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
     if (!token || !user) return Promise.resolve();
     const key = `${eventId}:${user.uid}:${token}`;
     if (attendanceRequest.current?.key === key) return attendanceRequest.current.promise;
-    const promise = httpsCallable(functions, 'submitCheckIn')({ eventId, token }).then(result => {
+    const promise = httpsCallable(null, 'submitCheckIn')({ eventId, token }).then(result => {
       setFeedbackMode(true);
       return result;
     }).catch(error => { attendanceRequest.current = null; throw error; });
@@ -62,50 +60,48 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
     return () => { active = false; };
   }, [ensureAttendance, token, user, isAr]);
 
-  // Opening the instruction link after a manual scan should still expose feedback.
+  // Opening the instruction link after a manual scan should still expose feedback, and prefill
+  // an existing answer for editing. One call covers both (registration status + feedback).
   useEffect(() => {
-    if (!user || token || feedbackMode) return;
+    if (!user || token) return;
     let active = true;
-    void getDoc(doc(db, 'registrations', `${eventId}_${user.uid}`)).then(registration => {
-      if (active && registration.data()?.status === 'attended') {
+    void apiGet<{
+      registration: { status: string } | null;
+      feedback: { rating: number; answers: Record<string, string> } | null;
+    }>(`/api/me/events/${encodeURIComponent(eventId)}`).then(data => {
+      if (!active) return;
+      if (data.registration?.status === 'attended') {
         setFeedbackMode(true);
         setStatus('idle_form');
       }
-    }).catch(() => { /* Instruction page remains available if this optional lookup fails. */ });
+      if (data.feedback) {
+        setRating(data.feedback.rating || 5);
+        setAnswers(data.feedback.answers || {});
+      }
+    }).catch(() => { /* Instruction page / editable draft remain usable if this lookup fails. */ });
     return () => { active = false; };
-  }, [user, token, feedbackMode, eventId]);
+  }, [user, token, eventId, setRating, setAnswers]);
 
   // Fetch Event Details
   useEffect(() => {
     const fetchEvent = async () => {
       try {
-        const evSnap = await getDoc(doc(db, 'events', eventId));
-        if (evSnap.exists()) {
-          const current = { id: evSnap.id, ...evSnap.data() } as PlatformEvent;
-          eventCache.set(eventId, current);
-          setEvent(current);
-        } else { setStatus('error'); setErrorMessage(isAr ? 'هذه الفعالية غير متاحة.' : 'This event is unavailable.'); }
+        const current = await apiGet<PlatformEvent>(`/api/public/events/${encodeURIComponent(eventId)}`);
+        eventCache.set(eventId, current);
+        setEvent(current);
       } catch (err) {
         console.error("Error loading event for check-in", err);
-        setStatus('error'); setErrorMessage(isAr ? 'تعذر تحميل الفعالية. أعد المحاولة.' : 'Could not load the event. Please retry.');
+        const code = err instanceof Error ? (err as Error & { code?: string }).code : undefined;
+        setStatus('error');
+        setErrorMessage(code === 'not-found'
+          ? (isAr ? 'هذه الفعالية غير متاحة.' : 'This event is unavailable.')
+          : (isAr ? 'تعذر تحميل الفعالية. أعد المحاولة.' : 'Could not load the event. Please retry.'));
       } finally {
         setEventLoading(false);
       }
     };
     fetchEvent();
   }, [eventId, isAr]);
-
-  useEffect(() => {
-    if (token || !feedbackMode || !user) return;
-    let active = true;
-    // Authorization is enforced by the feedback endpoint; avoid a redundant registration read.
-    void getDoc(doc(db, 'event_feedback', `${eventId}_${user.uid}`)).then(feedback => {
-      if (active && feedback.exists()) {
-        setRating(feedback.data().rating || 5); setAnswers(feedback.data().answers || {});
-      }
-    }).catch(() => { /* The editable draft remains usable; submission validates eligibility. */ });
-    return () => { active = false; };
-  }, [token, feedbackMode, user, eventId, setRating, setAnswers]);
 
   const handleSelectChoice = (questionId: string, value: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }));
@@ -144,7 +140,7 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
 
     try {
       await ensureAttendance();
-      const submitCheckInFn = httpsCallable(functions, 'submitEventFeedback');
+      const submitCheckInFn = httpsCallable(null, 'submitEventFeedback');
       const response = await submitCheckInFn({
         eventId,
         ...(feedbackMode ? {} : { token }),

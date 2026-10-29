@@ -2,8 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Trophy } from 'lucide-react';
-import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
+import { apiGet } from '@/lib/backend';
 import LeaderboardList, { LeaderboardUser } from './LeaderboardList';
 import LeaderboardSkeleton from '@/components/skeletons/LeaderboardSkeleton';
 import { useLocale } from 'next-intl';
@@ -18,28 +17,29 @@ export default function LeaderboardPage() {
   const [loadError, setLoadError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const q = query(collection(db, 'public_profiles'), orderBy('totalPoints', 'desc'), limit(50));
-    return onSnapshot(q, snap => {
-          
-        const users = snap.docs.map(d => {
-          const data = d.data();
-          return {
-            id: d.id,
-            name: data.arabicFullName || data.displayName || (isAr ? 'عضو' : 'Member'),
-            points: data.totalPoints || 0,
-            photoUrl: data.photoURL || data.photoUrl,
-            department: data.major || data.department
-          };
-        }).filter(u => u.points > 0);
-        
+    let alive = true;
+    (async () => {
+      try {
+        const rows = await apiGet<Array<{ id: string; arabicFullName?: string; displayName?: string; totalPoints?: number; photoURL?: string; major?: string }>>('/api/public/leaderboard', { limit: '50' });
+        if (!alive) return;
+        const users = rows.map(data => ({
+          id: data.id,
+          name: data.arabicFullName || data.displayName || (isAr ? 'عضو' : 'Member'),
+          points: data.totalPoints || 0,
+          photoUrl: data.photoURL,
+          department: data.major,
+        })).filter(u => u.points > 0);
         setTopUsers(users);
         setLoadError(null);
         setLoading(false);
-      }, error => {
+      } catch (error) {
+        if (!alive) return;
         console.error("Error fetching leaderboard", error);
         setLoadError(error instanceof Error ? error : new Error('Unable to load leaderboard'));
         setLoading(false);
-      });
+      }
+    })();
+    return () => { alive = false; };
   }, [isAr]);
 
   if (loadError) throw loadError;

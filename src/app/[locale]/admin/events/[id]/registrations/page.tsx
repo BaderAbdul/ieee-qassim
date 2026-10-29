@@ -1,11 +1,10 @@
 'use client';
 
 import { useEffect, useState, use, useRef } from 'react';
-import { collection, query, where, getDocs, doc, getDoc, getCountFromServer, limit, orderBy, documentId, startAfter, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { downloadCSV } from '@/lib/csv';
 import { registrationAction, runOperations, type OperationResult } from '@/lib/admin-operations';
-import { db, functions } from '@/lib/firebase/client';
-import { httpsCallable } from '@/lib/backend';
+import { apiGet, httpsCallable } from '@/lib/backend';
+import { apiGetArray } from '@/lib/backendResponse';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
 import { ArrowRight, Download, Users, Check, X, Clock, UserCheck, UserX, CheckSquare, Square, Trophy, QrCode, RefreshCw } from 'lucide-react';
@@ -25,16 +24,22 @@ interface RegistrationData {
   status: string;
   attended?: boolean;
   isWalkIn?: boolean;
-  timestamp: { toDate?: () => Date } | Date | null;
-  attendedAt?: { toDate?: () => Date } | Date | null;
-  registeredAt?: { toDate?: () => Date } | Date | null;
+  timestamp: string | Date | null;
+  attendedAt?: string | Date | null;
+  registeredAt?: string | Date | null;
 }
 
-const toDate = (val: { toDate?: () => Date } | Date | null | undefined): Date | null => {
+interface RegistrationsPage {
+  registrations: RegistrationData[];
+  nextCursor: string | null;
+  counts: { total: number; approved: number; waiting: number; attended: number; attendanceLogs: number };
+}
+
+const toDate = (val: string | Date | null | undefined): Date | null => {
   if (!val) return null;
   if (val instanceof Date) return val;
-  if (typeof val.toDate === 'function') return val.toDate();
-  return null;
+  const parsed = new Date(val);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
 export default function RegistrationDeskPage({ params }: { params: Promise<{ id: string }> }) {
@@ -44,8 +49,8 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
   const [registrations, setRegistrations] = useState<RegistrationData[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<Error | null>(null);
-  const [pageCursor, setPageCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
-  const [nextCursor, setNextCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [pageCursor, setPageCursor] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [totals, setTotals] = useState({ all: 0, approved: 0, waiting: 0, attended: 0 });
   const [isSyncing, setIsSyncing] = useState(false);
@@ -88,43 +93,21 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
 
     const fetchRegistrations = async () => {
       try {
-        const eventSnap = await getDoc(doc(db, 'events', eventId));
-        let eventData: PlatformEvent | null = null;
-        if (eventSnap.exists() && active) {
-          eventData = { id: eventSnap.id, ...eventSnap.data() } as PlatformEvent;
-          setEvent(eventData);
-        }
-
-        const base = query(collection(db, 'registrations'), where('eventId', '==', eventId));
-        const [countsAll, countsApproved, countsWaiting, countsAttended, countsLogs] = await Promise.all([
-          getCountFromServer(base),
-          getCountFromServer(query(base, where('status', '==', 'approved'))),
-          getCountFromServer(query(base, where('status', 'in', ['pending', 'waitlisted']))),
-          getCountFromServer(query(base, where('status', '==', 'attended'))),
-          getCountFromServer(query(collection(db, 'attendance_logs'), where('eventId', '==', eventId))),
+        const [eventData, page] = await Promise.all([
+          apiGet<PlatformEvent>(`/api/admin/events/${eventId}`),
+          apiGet<RegistrationsPage>(`/api/admin/events/${eventId}/registrations`, { cursor: pageCursor ?? undefined, limit: '50' }),
         ]);
+        if (!active) return;
+        setEvent(eventData);
 
-        const rawAll = countsAll.data().count;
-        const rawApproved = countsApproved.data().count;
-        const rawWaiting = countsWaiting.data().count;
-        const rawAttended = countsAttended.data().count;
-        const rawLogs = countsLogs.data().count;
-
-        const attendedTotal = Math.max(rawAttended, rawLogs);
-        const allTotal = Math.max(rawAll, attendedTotal);
-
-        if (active) {
-          setTotals({
-            all: allTotal,
-            approved: rawApproved,
-            waiting: rawWaiting,
-            attended: attendedTotal,
-          });
-        }
+        const { registrations: regs, nextCursor: cursor, counts } = page;
+        const attendedTotal = Math.max(counts.attended, counts.attendanceLogs);
+        const allTotal = Math.max(counts.total, attendedTotal);
+        setTotals({ all: allTotal, approved: counts.approved, waiting: counts.waiting, attended: attendedTotal });
 
         // Auto-heal missing registrations/timestamps if logs exist but aren't reflected in registrations
-        if (pageCursor === null && (rawLogs > rawAttended || (eventData && (eventData.requiresRegistration === false || eventData.type === 'Booth')))) {
-          httpsCallable(functions, 'syncEventAttendance')({ eventId })
+        if (pageCursor === null && (counts.attendanceLogs > counts.attended || eventData.requiresRegistration === false || eventData.type === 'Booth')) {
+          httpsCallable(null, 'syncEventAttendance')({ eventId })
             .then(res => {
               const resData = res.data as { repairedCount?: number };
               if (resData?.repairedCount && resData.repairedCount > 0 && active) {
@@ -134,64 +117,15 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
             .catch(() => {});
         }
 
-        const q = query(base, ...(pageCursor ? [startAfter(pageCursor)] : []), limit(50));
-        const snap = await getDocs(q);
-        
-        // Parallelize user fetching using Promise.all & cache to eliminate N+1 sequential waterfall
-        const userIdsToFetch = new Set<string>();
-        snap.docs.forEach(d => {
-          const data = d.data();
-          if (data.userId) {
-            userIdsToFetch.add(data.userId);
-          }
+        regs.forEach(reg => {
+          reg.isWalkIn = reg.isWalkIn === true || (!reg.registeredAt && Boolean(reg.attendedAt));
+          reg.timestamp = reg.timestamp || reg.attendedAt || reg.registeredAt || null;
         });
 
-        const userCache = new Map<string, Record<string, unknown>>();
-        if (userIdsToFetch.size > 0) {
-          const userSnaps = await Promise.all(
-            Array.from(userIdsToFetch).map(uid => getDoc(doc(db, 'users', uid)))
-          );
-          userSnaps.forEach(uSnap => {
-            if (uSnap.exists()) {
-              userCache.set(uSnap.id, uSnap.data() as Record<string, unknown>);
-            }
-          });
-        }
-
-        const regs: RegistrationData[] = snap.docs.map(regDoc => {
-          const regData = regDoc.data();
-          const cachedUser = userCache.get(regData.userId);
-          const cachedName = (cachedUser?.arabicFullName as string | undefined) || (cachedUser?.displayName as string | undefined);
-          const cachedEmail = cachedUser?.email as string | undefined;
-          return {
-            id: regDoc.id,
-            userId: regData.userId,
-            userName: regData.userName || cachedName || 'Unknown',
-            userEmail: regData.userEmail || cachedEmail || 'Unknown',
-            universityId: (cachedUser?.universityId as string | undefined) || regData.universityId,
-            major: cachedUser?.major as string | undefined,
-            college: cachedUser?.college as string | undefined,
-            academicLevel: cachedUser?.academicLevel as string | undefined,
-            isQassimStudent: cachedUser?.isQassimStudent as boolean | undefined,
-            status: regData.status,
-            attended: regData.attended === true || regData.status === 'attended',
-            isWalkIn: regData.isWalkIn === true || (!regData.registeredAt && Boolean(regData.attendedAt)),
-            timestamp: regData.timestamp || regData.attendedAt || regData.registeredAt || null,
-            attendedAt: regData.attendedAt || null,
-            registeredAt: regData.registeredAt || null,
-          };
-        });
-        
-        regs.sort((a, b) => {
-          const tA = toDate(a.timestamp || a.attendedAt || a.registeredAt)?.getTime() || 0;
-          const tB = toDate(b.timestamp || b.attendedAt || b.registeredAt)?.getTime() || 0;
-          return tA - tB; // Earliest first
-        });
-        
         if (active) {
           setRegistrations(previous => pageCursor ? [...previous.filter(item => !regs.some(next => next.id === item.id)), ...regs] : regs);
-          setNextCursor(snap.docs.at(-1) || null);
-          setHasMore(snap.size === 50);
+          setNextCursor(cursor);
+          setHasMore(cursor !== null);
         }
       } catch (error) {
         console.error("Error fetching registrations", error);
@@ -226,7 +160,7 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
     if (!confirm(`هل أنت متأكد من إلغاء تحضير ${reg.userName}؟ سيتم سحب نقاط الفعالية وإلغاء حضوره بالكامل دون تسجيل خصم.`)) return;
     setIsUpdatingBulk(true);
     try {
-      const cancelFn = httpsCallable<{ eventId: string; targetUserId: string }, { status: string; revokedPoints: number }>(functions, 'cancelAttendance');
+      const cancelFn = httpsCallable<{ eventId: string; targetUserId: string }, { status: string; revokedPoints: number }>(null, 'cancelAttendance');
       const res = await cancelFn({ eventId, targetUserId: reg.userId });
       setResults([{
         id: reg.id,
@@ -251,7 +185,7 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
     if (!selectedIds.length || !confirm(`هل أنت متأكد من إلغاء تحضير ${selectedIds.length} من الحضور؟ سيتم سحب نقاطهم بالكامل دون تسجيل خصم.`)) return;
     setIsUpdatingBulk(true);
     try {
-      const cancelFn = httpsCallable<{ eventId: string; targetUserId: string }, { status: string; revokedPoints: number }>(functions, 'cancelAttendance');
+      const cancelFn = httpsCallable<{ eventId: string; targetUserId: string }, { status: string; revokedPoints: number }>(null, 'cancelAttendance');
       const selectedItems = registrations.filter(r => selectedIds.includes(r.id));
       const outcome = await runOperations(selectedItems.map(item => ({ ...item, name: item.userName })), async item => {
         await cancelFn({ eventId, targetUserId: item.userId });
@@ -268,10 +202,10 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
     setIsUpdatingBulk(true);
     try {
       const outcome = await runOperations(job.items.map(item => ({ ...item, name: item.userName })), async item => {
-        if (job.points) await httpsCallable(functions, 'addManualPoints')({ studentUid: item.userId, amount: job.points.amount, reason: job.points.reason, operationId: job.points.operationIds[item.id] });
+        if (job.points) await httpsCallable(null, 'addManualPoints')({ studentUid: item.userId, amount: job.points.amount, reason: job.points.reason, operationId: job.points.operationIds[item.id] });
         else {
-          if (job.status === 'attended') await httpsCallable(functions, 'submitCheckIn')({ eventId, targetUserId: item.userId });
-          else await httpsCallable(functions, 'manageRegistration')({ eventId, userId: item.userId, action: registrationAction(job.status || '') });
+          if (job.status === 'attended') await httpsCallable(null, 'submitCheckIn')({ eventId, targetUserId: item.userId });
+          else await httpsCallable(null, 'manageRegistration')({ eventId, userId: item.userId, action: registrationAction(job.status || '') });
         }
       });
       setResults(outcome);
@@ -313,7 +247,7 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
   const handleSyncAttendance = async () => {
     setIsSyncing(true);
     try {
-      const syncFn = httpsCallable<{ eventId: string }, { status: string; repairedCount: number; totalAttendance: number }>(functions, 'syncEventAttendance');
+      const syncFn = httpsCallable<{ eventId: string }, { status: string; repairedCount: number; totalAttendance: number }>(null, 'syncEventAttendance');
       const res = await syncFn({ eventId });
       setResults([{
         id: 'sync',
@@ -338,68 +272,31 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
     if (!event) return;
     setExporting(true);
     try {
+      // Registrations already come fully joined with student info from the backend; no N+1 fetch needed.
       const all: RegistrationData[] = [];
-      let cursor: QueryDocumentSnapshot<DocumentData> | undefined;
+      let cursor: string | undefined;
       do {
-        const snap = await getDocs(query(
-          collection(db, 'registrations'),
-          where('eventId', '==', eventId),
-          ...(cursor ? [startAfter(cursor)] : []),
-          limit(200)
-        ));
-        const page = snap.docs.map(item => ({ id: item.id, ...item.data() } as RegistrationData));
-        for (let offset = 0; offset < page.length; offset += 25) {
-          await Promise.all(page.slice(offset, offset + 25).map(async item => {
-            const profile = await getDoc(doc(db, 'users', item.userId));
-            if (profile.exists()) {
-              const user = profile.data();
-              Object.assign(item, {
-                userName: item.userName || user.arabicFullName || user.displayName,
-                userEmail: item.userEmail || user.email,
-                universityId: user.universityId || item.universityId,
-                college: user.college || '',
-                major: user.major || '',
-                academicLevel: user.academicLevel || '',
-                isQassimStudent: user.isQassimStudent === true
-              });
-            }
-          }));
-        }
-        all.push(...page);
-        cursor = snap.size === 200 ? snap.docs.at(-1) : undefined;
+        const page = await apiGet<RegistrationsPage>(`/api/admin/events/${eventId}/registrations`, { cursor, limit: '200' });
+        all.push(...page.registrations);
+        cursor = page.nextCursor ?? undefined;
       } while (cursor);
 
-      // Verify if any attendance logs are missing from registrations in CSV
-      const logsSnap = await getDocs(query(collection(db, 'attendance_logs'), where('eventId', '==', eventId), limit(500)));
-      const missingUids = logsSnap.docs
-        .map(d => d.data().userId as string)
-        .filter(uid => uid && !all.some(r => r.userId === uid));
+      // Verify if any attendance logs are missing from registrations in the CSV (walk-ins, booths)
+      const attendance = await apiGetArray<{ userId: string; userName: string; userEmail: string; timestamp: string }>(`/api/admin/events/${eventId}/attendance`);
+      const missing = attendance.filter(log => log.userId && !all.some(r => r.userId === log.userId));
 
-      if (missingUids.length > 0) {
-        for (let offset = 0; offset < missingUids.length; offset += 25) {
-          const chunk = missingUids.slice(offset, offset + 25);
-          await Promise.all(chunk.map(async uid => {
-            const profile = await getDoc(doc(db, 'users', uid));
-            const logDoc = logsSnap.docs.find(d => d.data().userId === uid);
-            const user = profile.exists() ? profile.data() : null;
-            all.push({
-              id: `${eventId}_${uid}`,
-              userId: uid,
-              userName: (user?.arabicFullName as string) || (user?.displayName as string) || 'Student',
-              userEmail: (user?.email as string) || '',
-              universityId: user?.universityId as string,
-              college: user?.college as string,
-              major: user?.major as string,
-              academicLevel: user?.academicLevel as string,
-              isQassimStudent: user?.isQassimStudent === true,
-              status: 'attended',
-              attended: true,
-              isWalkIn: true,
-              timestamp: logDoc?.data().timestamp || null,
-            });
-          }));
-        }
-      }
+      missing.forEach(log => {
+        all.push({
+          id: `${eventId}_${log.userId}`,
+          userId: log.userId,
+          userName: log.userName || 'Student',
+          userEmail: log.userEmail || '',
+          status: 'attended',
+          attended: true,
+          isWalkIn: true,
+          timestamp: log.timestamp || null,
+        });
+      });
 
       const headers = ['Name', 'Email', 'University ID', 'College', 'Major', 'Academic Level', 'Qassim Student?', 'Status', 'Attendance Type', 'Date (UTC)'];
       const rows = all.map(r => {

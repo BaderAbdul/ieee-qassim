@@ -2,9 +2,7 @@
 
 import React, { useEffect, useState, use, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { doc, getDoc } from 'firebase/firestore';
-import { db, functions } from '@/lib/firebase/client';
-import { httpsCallable } from '@/lib/backend';
+import { apiGet, httpsCallable } from '@/lib/backend';
 import { QRCodeSVG } from 'qrcode.react';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
@@ -80,7 +78,7 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
     const mins = customMinutes ?? tokenDurationMinutes;
     setIsGeneratingToken(true);
     try {
-      const generate = httpsCallable<{ eventId: string; durationMinutes?: number }, { token: string; expiresAt: number; durationMinutes?: number }>(functions, 'generateCheckInToken');
+      const generate = httpsCallable<{ eventId: string; durationMinutes?: number }, { token: string; expiresAt: number; durationMinutes?: number }>(null, 'generateCheckInToken');
       const { data } = await generate({ eventId, durationMinutes: mins });
       setEvent(prev => prev ? { ...prev, checkinToken: data.token } : null);
       setTokenExpiry(data.expiresAt);
@@ -103,7 +101,7 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
       if (term.length < 2) { setSearchResults([]); setIsSearching(false); return; }
       setIsSearching(true);
       try {
-        const searchFn = httpsCallable<{ query: string }, { users: SearchStudent[] }>(functions, 'searchMembers');
+        const searchFn = httpsCallable<{ query: string }, { users: SearchStudent[] }>(null, 'searchMembers');
         const res = await searchFn({ query: term });
         if (active) setSearchResults(res.data.users || []);
       } catch (err) { console.error('Member search failed:', err); }
@@ -115,10 +113,8 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
   useEffect(() => {
     const fetchEvent = async () => {
       try {
-        const eventSnap = await getDoc(doc(db, 'events', eventId));
-        if (eventSnap.exists()) {
-          setEvent({ id: eventSnap.id, ...eventSnap.data(), checkinToken: undefined } as PlatformEvent);
-        }
+        const eventData = await apiGet<PlatformEvent>(`/api/admin/events/${eventId}`);
+        setEvent({ ...eventData, checkinToken: undefined });
       } catch (error) {
         console.error("Error fetching event", error);
       } finally {
@@ -137,7 +133,7 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
     setScanResult({ status: null, message: '' });
 
     try {
-      const submitCheckInFn = httpsCallable(functions, 'submitCheckIn');
+      const submitCheckInFn = httpsCallable(null, 'submitCheckIn');
       const response = await submitCheckInFn({
         eventId,
         targetUserId: userIdToSubmit,

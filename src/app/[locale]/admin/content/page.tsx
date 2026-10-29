@@ -1,14 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
+import { apiGet } from '@/lib/backend';
 import { Save, Settings, Star, LayoutTemplate } from 'lucide-react';
 import { useLocale } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import type { PlatformEvent } from '@/lib/types';
 import { AdminError, AdminLoading } from '@/components/admin/AdminData';
 import { httpsCallable } from '@/lib/backend';
+
+const DROPDOWN_STATES = new Set(['Published', 'Registration Open', 'Registration Closed', 'Ongoing']);
 
 export default function AdminContentPage() {
   const isAr = useLocale() === 'ar';
@@ -24,10 +25,13 @@ export default function AdminContentPage() {
     const load = async () => {
       setLoading(true); setError(null);
       try {
-        const [settings, events] = await Promise.all([getDoc(doc(db, 'settings', 'homepage')), getDocs(query(collection(db, 'events'), where('state', 'in', ['Published', 'Registration Open', 'Registration Closed', 'Ongoing']), limit(50)))]);
+        const [settings, eventsPage] = await Promise.all([
+          apiGet<Record<string, unknown>>('/api/admin/settings/homepage'),
+          httpsCallable<unknown, { events: PlatformEvent[] }>(null, 'getAdminEvents')({}),
+        ]);
         if (!active) return;
-        if (settings.exists()) setHeroStats(previous => ({ ...previous, ...Object.fromEntries(Object.keys(previous).filter(key => settings.data()[key] !== undefined).map(key => [key, settings.data()[key]])) }));
-        setAllEvents(events.docs.map(item => ({ id: item.id, ...item.data() } as PlatformEvent)));
+        setHeroStats(previous => ({ ...previous, ...Object.fromEntries(Object.keys(previous).filter(key => settings[key] !== undefined).map(key => [key, settings[key]])) }));
+        setAllEvents(eventsPage.data.events.filter(ev => DROPDOWN_STATES.has(ev.state)));
       } catch (reason) { if (active) setError(reason instanceof Error ? reason.message : 'Unable to load content'); }
       finally { if (active) setLoading(false); }
     };

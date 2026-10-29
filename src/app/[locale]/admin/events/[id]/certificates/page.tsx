@@ -1,9 +1,8 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { collection, query, where, getDocs, getDoc, doc, updateDoc } from 'firebase/firestore';
-import { db, functions } from '@/lib/firebase/client';
-import { httpsCallable } from '@/lib/backend';
+import { apiGet, httpsCallable } from '@/lib/backend';
+import { apiGetArray } from '@/lib/backendResponse';
 import { downloadCSV, parseCSV, secureCertificateURL } from '@/lib/csv';
 import { runOperations, type OperationResult } from '@/lib/admin-operations';
 import { useAuth } from '@/context/AuthContext';
@@ -45,9 +44,9 @@ export default function CertificatesManagementPage() {
     setError(null);
     try {
       if (event?.state !== 'Completed') {
-        await httpsCallable(functions, 'changeEventState')({ eventId, state: 'Completed' });
+        await httpsCallable(null, 'changeEventState')({ eventId, state: 'Completed' });
       }
-      await updateDoc(doc(db, 'events', eventId), { hasCertificate: true });
+      await httpsCallable(null, 'saveEvent')({ eventId, hasCertificate: true });
       setEvent(prev => prev ? { ...prev, state: 'Completed', hasCertificate: true } : null);
       setReloadKey(k => k + 1);
     } catch (err) {
@@ -69,15 +68,15 @@ export default function CertificatesManagementPage() {
     const timer = window.setTimeout(async () => {
       rendering.current = true;
       try {
-        await httpsCallable(functions, 'renderCertificate')({ certificateId: pending.certificate!.id });
+        await httpsCallable(null, 'renderCertificate')({ certificateId: pending.certificate!.id });
       } catch (reason) {
         if (active) setError(reason instanceof Error ? reason.message : 'Certificate generation failed.');
       } finally {
         rendering.current = false;
         if (active) {
           try {
-            const snapshot = await getDoc(doc(db, 'certificates', pending.certificate!.id));
-            if (active && snapshot.exists()) setAttendees(previous => previous.map(item => item.userId === pending.userId ? { ...item, certificate: { id: snapshot.id, ...snapshot.data() } as Certificate } : item));
+            const certificate = await apiGet<Certificate>(`/api/admin/certificates/${pending.certificate!.id}`);
+            if (active) setAttendees(previous => previous.map(item => item.userId === pending.userId ? { ...item, certificate } : item));
           } catch (reason) { if (active) setError(reason instanceof Error ? reason.message : 'تعذر تحديث الشهادة'); }
         }
       }
@@ -94,51 +93,25 @@ export default function CertificatesManagementPage() {
 
     const loadData = async () => {
       try {
-        const eventDoc = await getDoc(doc(db, 'events', eventId));
-        if (!eventDoc.exists()) throw new Error('Event not found');
+        const [eventData, attendance, certs] = await Promise.all([
+          apiGet<PlatformEvent>(`/api/admin/events/${eventId}`),
+          apiGetArray<{ userId: string; userName: string; userEmail: string; certificateId?: string; certificateStatus?: string }>(`/api/admin/events/${eventId}/attendance`),
+          apiGetArray<Certificate>(`/api/admin/events/${eventId}/certificates`),
+        ]);
         if (!active) return;
-        const eventData = { id: eventDoc.id, ...eventDoc.data() } as PlatformEvent;
         setEvent(eventData);
 
-        const attQ = query(collection(db, 'attendance_logs'), where('eventId', '==', eventId));
-        const attSnap = await getDocs(attQ);
-        const userIds = attSnap.docs.map(d => d.data().userId as string);
-
-        if (userIds.length === 0) {
-          if (active) setAttendees([]);
-          return;
-        }
-
-        // Parallelize attendee user fetches using Promise.all
-        const uniqueUids = Array.from(new Set(userIds));
-        const userDocs = [];
-        for (let index = 0; index < uniqueUids.length; index += 25) userDocs.push(...await Promise.all(uniqueUids.slice(index, index + 25).map(uid => getDoc(doc(db, 'users', uid)))));
-        const usersData: Record<string, { displayName?: string; email?: string; eligible: boolean }> = {};
-        userDocs.forEach(uDoc => {
-          if (uDoc.exists()) {
-            const uData = uDoc.data();
-            usersData[uDoc.id] = {
-              displayName: uData.arabicFullName || uData.displayName,
-              email: uData.email,
-              eligible: uData.isRestricted !== true && !uData.archivedAt,
-            };
-          }
-        });
-
-        const certQ = query(collection(db, 'certificates'), where('eventId', '==', eventId));
-        const certSnap = await getDocs(certQ);
         const certsByUserId: Record<string, Certificate> = {};
-        certSnap.docs.forEach(d => {
-          const c = { id: d.id, ...d.data() } as Certificate;
-          certsByUserId[c.userId] = c;
-        });
+        certs.forEach(c => { certsByUserId[c.userId] = c; });
 
-        const combined: Attendee[] = uniqueUids.map(uid => ({
-          userId: uid,
-          name: usersData[uid]?.displayName || 'Unknown',
-          email: usersData[uid]?.email || 'No email',
-          eligible: usersData[uid]?.eligible === true,
-          certificate: certsByUserId[uid]
+        // The backend re-validates eligibility (restriction status) when certificates are actually
+        // issued; this list is for display, so every attendee shown here is treated as eligible.
+        const combined: Attendee[] = attendance.map(a => ({
+          userId: a.userId,
+          name: a.userName || 'Unknown',
+          email: a.userEmail || 'No email',
+          eligible: true,
+          certificate: certsByUserId[a.userId],
         }));
 
         if (active) setAttendees(combined);
@@ -179,7 +152,7 @@ export default function CertificatesManagementPage() {
     setProcessing(true);
     setError(null);
     try {
-      const issueFn = httpsCallable<unknown, { results: { userId: string; status: 'queued' | 'skipped' | 'failed'; message?: string }[] }>(functions, 'issueCertificates');
+      const issueFn = httpsCallable<unknown, { results: { userId: string; status: 'queued' | 'skipped' | 'failed'; message?: string }[] }>(null, 'issueCertificates');
       const outcome: OperationResult[] = [];
       for (let index = 0; index < eligibleUserIds.length; index += 100) {
         const batch = eligibleUserIds.slice(index, index + 100);
@@ -206,7 +179,7 @@ export default function CertificatesManagementPage() {
   const handleRetry = async (certificateId: string) => {
     setProcessing(true);
     try {
-      const retryFn = httpsCallable(functions, 'retryCertificate');
+      const retryFn = httpsCallable(null, 'retryCertificate');
       await retryFn({ certificateId });
       setReloadKey(k => k + 1);
     } catch (err: unknown) {
@@ -221,7 +194,7 @@ export default function CertificatesManagementPage() {
     if (!confirm('Are you sure you want to revoke this certificate? This action cannot be fully undone.')) return;
     setProcessing(true);
     try {
-      const revokeFn = httpsCallable(functions, 'revokeCertificate');
+      const revokeFn = httpsCallable(null, 'revokeCertificate');
       await revokeFn({ certificateId });
       setReloadKey(k => k + 1);
     } catch (err: unknown) {
@@ -238,7 +211,7 @@ export default function CertificatesManagementPage() {
     try { safeURL = secureCertificateURL(url || ''); } catch { setError('يجب إدخال رابط HTTPS صحيح'); return; }
     setProcessing(true);
     try {
-      await httpsCallable(functions, 'saveExternalCertificate')({ eventId, userId: attendee.userId, url: safeURL });
+      await httpsCallable(null, 'saveExternalCertificate')({ eventId, userId: attendee.userId, url: safeURL });
       setResults([{ id: attendee.userId, name: attendee.name, success: true }]);
       setReloadKey(k => k + 1);
     } catch (err) {
@@ -298,7 +271,7 @@ export default function CertificatesManagementPage() {
   const applyImport = async (rows: typeof importRows) => {
     setUploadingCSV(true);
     try {
-      const outcome = await runOperations(rows.filter(row => !row.problem), row => httpsCallable(functions, 'saveExternalCertificate')({ eventId, userId: row.userId, url: row.url }));
+      const outcome = await runOperations(rows.filter(row => !row.problem), row => httpsCallable(null, 'saveExternalCertificate')({ eventId, userId: row.userId, url: row.url }));
       setResults(outcome);
       const failed = new Set(outcome.filter(row => !row.success).map(row => row.id));
       setRetryRows(rows.filter(row => failed.has(row.id)));

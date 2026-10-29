@@ -4,21 +4,9 @@ import React, { useEffect, useState } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import { useAuth } from '@/context/AuthContext';
-import { 
-  collection, 
-  query, 
-  where, 
-  getDocs, 
-  doc, 
-  getDoc,
-  updateDoc,
-  getCountFromServer,
-  onSnapshot
-} from 'firebase/firestore';
-import { db, functions } from '@/lib/firebase/client';
-import { uploadImage } from '@/lib/backend';
+import { apiGet, uploadImage, httpsCallable, API_BASE_URL } from '@/lib/backend';
+import { readBackendResponse } from '@/lib/backendResponse';
 import ProfileSkeleton from '@/components/skeletons/ProfileSkeleton';
-import { httpsCallable } from '@/lib/backend';
 import { PlatformEvent, Certificate, PointTransaction } from '@/lib/types';
 import { formatDateSafe, toJsDate } from '@/lib/dateUtils';
 import { ar, enUS } from 'date-fns/locale';
@@ -54,6 +42,25 @@ interface RegistrationWithEvent {
   timestamp: unknown;
   event: PlatformEvent;
   certificate?: CertificateData;
+}
+
+interface OverviewResponse {
+  registrations: { eventId: string; status: string; registeredAt: string | null; attendedAt: string | null; event: PlatformEvent | null }[];
+  certificates: CertificateData[];
+  pointTransactions: PointTransaction[];
+  totalPoints: number;
+  rank: number | null;
+}
+
+async function patchMe(data: Record<string, unknown>): Promise<void> {
+  const token = await window.Clerk?.session?.getToken();
+  if (!token) throw new Error('Sign in first. / سجّل دخولك أولًا.');
+  const response = await fetch(`${API_BASE_URL}/api/me`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+  await readBackendResponse(response);
 }
 
 interface BadgeDef {
@@ -134,7 +141,7 @@ export default function EngineeringProfilePage() {
   const isAr = locale === 'ar';
   const dateLocale = isAr ? ar : enUS;
 
-  const { user, userData, loading: authLoading, login, logout } = useAuth();
+  const { user, userData, loading: authLoading, login, logout, retry: retryAuth } = useAuth();
   const userBadges = userData?.badges || [];
 
   const [loading, setLoading] = useState(true);
@@ -191,11 +198,11 @@ export default function EngineeringProfilePage() {
     if (!user) return;
     setIsSavingCard(true);
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        'cardPreferences.theme': editingCard.theme,
-        'cardPreferences.pattern': editingCard.pattern,
-        'publicProfile.linkedin': editingCard.linkedin.trim()
+      await patchMe({
+        cardPreferences: { theme: editingCard.theme, pattern: editingCard.pattern },
+        publicProfile: { linkedin: editingCard.linkedin.trim() },
       });
+      retryAuth();
       setShowCardModal(false);
       alert(isAr ? 'تم حفظ التخصيص بنجاح' : 'Card customization saved');
       setReloadKey(k => k + 1);
@@ -234,13 +241,14 @@ export default function EngineeringProfilePage() {
         avatarUrl = await uploadImage(avatarFile, 'avatar');
       }
 
-      await updateDoc(doc(db, 'users', user.uid), {
+      await patchMe({
         publicProfile: {
           linkedin: editingPublicProfile.linkedin.trim(),
           bio: editingPublicProfile.bio.trim(),
           avatar: avatarUrl
         }
       });
+      retryAuth();
       alert(isAr ? 'تم الحفظ بنجاح!' : 'Saved successfully!');
       setShowPublicProfileModal(false);
       setAvatarFile(null);
@@ -263,84 +271,41 @@ export default function EngineeringProfilePage() {
     const loadData = async () => {
       try {
         setError(null);
-        
-        // 1. Concurrently fetch Registrations, Certificates, Point Transactions, and Community Rank
-        const regQ = query(collection(db, 'registrations'), where('userId', '==', user.uid));
-        const certQ = query(collection(db, 'certificates'), where('userId', '==', user.uid));
-        const ptQ = query(collection(db, 'point_transactions'), where('userId', '==', user.uid));
-        const myPoints = userData?.totalPoints || 0;
-        const higherPointsQuery = query(
-          collection(db, 'public_profiles'),
-          where('totalPoints', '>', myPoints)
-        );
 
-        const [regSnap, certSnap, ptSnap, rankCountSnap] = await Promise.all([
-          getDocs(regQ),
-          getDocs(certQ),
-          getDocs(ptQ),
-          myPoints > 0 ? getCountFromServer(higherPointsQuery).catch(() => null) : null
-        ]);
+        const overview = await apiGet<OverviewResponse>('/api/me/overview');
 
-        const certsData = certSnap.docs.map(d => ({ id: d.id, ...d.data() })) as CertificateData[];
+        const certsData = overview.certificates.sort((a, b) => {
+          const tA = toJsDate(a.issueDate || a.createdAt)?.getTime() || 0;
+          const tB = toJsDate(b.issueDate || b.createdAt)?.getTime() || 0;
+          return tB - tA;
+        });
         const certsByEvent = certsData.reduce((acc, cert) => {
           acc[cert.eventId] = cert;
           return acc;
         }, {} as Record<string, CertificateData>);
 
-        // 2. Concurrently fetch all registered events in parallel (O(1) network waterfall)
-        const uniqueEventIds = Array.from(new Set(regSnap.docs.map(d => d.data().eventId).filter(Boolean)));
-        const eventDocs = await Promise.all(
-          uniqueEventIds.map(eventId => getDoc(doc(db, 'events', eventId)).catch(() => null))
-        );
+        const regsWithEvents: RegistrationWithEvent[] = overview.registrations
+          .filter((r): r is typeof r & { event: PlatformEvent } => r.event !== null)
+          .map(r => ({
+            id: `${r.eventId}_${user.uid}`,
+            status: r.status,
+            timestamp: r.registeredAt,
+            event: r.event,
+            certificate: certsByEvent[r.event.id],
+          }))
+          .sort((a, b) => (toJsDate(b.timestamp)?.getTime() || 0) - (toJsDate(a.timestamp)?.getTime() || 0));
 
-        const eventMap = new Map<string, PlatformEvent>();
-        for (const eDoc of eventDocs) {
-          if (eDoc && eDoc.exists()) {
-            eventMap.set(eDoc.id, { id: eDoc.id, ...eDoc.data() } as PlatformEvent);
-          }
-        }
-
-        const regsWithEvents: RegistrationWithEvent[] = [];
-        for (const rDoc of regSnap.docs) {
-          const rData = rDoc.data();
-          const event = eventMap.get(rData.eventId);
-          if (event) {
-            regsWithEvents.push({
-              id: rDoc.id,
-              status: rData.status,
-              timestamp: rData.timestamp || rData.registeredAt,
-              event,
-              certificate: certsByEvent[event.id]
-            });
-          }
-        }
-
-        regsWithEvents.sort((a, b) => {
-          const timeA = toJsDate(a.timestamp)?.getTime() || 0;
-          const timeB = toJsDate(b.timestamp)?.getTime() || 0;
-          return timeB - timeA;
-        });
-
-        // 3. Process Point Transactions
-        const ptsData = ptSnap.docs.map(d => ({ id: d.id, ...d.data() })) as PointTransaction[];
-        ptsData.sort((a, b) => {
+        const ptsData = [...overview.pointTransactions].sort((a, b) => {
           const tA = toJsDate(a.createdAt)?.getTime() || 0;
           const tB = toJsDate(b.createdAt)?.getTime() || 0;
           return tB - tA;
         });
 
-        // 4. Compute Community Rank
-        const userCalculatedRank = rankCountSnap ? rankCountSnap.data().count + 1 : null;
-
         if (active) {
           setRegistrations(regsWithEvents);
-          setCertificates(certsData.sort((a, b) => {
-            const tA = toJsDate(a.issueDate || a.createdAt)?.getTime() || 0;
-            const tB = toJsDate(b.issueDate || b.createdAt)?.getTime() || 0;
-            return tB - tA;
-          }));
+          setCertificates(certsData);
           setTransactions(ptsData);
-          setUserRank(userCalculatedRank);
+          setUserRank(overview.rank);
         }
       } catch (err) {
         console.error('Error fetching profile data:', err);
@@ -359,23 +324,13 @@ export default function EngineeringProfilePage() {
     return () => {
       active = false;
     };
-  }, [user, authLoading, isAr, reloadKey, userData?.totalPoints]);
-
-  useEffect(() => {
-    if (!user) return;
-    return onSnapshot(query(collection(db, 'certificates'), where('userId', '==', user.uid)), snapshot => {
-      const updated = snapshot.docs.map(item => ({ id: item.id, ...item.data() } as CertificateData));
-      setCertificates(updated.sort((a, b) => (toJsDate(b.issueDate || b.createdAt)?.getTime() ?? 0) - (toJsDate(a.issueDate || a.createdAt)?.getTime() ?? 0)));
-      // Discard links whenever certificate state changes (including revocation).
-      setCertificateLinks({});
-    }, () => setCertificateMessage(isAr ? 'تعذر تحديث حالة الشهادات. أعد تحميل الصفحة.' : 'Could not refresh certificate status. Reload the page.'));
-  }, [user, isAr]);
+  }, [user, authLoading, isAr, reloadKey]);
 
   const handleDownloadCertificate = async (certificateId: string) => {
     setDownloadingCert(certificateId);
     setCertificateMessage('');
     try {
-      const getCertUrl = httpsCallable(functions, 'getCertificateDownloadUrl');
+      const getCertUrl = httpsCallable(null, 'getCertificateDownloadUrl');
       const res = await getCertUrl({ certificateId });
       const data = res.data as { downloadUrl?: string; url?: string };
       const targetUrl = data?.downloadUrl || data?.url;
@@ -401,7 +356,7 @@ export default function EngineeringProfilePage() {
     if (!fullName || !user) return;
     setIsSaving(true);
     try {
-      await httpsCallable(functions, 'saveProfile')({
+      await httpsCallable(null, 'saveProfile')({
         firstName: editingName.first.trim(),
         fatherName: editingName.middle.trim(),
         familyName: editingName.last.trim()
@@ -421,7 +376,7 @@ export default function EngineeringProfilePage() {
     if (!user) return;
     setIsSavingProfile(true);
     try {
-      await httpsCallable(functions, 'saveProfile')({
+      await httpsCallable(null, 'saveProfile')({
         college: editingProfile.college,
         major: editingProfile.major,
         academicLevel: editingProfile.academicLevel,

@@ -1,6 +1,5 @@
 import React from 'react';
-import { collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
+import { API_BASE_URL } from '@/lib/apiBase';
 import { PlatformEvent } from '@/lib/types';
 import { sortEventsByClosestDate } from '@/lib/dateUtils';
 import EventsList from './EventsList';
@@ -13,58 +12,16 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
   const filters = await searchParams;
   // eslint-disable-next-line react-hooks/purity -- Dynamic server request time is passed once to the client to avoid hydration drift.
   const requestTime = Date.now();
-  const validStates = ['Published', 'Registration Open', 'Registration Closed', 'Ongoing', 'Completed'];
-  
-  try {
-    const { adminDb } = await import('@/lib/firebase/admin');
-    if (adminDb) {
-      const snapshot = await adminDb.collection('events')
-        .where('state', 'in', validStates)
-        .orderBy('date', 'desc')
-        .limit(24)
-        .get();
 
-      nextCursor = snapshot.size === 24 ? snapshot.docs.at(-1)?.id ?? null : null;
-      const fetchedEvents = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          date: data.date?.toDate ? data.date.toDate().toISOString() : data.date,
-          createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
-          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt
-        };
-      }) as PlatformEvent[];
-      events = sortEventsByClosestDate(fetchedEvents);
-    }
-  } catch {
-    try {
-      const eventsRef = collection(db, 'events');
-      const q = query(
-        eventsRef, 
-        where('state', 'in', validStates),
-        orderBy('date', 'desc'),
-        limit(24)
-      );
-      const snapshot = await getDocs(q);
-      nextCursor = snapshot.size === 24 ? snapshot.docs.at(-1)?.id ?? null : null;
-        
-      const fetchedEvents = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          date: data.date?.toDate ? data.date.toDate().toISOString() : data.date,
-          createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
-          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt
-        };
-      }) as PlatformEvent[];
-      
-      events = sortEventsByClosestDate(fetchedEvents);
-    } catch (error) {
-      console.error("Error fetching events", error);
-      throw error;
-    }
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/public/events?limit=24`, { next: { revalidate: 60 } });
+    if (!response.ok) throw new Error(`events fetch failed: ${response.status}`);
+    const body = await response.json() as { events: PlatformEvent[]; nextCursor: string | null };
+    events = sortEventsByClosestDate(body.events);
+    nextCursor = body.nextCursor;
+  } catch (error) {
+    console.error('Error fetching events', error);
+    throw error;
   }
 
   return (
