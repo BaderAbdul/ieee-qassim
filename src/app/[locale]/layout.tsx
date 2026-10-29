@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ClerkProvider } from '@clerk/nextjs';
 import { getClerkLocalization } from '@/lib/clerkLocalization';
 import { NextIntlClientProvider } from 'next-intl';
-import { getMessages } from 'next-intl/server';
+import { getMessages, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { Cairo, Inter } from 'next/font/google';
 import localFont from 'next/font/local';
@@ -47,8 +47,7 @@ const inter = Inter({
   display: 'swap',
 });
 
-// Frankfurt keeps server rendering closer to the Riyadh API than the default US region.
-export const preferredRegion = 'fra1';
+
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://www.ieeequ.online'),
@@ -66,6 +65,10 @@ export const metadata: Metadata = {
   }
 };
 
+export function generateStaticParams() {
+  return routing.locales.map(locale => ({ locale }));
+}
+
 export default async function RootLayout({
   children,
   params
@@ -82,6 +85,7 @@ export default async function RootLayout({
   }
  
   // Providing all messages to the client side
+  setRequestLocale(locale);
   const messages = await getMessages();
 
   // Determine direction based on locale
@@ -113,7 +117,7 @@ export default async function RootLayout({
       <body
         className={`${cairo.variable} ${inter.variable} ${thmanyah.variable} font-sans antialiased bg-gray-50 text-gray-900`}
       >
-        <ClerkProvider appearance={clerkAppearance} localization={getClerkLocalization(locale)}>
+        <ClerkProvider prefetchUI={false} appearance={clerkAppearance} localization={getClerkLocalization(locale)}>
         <NextIntlClientProvider messages={messages}>
           <SessionRecoveryBoundary>
           <AuthProvider>
@@ -142,4 +146,7 @@ export default async function RootLayout({
     </html>
   );
 }
+
+
+
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { PlatformEvent } from '@/lib/types';
-import { getTranslations } from 'next-intl/server';
+import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/routing';
 import dynamic from 'next/dynamic';
 import { Calendar, Trophy, ArrowRight, UserCircle, Users } from 'lucide-react';
@@ -19,6 +19,7 @@ interface PageProps {
 
 export default async function HomePage({ params }: PageProps) {
   const { locale } = await params;
+  setRequestLocale(locale);
   const isAr = locale === 'ar';
   const t = await getTranslations({ locale, namespace: 'Index' });
 
@@ -250,3 +251,4 @@ export default async function HomePage({ params }: PageProps) {
     </div>
   );
 }
+
