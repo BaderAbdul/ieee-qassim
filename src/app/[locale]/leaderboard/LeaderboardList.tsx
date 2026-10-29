@@ -4,7 +4,7 @@ import React from 'react';
 import { Trophy, Medal, Award, Sparkles } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useLocale } from 'next-intl';
-import { competitionRanks } from '@/lib/studentExperience';
+
 
 export interface LeaderboardUser {
   id: string;
@@ -30,7 +30,7 @@ export default function LeaderboardList({ users }: { users: LeaderboardUser[] })
 
   const top3 = users.slice(0, 3);
   const remaining = users.slice(3);
-  const ranks = competitionRanks(users.map(user => user.points));
+  const ranks = users.map((_, index) => index + 1);
 
   // Rearrange top3 for podium: 2nd place (idx 1), 1st place (idx 0), 3rd place (idx 2)
   const first = top3[0];
@@ -149,3 +149,4 @@ export default function LeaderboardList({ users }: { users: LeaderboardUser[] })
     </div>
   );
 }
+
