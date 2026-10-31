@@ -214,7 +214,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
 
     setIsUploading(true);
     try {
-      const url = await uploadImage(file, 'event');
+      const url = await uploadImage(file, 'event', formData.coverUrl);
       setFormData(prev => ({ ...prev, coverUrl: url }));
     } catch (error) {
       console.error('Error uploading image:', error);

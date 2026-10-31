@@ -238,7 +238,7 @@ export default function EngineeringProfilePage() {
         if (!['image/jpeg', 'image/png', 'image/webp'].includes(avatarFile.type) || avatarFile.size > 3 * 1024 * 1024) {
           throw new Error(isAr ? 'اختر صورة JPG أو PNG أو WebP أصغر من 3 ميغابايت.' : 'Choose a JPG, PNG, or WebP image under 3 MB.');
         }
-        avatarUrl = await uploadImage(avatarFile, 'avatar');
+        avatarUrl = await uploadImage(avatarFile, 'avatar', editingPublicProfile.avatar);
       }
 
       await patchMe({

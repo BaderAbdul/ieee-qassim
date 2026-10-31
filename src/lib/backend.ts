@@ -45,7 +45,7 @@ export async function apiGet<Output = unknown>(path: string, params?: Record<str
 
 import { compressImage } from './imageCompressor';
 
-export async function uploadImage(file: File, purpose: 'avatar' | 'event') {
+export async function uploadImage(file: File, purpose: 'avatar' | 'event', previousUrl?: string | null) {
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
     throw new Error('Use JPG, PNG or WebP images.');
   }
@@ -67,6 +67,7 @@ export async function uploadImage(file: File, purpose: 'avatar' | 'event') {
   const form = new FormData();
   form.append('file', compressedFile);
   form.append('purpose', purpose);
+  if (previousUrl) form.append('previousUrl', previousUrl);
   const response = await fetch(`${API_BASE_URL}/api/media`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },

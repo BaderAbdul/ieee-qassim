@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
+import { API_BASE_URL } from '@/lib/apiBase';
 
 interface Readiness { platformConfigured: boolean; mediaConfigured: boolean; email: string; configurationOnly: boolean }
 
@@ -14,7 +15,7 @@ export default function ConfigurationNotice() {
     let active = true;
     const load = async () => {
       try {
-        const response = await fetch('/api/readiness', { cache: 'no-store', signal: controller.signal });
+        const response = await fetch(`${API_BASE_URL}/api/readiness`, { cache: 'no-store', signal: controller.signal });
         if (!response.ok) throw new Error();
         const data = await response.json();
         if (typeof data.platformConfigured !== 'boolean' || typeof data.mediaConfigured !== 'boolean' || data.configurationOnly !== true) throw new Error();
