@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth } from '@/context/AuthContext';
+import { hasAnyPrivilege, useAuth } from '@/context/AuthContext';
 import { useRouter } from '@/i18n/routing';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Link } from '@/i18n/routing';
@@ -20,7 +20,10 @@ import {
   Activity,
   BarChart3,
   ClipboardList,
-  Rocket
+  Rocket,
+  Shield,
+  UsersRound,
+  Award
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useLocale } from 'next-intl';
@@ -55,13 +58,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     window.dispatchEvent(new Event('ieee-sidebar'));
   };
 
+  const isDashboardUser = !!userData && userData.role !== 'student';
+
   useEffect(() => {
     if (!loading) {
-      if (!user || (userData?.role !== 'super_admin' && userData?.role !== 'event_organizer')) {
+      if (!user || !isDashboardUser) {
         router.replace('/');
       }
     }
-  }, [user, userData, loading, router]);
+  }, [user, userData, isDashboardUser, loading, router]);
 
   if (loading) {
     return (
@@ -71,7 +76,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  if (!user || (userData?.role !== 'super_admin' && userData?.role !== 'event_organizer')) {
+  if (!user || !isDashboardUser) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-4 text-center">
         <ShieldAlert className="w-16 h-16 text-red-500 mb-4 animate-bounce" />
@@ -99,19 +104,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return pathname.includes(path);
   };
 
+  const isSuperAdmin = userData.isSuperAdmin === true || userData.role === 'super_admin';
+
   const navItems = [
     { name: isAr ? 'مركز العمل' : 'Command center', href: '/admin', icon: <LayoutDashboard size={20} /> },
-    { name: isAr ? 'إدارة الفعاليات' : 'Events', href: '/admin/events', icon: <Calendar size={20} /> },
-    { name: isAr ? 'معرض المشاريع' : 'Projects Showcase', href: '/admin/showcase', icon: <Rocket size={20} /> },
-    { name: isAr ? 'المسجلون والطلاب' : 'Users & Members', href: '/admin/users', icon: <Users size={20} /> },
-    { name: isAr ? 'تسجيل الحضور (QR)' : 'Check-In Desk', href: '/admin/check-in', icon: <QrCode size={20} /> },
-    { name: isAr ? 'الأفكار والمبادرات' : 'Ideas & Proposals', href: '/admin/ideas', icon: <Lightbulb size={20} /> },
-    { name: isAr ? 'الهيكلة والتنظيم' : 'Structure Management', href: '/admin/structure', icon: <Users size={20} /> },
-    { name: isAr ? 'محتوى الموقع' : 'Site content', href: '/admin/content', icon: <Settings size={20} /> },
-    { name: isAr ? 'مركز المهام' : 'Operations', href: '/admin/operations', icon: <Activity size={20} /> },
-    { name: isAr ? 'التقارير' : 'Reports', href: '/admin/reports', icon: <BarChart3 size={20} /> },
-    ...(userData.role === 'super_admin' ? [{ name: isAr ? 'سجل الإجراءات' : 'Audit log', href: '/admin/audit', icon: <ClipboardList size={20} /> }] : []),
-    ...(userData.role === 'super_admin' ? [{ name: isAr ? 'وضع الصيانة' : 'Maintenance mode', href: '/admin/maintenance', icon: <Wrench size={20} /> }] : []),
+    ...(hasAnyPrivilege(userData, 'events') ? [{ name: isAr ? 'إدارة الفعاليات' : 'Events', href: '/admin/events', icon: <Calendar size={20} /> }] : []),
+    ...(hasAnyPrivilege(userData, 'showcase') ? [{ name: isAr ? 'معرض المشاريع' : 'Projects Showcase', href: '/admin/showcase', icon: <Rocket size={20} /> }] : []),
+    ...(hasAnyPrivilege(userData, 'members') ? [{ name: isAr ? 'المسجلون والطلاب' : 'Users & Members', href: '/admin/users', icon: <Users size={20} /> }] : []),
+    ...(hasAnyPrivilege(userData, 'attendance') ? [{ name: isAr ? 'تسجيل الحضور (QR)' : 'Check-In Desk', href: '/admin/check-in', icon: <QrCode size={20} /> }] : []),
+    ...(hasAnyPrivilege(userData, 'ideas') ? [{ name: isAr ? 'الأفكار والمبادرات' : 'Ideas & Proposals', href: '/admin/ideas', icon: <Lightbulb size={20} /> }] : []),
+    ...(hasAnyPrivilege(userData, 'content') ? [{ name: isAr ? 'الهيكلة والتنظيم' : 'Structure Management', href: '/admin/structure', icon: <Users size={20} /> }] : []),
+    ...(hasAnyPrivilege(userData, 'content') ? [{ name: isAr ? 'محتوى الموقع' : 'Site content', href: '/admin/content', icon: <Settings size={20} /> }] : []),
+    ...(hasAnyPrivilege(userData, 'operations') ? [{ name: isAr ? 'مركز المهام' : 'Operations', href: '/admin/operations', icon: <Activity size={20} /> }] : []),
+    ...(hasAnyPrivilege(userData, 'operations') ? [{ name: isAr ? 'التقارير' : 'Reports', href: '/admin/reports', icon: <BarChart3 size={20} /> }] : []),
+    ...(isSuperAdmin ? [{ name: isAr ? 'الأدوار والصلاحيات' : 'Roles & Privileges', href: '/admin/roles', icon: <Shield size={20} /> }] : []),
+    ...(isSuperAdmin ? [{ name: isAr ? 'الفرق' : 'Teams', href: '/admin/teams', icon: <UsersRound size={20} /> }] : []),
+    ...(isSuperAdmin ? [{ name: isAr ? 'الأوسمة الإدارية' : 'Admin Badges', href: '/admin/badges', icon: <Award size={20} /> }] : []),
+    ...(isSuperAdmin ? [{ name: isAr ? 'سجل الإجراءات' : 'Audit log', href: '/admin/audit', icon: <ClipboardList size={20} /> }] : []),
+    ...(isSuperAdmin ? [{ name: isAr ? 'وضع الصيانة' : 'Maintenance mode', href: '/admin/maintenance', icon: <Wrench size={20} /> }] : []),
   ];
 
   return (

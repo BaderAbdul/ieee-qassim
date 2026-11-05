@@ -3,10 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { httpsCallable } from '@/lib/backend';
-import { useAuth } from '@/context/AuthContext';
-import { Search, Trophy, Shield, ShieldAlert, Trash2, Edit3, Lock, Unlock, Filter, ArrowUpDown } from 'lucide-react';
+import { hasAnyPrivilege, useAuth } from '@/context/AuthContext';
+import { apiGetArray } from '@/lib/backendResponse';
+import { Search, Trophy, Shield, ShieldAlert, Trash2, Edit3, Lock, Unlock, Filter, ArrowUpDown, KeyRound } from 'lucide-react';
 import type { MemberSearchResult } from '@/lib/adminTypes';
 import { AdminError } from '@/components/admin/AdminData';
+import PrivilegesBadgesPanel from '@/components/admin/PrivilegesBadgesPanel';
 import { Link } from '@/i18n/routing';
 
 interface AdminUserItem {
@@ -28,7 +30,7 @@ export default function AdminUsersPage() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'all' | 'student' | 'event_organizer' | 'super_admin' | 'restricted'>('all');
+  const [roleFilter, setRoleFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'points_desc' | 'points_asc' | 'name_asc' | 'default'>('default');
   const [revision, setRevision] = useState(0);
   const [truncated, setTruncated] = useState(false);
@@ -37,14 +39,25 @@ export default function AdminUsersPage() {
   // Adjust Points Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<AdminUserItem | null>(null);
+  const [privilegesUserId, setPrivilegesUserId] = useState<string | null>(null);
   const [amount, setAmount] = useState<number | ''>('');
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const role = userData?.role;
+  const canViewMembers = hasAnyPrivilege(userData, 'members');
+  const isSuperAdmin = userData?.isSuperAdmin === true || role === 'super_admin';
+  const [availableRoles, setAvailableRoles] = useState<{ key: string; nameAr: string; nameEn: string }[]>([]);
   useEffect(() => {
-    if (role !== 'super_admin' && role !== 'event_organizer') {
+    if (!canViewMembers) return;
+    apiGetArray<{ key: string; nameAr: string; nameEn: string }>('/api/admin/roles')
+      .then(setAvailableRoles)
+      .catch(() => setAvailableRoles([]));
+  }, [canViewMembers]);
+
+  useEffect(() => {
+    if (!canViewMembers) {
       return;
     }
 
@@ -77,7 +90,7 @@ export default function AdminUsersPage() {
       active = false;
       window.clearTimeout(timer);
     };
-  }, [role, pageCursor, searchTerm, revision]);
+  }, [canViewMembers, pageCursor, searchTerm, revision]);
 
   const handleAdjustPoints = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,7 +134,7 @@ export default function AdminUsersPage() {
   };
 
   const handleRoleChange = async (userId: string, newRole: string) => {
-    if (userData?.role !== 'super_admin') return alert('غير مصرح لك بتغيير الصلاحيات');
+    if (!isSuperAdmin) return alert('غير مصرح لك بتغيير الصلاحيات');
     if (!confirm('هل أنت متأكد من تغيير صلاحية هذا المستخدم؟')) return;
     try {
       await httpsCallable(null, 'manageUser')({ userId, change: 'role', role: newRole });
@@ -133,7 +146,7 @@ export default function AdminUsersPage() {
   };
 
   const handleToggleRestrict = async (userId: string, currentRestricted: boolean) => {
-    if (userData?.role !== 'super_admin') return alert('غير مصرح لك بتقييد الحسابات');
+    if (!isSuperAdmin) return alert('غير مصرح لك بتقييد الحسابات');
     const actionStr = currentRestricted ? 'فك التقييد عن' : 'تقييد';
     if (!confirm(`هل أنت متأكد من ${actionStr} هذا المستخدم؟`)) return;
     try {
@@ -146,7 +159,7 @@ export default function AdminUsersPage() {
   };
 
   const handleDeleteUser = async (userId: string) => {
-    if (userData?.role !== 'super_admin') return alert('غير مصرح لك بحذف الحسابات');
+    if (!isSuperAdmin) return alert('غير مصرح لك بحذف الحسابات');
     if (!confirm('أرشفة هذا الحساب ومنعه من استخدام المنصة؟ ستُحفظ سجلاته السابقة ويمكن فك التقييد لاحقًا.')) return;
     try {
       await httpsCallable(null, 'manageUser')({ userId, change: 'delete' });
@@ -183,7 +196,7 @@ export default function AdminUsersPage() {
     return result;
   }, [users, roleFilter, sortBy]);
 
-  const isAuthorized = userData && (userData.role === 'super_admin' || userData.role === 'event_organizer');
+  const isAuthorized = !!userData && canViewMembers;
 
   if (authLoading || (isAuthorized && loading && !users.length && !searchTerm)) {
     return <div className="py-20 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div></div>;
@@ -231,8 +244,9 @@ export default function AdminUsersPage() {
                 >
                   <option value="all">جميع الأدوار</option>
                   <option value="student">الطلاب فقط</option>
-                  <option value="event_organizer">منظمو الفعاليات</option>
-                  <option value="super_admin">المدراء العامون</option>
+                  {availableRoles.filter(r => r.key !== 'student').map(r => (
+                    <option key={r.key} value={r.key}>{r.nameAr}</option>
+                  ))}
                   <option value="restricted">المقيدون / المؤرشفون</option>
                 </select>
               </div>
@@ -283,21 +297,25 @@ export default function AdminUsersPage() {
                   </td>
                   <td className="py-4 px-6 text-gray-500">{u.email}</td>
                   <td className="py-4 px-6">
-                    {userData?.role === 'super_admin' ? (
+                    {isSuperAdmin ? (
                       <select
                         value={u.role || 'student'}
                         onChange={(e) => handleRoleChange(u.id, e.target.value)}
                         className="text-sm border border-gray-200 rounded-lg px-2 py-1 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
                       >
-                        <option value="student">طالب</option>
-                        <option value="event_organizer">منظم فعاليات</option>
-                        <option value="super_admin">مدير عام</option>
+                        {availableRoles.length > 0
+                          ? availableRoles.map(r => <option key={r.key} value={r.key}>{r.nameAr}</option>)
+                          : <option value={u.role || 'student'}>{u.role || 'student'}</option>}
                       </select>
                     ) : (
                       u.role === 'super_admin' ? (
                         <span className="inline-flex items-center px-2 py-1 rounded text-xs font-bold bg-purple-100 text-purple-700"><ShieldAlert className="h-3 w-3 me-1"/> مدير عام</span>
                       ) : u.role === 'event_organizer' ? (
                         <span className="inline-flex items-center px-2 py-1 rounded text-xs font-bold bg-blue-100 text-blue-700"><Shield className="h-3 w-3 me-1"/> منظم فعاليات</span>
+                      ) : u.role && u.role !== 'student' ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded text-xs font-bold bg-indigo-100 text-indigo-700">
+                          <Shield className="h-3 w-3 me-1"/> {availableRoles.find(r => r.key === u.role)?.nameAr || u.role}
+                        </span>
                       ) : (
                         <span className="text-gray-500 text-sm">طالب</span>
                       )
@@ -318,8 +336,15 @@ export default function AdminUsersPage() {
                       >
                         <Edit3 className="h-4 w-4" />
                       </button>
-                      
-                      {userData?.role === 'super_admin' && (
+                      <button
+                        onClick={() => setPrivilegesUserId(u.id)}
+                        className="text-indigo-600 hover:bg-indigo-50 p-2 rounded-lg transition-colors"
+                        title="الصلاحيات والأوسمة"
+                      >
+                        <KeyRound className="h-4 w-4" />
+                      </button>
+
+                      {isSuperAdmin && (
                         <>
                           <button
                             onClick={() => handleToggleRestrict(u.id, !!u.isRestricted)}
@@ -447,6 +472,7 @@ export default function AdminUsersPage() {
       )}
       {hasMore && <button disabled={loading} onClick={() => { setLoading(true); setPageCursor(nextCursor); }} className="mt-6 rounded-xl bg-slate-100 px-5 py-3 font-bold disabled:opacity-50">تحميل المزيد / Load more</button>}
 
+      {privilegesUserId && <PrivilegesBadgesPanel userId={privilegesUserId} onClose={() => setPrivilegesUserId(null)} />}
     </div>
   );
 }

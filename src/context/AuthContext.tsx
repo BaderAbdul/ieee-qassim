@@ -4,10 +4,23 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import { useAuth as useClerkAuth, useClerk, useUser } from '@clerk/nextjs';
 import { apiGet } from '@/lib/backend';
 
+export interface UserTeam {
+  id: string;
+  nameAr: string;
+  nameEn: string;
+  isLeader: boolean;
+}
+
 export interface UserData {
   id: string;
   isRestricted?: boolean;
-  role: 'student' | 'event_organizer' | 'super_admin';
+  role: 'student' | 'member' | 'event_organizer' | 'super_admin' | string;
+  roleNameAr?: string;
+  roleNameEn?: string;
+  roleTier?: number;
+  isSuperAdmin?: boolean;
+  privileges?: string[];
+  teams?: UserTeam[];
   totalPoints: number;
   email?: string | null;
   displayName?: string | null;
@@ -156,4 +169,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 };
 
 export const useAuth = () => useContext(AuthContext);
+
+// super_admin always has every privilege server-side too; mirrored here so the UI never
+// has to special-case it separately from a privilege list.
+export function hasPrivilege(userData: UserData | null | undefined, key: string): boolean {
+  return !!userData && (userData.isSuperAdmin === true || (userData.privileges ?? []).includes(key));
+}
+
+export function hasAnyPrivilege(userData: UserData | null | undefined, prefix: string): boolean {
+  if (!userData) return false;
+  if (userData.isSuperAdmin) return true;
+  return (userData.privileges ?? []).some(key => key.startsWith(`${prefix}.`));
+}
 

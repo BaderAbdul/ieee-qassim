@@ -43,6 +43,20 @@ export async function apiGet<Output = unknown>(path: string, params?: Record<str
   return result as Output;
 }
 
+// Generic JSON request to a plain REST path (not /api/platform/{action}) -- used by the
+// roles/teams/badges/privileges admin endpoints, which have their own verbs and URL params.
+export async function apiSend<Output = unknown>(method: 'POST' | 'PATCH' | 'PUT' | 'DELETE', path: string, body?: unknown): Promise<Output> {
+  const token = await clerkToken();
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(20000),
+  });
+  const result = await readBackendResponse(response, true, true);
+  return result as Output;
+}
+
 import { compressImage } from './imageCompressor';
 
 export async function uploadImage(file: File, purpose: 'avatar' | 'event', previousUrl?: string | null) {
