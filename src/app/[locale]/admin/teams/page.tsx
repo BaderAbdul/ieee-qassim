@@ -7,7 +7,7 @@ import { apiSend, httpsCallable } from '@/lib/backend';
 import { apiGetArray } from '@/lib/backendResponse';
 import { AdminError, AdminLoading } from '@/components/admin/AdminData';
 import type { MemberSearchResult } from '@/lib/adminTypes';
-import { ArrowDown, ArrowUp, Edit2, Plus, Search, Trash2, UserMinus, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Edit2, Plus, Trash2, UserMinus, X } from 'lucide-react';
 
 interface TeamMember { userId: string; teamRole: 'leader' | 'member'; position: number; displayName: string; role: string }
 interface Team {
@@ -31,6 +31,7 @@ export default function AdminTeamsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResultUser[]>([]);
   const [searching, setSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
 
   const load = async () => {
     setLoading(true); setError(null);
@@ -128,15 +129,24 @@ export default function AdminTeamsPage() {
     void saveMembers(team, team.members.filter(m => m.userId !== userId));
   };
 
-  const searchUsers = async () => {
-    if (!searchQuery.trim()) return;
+  const searchUsers = async (query: string) => {
     setSearching(true); setError(null);
     try {
-      const result = await httpsCallable<unknown, MemberSearchResult>(null, 'searchMembers')({ query: searchQuery.trim() });
+      const result = await httpsCallable<unknown, MemberSearchResult>(null, 'searchMembers')({ query });
       setSearchResults(result.data.users);
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to search members'); }
-    finally { setSearching(false); }
+    finally { setSearching(false); setHasSearched(true); }
   };
+
+  // Search as you type (debounced), same pattern as the Users & Members page.
+  useEffect(() => {
+    if (!memberPicker) return;
+    const query = searchQuery.trim();
+    if (!query) { setSearchResults([]); setHasSearched(false); return; }
+    const timer = window.setTimeout(() => { void searchUsers(query); }, 300);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, memberPicker]);
 
   const addMember = (user: SearchResultUser) => {
     if (!memberPicker) return;
@@ -268,7 +278,13 @@ export default function AdminTeamsPage() {
             </ul>
 
             <div className="mt-3 flex gap-2">
-              <select onChange={e => { if (e.target.value) setMemberPicker({ teamId: team.id, teamRole: e.target.value as 'leader' | 'member' }); e.target.value = ''; }}
+              <select onChange={e => {
+                        if (e.target.value) {
+                          setSearchQuery(''); setSearchResults([]); setHasSearched(false);
+                          setMemberPicker({ teamId: team.id, teamRole: e.target.value as 'leader' | 'member' });
+                        }
+                        e.target.value = '';
+                      }}
                       defaultValue="" className="rounded-lg border px-2 py-1.5 text-xs font-bold text-gray-600 hover:bg-gray-50">
                 <option value="" disabled>{isAr ? '+ إضافة عضو كـ…' : '+ Add member as…'}</option>
                 <option value="member">{isAr ? 'عضو' : 'Member'}</option>
@@ -289,11 +305,11 @@ export default function AdminTeamsPage() {
             </div>
             <p className="text-xs text-gray-500 mb-3">{isAr ? 'ابحث بالاسم أو البريد أو الرقم الجامعي — لا حاجة لمعرفة المعرّف.' : "Search by name, email, or university id — no need to know a user's id."}</p>
             <div className="flex gap-2 mb-4">
-              <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && searchUsers()}
-                     className="flex-1 border rounded-lg p-2 text-sm" placeholder={isAr ? 'ابحث…' : 'Search…'} autoFocus />
-              <button type="button" onClick={searchUsers} disabled={searching} className="bg-purple-100 text-purple-700 px-4 rounded-lg">
-                {searching ? <div className="animate-spin h-4 w-4 border-2 border-purple-700 border-t-transparent rounded-full" /> : <Search size={18} />}
-              </button>
+              <div className="relative flex-1">
+                <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                       className="w-full border rounded-lg p-2 text-sm" placeholder={isAr ? 'ابحث…' : 'Search…'} autoFocus />
+                {searching && <div className="absolute end-2 top-1/2 -translate-y-1/2 animate-spin h-4 w-4 border-2 border-purple-700 border-t-transparent rounded-full" />}
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto space-y-2">
               {searchResults.map(u => (
@@ -307,7 +323,7 @@ export default function AdminTeamsPage() {
                   </button>
                 </div>
               ))}
-              {searchResults.length === 0 && !searching && searchQuery && (
+              {searchResults.length === 0 && !searching && hasSearched && (
                 <div className="text-center text-gray-500 py-8 text-sm">{isAr ? 'لا توجد نتائج مطابقة' : 'No matching results'}</div>
               )}
             </div>
