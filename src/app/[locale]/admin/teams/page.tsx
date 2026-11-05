@@ -14,7 +14,7 @@ interface Team {
   id: string; nameAr: string; nameEn: string; descriptionAr: string | null; descriptionEn: string | null;
   icon: string | null; position: number; isPublic: boolean; members: TeamMember[];
 }
-interface SearchResultUser { id: string; email?: string; displayName?: string; arabicFullName?: string; photoURL?: string }
+interface SearchResultUser { id: string; email?: string; displayName?: string; arabicFullName?: string; photoURL?: string; role?: string }
 
 export default function AdminTeamsPage() {
   const isAr = useLocale() === 'ar';
@@ -45,7 +45,10 @@ export default function AdminTeamsPage() {
     setSearching(true); setError(null);
     try {
       const result = await httpsCallable<unknown, MemberSearchResult>(null, 'searchMembers')({ query });
-      setSearchResults(result.data.users);
+      // Teams are for club staff: only accounts that already hold an admin-tier role (Member,
+      // Leader/Vice-Leader, Super Admin) are offered here. A plain student must first be given
+      // one of those roles on the Users & Members page before they can be added to a team.
+      setSearchResults(result.data.users.filter(u => !!u.role && u.role !== 'student'));
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to search members'); }
     finally { setSearching(false); setHasSearched(true); }
   };
@@ -304,7 +307,11 @@ export default function AdminTeamsPage() {
               <h2 className="text-lg font-bold font-cairo">{isAr ? 'إضافة عضو للفريق' : 'Add team member'}</h2>
               <button type="button" onClick={() => setMemberPicker(null)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
             </div>
-            <p className="text-xs text-gray-500 mb-3">{isAr ? 'ابحث بالاسم أو البريد أو الرقم الجامعي — لا حاجة لمعرفة المعرّف.' : "Search by name, email, or university id — no need to know a user's id."}</p>
+            <p className="text-xs text-gray-500 mb-3">
+              {isAr
+                ? 'ابحث بالاسم أو البريد أو الرقم الجامعي. تظهر فقط الحسابات التي لديها دور إداري بالفعل (عضو/قائد/مدير عام) — رقِّ الطالب من صفحة الأعضاء أولًا إذا لم يظهر.'
+                : "Search by name, email, or university id. Only accounts that already have an admin-tier role (Member/Leader/Super Admin) show up — promote a student from Users & Members first if they're missing."}
+            </p>
             <div className="flex gap-2 mb-4">
               <div className="relative flex-1">
                 <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
