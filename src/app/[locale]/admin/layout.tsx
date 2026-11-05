@@ -113,7 +113,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     ...(hasAnyPrivilege(userData, 'members') ? [{ name: isAr ? 'المسجلون والطلاب' : 'Users & Members', href: '/admin/users', icon: <Users size={20} /> }] : []),
     ...(hasAnyPrivilege(userData, 'attendance') ? [{ name: isAr ? 'تسجيل الحضور (QR)' : 'Check-In Desk', href: '/admin/check-in', icon: <QrCode size={20} /> }] : []),
     ...(hasAnyPrivilege(userData, 'ideas') ? [{ name: isAr ? 'الأفكار والمبادرات' : 'Ideas & Proposals', href: '/admin/ideas', icon: <Lightbulb size={20} /> }] : []),
-    ...(hasAnyPrivilege(userData, 'content') ? [{ name: isAr ? 'الهيكلة والتنظيم' : 'Structure Management', href: '/admin/structure', icon: <Users size={20} /> }] : []),
     ...(hasAnyPrivilege(userData, 'content') ? [{ name: isAr ? 'محتوى الموقع' : 'Site content', href: '/admin/content', icon: <Settings size={20} /> }] : []),
     ...(hasAnyPrivilege(userData, 'operations') ? [{ name: isAr ? 'مركز المهام' : 'Operations', href: '/admin/operations', icon: <Activity size={20} /> }] : []),
     ...(hasAnyPrivilege(userData, 'operations') ? [{ name: isAr ? 'التقارير' : 'Reports', href: '/admin/reports', icon: <BarChart3 size={20} /> }] : []),
