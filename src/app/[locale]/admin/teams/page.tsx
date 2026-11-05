@@ -41,6 +41,26 @@ export default function AdminTeamsPage() {
   };
   useEffect(() => { void load(); }, []);
 
+  const searchUsers = async (query: string) => {
+    setSearching(true); setError(null);
+    try {
+      const result = await httpsCallable<unknown, MemberSearchResult>(null, 'searchMembers')({ query });
+      setSearchResults(result.data.users);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to search members'); }
+    finally { setSearching(false); setHasSearched(true); }
+  };
+
+  // Search as you type (debounced), same pattern as the Users & Members page. Declared here,
+  // before any early return below, so every render calls the same hooks in the same order.
+  useEffect(() => {
+    if (!memberPicker) return;
+    const query = searchQuery.trim();
+    if (!query) { setSearchResults([]); setHasSearched(false); return; }
+    const timer = window.setTimeout(() => { void searchUsers(query); }, 300);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, memberPicker]);
+
   if (userData && userData.isSuperAdmin !== true) {
     return <AdminError message={isAr ? 'إدارة الفرق مخصصة للمدير العام.' : 'Team management requires super admin access.'} />;
   }
@@ -128,25 +148,6 @@ export default function AdminTeamsPage() {
   const removeMember = (team: Team, userId: string) => {
     void saveMembers(team, team.members.filter(m => m.userId !== userId));
   };
-
-  const searchUsers = async (query: string) => {
-    setSearching(true); setError(null);
-    try {
-      const result = await httpsCallable<unknown, MemberSearchResult>(null, 'searchMembers')({ query });
-      setSearchResults(result.data.users);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to search members'); }
-    finally { setSearching(false); setHasSearched(true); }
-  };
-
-  // Search as you type (debounced), same pattern as the Users & Members page.
-  useEffect(() => {
-    if (!memberPicker) return;
-    const query = searchQuery.trim();
-    if (!query) { setSearchResults([]); setHasSearched(false); return; }
-    const timer = window.setTimeout(() => { void searchUsers(query); }, 300);
-    return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, memberPicker]);
 
   const addMember = (user: SearchResultUser) => {
     if (!memberPicker) return;
