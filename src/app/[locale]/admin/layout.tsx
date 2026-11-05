@@ -61,11 +61,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const isDashboardUser = !!userData && userData.role !== 'student';
 
   useEffect(() => {
-    if (!loading) {
-      if (!user || !isDashboardUser) {
-        router.replace('/');
-      }
-    }
+    if (loading || (user && isDashboardUser)) return;
+    // On a hard refresh Clerk can report "not signed in yet" for an instant before it finishes
+    // restoring the session from the browser, which would otherwise redirect a valid admin out
+    // before /api/me even gets a chance to answer. Wait briefly for that to settle; if the real
+    // state changes (loading again, or now authorized), this effect reruns and cancels the timer.
+    const timer = window.setTimeout(() => { router.replace('/'); }, 800);
+    return () => window.clearTimeout(timer);
   }, [user, userData, isDashboardUser, loading, router]);
 
   if (loading) {
