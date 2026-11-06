@@ -136,7 +136,7 @@ export default function AdminEventsPage() {
     return { total, active, totalRegistered, totalAttended };
   }, [events]);
 
-  useAdminTopbarActions(
+  const topbarActions = useMemo(() => (
     <>
       <Link
         href="/admin/check-in"
@@ -169,7 +169,8 @@ export default function AdminEventsPage() {
         <span>{isAr ? 'إنشاء فعالية' : 'Create Event'}</span>
       </Link>
     </>
-  );
+  ), [isAr, templatesCount]);
+  useAdminTopbarActions(topbarActions);
 
   // Filtered and sorted events
   const visible = useMemo(() => {
