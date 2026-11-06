@@ -16,6 +16,7 @@ import { usePathname } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import ConfigurationNotice from '@/components/admin/ConfigurationNotice';
 import AdminTopbar from '@/components/admin/AdminTopbar';
+import { AdminTopbarActionsProvider } from '@/components/admin/AdminTopbarActions';
 import { useAdminNav, type AdminNavItem } from '@/components/admin/useAdminNav';
 
 const subscribeSidebar = (notify: () => void) => {
@@ -254,13 +255,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Main Content */}
       <div className="min-w-0 flex-1 flex flex-col">
-        <AdminTopbar pageTitle={[...navItems, ...footerItems].find(item => isCurrentPath(item.href))?.name} />
-        <div className="p-4 sm:p-6 lg:p-8">
-          <div className="max-w-6xl mx-auto">
-            <ConfigurationNotice />
-            {children}
+        <AdminTopbarActionsProvider>
+          <AdminTopbar pageTitle={[...navItems, ...footerItems].find(item => isCurrentPath(item.href))?.name} />
+          <div className="p-4 sm:p-6 lg:p-8">
+            <div className="max-w-6xl mx-auto">
+              <ConfigurationNotice />
+              {children}
+            </div>
           </div>
-        </div>
+        </AdminTopbarActionsProvider>
       </div>
     </div>
   );

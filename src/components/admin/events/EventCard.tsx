@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { Link } from '@/i18n/routing';
 import {
-  Pin, ArrowUpRight, Calendar, Clock, Award, QrCode, Edit3, Layers, MapPin, Check, Eye, EyeOff,
+  ArrowUpRight, Calendar, Clock, Award, QrCode, Edit3, Layers, MapPin, Check, Eye, EyeOff,
 } from 'lucide-react';
 import { toJsDate } from '@/lib/dateUtils';
 import type { PlatformEvent, EventState } from '@/lib/types';
@@ -39,13 +39,12 @@ interface EventCardProps {
   busy: boolean;
   isJustSavedTemplate: boolean;
   onChangeState: (state: EventState) => void;
-  onTogglePin: () => void;
   onToggleVisibility: (nextUnlisted: boolean) => void;
   onSaveTemplate: () => void;
 }
 
 export default function EventCard({
-  event, isAr, locale, busy, isJustSavedTemplate, onChangeState, onTogglePin, onToggleVisibility, onSaveTemplate,
+  event, isAr, locale, busy, isJustSavedTemplate, onChangeState, onToggleVisibility, onSaveTemplate,
 }: EventCardProps) {
   const [pendingState, setPendingState] = useState<EventState | null>(null);
   const [pendingUnlisted, setPendingUnlisted] = useState<boolean | null>(null);
@@ -55,11 +54,33 @@ export default function EventCard({
   const isVisible = !event.isUnlisted;
 
   return (
-    <article
-      className={`rounded-3xl border bg-[var(--color-surface)]/60 backdrop-blur-md p-5 sm:p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between ${
-        event.isPinned ? 'border-amber-300 ring-1 ring-amber-100' : 'border-[var(--color-border)]/50'
-      }`}
-    >
+    <article className="relative rounded-3xl border bg-[var(--color-surface)]/60 backdrop-blur-md p-5 sm:p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between border-[var(--color-border)]/50">
+      {/* Status + visibility badge, pinned to the card's top-left corner. The select is the
+          actual status-change control; the eye icon just reflects whether the event is public. */}
+      <div className={`absolute -top-2.5 -left-2.5 z-10 flex items-center gap-1 rounded-full border shadow-sm ${badge.bg} ${badge.text} ${badge.border} ps-2 pe-1 py-1`}>
+        {isVisible ? (
+          <Eye className="w-3 h-3 shrink-0" aria-label={isAr ? 'ظاهرة في الموقع' : 'Visible on site'} />
+        ) : (
+          <EyeOff className="w-3 h-3 shrink-0" aria-label={isAr ? 'مخفية عن الموقع' : 'Hidden from site'} />
+        )}
+        {transitions[event.state]?.length ? (
+          <select
+            aria-label={isAr ? `تغيير حالة ${event.title}` : `Change ${event.title} state`}
+            value={event.state}
+            disabled={busy}
+            onChange={(e) => setPendingState(e.target.value as EventState)}
+            className="cursor-pointer bg-transparent border-none px-0.5 py-0 text-[11px] font-bold disabled:opacity-50 transition-all focus:outline-none"
+          >
+            <option value={event.state}>{eventStateLabel(event.state, isAr)}</option>
+            {transitions[event.state].map((st) => (
+              <option key={st} value={st}>{eventStateLabel(st, isAr)}</option>
+            ))}
+          </select>
+        ) : (
+          <span className="text-[11px] font-bold px-0.5">{isAr ? 'مؤرشفة' : 'Archived'}</span>
+        )}
+      </div>
+
       <div>
         <div className="flex items-start gap-3 mb-3">
           <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden bg-[var(--color-surface-2)] flex items-center justify-center text-[var(--color-text-muted)] flex-shrink-0">
@@ -71,33 +92,16 @@ export default function EventCard({
           </div>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border ${badge.bg} ${badge.text} ${badge.border}`}>
-                  {eventStateLabel(event.state, isAr)}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-[var(--color-surface-2)] text-[var(--color-text-secondary)] border border-[var(--color-border)]">
+                {event.type}
+              </span>
+              {event.hasCertificate && (
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200/60 flex items-center gap-1">
+                  <Award className="w-3 h-3" />
+                  <span>{isAr ? 'شهادة' : 'Certificate'}</span>
                 </span>
-                <span className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-[var(--color-surface-2)] text-[var(--color-text-secondary)] border border-[var(--color-border)]">
-                  {event.type}
-                </span>
-                {event.hasCertificate && (
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200/60 flex items-center gap-1">
-                    <Award className="w-3 h-3" />
-                    <span>{isAr ? 'شهادة' : 'Certificate'}</span>
-                  </span>
-                )}
-              </div>
-              <button
-                disabled={busy}
-                onClick={onTogglePin}
-                aria-label={event.isPinned ? (isAr ? 'إلغاء التثبيت' : 'Unpin event') : (isAr ? 'تثبيت الفعالية' : 'Pin event')}
-                aria-pressed={!!event.isPinned}
-                className={`rounded-xl p-1.5 shrink-0 transition-all ${
-                  event.isPinned ? 'bg-amber-100 text-amber-700' : 'bg-[var(--color-surface-2)] text-[var(--color-text-muted)] hover:text-amber-600'
-                }`}
-                title={event.isPinned ? (isAr ? 'إلغاء التثبيت' : 'Unpin') : (isAr ? 'تثبيت في الأعلى' : 'Pin to top')}
-              >
-                <Pin size={14} className={event.isPinned ? 'fill-current' : ''} />
-              </button>
+              )}
             </div>
 
             <Link href={`/admin/events/${event.id}`} className="group block mt-2">
@@ -176,30 +180,7 @@ export default function EventCard({
           </button>
         </div>
 
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            {isVisible ? (
-              <Eye className="w-4 h-4 text-[var(--color-success)]" aria-label={isAr ? 'ظاهرة في الموقع' : 'Visible on site'} />
-            ) : (
-              <EyeOff className="w-4 h-4 text-[var(--color-text-muted)]" aria-label={isAr ? 'مخفية عن الموقع' : 'Hidden from site'} />
-            )}
-            {transitions[event.state]?.length ? (
-              <select
-                aria-label={isAr ? `تغيير حالة ${event.title}` : `Change ${event.title} state`}
-                value={event.state}
-                disabled={busy}
-                onChange={(e) => setPendingState(e.target.value as EventState)}
-                className={`rounded-full border-none px-2.5 py-1 text-[11px] font-bold disabled:opacity-50 transition-all ${badge.bg} ${badge.text}`}
-              >
-                <option value={event.state}>{eventStateLabel(event.state, isAr)}</option>
-                {transitions[event.state].map((st) => (
-                  <option key={st} value={st}>{eventStateLabel(st, isAr)}</option>
-                ))}
-              </select>
-            ) : (
-              <span className="text-xs text-[var(--color-text-muted)]">{isAr ? 'مؤرشفة' : 'Archived'}</span>
-            )}
-          </div>
+        <div className="flex items-center justify-end gap-2">
           <button
             type="button"
             disabled={busy}

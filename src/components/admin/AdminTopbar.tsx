@@ -8,6 +8,7 @@ import { Bell, Search, Settings, LogOut, CircleUserRound, ChevronDown } from 'lu
 import { useAdminQuery } from '@/components/admin/AdminData';
 import type { AdminOverview } from '@/lib/adminTypes';
 import AdminSearchModal from '@/components/admin/AdminSearchModal';
+import { useAdminTopbarActionsSlot } from '@/components/admin/AdminTopbarActions';
 
 function useClickOutside(onOutside: () => void) {
   const ref = useRef<HTMLDivElement>(null);
@@ -26,6 +27,7 @@ export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
   const isAr = locale === 'ar';
   const { user, userData, logout } = useAuth();
   const { data } = useAdminQuery<AdminOverview>('getAdminOverview');
+  const pageActions = useAdminTopbarActionsSlot();
   const [searchOpen, setSearchOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -51,10 +53,16 @@ export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
 
   return (
     <>
-      <header className="sticky top-3 z-30 flex items-center justify-between gap-3 rounded-3xl border border-white/10 bg-slate-900/70 backdrop-blur-xl shadow-2xl px-4 sm:px-6 py-3.5">
-        <h1 className="text-base sm:text-lg font-black font-cairo text-white truncate">
+      <header className="sticky top-3 z-30 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-white/10 bg-slate-900/70 backdrop-blur-xl shadow-2xl px-4 sm:px-6 py-3.5">
+        <h1 className="text-base sm:text-lg font-black font-cairo text-white truncate shrink-0">
           {pageTitle || (isAr ? 'لوحة الإدارة' : 'Admin Portal')}
         </h1>
+
+        {pageActions && (
+          <div className="flex flex-wrap items-center gap-2 order-last md:order-none md:mx-auto">
+            {pageActions}
+          </div>
+        )}
 
         <div className="flex items-center gap-2 shrink-0">
           <button

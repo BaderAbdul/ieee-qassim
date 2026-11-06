@@ -21,6 +21,7 @@ import { AdminError, AdminLoading } from '@/components/admin/AdminData';
 import { eventStateLabel } from '@/components/admin/EventWorkspace';
 import EventTemplatesModal from '@/components/admin/EventTemplatesModal';
 import EventCard, { transitions } from '@/components/admin/events/EventCard';
+import { useAdminTopbarActions } from '@/components/admin/AdminTopbarActions';
 import {
   getCustomEventTemplates,
   createTemplateFromEvent
@@ -47,11 +48,11 @@ export default function AdminEventsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
-  const [sortBy, setSortBy] = useState<'date' | 'registered' | 'pinned'>('date');
+  const [sortBy, setSortBy] = useState<'date' | 'registered'>('date');
 
   // Custom Templates Modal & State
   const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false);
-  const [templatesCount, setTemplatesCount] = useState(0);
+  const [templatesCount, setTemplatesCount] = useState(() => getCustomEventTemplates().length);
   const [savedAsTemplateSuccessId, setSavedAsTemplateSuccessId] = useState<string | null>(null);
 
   const refreshTemplatesCount = () => {
@@ -59,7 +60,6 @@ export default function AdminEventsPage() {
   };
 
   useEffect(() => {
-    refreshTemplatesCount();
     window.addEventListener('ieee-event-templates-updated', refreshTemplatesCount);
     return () => window.removeEventListener('ieee-event-templates-updated', refreshTemplatesCount);
   }, []);
@@ -114,20 +114,6 @@ export default function AdminEventsPage() {
     }
   };
 
-  const togglePin = async (event: PlatformEvent) => {
-    if (busy) return;
-    setBusy(event.id);
-    setError(null);
-    try {
-      await httpsCallable(null, 'saveEvent')({ eventId: event.id, isPinned: !event.isPinned });
-      setEvents(prev => prev.map(item => item.id === event.id ? { ...item, isPinned: !event.isPinned } : item));
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to update pin');
-    } finally {
-      setBusy(null);
-    }
-  };
-
   const handleSaveEventAsTemplate = (event: PlatformEvent) => {
     const customName = prompt(
       isAr ? 'أدخل اسماً لهذا القالب الجديد:' : 'Enter a name for this new template:',
@@ -150,6 +136,41 @@ export default function AdminEventsPage() {
     return { total, active, totalRegistered, totalAttended };
   }, [events]);
 
+  useAdminTopbarActions(
+    <>
+      <Link
+        href="/admin/check-in"
+        className="cursor-pointer flex items-center gap-2 rounded-xl bg-white/10 hover:bg-white/20 px-3 py-2 text-slate-300 hover:text-white transition-all"
+      >
+        <QrCode className="w-4 h-4" />
+        <span className="hidden lg:inline text-xs font-bold">{isAr ? 'مكتب التحضير' : 'Check-in desk'}</span>
+      </Link>
+      <Link
+        href="/admin/reports"
+        className="cursor-pointer flex items-center gap-2 rounded-xl bg-white/10 hover:bg-white/20 px-3 py-2 text-slate-300 hover:text-white transition-all"
+      >
+        <BarChart3 className="w-4 h-4" />
+        <span className="hidden lg:inline text-xs font-bold">{isAr ? 'تقرير تفصيلي' : 'Detailed report'}</span>
+      </Link>
+      <button
+        type="button"
+        onClick={() => setIsTemplatesModalOpen(true)}
+        className="cursor-pointer flex items-center gap-2 rounded-xl bg-white/10 hover:bg-white/20 px-3 py-2 text-slate-300 hover:text-white transition-all"
+      >
+        <Layers className="w-4 h-4" />
+        <span className="hidden lg:inline text-xs font-bold">{isAr ? 'قوالب الفعاليات' : 'Event Templates'}</span>
+        <span className="text-xs font-bold">({templatesCount})</span>
+      </button>
+      <Link
+        href="/admin/events/create"
+        className="cursor-pointer inline-flex items-center gap-2 rounded-xl bg-[var(--color-accent)] hover:opacity-90 px-3.5 py-2 text-xs font-bold text-[var(--color-accent-contrast)] transition-opacity"
+      >
+        <Plus size={16} />
+        <span>{isAr ? 'إنشاء فعالية' : 'Create Event'}</span>
+      </Link>
+    </>
+  );
+
   // Filtered and sorted events
   const visible = useMemo(() => {
     return events
@@ -164,10 +185,6 @@ export default function AdminEventsPage() {
         return titleMatch || titleEnMatch || locationMatch;
       })
       .sort((a, b) => {
-        if (sortBy === 'pinned') {
-          if (a.isPinned && !b.isPinned) return -1;
-          if (!a.isPinned && b.isPinned) return 1;
-        }
         if (sortBy === 'registered') {
           return (b.registeredCount || 0) - (a.registeredCount || 0);
         }
@@ -180,62 +197,6 @@ export default function AdminEventsPage() {
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Page Header */}
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[var(--color-surface)]/60 backdrop-blur-md p-6 rounded-3xl border border-[var(--color-border)]/50 shadow-sm">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-[var(--color-accent)] text-[var(--color-accent-contrast)] rounded-2xl shadow-sm">
-              <Calendar className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-black font-cairo text-[var(--color-text-primary)]">
-                {isAr ? 'الفعاليات' : 'Events'}
-              </h1>
-              <p className="text-xs sm:text-sm text-[var(--color-text-secondary)] mt-0.5">
-                {isAr
-                  ? 'كل ما يخص الفعاليات في مكان واحد: الحالة، الحضور، والتقارير.'
-                  : 'Everything about events in one place: status, attendance and reports.'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5">
-          <Link
-            href="/admin/check-in"
-            className="bg-[var(--color-surface-2)] hover:opacity-80 text-[var(--color-text-secondary)] text-xs sm:text-sm font-bold px-4 py-3 rounded-2xl transition-opacity flex items-center gap-2"
-          >
-            <QrCode className="w-4 h-4" />
-            <span>{isAr ? 'مكتب التحضير' : 'Check-in desk'}</span>
-          </Link>
-          <Link
-            href="/admin/reports"
-            className="bg-[var(--color-surface-2)] hover:opacity-80 text-[var(--color-text-secondary)] text-xs sm:text-sm font-bold px-4 py-3 rounded-2xl transition-opacity flex items-center gap-2"
-          >
-            <BarChart3 className="w-4 h-4" />
-            <span>{isAr ? 'تقرير تفصيلي' : 'Detailed report'}</span>
-          </Link>
-          {/* Custom Templates Button */}
-          <button
-            type="button"
-            onClick={() => setIsTemplatesModalOpen(true)}
-            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs sm:text-sm font-bold px-4 py-3 rounded-2xl transition-all flex items-center gap-2 shadow-sm"
-          >
-            <Layers className="w-4 h-4 text-indigo-600" />
-            <span>{isAr ? 'قوالب الفعاليات' : 'Event Templates'} ({templatesCount})</span>
-          </button>
-
-          {/* Create Event Button */}
-          <Link
-            href="/admin/events/create"
-            className="inline-flex items-center gap-2 rounded-2xl bg-[var(--color-accent)] hover:opacity-90 px-5 py-3 text-xs sm:text-sm font-bold text-[var(--color-accent-contrast)] transition-opacity shadow-md"
-          >
-            <Plus size={18} />
-            <span>{isAr ? 'إنشاء فعالية جديدة' : 'Create Event'}</span>
-          </Link>
-        </div>
-      </header>
-
       {/* Metrics Summary Bar */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
         {/* Total Events */}
@@ -361,19 +322,18 @@ export default function AdminEventsPage() {
           <select
             aria-label={isAr ? 'الترتيب' : 'Sort by'}
             value={sortBy}
-            onChange={e => setSortBy(e.target.value as any)}
+            onChange={e => setSortBy(e.target.value as 'date' | 'registered')}
             className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3.5 py-2.5 text-xs font-bold text-[var(--color-text-secondary)] focus:bg-[var(--color-surface)] focus:ring-2 focus:ring-[var(--color-accent)]"
           >
             <option value="date">{isAr ? 'الأحدث تاريخاً' : 'Latest date'}</option>
             <option value="registered">{isAr ? 'الأكثر تسجيلاً' : 'Most registered'}</option>
-            <option value="pinned">{isAr ? 'المثبتة أولاً' : 'Pinned first'}</option>
           </select>
 
           {/* Refresh Button */}
           <button
             onClick={() => { setCursor(null); setRevision(v => v + 1); }}
             disabled={loading || busy !== null}
-            className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-2)] px-3.5 py-2.5 text-xs font-bold text-[var(--color-text-secondary)] disabled:opacity-50 transition-all flex items-center gap-1.5 shadow-sm"
+            className="cursor-pointer rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-2)] px-3.5 py-2.5 text-xs font-bold text-[var(--color-text-secondary)] disabled:opacity-50 transition-all flex items-center gap-1.5 shadow-sm"
             title={isAr ? 'تحديث البيانات' : 'Refresh'}
           >
             <RotateCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -414,7 +374,6 @@ export default function AdminEventsPage() {
                       busy={busy === event.id}
                       isJustSavedTemplate={savedAsTemplateSuccessId === event.id}
                       onChangeState={(state) => void changeState(event, state)}
-                      onTogglePin={() => void togglePin(event)}
                       onToggleVisibility={(nextUnlisted) => void toggleVisibility(event, nextUnlisted)}
                       onSaveTemplate={() => handleSaveEventAsTemplate(event)}
                     />
