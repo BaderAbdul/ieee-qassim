@@ -167,8 +167,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className={`${themeClass} min-h-screen bg-[var(--color-page)] flex flex-col md:flex-row font-sans relative`}>
-      {/* Decorative background shapes -- purely visual, sits behind the glass sidebar and cards */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden -z-10" aria-hidden="true">
+      {/* Decorative background shapes -- fixed to the viewport (not the document) so every
+          page reads the same regardless of how tall its content is, and so they stay put
+          while the page scrolls */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10" aria-hidden="true">
         <div className="absolute -top-24 -start-24 w-[28rem] h-[28rem] rounded-full bg-[var(--color-accent)]/20 blur-3xl animate-blob" />
         <div className="absolute top-1/3 -end-32 w-[24rem] h-[24rem] rounded-full bg-[var(--color-highlight)]/15 blur-3xl animate-blob animation-delay-2000" />
         <div className="absolute bottom-0 start-1/4 w-[22rem] h-[22rem] rounded-full bg-[var(--color-accent)]/15 blur-3xl animate-blob animation-delay-4000" />
@@ -176,7 +178,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Sidebar: floats over the background, glassmorphic, stays in view while the page scrolls */}
       <aside
-        className={`sticky top-3 self-start z-10 w-full m-3 md:ms-3 md:me-0 bg-slate-900/70 backdrop-blur-xl text-white md:max-h-[calc(100vh-1.5rem)] rounded-3xl overflow-hidden flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out border border-white/10 shadow-2xl ${
+        className={`sticky top-3 self-start z-10 w-full m-3 md:ms-3 md:me-0 bg-slate-900/70 backdrop-blur-xl text-white md:h-[calc(100vh-1.5rem)] rounded-3xl overflow-hidden flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out border border-white/10 shadow-2xl ${
           isCollapsed ? 'md:w-20' : 'md:w-64'
         }`}
       >
@@ -253,7 +255,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Navigation Links */}
         <div id="admin-navigation-panel" className={`${mobileOpen ? 'flex' : 'hidden'} md:flex flex-1 flex-col min-h-0`}>
-          <nav aria-label={isAr ? 'التنقل الإداري' : 'Admin navigation'} className="flex-1 p-3 space-y-1.5 overflow-y-auto">
+          <nav aria-label={isAr ? 'التنقل الإداري' : 'Admin navigation'} className="flex-1 p-3 space-y-1.5 overflow-y-auto no-scrollbar">
             {navItems.map(renderNavLink)}
           </nav>
           <div className="p-3 border-t border-white/10 space-y-1.5">

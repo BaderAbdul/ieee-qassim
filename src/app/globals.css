@@ -30,6 +30,28 @@
   --color-danger-soft: #FEE2E2;
 }
 
+/* Glass look applied broadly: every admin page already uses these same few Tailwind fill
+   utilities for its panels/cards, so retinting them here (instead of editing every page) makes
+   the whole dashboard read as glass over the decorative background, not just the Events hub. */
+.ieee-admin-theme .bg-white {
+  background-color: color-mix(in oklab, var(--color-surface) 65%, transparent);
+  backdrop-filter: blur(14px);
+}
+.ieee-admin-theme .bg-slate-50 {
+  background-color: color-mix(in oklab, var(--color-surface-2) 65%, transparent);
+  backdrop-filter: blur(10px);
+}
+.ieee-admin-theme .bg-gray-50 {
+  background-color: color-mix(in oklab, var(--color-surface-2) 65%, transparent);
+  backdrop-filter: blur(10px);
+}
+.ieee-admin-theme .bg-slate-100 {
+  background-color: color-mix(in oklab, var(--color-surface-2) 80%, transparent);
+}
+.ieee-admin-theme .bg-gray-100 {
+  background-color: color-mix(in oklab, var(--color-surface-2) 80%, transparent);
+}
+
 .ieee-admin-theme.dark {
   --color-page: #0B1220;
   --color-surface: #121A2B;
