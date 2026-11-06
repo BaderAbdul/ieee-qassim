@@ -32,6 +32,21 @@
   --color-danger-soft: #FEE2E2;
 }
 
+/* Tailwind's own reset leaves native button cursors as "default" on some platforms, and a
+   handful of clickable elements here are plain divs/labels, not <button>/<a>. Covering the
+   whole admin dashboard once here is simpler and more complete than adding cursor-pointer
+   to every individual element. */
+.ieee-admin-theme a,
+.ieee-admin-theme select,
+.ieee-admin-theme label[for],
+.ieee-admin-theme [role="button"],
+.ieee-admin-theme button:not(:disabled) {
+  cursor: pointer;
+}
+.ieee-admin-theme button:disabled {
+  cursor: not-allowed;
+}
+
 /* Glass look applied broadly: every admin page already uses these same few Tailwind fill
    utilities for its panels/cards, so retinting them here (instead of editing every page) makes
    the whole dashboard read as glass over the decorative background, not just the Events hub. */

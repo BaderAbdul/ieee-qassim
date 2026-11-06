@@ -54,34 +54,34 @@ export default function EventCard({
   const isVisible = !event.isUnlisted;
 
   return (
-    <article className="relative rounded-3xl border bg-[var(--color-surface)]/60 backdrop-blur-md p-5 sm:p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between border-[var(--color-border)]/50">
-      {/* Status + visibility badge, pinned to the card's top-left corner. The select is the
-          actual status-change control; the eye icon just reflects whether the event is public. */}
-      <div className={`absolute -top-2.5 -left-2.5 z-10 flex items-center gap-1 rounded-full border shadow-sm ${badge.bg} ${badge.text} ${badge.border} ps-2 pe-1 py-1`}>
-        {isVisible ? (
-          <Eye className="w-3 h-3 shrink-0" aria-label={isAr ? 'ظاهرة في الموقع' : 'Visible on site'} />
-        ) : (
-          <EyeOff className="w-3 h-3 shrink-0" aria-label={isAr ? 'مخفية عن الموقع' : 'Hidden from site'} />
-        )}
-        {transitions[event.state]?.length ? (
-          <select
-            aria-label={isAr ? `تغيير حالة ${event.title}` : `Change ${event.title} state`}
-            value={event.state}
-            disabled={busy}
-            onChange={(e) => setPendingState(e.target.value as EventState)}
-            className="cursor-pointer bg-transparent border-none px-0.5 py-0 text-[11px] font-bold disabled:opacity-50 transition-all focus:outline-none"
-          >
-            <option value={event.state}>{eventStateLabel(event.state, isAr)}</option>
-            {transitions[event.state].map((st) => (
-              <option key={st} value={st}>{eventStateLabel(st, isAr)}</option>
-            ))}
-          </select>
-        ) : (
-          <span className="text-[11px] font-bold px-0.5">{isAr ? 'مؤرشفة' : 'Archived'}</span>
-        )}
-      </div>
-
+    <article className="rounded-3xl border bg-[var(--color-surface)]/60 backdrop-blur-md p-5 sm:p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between border-[var(--color-border)]/50">
       <div>
+        {/* Status + visibility badge, kept at the card's top-left corner. The select is the
+            actual status-change control; the eye icon just reflects whether the event is public. */}
+        <div className={`inline-flex mr-auto items-center gap-1 rounded-full border shadow-sm mb-3 ${badge.bg} ${badge.text} ${badge.border} ps-2 pe-1 py-1`}>
+          {isVisible ? (
+            <Eye className="w-3 h-3 shrink-0" aria-label={isAr ? 'ظاهرة في الموقع' : 'Visible on site'} />
+          ) : (
+            <EyeOff className="w-3 h-3 shrink-0" aria-label={isAr ? 'مخفية عن الموقع' : 'Hidden from site'} />
+          )}
+          {transitions[event.state]?.length ? (
+            <select
+              aria-label={isAr ? `تغيير حالة ${event.title}` : `Change ${event.title} state`}
+              value={event.state}
+              disabled={busy}
+              onChange={(e) => setPendingState(e.target.value as EventState)}
+              className="bg-transparent border-none px-0.5 py-0 text-[11px] font-bold disabled:opacity-50 transition-all focus:outline-none"
+            >
+              <option value={event.state}>{eventStateLabel(event.state, isAr)}</option>
+              {transitions[event.state].map((st) => (
+                <option key={st} value={st}>{eventStateLabel(st, isAr)}</option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-[11px] font-bold px-0.5">{isAr ? 'مؤرشفة' : 'Archived'}</span>
+          )}
+        </div>
+
         <div className="flex items-start gap-3 mb-3">
           <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden bg-[var(--color-surface-2)] flex items-center justify-center text-[var(--color-text-muted)] flex-shrink-0">
             {event.coverUrl ? (
@@ -178,14 +178,11 @@ export default function EventCard({
             {isJustSavedTemplate ? <Check size={14} /> : <Layers size={14} className="text-indigo-600" />}
             <span className="hidden sm:inline">{isJustSavedTemplate ? (isAr ? 'تم الحفظ!' : 'Saved!') : (isAr ? 'حفظ كقالب' : 'Template')}</span>
           </button>
-        </div>
-
-        <div className="flex items-center justify-end gap-2">
           <button
             type="button"
             disabled={busy}
             onClick={() => setPendingUnlisted(isVisible)}
-            className="text-xs font-bold px-3 py-1.5 rounded-xl bg-[var(--color-surface-2)] text-[var(--color-text-secondary)] hover:opacity-80 disabled:opacity-50 transition-opacity"
+            className="text-xs font-bold px-3 py-2 rounded-xl bg-[var(--color-surface-2)] hover:opacity-80 text-[var(--color-text-secondary)] disabled:opacity-50 transition-opacity ms-auto"
           >
             {isVisible ? (isAr ? 'إخفاء' : 'Hide') : (isAr ? 'إظهار' : 'Show')}
           </button>

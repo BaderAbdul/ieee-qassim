@@ -1,6 +1,9 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useSyncExternalStore, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+
+const subscribeNever = () => () => {};
 
 type Tone = 'accent' | 'warning' | 'danger';
 
@@ -26,9 +29,15 @@ interface ConfirmDialogProps {
 export default function ConfirmDialog({
   open, icon, tone = 'accent', title, message, confirmLabel, cancelLabel, onConfirm, onCancel, busy,
 }: ConfirmDialogProps) {
-  if (!open) return null;
+  // A card with backdrop-blur (glassmorphism) becomes a containing block for its own
+  // fixed-position descendants, which would otherwise trap this dialog inside the card
+  // instead of covering the page. Render it through a portal to document.body instead,
+  // once mounted on the client (document doesn't exist during server rendering).
+  const mounted = useSyncExternalStore(subscribeNever, () => true, () => false);
+
+  if (!open || !mounted) return null;
   const toneStyle = TONE_STYLES[tone];
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
       role="alertdialog"
@@ -64,6 +73,7 @@ export default function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
