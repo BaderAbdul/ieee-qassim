@@ -5,6 +5,51 @@
   --font-cairo: var(--font-cairo), sans-serif;
   --font-inter: var(--font-inter), sans-serif;
   --font-thmanyah: var(--font-thmanyah), serif;
+
+  /* IEEE-anchored admin theme (scoped to .ieee-admin-theme, see admin/layout.tsx).
+     Light values here; .ieee-admin-theme.dark below overrides the same custom
+     properties, so every bg-accent/text-accent/etc. utility stays in sync. */
+  --color-page: #F4F7FA;
+  --color-surface: #FFFFFF;
+  --color-surface-2: #F1F5F9;
+  --color-border: #E2E8F0;
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #5B6472;
+  --color-text-muted: #94A3B8;
+  --color-accent: #00629B;
+  --color-accent-contrast: #FFFFFF;
+  --color-accent-soft: #E6F1FB;
+  --color-accent-strong: #004B7A;
+  --color-highlight: #E87722;
+  --color-highlight-soft: #FDEBD9;
+  --color-success: #15803D;
+  --color-success-soft: #DCFCE7;
+  --color-warning: #B45309;
+  --color-warning-soft: #FEF3C7;
+  --color-danger: #B91C1C;
+  --color-danger-soft: #FEE2E2;
+}
+
+.ieee-admin-theme.dark {
+  --color-page: #0B1220;
+  --color-surface: #121A2B;
+  --color-surface-2: #16213A;
+  --color-border: #243249;
+  --color-text-primary: #E7ECF3;
+  --color-text-secondary: #9AA7BD;
+  --color-text-muted: #6B7A94;
+  --color-accent: #4DA8DA;
+  --color-accent-contrast: #04141F;
+  --color-accent-soft: #163449;
+  --color-accent-strong: #79C2EA;
+  --color-highlight: #FFA75C;
+  --color-highlight-soft: #3A2512;
+  --color-success: #4ADE80;
+  --color-success-soft: #0F2E1C;
+  --color-warning: #FBBF24;
+  --color-warning-soft: #3A2B07;
+  --color-danger: #F87171;
+  --color-danger-soft: #3A1414;
 }
 
 /* Custom CSS variables and global styles */

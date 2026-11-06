@@ -40,7 +40,7 @@ export default function CreateEventPage() {
     points: 10,
     hasCertificate: false,
     requiresRegistration: true,
-    isUnlisted: false,
+    isUnlisted: true, // hidden from the public site by default; the organizer un-hides it when ready
     registrationMode: 'Auto' as RegistrationMode,
     gains: '',
     gainsEn: '',

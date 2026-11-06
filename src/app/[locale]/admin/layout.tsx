@@ -7,9 +7,8 @@ import { Link } from '@/i18n/routing';
 import { 
   LayoutDashboard, 
   Calendar, 
-  Users, 
-  QrCode, 
-  LogOut, 
+  Users,
+  LogOut,
   Lightbulb, 
   ChevronLeft, 
   ChevronRight,
@@ -18,12 +17,14 @@ import {
   Wrench,
   Settings,
   Activity,
-  BarChart3,
   ClipboardList,
   Rocket,
   Shield,
   UsersRound,
-  Award
+  Award,
+  Sun,
+  Moon,
+  Mail
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useLocale } from 'next-intl';
@@ -43,6 +44,19 @@ const getSidebarSnapshot = () => {
   catch { return false; }
 };
 
+const subscribeTheme = (notify: () => void) => {
+  window.addEventListener('storage', notify);
+  window.addEventListener('ieee-admin-theme', notify);
+  return () => {
+    window.removeEventListener('storage', notify);
+    window.removeEventListener('ieee-admin-theme', notify);
+  };
+};
+const getThemeSnapshot = () => {
+  try { return localStorage.getItem('admin_theme') === 'dark'; }
+  catch { return false; }
+};
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, userData, loading } = useAuth();
   const router = useRouter();
@@ -58,6 +72,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     window.dispatchEvent(new Event('ieee-sidebar'));
   };
 
+  const isDark = useSyncExternalStore(subscribeTheme, getThemeSnapshot, () => false);
+  const toggleTheme = () => {
+    try { localStorage.setItem('admin_theme', isDark ? 'light' : 'dark'); }
+    catch { return; }
+    window.dispatchEvent(new Event('ieee-admin-theme'));
+  };
+  const themeClass = `ieee-admin-theme${isDark ? ' dark' : ''}`;
+
   const isDashboardUser = !!userData && userData.role !== 'student';
 
   useEffect(() => {
@@ -72,25 +94,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+      <div className={`${themeClass} min-h-screen flex items-center justify-center bg-[var(--color-page)]`}>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-accent)]"></div>
       </div>
     );
   }
 
   if (!user || !isDashboardUser) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-4 text-center">
-        <ShieldAlert className="w-16 h-16 text-red-500 mb-4 animate-bounce" />
-        <h2 className="text-xl sm:text-2xl font-bold text-slate-800 mb-2 font-cairo">
+      <div className={`${themeClass} min-h-screen flex flex-col items-center justify-center bg-[var(--color-page)] px-4 text-center`}>
+        <ShieldAlert className="w-16 h-16 text-[var(--color-danger)] mb-4 animate-bounce" />
+        <h2 className="text-xl sm:text-2xl font-bold text-[var(--color-text-primary)] mb-2 font-cairo">
           {isAr ? 'غير مصرح بالدخول' : 'Access Denied'}
         </h2>
-        <p className="text-slate-500 text-sm mb-6 max-w-md">
+        <p className="text-[var(--color-text-secondary)] text-sm mb-6 max-w-md">
           {isAr ? 'هذه الصفحة مخصصة لمديري ومنظمي الفعاليات فقط.' : 'This section is restricted to organizers and super admins only.'}
         </p>
-        <Link 
-          href="/" 
-          className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-all"
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 bg-[var(--color-accent)] hover:opacity-90 text-[var(--color-accent-contrast)] px-5 py-2.5 rounded-xl font-bold text-sm transition-all"
         >
           <Home className="w-4 h-4" />
           <span>{isAr ? 'العودة للمنصة الرئيسية' : 'Return to Home'}</span>
@@ -113,11 +135,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     ...(hasAnyPrivilege(userData, 'events') ? [{ name: isAr ? 'إدارة الفعاليات' : 'Events', href: '/admin/events', icon: <Calendar size={20} /> }] : []),
     ...(hasAnyPrivilege(userData, 'showcase') ? [{ name: isAr ? 'معرض المشاريع' : 'Projects Showcase', href: '/admin/showcase', icon: <Rocket size={20} /> }] : []),
     ...(hasAnyPrivilege(userData, 'members') ? [{ name: isAr ? 'المسجلون والطلاب' : 'Users & Members', href: '/admin/users', icon: <Users size={20} /> }] : []),
-    ...(hasAnyPrivilege(userData, 'attendance') ? [{ name: isAr ? 'تسجيل الحضور (QR)' : 'Check-In Desk', href: '/admin/check-in', icon: <QrCode size={20} /> }] : []),
     ...(hasAnyPrivilege(userData, 'ideas') ? [{ name: isAr ? 'الأفكار والمبادرات' : 'Ideas & Proposals', href: '/admin/ideas', icon: <Lightbulb size={20} /> }] : []),
     ...(hasAnyPrivilege(userData, 'content') ? [{ name: isAr ? 'محتوى الموقع' : 'Site content', href: '/admin/content', icon: <Settings size={20} /> }] : []),
+    ...(hasAnyPrivilege(userData, 'content') ? [{ name: isAr ? 'قوالب البريد والشهادات' : 'Email & certificate templates', href: '/admin/templates', icon: <Mail size={20} /> }] : []),
     ...(hasAnyPrivilege(userData, 'operations') ? [{ name: isAr ? 'مركز المهام' : 'Operations', href: '/admin/operations', icon: <Activity size={20} /> }] : []),
-    ...(hasAnyPrivilege(userData, 'operations') ? [{ name: isAr ? 'التقارير' : 'Reports', href: '/admin/reports', icon: <BarChart3 size={20} /> }] : []),
     ...(isSuperAdmin ? [{ name: isAr ? 'الأدوار والصلاحيات' : 'Roles & Privileges', href: '/admin/roles', icon: <Shield size={20} /> }] : []),
     ...(isSuperAdmin ? [{ name: isAr ? 'الفرق' : 'Teams', href: '/admin/teams', icon: <UsersRound size={20} /> }] : []),
     ...(isSuperAdmin ? [{ name: isAr ? 'الأوسمة الإدارية' : 'Admin Badges', href: '/admin/badges', icon: <Award size={20} /> }] : []),
@@ -126,9 +147,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans">
-      {/* Sidebar */}
-      <aside 
+    <div className={`${themeClass} min-h-screen bg-[var(--color-page)] flex flex-col md:flex-row font-sans`}>
+      {/* Sidebar (kept as a dark rail regardless of theme, like most dashboards) */}
+      <aside
         className={`w-full bg-slate-900 text-white md:min-h-screen flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out border-e border-slate-800 ${
           isCollapsed ? 'md:w-20' : 'md:w-64'
         }`}
@@ -136,7 +157,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* Header & Toggle Button */}
         <div className="p-3 sm:p-5 border-b border-slate-800/80 flex items-center justify-between">
           <div className={`truncate ${isCollapsed ? 'md:hidden' : ''}`}>
-            <h2 className="text-base sm:text-lg font-black font-cairo text-purple-400 tracking-wide">
+            <h2 className="text-base sm:text-lg font-black font-cairo text-[#4DA8DA] tracking-wide">
               {isAr ? 'لوحة الإدارة' : 'Admin Portal'}
             </h2>
             <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">
@@ -144,6 +165,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </p>
           </div>
           <div className="flex items-center gap-1.5">
+            <button
+              onClick={toggleTheme}
+              aria-label={isDark ? (isAr ? 'الوضع الفاتح' : 'Light mode') : (isAr ? 'الوضع الداكن' : 'Dark mode')}
+              title={isDark ? (isAr ? 'الوضع الفاتح' : 'Light mode') : (isAr ? 'الوضع الداكن' : 'Dark mode')}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all"
+            >
+              {isDark ? <Sun className="w-4 h-4 sm:w-5 sm:h-5" /> : <Moon className="w-4 h-4 sm:w-5 sm:h-5" />}
+            </button>
+
             {/* Mobile partial collapse / expand button */}
             <button
               type="button"
@@ -154,7 +184,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             >
               {mobileOpen ? (isAr ? 'إخفاء جزئي (أيقونات)' : 'Icons only') : (isAr ? 'عرض العناوين' : 'Full menu')}
             </button>
-            
+
             <button
               onClick={toggleSidebar}
               aria-label={isCollapsed ? (isAr ? 'توسيع القائمة' : 'Expand sidebar') : (isAr ? 'طي القائمة' : 'Collapse sidebar')}
@@ -186,7 +216,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   title={item.name}
                   className={`p-2.5 rounded-xl shrink-0 transition-colors ${
                     active
-                      ? 'bg-purple-600 text-white shadow-sm'
+                      ? 'bg-[#00629B] text-white shadow-sm'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800'
                   }`}
                 >
@@ -220,8 +250,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 className={`flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all ${
                   isCollapsed ? 'justify-center' : ''
                 } ${
-                  active 
-                    ? 'bg-purple-600 text-white shadow-md shadow-purple-900/30 font-bold' 
+                  active
+                    ? 'bg-[#00629B] text-white shadow-md shadow-black/30 font-bold'
                     : 'text-slate-300 hover:bg-slate-800/80 hover:text-white font-medium'
                 }`}
               >
