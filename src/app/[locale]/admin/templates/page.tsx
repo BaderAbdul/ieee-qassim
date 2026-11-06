@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Award, CheckCircle2, Clock3, Layers, Mail, Plus, Search } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
@@ -37,7 +37,8 @@ export default function AdminTemplatesPage() {
     try { setEditor({ initial: await apiGet<CertificateTemplate>(`/api/admin/templates/${id}`) }); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to open template'); } finally { setBusy(false); }
   };
-  useAdminTopbarActions(<button type="button" onClick={() => setChooser(true)} className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-accent)] px-3.5 py-2 text-xs font-bold text-[var(--color-accent-contrast)]"><Plus size={16} />{t('إنشاء قالب', 'Create template')}</button>);
+  const topbarActions = useMemo(() => <button type="button" onClick={() => setChooser(true)} className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-accent)] px-3.5 py-2 text-xs font-bold text-[var(--color-accent-contrast)]"><Plus size={16} />{isAr ? 'إنشاء قالب' : 'Create template'}</button>, [isAr]);
+  useAdminTopbarActions(topbarActions);
   const visible = templates.filter(template => (!status || status === template.status) && template.nameAr.includes(search.trim()));
   return <div className="space-y-6 pb-12">
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">{[
