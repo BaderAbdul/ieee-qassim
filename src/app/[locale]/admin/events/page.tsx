@@ -181,7 +181,7 @@ export default function AdminEventsPage() {
   return (
     <div className="space-y-6 pb-12">
       {/* Page Header */}
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[var(--color-surface)] p-6 rounded-3xl border border-[var(--color-border)] shadow-sm">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[var(--color-surface)]/60 backdrop-blur-md p-6 rounded-3xl border border-[var(--color-border)]/50 shadow-sm">
         <div>
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-[var(--color-accent)] text-[var(--color-accent-contrast)] rounded-2xl shadow-sm">
@@ -239,7 +239,7 @@ export default function AdminEventsPage() {
       {/* Metrics Summary Bar */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
         {/* Total Events */}
-        <div className="bg-[var(--color-surface)] p-4 sm:p-5 rounded-2xl border border-[var(--color-border)] shadow-sm flex items-center gap-3.5">
+        <div className="bg-[var(--color-surface)]/60 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-[var(--color-border)]/50 shadow-sm flex items-center gap-3.5">
           <div className="p-3 bg-[var(--color-accent-soft)] text-[var(--color-accent)] rounded-xl">
             <Calendar className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
@@ -254,7 +254,7 @@ export default function AdminEventsPage() {
         </div>
 
         {/* Active Events */}
-        <div className="bg-[var(--color-surface)] p-4 sm:p-5 rounded-2xl border border-[var(--color-border)] shadow-sm flex items-center gap-3.5">
+        <div className="bg-[var(--color-surface)]/60 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-[var(--color-border)]/50 shadow-sm flex items-center gap-3.5">
           <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
             <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
@@ -269,7 +269,7 @@ export default function AdminEventsPage() {
         </div>
 
         {/* Registered / Attended */}
-        <div className="bg-[var(--color-surface)] p-4 sm:p-5 rounded-2xl border border-[var(--color-border)] shadow-sm flex items-center gap-3.5">
+        <div className="bg-[var(--color-surface)]/60 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-[var(--color-border)]/50 shadow-sm flex items-center gap-3.5">
           <div className="p-3 bg-sky-50 text-sky-600 rounded-xl">
             <Users className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
@@ -286,7 +286,7 @@ export default function AdminEventsPage() {
         {/* Saved Templates */}
         <div 
           onClick={() => setIsTemplatesModalOpen(true)}
-          className="bg-[var(--color-surface)] p-4 sm:p-5 rounded-2xl border border-[var(--color-border)] shadow-sm flex items-center gap-3.5 cursor-pointer hover:border-indigo-300 transition-all group"
+          className="bg-[var(--color-surface)]/60 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-[var(--color-border)]/50 shadow-sm flex items-center gap-3.5 cursor-pointer hover:border-indigo-300 transition-all group"
         >
           <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl group-hover:bg-indigo-600 group-hover:text-white transition-all">
             <Layers className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -303,7 +303,7 @@ export default function AdminEventsPage() {
       </div>
 
       {/* Toolbar: Search, Filters & Sorting */}
-      <div className="bg-[var(--color-surface)] p-4 sm:p-5 rounded-2xl border border-[var(--color-border)] shadow-sm flex flex-col md:flex-row items-stretch md:items-center gap-3">
+      <div className="bg-[var(--color-surface)]/60 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-[var(--color-border)]/50 shadow-sm flex flex-col md:flex-row items-stretch md:items-center gap-3">
         {/* Search Input */}
         <div className="relative flex-1">
           <Search className="w-4 h-4 text-[var(--color-text-muted)] absolute right-3.5 top-1/2 -translate-y-1/2" />
@@ -428,7 +428,7 @@ export default function AdminEventsPage() {
 
       {/* Empty State */}
       {!loading && !error && !visible.length && (
-        <div className="bg-[var(--color-surface)] rounded-3xl border border-[var(--color-border)] p-12 text-center">
+        <div className="bg-[var(--color-surface)]/60 backdrop-blur-md rounded-3xl border border-[var(--color-border)]/50 p-12 text-center">
           <div className="w-14 h-14 bg-[var(--color-surface-2)] rounded-2xl flex items-center justify-center mx-auto mb-3 text-[var(--color-text-muted)]">
             <Calendar className="w-7 h-7" />
           </div>
@@ -453,7 +453,7 @@ export default function AdminEventsPage() {
       )}
 
       {/* Pagination Footer */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-[var(--color-surface)] p-4 rounded-2xl border border-[var(--color-border)] shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-[var(--color-surface)]/60 backdrop-blur-md p-4 rounded-2xl border border-[var(--color-border)]/50 shadow-sm">
         <p className="text-xs text-[var(--color-text-secondary)]">
           {isAr ? 'الفعاليات المعروضة:' : 'Showing:'} <strong>{visible.length}</strong> {isAr ? 'من أصل' : 'of'} {events.length}
         </p>

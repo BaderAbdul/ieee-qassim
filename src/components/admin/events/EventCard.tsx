@@ -56,8 +56,8 @@ export default function EventCard({
 
   return (
     <article
-      className={`rounded-3xl border bg-[var(--color-surface)] p-5 sm:p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between ${
-        event.isPinned ? 'border-amber-300 ring-1 ring-amber-100' : 'border-[var(--color-border)]'
+      className={`rounded-3xl border bg-[var(--color-surface)]/60 backdrop-blur-md p-5 sm:p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between ${
+        event.isPinned ? 'border-amber-300 ring-1 ring-amber-100' : 'border-[var(--color-border)]/50'
       }`}
     >
       <div>
@@ -120,7 +120,7 @@ export default function EventCard({
           </div>
         </div>
 
-        <div className="bg-[var(--color-surface-2)] rounded-2xl p-3 border border-[var(--color-border)] space-y-1.5 mb-4">
+        <div className="bg-[var(--color-surface-2)]/70 backdrop-blur-sm rounded-2xl p-3 border border-[var(--color-border)]/50 space-y-1.5 mb-4">
           <div className="flex items-center justify-between text-xs">
             <span className="text-[var(--color-text-secondary)] font-medium">
               {isAr ? 'المسجلون:' : 'Registered:'} <strong className="text-[var(--color-text-primary)]">{event.registeredCount || 0}</strong> / {event.isUnlimitedCapacity ? '∞' : event.capacity}

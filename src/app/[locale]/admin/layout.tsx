@@ -147,15 +147,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   ];
 
   return (
-    <div className={`${themeClass} min-h-screen bg-[var(--color-page)] flex flex-col md:flex-row font-sans`}>
-      {/* Sidebar (kept as a dark rail regardless of theme, like most dashboards) */}
+    <div className={`${themeClass} min-h-screen bg-[var(--color-page)] flex flex-col md:flex-row font-sans relative overflow-hidden`}>
+      {/* Decorative background shapes -- purely visual, sits behind the glass sidebar and cards */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden -z-10" aria-hidden="true">
+        <div className="absolute -top-24 -start-24 w-[28rem] h-[28rem] rounded-full bg-[var(--color-accent)]/20 blur-3xl animate-blob" />
+        <div className="absolute top-1/3 -end-32 w-[24rem] h-[24rem] rounded-full bg-[var(--color-highlight)]/15 blur-3xl animate-blob animation-delay-2000" />
+        <div className="absolute bottom-0 start-1/4 w-[22rem] h-[22rem] rounded-full bg-[var(--color-accent)]/15 blur-3xl animate-blob animation-delay-4000" />
+      </div>
+
+      {/* Sidebar: floats over the background, glassmorphic, kept dark regardless of theme */}
       <aside
-        className={`w-full bg-slate-900 text-white md:min-h-screen flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out border-e border-slate-800 ${
+        className={`relative z-10 w-full m-3 md:ms-3 md:me-0 bg-slate-900/70 backdrop-blur-xl text-white md:h-[calc(100vh-1.5rem)] rounded-3xl overflow-hidden flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out border border-white/10 shadow-2xl ${
           isCollapsed ? 'md:w-20' : 'md:w-64'
         }`}
       >
         {/* Header & Toggle Button */}
-        <div className="p-3 sm:p-5 border-b border-slate-800/80 flex items-center justify-between">
+        <div className="p-3 sm:p-5 border-b border-white/10 flex items-center justify-between">
           <div className={`truncate ${isCollapsed ? 'md:hidden' : ''}`}>
             <h2 className="text-base sm:text-lg font-black font-cairo text-[#4DA8DA] tracking-wide">
               {isAr ? 'لوحة الإدارة' : 'Admin Portal'}
@@ -169,7 +176,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               onClick={toggleTheme}
               aria-label={isDark ? (isAr ? 'الوضع الفاتح' : 'Light mode') : (isAr ? 'الوضع الداكن' : 'Dark mode')}
               title={isDark ? (isAr ? 'الوضع الفاتح' : 'Light mode') : (isAr ? 'الوضع الداكن' : 'Dark mode')}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all"
+              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all"
             >
               {isDark ? <Sun className="w-4 h-4 sm:w-5 sm:h-5" /> : <Moon className="w-4 h-4 sm:w-5 sm:h-5" />}
             </button>
@@ -180,7 +187,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               aria-controls="admin-navigation-panel"
               aria-expanded={mobileOpen}
               onClick={() => setMobileOpen(value => !value)}
-              className="md:hidden inline-flex items-center gap-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 px-3 py-1.5 text-xs font-bold text-slate-200 transition-colors"
+              className="md:hidden inline-flex items-center gap-1.5 rounded-xl bg-white/10 hover:bg-white/20 px-3 py-1.5 text-xs font-bold text-slate-200 transition-colors"
             >
               {mobileOpen ? (isAr ? 'إخفاء جزئي (أيقونات)' : 'Icons only') : (isAr ? 'عرض العناوين' : 'Full menu')}
             </button>
@@ -189,7 +196,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               onClick={toggleSidebar}
               aria-label={isCollapsed ? (isAr ? 'توسيع القائمة' : 'Expand sidebar') : (isAr ? 'طي القائمة' : 'Collapse sidebar')}
               aria-expanded={!isCollapsed}
-              className={`hidden md:block p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all ${
+              className={`hidden md:block p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all ${
                 isCollapsed ? 'mx-auto' : ''
               }`}
               title={isCollapsed ? (isAr ? 'توسيع القائمة' : 'Expand Sidebar') : (isAr ? 'طَيّ القائمة (أيقونات فقط)' : 'Collapse Sidebar')}
@@ -205,7 +212,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Mobile quick icons strip when full menu is closed (partial collapse) */}
         {!mobileOpen && (
-          <div className="md:hidden flex items-center gap-1 p-2 overflow-x-auto no-scrollbar border-b border-slate-800/60 bg-slate-900/90">
+          <div className="md:hidden flex items-center gap-1 p-2 overflow-x-auto no-scrollbar border-b border-white/10 bg-slate-900/60">
             {navItems.map((item) => {
               const active = isCurrentPath(item.href);
               return (
@@ -217,7 +224,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   className={`p-2.5 rounded-xl shrink-0 transition-colors ${
                     active
                       ? 'bg-[#00629B] text-white shadow-sm'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                      : 'text-slate-400 hover:text-white hover:bg-white/10'
                   }`}
                 >
                   {item.icon}
@@ -227,7 +234,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Link
               href="/"
               title={isAr ? 'العودة للمنصة' : 'Back to main site'}
-              className="p-2.5 rounded-xl shrink-0 text-slate-400 hover:text-white hover:bg-slate-800"
+              className="p-2.5 rounded-xl shrink-0 text-slate-400 hover:text-white hover:bg-white/10"
             >
               <LogOut size={20} className="rtl:rotate-180" />
             </Link>
@@ -252,7 +259,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 } ${
                   active
                     ? 'bg-[#00629B] text-white shadow-md shadow-black/30 font-bold'
-                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white font-medium'
+                    : 'text-slate-300 hover:bg-white/10 hover:text-white font-medium'
                 }`}
               >
                 <div className="flex-shrink-0">{item.icon}</div>
@@ -264,11 +271,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Return to Main Site Button */}
         {!isCollapsed && <NotificationQueueControl />}
-        <div className="p-3 border-t border-slate-800/80">
+        <div className="p-3 border-t border-white/10">
           <Link 
             href="/" 
             title={isCollapsed ? (isAr ? 'العودة للمنصة' : 'Return to Home') : undefined}
-            className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition-all ${
+            className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-slate-300 hover:bg-white/10 hover:text-white transition-all ${
               isCollapsed ? 'justify-center' : ''
             }`}
           >
