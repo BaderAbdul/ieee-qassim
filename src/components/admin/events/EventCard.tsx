@@ -58,7 +58,7 @@ export default function EventCard({
       <div>
         {/* Status + visibility badge, kept at the card's top-left corner. The select is the
             actual status-change control; the eye icon just reflects whether the event is public. */}
-        <div className={`inline-flex mr-auto items-center gap-1 rounded-full border shadow-sm mb-3 ${badge.bg} ${badge.text} ${badge.border} ps-2 pe-1 py-1`}>
+        <div className={`flex w-fit mr-auto items-center gap-1 rounded-full border shadow-sm mb-3 ${badge.bg} ${badge.text} ${badge.border} ps-2 pe-1 py-1`}>
           {isVisible ? (
             <Eye className="w-3 h-3 shrink-0" aria-label={isAr ? 'ظاهرة في الموقع' : 'Visible on site'} />
           ) : (
