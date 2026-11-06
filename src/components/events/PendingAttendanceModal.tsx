@@ -42,12 +42,25 @@ export default function PendingAttendanceModal() {
   const [errorMessage, setErrorMessage] = useState('');
 
   // Polls for a pending attendance scan on the student's device (no server push available).
+  // This used to run unconditionally for every signed-in user, on every page, every 4s, for as
+  // long as a tab stayed open -- including admin dashboard tabs left open for hours, which added
+  // up to a steady stream of writes against the backend's per-user rate-limit row and made the
+  // whole site sluggish after a while. It only ever matters for someone who could plausibly have
+  // just had their badge scanned at a physical event, so: skip it entirely on admin pages (same
+  // condition the render-gate below already uses), pause it while the tab is in the background,
+  // and poll far less often -- a human at a check-in desk won't notice 12s instead of 4s.
+  const skipPolling = !!user && !!userData && userData.role !== 'student' && pathname.includes('/admin');
   useEffect(() => {
-    if (!user) return;
+    if (!user || skipPolling) return;
     let active = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    const POLL_INTERVAL_MS = 12000;
 
     const poll = async () => {
+      if (document.hidden) {
+        if (active) timer = setTimeout(poll, POLL_INTERVAL_MS);
+        return;
+      }
       try {
         const data = await apiGet<PendingCheckinDoc | null>('/api/me/pending-checkin');
         if (!active) return;
@@ -70,13 +83,21 @@ export default function PendingAttendanceModal() {
         if (!active) return;
         console.warn('Pending checkin poll:', error);
       } finally {
-        if (active) timer = setTimeout(poll, 4000);
+        if (active) timer = setTimeout(poll, POLL_INTERVAL_MS);
       }
     };
 
+    // Check right away when the tab regains focus, instead of waiting out the current interval.
+    const handleVisibility = () => { if (!document.hidden) void poll(); };
+    document.addEventListener('visibilitychange', handleVisibility);
+
     poll();
-    return () => { active = false; if (timer) clearTimeout(timer); };
-  }, [user]);
+    return () => {
+      active = false;
+      if (timer) clearTimeout(timer);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [user, skipPolling]);
 
   if (!user) return null;
   // Organizer controls remain independent even if an organizer attended an event too.
