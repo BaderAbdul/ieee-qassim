@@ -9,6 +9,7 @@ import AdminContentPage from '../content/page';
 import AdminMaintenancePage from '../maintenance/page';
 import AdminBadgesPage from '../badges/page';
 import AdminAuditPage from '../audit/page';
+import AdminAcademicTermPage from '../academic-term/page';
 
 export default function AdminSettingsPage() {
   const isAr = useLocale() === 'ar';
@@ -19,6 +20,7 @@ export default function AdminSettingsPage() {
   const tabs: AdminTab[] = [
     ...(isSuperAdmin ? [{ key: 'roles', label: isAr ? 'الأدوار والصلاحيات' : 'Roles & Privileges', content: <AdminRolesPage /> }] : []),
     ...(canEditContent ? [{ key: 'content', label: isAr ? 'محتوى الموقع' : 'Site content', content: <AdminContentPage /> }] : []),
+    ...(canEditContent ? [{ key: 'academic-term', label: isAr ? 'الفصل الدراسي' : 'Academic term', content: <AdminAcademicTermPage /> }] : []),
     ...(isSuperAdmin ? [{ key: 'maintenance', label: isAr ? 'وضع الصيانة' : 'Maintenance mode', content: <AdminMaintenancePage /> }] : []),
     ...(isSuperAdmin ? [{ key: 'badges', label: isAr ? 'الأوسمة الإدارية' : 'Admin Badges', content: <AdminBadgesPage /> }] : []),
     ...(isSuperAdmin ? [{ key: 'audit', label: isAr ? 'سجل الإجراءات' : 'Audit log', content: <AdminAuditPage /> }] : []),

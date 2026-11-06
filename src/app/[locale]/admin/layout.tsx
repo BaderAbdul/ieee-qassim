@@ -153,7 +153,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
 
   return (
-    <div className={`${themeClass} min-h-screen bg-[var(--color-page)] flex flex-col md:flex-row font-sans relative isolate`}>
+    <div className={`${themeClass} min-h-screen bg-[var(--color-page)] flex flex-col md:flex-row gap-3 p-3 font-sans relative isolate`}>
       {/* Decorative background shapes -- fixed to the viewport (not the document) so every
           page reads the same regardless of how tall its content is, and so they stay put
           while the page scrolls */}
@@ -165,7 +165,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Sidebar: floats over the background, glassmorphic, stays in view while the page scrolls */}
       <aside
-        className={`sticky top-3 self-start z-10 w-full m-3 md:ms-3 md:me-0 bg-slate-900/70 backdrop-blur-xl text-white md:h-[calc(100vh-1.5rem)] rounded-3xl flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out border border-white/10 shadow-2xl ${
+        className={`sticky top-3 self-start z-10 w-full bg-slate-900/70 backdrop-blur-xl text-white md:h-[calc(100vh-1.5rem)] rounded-3xl flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out border border-white/10 shadow-2xl ${
           isCollapsed ? 'md:w-20' : 'md:w-64'
         }`}
       >
@@ -184,7 +184,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               onClick={toggleTheme}
               aria-label={isDark ? (isAr ? 'الوضع الفاتح' : 'Light mode') : (isAr ? 'الوضع الداكن' : 'Dark mode')}
               title={isDark ? (isAr ? 'الوضع الفاتح' : 'Light mode') : (isAr ? 'الوضع الداكن' : 'Dark mode')}
-              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all"
+              className="cursor-pointer p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all"
             >
               {isDark ? <Sun className="w-4 h-4 sm:w-5 sm:h-5" /> : <Moon className="w-4 h-4 sm:w-5 sm:h-5" />}
             </button>
@@ -195,7 +195,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               aria-controls="admin-navigation-panel"
               aria-expanded={mobileOpen}
               onClick={() => setMobileOpen(value => !value)}
-              className="md:hidden inline-flex items-center gap-1.5 rounded-xl bg-white/10 hover:bg-white/20 px-3 py-1.5 text-xs font-bold text-slate-200 transition-colors"
+              className="cursor-pointer md:hidden inline-flex items-center gap-1.5 rounded-xl bg-white/10 hover:bg-white/20 px-3 py-1.5 text-xs font-bold text-slate-200 transition-colors"
             >
               {mobileOpen ? (isAr ? 'إخفاء جزئي (أيقونات)' : 'Icons only') : (isAr ? 'عرض العناوين' : 'Full menu')}
             </button>
@@ -204,7 +204,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               onClick={toggleSidebar}
               aria-label={isCollapsed ? (isAr ? 'توسيع القائمة' : 'Expand sidebar') : (isAr ? 'طي القائمة' : 'Collapse sidebar')}
               aria-expanded={!isCollapsed}
-              className="hidden md:block p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all"
+              className="cursor-pointer hidden md:block p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all"
               title={isCollapsed ? (isAr ? 'توسيع القائمة' : 'Expand Sidebar') : (isAr ? 'طَيّ القائمة (أيقونات فقط)' : 'Collapse Sidebar')}
             >
               {isCollapsed ? (

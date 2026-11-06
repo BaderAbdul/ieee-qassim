@@ -1,15 +1,17 @@
 'use client';
 
+import { useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Users, ListTodo, ArrowRightLeft, ClipboardList, Sparkles } from 'lucide-react';
 import type { AdminOverview, AdminEventsPage, AdminEventSummary } from '@/lib/adminTypes';
-import { AdminError, AdminLoading, formatAdminDate, useAdminQuery } from '@/components/admin/AdminData';
+import { AdminError, AdminLoading, useAdminQuery } from '@/components/admin/AdminData';
 import AdminCalendar from '@/components/admin/home/AdminCalendar';
+import DayDetailsPanel from '@/components/admin/home/DayDetailsPanel';
 import HomeEventsTable from '@/components/admin/home/HomeEventsTable';
 
 function RequestsPanel({ icon: Icon, title, description, isAr }: { icon: typeof ArrowRightLeft; title: string; description: string; isAr: boolean }) {
   return (
-    <div className="rounded-3xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/60 backdrop-blur-md p-5 shadow-xs flex flex-col">
+    <div className="rounded-3xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/80 backdrop-blur-md p-5 shadow-xs flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-black font-cairo text-[var(--color-text-primary)] flex items-center gap-2">
           <Icon size={17} className="text-[var(--color-accent)]" />
@@ -31,6 +33,7 @@ export default function AdminDashboardPage() {
   const locale = useLocale(); const isAr = locale === 'ar';
   const { data, loading, error, refresh } = useAdminQuery<AdminOverview>('getAdminOverview');
   const { data: eventsPage } = useAdminQuery<AdminEventsPage>('getAdminEvents');
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const events: AdminEventSummary[] = (eventsPage?.events ?? data?.events ?? []).map(e => ({
     id: e.id,
     title: e.title,
@@ -51,38 +54,36 @@ export default function AdminDashboardPage() {
         <AdminLoading />
       ) : data ? (
         <>
-          {/* Calendar + KPIs */}
-          <div className="grid gap-4 lg:grid-cols-3">
+          {/* Calendar + KPIs/day details */}
+          <div className="grid gap-4 lg:grid-cols-3 items-stretch">
             <div className="lg:col-span-2">
-              <AdminCalendar events={events} isAr={isAr} />
+              <AdminCalendar events={events} isAr={isAr} selected={selectedDay} onSelectDay={setSelectedDay} />
             </div>
-            <div className="flex flex-col gap-4">
-              <div className="rounded-3xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/60 backdrop-blur-md p-6 shadow-xs flex-1 flex flex-col justify-between">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-11 h-11 rounded-2xl flex items-center justify-center shadow-md" style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-accent-contrast)' }}>
-                    <Users size={20} />
+            <div className="flex flex-col gap-3 min-h-0">
+              <div className="grid grid-cols-2 gap-3 shrink-0">
+                <div className="rounded-2xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/80 backdrop-blur-md p-4 shadow-xs">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2" style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-accent-contrast)' }}>
+                    <Users size={16} />
                   </div>
+                  <p className="text-[10px] font-bold text-[var(--color-text-secondary)] uppercase tracking-wider truncate">{isAr ? 'إجمالي الأعضاء' : 'Participants'}</p>
+                  <p className="mt-0.5 text-xl font-black text-[var(--color-text-primary)] font-cairo">{data.counts.users.toLocaleString(locale)}</p>
                 </div>
-                <div>
-                  <p className="text-xs font-bold text-[var(--color-text-secondary)] uppercase tracking-wider">{isAr ? 'إجمالي الأعضاء' : 'Total participants'}</p>
-                  <p className="mt-1 text-3xl font-black text-[var(--color-text-primary)] font-cairo">{data.counts.users.toLocaleString(locale)}</p>
+
+                <div className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)]/50 backdrop-blur-md p-4 shadow-xs">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[var(--color-surface-2)] text-[var(--color-text-muted)]">
+                      <ListTodo size={16} />
+                    </div>
+                    <span className="text-[9px] font-bold text-[var(--color-text-muted)] bg-[var(--color-surface-2)] px-1.5 py-0.5 rounded-full">
+                      {isAr ? 'قريبًا' : 'Soon'}
+                    </span>
+                  </div>
+                  <p className="text-[10px] font-bold text-[var(--color-text-secondary)] uppercase tracking-wider truncate">{isAr ? 'المهام المتبقية' : 'Remaining tasks'}</p>
+                  <p className="mt-0.5 text-xl font-black text-[var(--color-text-muted)] font-cairo">—</p>
                 </div>
               </div>
 
-              <div className="rounded-3xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)]/40 backdrop-blur-md p-6 shadow-xs flex-1 flex flex-col justify-between">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-11 h-11 rounded-2xl flex items-center justify-center bg-[var(--color-surface-2)] text-[var(--color-text-muted)]">
-                    <ListTodo size={20} />
-                  </div>
-                  <span className="text-[10px] font-bold text-[var(--color-text-muted)] bg-[var(--color-surface-2)] px-2 py-0.5 rounded-full">
-                    {isAr ? 'قريبًا' : 'Coming soon'}
-                  </span>
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-[var(--color-text-secondary)] uppercase tracking-wider">{isAr ? 'المهام المتبقية' : 'Remaining tasks'}</p>
-                  <p className="mt-1 text-3xl font-black text-[var(--color-text-muted)] font-cairo">—</p>
-                </div>
-              </div>
+              <DayDetailsPanel selected={selectedDay} events={events} isAr={isAr} />
             </div>
           </div>
 
@@ -104,10 +105,6 @@ export default function AdminDashboardPage() {
 
           {/* Events table */}
           <HomeEventsTable events={events} locale={locale} isAr={isAr} />
-
-          <p className="text-[11px] text-[var(--color-text-muted)] font-mono">
-            {isAr ? 'آخر تحديث للبيانات:' : 'Last updated:'} {formatAdminDate(data.generatedAt, locale)}
-          </p>
         </>
       ) : null}
     </div>

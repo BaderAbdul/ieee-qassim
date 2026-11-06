@@ -51,8 +51,8 @@ export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
 
   return (
     <>
-      <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-[var(--color-border)]/60 bg-[var(--color-surface)]/70 backdrop-blur-md px-4 sm:px-6 lg:px-8 py-3.5">
-        <h1 className="text-base sm:text-lg font-black font-cairo text-[var(--color-text-primary)] truncate">
+      <header className="sticky top-3 z-30 flex items-center justify-between gap-3 rounded-3xl border border-white/10 bg-slate-900/70 backdrop-blur-xl shadow-2xl px-4 sm:px-6 py-3.5">
+        <h1 className="text-base sm:text-lg font-black font-cairo text-white truncate">
           {pageTitle || (isAr ? 'لوحة الإدارة' : 'Admin Portal')}
         </h1>
 
@@ -60,12 +60,12 @@ export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
-            className="flex items-center gap-2 rounded-xl border border-[var(--color-border)]/60 bg-[var(--color-surface-2)]/60 hover:bg-[var(--color-surface-2)] px-3 py-2 text-[var(--color-text-secondary)] transition-colors"
+            className="cursor-pointer flex items-center gap-2 rounded-xl bg-white/10 hover:bg-white/20 px-3 py-2 text-slate-300 hover:text-white transition-all"
             aria-label={isAr ? 'بحث' : 'Search'}
           >
             <Search size={18} />
             <span className="hidden md:inline text-xs font-bold">{isAr ? 'بحث' : 'Search'}</span>
-            <kbd className="hidden md:inline text-[10px] font-mono bg-[var(--color-surface)] border border-[var(--color-border)] rounded px-1.5 py-0.5">Ctrl K</kbd>
+            <kbd className="hidden md:inline text-[10px] font-mono bg-white/10 border border-white/10 rounded px-1.5 py-0.5">Ctrl K</kbd>
           </button>
 
           {/* Notifications */}
@@ -73,7 +73,7 @@ export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
             <button
               type="button"
               onClick={() => setNotifOpen(value => !value)}
-              className="relative p-2.5 rounded-xl border border-[var(--color-border)]/60 bg-[var(--color-surface-2)]/60 hover:bg-[var(--color-surface-2)] text-[var(--color-text-secondary)] transition-colors"
+              className="cursor-pointer relative p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all"
               aria-label={isAr ? 'الإشعارات' : 'Notifications'}
             >
               <Bell size={18} />
@@ -118,7 +118,7 @@ export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
             <button
               type="button"
               onClick={() => setProfileOpen(value => !value)}
-              className="flex items-center gap-2 rounded-xl border border-[var(--color-border)]/60 bg-[var(--color-surface-2)]/60 hover:bg-[var(--color-surface-2)] ps-1.5 pe-2.5 py-1.5 transition-colors"
+              className="cursor-pointer flex items-center gap-1 rounded-xl bg-white/10 hover:bg-white/20 ps-1.5 pe-2 py-1.5 transition-all"
               aria-label={isAr ? 'حسابي' : 'My account'}
             >
               {user?.photoURL ? (
@@ -129,10 +129,7 @@ export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
                   <CircleUserRound size={16} />
                 </div>
               )}
-              <span className="hidden sm:inline text-xs font-bold text-[var(--color-text-primary)] max-w-[120px] truncate">
-                {user?.displayName || (isAr ? 'حسابي' : 'Account')}
-              </span>
-              <ChevronDown size={14} className="hidden sm:inline text-[var(--color-text-muted)]" />
+              <ChevronDown size={14} className="text-slate-400" />
             </button>
             {profileOpen && (
               <div className="absolute end-0 mt-2 w-56 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl overflow-hidden z-40">
@@ -165,7 +162,7 @@ export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
                   <button
                     type="button"
                     onClick={() => { setProfileOpen(false); void logout(); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-[var(--color-danger-soft)] text-sm font-bold text-[var(--color-danger)] transition-colors"
+                    className="cursor-pointer w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-[var(--color-danger-soft)] text-sm font-bold text-[var(--color-danger)] transition-colors"
                   >
                     <LogOut size={16} />
                     {isAr ? 'تسجيل الخروج' : 'Log out'}

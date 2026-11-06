@@ -9,7 +9,9 @@
   /* IEEE-anchored admin theme (scoped to .ieee-admin-theme, see admin/layout.tsx).
      Light values here; .ieee-admin-theme.dark below overrides the same custom
      properties, so every bg-accent/text-accent/etc. utility stays in sync. */
-  --color-page: #F4F7FA;
+  /* Noticeably darker than --color-surface on purpose: a near-white page behind near-white
+     translucent cards reads as almost no contrast at all outside the decorative blobs. */
+  --color-page: #E4EAF1;
   --color-surface: #FFFFFF;
   --color-surface-2: #F1F5F9;
   --color-border: #E2E8F0;
