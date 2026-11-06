@@ -43,7 +43,11 @@ export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  const notifCount = data ? data.notifications.pending + data.notifications.failed + data.notifications.review : 0;
+  // Only count things that actually need a human to act on them -- not the notification
+  // queue's own "pending" (not-yet-sent) backlog, which the delivery worker handles on its own.
+  const notifCount = data
+    ? data.counts.pendingRegistrations + data.counts.failedCertificates + data.notifications.failed + data.notifications.review
+    : 0;
 
   return (
     <>
@@ -74,7 +78,7 @@ export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
             >
               <Bell size={18} />
               {notifCount > 0 && (
-                <span className="absolute -top-1 -end-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--color-danger)] text-white text-[10px] font-bold flex items-center justify-center">
+                <span dir="ltr" className="absolute -top-1 -end-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--color-danger)] text-white text-[10px] font-bold flex items-center justify-center">
                   {notifCount > 99 ? '99+' : notifCount}
                 </span>
               )}
