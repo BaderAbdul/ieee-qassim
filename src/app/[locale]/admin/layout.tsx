@@ -4,31 +4,23 @@ import { hasAnyPrivilege, useAuth } from '@/context/AuthContext';
 import { useRouter } from '@/i18n/routing';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Link } from '@/i18n/routing';
-import { 
-  LayoutDashboard, 
-  Calendar, 
-  Users,
-  LogOut,
-  Lightbulb, 
-  ChevronLeft, 
+import {
+  LayoutDashboard,
+  Calendar,
+  Lightbulb,
+  ChevronLeft,
   ChevronRight,
   ShieldAlert,
   Home,
-  Wrench,
   Settings,
   Activity,
-  ClipboardList,
-  Rocket,
-  Shield,
   UsersRound,
-  Award,
   Sun,
   Moon,
   Mail
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useLocale } from 'next-intl';
-import NotificationQueueControl from '@/components/admin/NotificationQueueControl';
 import ConfigurationNotice from '@/components/admin/ConfigurationNotice';
 
 const subscribeSidebar = (notify: () => void) => {
@@ -130,20 +122,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const isSuperAdmin = userData.isSuperAdmin === true || userData.role === 'super_admin';
 
+  const canEditContent = hasAnyPrivilege(userData, 'content');
+  const canViewMembers = hasAnyPrivilege(userData, 'members');
+
   const navItems = [
     { name: isAr ? 'مركز العمل' : 'Command center', href: '/admin', icon: <LayoutDashboard size={20} /> },
     ...(hasAnyPrivilege(userData, 'events') ? [{ name: isAr ? 'إدارة الفعاليات' : 'Events', href: '/admin/events', icon: <Calendar size={20} /> }] : []),
-    ...(hasAnyPrivilege(userData, 'showcase') ? [{ name: isAr ? 'معرض المشاريع' : 'Projects Showcase', href: '/admin/showcase', icon: <Rocket size={20} /> }] : []),
-    ...(hasAnyPrivilege(userData, 'members') ? [{ name: isAr ? 'المسجلون والطلاب' : 'Users & Members', href: '/admin/users', icon: <Users size={20} /> }] : []),
+    ...(canViewMembers || isSuperAdmin ? [{ name: isAr ? 'الهيكلة والطلاب' : 'Structure & Students', href: '/admin/people', icon: <UsersRound size={20} /> }] : []),
     ...(hasAnyPrivilege(userData, 'ideas') ? [{ name: isAr ? 'الأفكار والمبادرات' : 'Ideas & Proposals', href: '/admin/ideas', icon: <Lightbulb size={20} /> }] : []),
-    ...(hasAnyPrivilege(userData, 'content') ? [{ name: isAr ? 'محتوى الموقع' : 'Site content', href: '/admin/content', icon: <Settings size={20} /> }] : []),
-    ...(hasAnyPrivilege(userData, 'content') ? [{ name: isAr ? 'قوالب البريد والشهادات' : 'Email & certificate templates', href: '/admin/templates', icon: <Mail size={20} /> }] : []),
+    ...(canEditContent ? [{ name: isAr ? 'قوالب البريد والشهادات' : 'Email & certificate templates', href: '/admin/templates', icon: <Mail size={20} /> }] : []),
     ...(hasAnyPrivilege(userData, 'operations') ? [{ name: isAr ? 'مركز المهام' : 'Operations', href: '/admin/operations', icon: <Activity size={20} /> }] : []),
-    ...(isSuperAdmin ? [{ name: isAr ? 'الأدوار والصلاحيات' : 'Roles & Privileges', href: '/admin/roles', icon: <Shield size={20} /> }] : []),
-    ...(isSuperAdmin ? [{ name: isAr ? 'الفرق' : 'Teams', href: '/admin/teams', icon: <UsersRound size={20} /> }] : []),
-    ...(isSuperAdmin ? [{ name: isAr ? 'الأوسمة الإدارية' : 'Admin Badges', href: '/admin/badges', icon: <Award size={20} /> }] : []),
-    ...(isSuperAdmin ? [{ name: isAr ? 'سجل الإجراءات' : 'Audit log', href: '/admin/audit', icon: <ClipboardList size={20} /> }] : []),
-    ...(isSuperAdmin ? [{ name: isAr ? 'وضع الصيانة' : 'Maintenance mode', href: '/admin/maintenance', icon: <Wrench size={20} /> }] : []),
+    ...(isSuperAdmin || canEditContent ? [{ name: isAr ? 'الإعدادات' : 'Settings', href: '/admin/settings', icon: <Settings size={20} /> }] : []),
   ];
 
   return (
@@ -231,13 +220,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 </Link>
               );
             })}
-            <Link
-              href="/"
-              title={isAr ? 'العودة للمنصة' : 'Back to main site'}
-              className="p-2.5 rounded-xl shrink-0 text-slate-400 hover:text-white hover:bg-white/10"
-            >
-              <LogOut size={20} className="rtl:rotate-180" />
-            </Link>
           </div>
         )}
         
@@ -268,23 +250,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             );
           })}
         </nav>
-
-        {/* Return to Main Site Button */}
-        {!isCollapsed && <NotificationQueueControl />}
-        <div className="p-3 border-t border-white/10">
-          <Link 
-            href="/" 
-            title={isCollapsed ? (isAr ? 'العودة للمنصة' : 'Return to Home') : undefined}
-            className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-slate-300 hover:bg-white/10 hover:text-white transition-all ${
-              isCollapsed ? 'justify-center' : ''
-            }`}
-          >
-            <LogOut size={20} className="rtl:rotate-180 flex-shrink-0" />
-            {!isCollapsed && (
-              <span className="font-medium text-sm truncate">{isAr ? 'العودة للمنصة' : 'Back to Main Site'}</span>
-            )}
-          </Link>
-        </div>
         </div>
       </aside>
 
