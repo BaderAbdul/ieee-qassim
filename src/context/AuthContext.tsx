@@ -19,6 +19,7 @@ export interface UserData {
   roleNameEn?: string;
   roleTier?: number;
   isSuperAdmin?: boolean;
+  canReviewTemplates?: boolean;
   privileges?: string[];
   teams?: UserTeam[];
   totalPoints: number;

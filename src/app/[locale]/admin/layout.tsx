@@ -71,7 +71,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const { navItems, footerItems } = useAdminNav(userData, isAr);
 
-  const isDashboardUser = !!userData && userData.role !== 'student';
+  const isDashboardUser = !!userData && (userData.role !== 'student' || (userData.canReviewTemplates === true && /\/admin\/templates(?:\/|$)/.test(pathname)));
 
   useEffect(() => {
     if (loading || (user && isDashboardUser)) return;

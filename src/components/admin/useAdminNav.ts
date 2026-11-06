@@ -23,11 +23,19 @@ export function useAdminNav(userData: UserData | null, isAr: boolean) {
   const canEditContent = hasAnyPrivilege(userData, 'content');
   const canViewMembers = hasAnyPrivilege(userData, 'members');
 
+  if (userData?.role === 'student' && userData.canReviewTemplates) {
+    return {
+      navItems: [{ name: isAr ? 'القوالب' : 'Templates', href: '/admin/templates', icon: Layers }],
+      footerItems: [{ name: isAr ? 'صفحتي' : 'My page', href: '/profile', icon: CircleUserRound }],
+      isSuperAdmin, canEditContent, canViewMembers,
+    };
+  }
+
   const navItems: AdminNavItem[] = [
     { name: isAr ? 'الرئيسية' : 'Home', href: '/admin', icon: LayoutDashboard },
     ...(hasAnyPrivilege(userData, 'events') ? [{ name: isAr ? 'الفعاليات' : 'Events', href: '/admin/events', icon: Calendar }] : []),
     ...(canViewMembers || isSuperAdmin ? [{ name: isAr ? 'الهيكلة والطلاب' : 'Structure & Students', href: '/admin/people', icon: UsersRound }] : []),
-    ...(canEditContent ? [{ name: isAr ? 'القوالب' : 'Templates', href: '/admin/templates', icon: Layers }] : []),
+    ...(canEditContent || userData?.canReviewTemplates ? [{ name: isAr ? 'القوالب' : 'Templates', href: '/admin/templates', icon: Layers }] : []),
     ...(canEditContent ? [{ name: isAr ? 'البريد' : 'Mail', href: '/admin/mail', icon: Mail }] : []),
     ...(hasAnyPrivilege(userData, 'operations') ? [{ name: isAr ? 'مركز المهام' : 'Operations', href: '/admin/operations', icon: Activity }] : []),
   ];

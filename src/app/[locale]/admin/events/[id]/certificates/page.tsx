@@ -35,9 +35,22 @@ export default function CertificatesManagementPage() {
   const [results, setResults] = useState<OperationResult[]>([]);
   const [retryRows, setRetryRows] = useState<typeof importRows>([]);
   const [issueRetryIds, setIssueRetryIds] = useState<string[]>([]);
+  const [templates, setTemplates] = useState<{ id: string; nameAr: string }[]>([]);
+  const [templateId, setTemplateId] = useState('');
+  const [vtoolsUUID, setVtoolsUUID] = useState('');
+  const [genders, setGenders] = useState<Record<string, string>>({});
   const role = userData?.role;
   const canIssue = event?.state === 'Completed' && event?.hasCertificate === true;
   const canAttachExternal = ['Ongoing', 'Completed'].includes(event?.state || '');
+
+  useEffect(() => {
+    if (!userData) return;
+    let active = true;
+    apiGet<{ templates: { id: string; nameAr: string }[] }>('/api/admin/templates', { scope: 'approved' })
+      .then(result => { if (active) setTemplates(result.templates); })
+      .catch(reason => { if (active) setError(reason instanceof Error ? reason.message : 'تعذر تحميل القوالب المعتمدة'); });
+    return () => { active = false; };
+  }, [userData]);
 
   const handleCompleteEventAndEnableCertificates = async () => {
     setProcessing(true);
@@ -157,7 +170,8 @@ export default function CertificatesManagementPage() {
       for (let index = 0; index < eligibleUserIds.length; index += 100) {
         const batch = eligibleUserIds.slice(index, index + 100);
         try {
-          const response = await issueFn({ eventId, userIds: batch });
+          const response = await issueFn({ eventId, userIds: batch, templateId: templateId || undefined, vtoolsUUID,
+            genders: Object.fromEntries(batch.map(id => [id, genders[id] || ''])) });
           outcome.push(...batch.map(id => {
             const result = response.data.results.find(item => item.userId === id);
             return { id, name: attendees.find(a => a.userId === id)?.name || id, success: !!result && result.status !== 'failed', message: result?.message || (!result ? 'لم يؤكد الخادم نتيجة هذا المستفيد' : undefined) };
@@ -335,6 +349,11 @@ export default function CertificatesManagementPage() {
         </div>
       </div>
 
+      <section className="space-y-3 rounded-2xl border bg-white p-5 text-slate-900">
+        <label className="block space-y-2"><span className="font-bold">قالب الشهادة المعتمد</span><select disabled={processing} value={templateId} onChange={e => setTemplateId(e.target.value)} className="w-full rounded-xl border p-3"><option value="">التصميم الافتراضي</option>{templates.map(template => <option key={template.id} value={template.id}>{template.nameAr}</option>)}</select></label>
+        {templateId && <><label className="block space-y-2"><span>معرّف الفعالية في vTools (UUID)</span><input disabled={processing} dir="ltr" className="w-full rounded-xl border p-3" value={vtoolsUUID} onChange={e => setVtoolsUUID(e.target.value)} /></label><details><summary className="cursor-pointer font-bold">بيانات المخاطبة للمستفيدين</summary><p className="my-3 text-sm text-slate-500">حدد البيانات عند الحاجة للشروط. غير المحدد يستخدم النص البديل في القالب؛ لا نستنتج الجنس من الاسم.</p><div className="max-h-64 space-y-2 overflow-y-auto">{attendees.map(attendee => <label key={attendee.userId} className="flex items-center justify-between gap-3"><span>{attendee.name}</span><select disabled={processing} className="rounded-lg border p-2" value={genders[attendee.userId] || ''} onChange={e => setGenders(previous => ({ ...previous, [attendee.userId]: e.target.value }))}><option value="">غير محدد</option><option value="male">ذكر</option><option value="female">أنثى</option></select></label>)}</div></details></>}
+        <p className="text-xs text-slate-500">المسودات غير متاحة للإصدار. تُحفظ نسخة من القالب المعتمد وبياناته مع الشهادة عند إضافتها لقائمة الإصدار.</p>
+      </section>
       {error && <div className="bg-red-50 text-red-600 p-4 rounded-xl">{error}</div>}
       {issueRetryIds.length > 0 && <button disabled={processing || !canIssue} onClick={() => handleIssueCertificates(issueRetryIds)} className="rounded-xl bg-purple-600 px-4 py-3 text-white disabled:opacity-50">إعادة إرسال دفعات الإصدار المتعثرة فقط</button>}
       {results.length > 0 && <section className="rounded-xl border bg-white p-4" aria-live="polite"><p>نجح {results.filter(row => row.success).length} / {results.length}.</p>{results.filter(row => !row.success).map(row => <p key={row.id} className="text-red-700">{row.name}: {row.message}</p>)}<button className="mt-2 underline" onClick={() => downloadCSV('certificate-operation-results.csv', [['Name', 'Success', 'Message'], ...results.map(row => [row.name, row.success, row.message || ''])])}>تنزيل تقرير النتائج</button>{retryRows.length > 0 && <button disabled={uploadingCSV} className="ms-4 rounded bg-blue-600 px-4 py-2 text-white" onClick={() => applyImport(retryRows)}>إعادة محاولة الفاشل فقط ({retryRows.length})</button>}</section>}
