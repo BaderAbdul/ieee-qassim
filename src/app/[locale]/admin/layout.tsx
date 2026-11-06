@@ -57,6 +57,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const locale = useLocale();
   const isAr = locale === 'ar';
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [hoveredNav, setHoveredNav] = useState<string | null>(null);
 
   const isCollapsed = useSyncExternalStore(subscribeSidebar, getSidebarSnapshot, () => false);
   const toggleSidebar = () => {
@@ -148,9 +149,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         key={item.href}
         href={item.href}
         onClick={() => setMobileOpen(false)}
+        onMouseEnter={() => setHoveredNav(item.href)}
+        onMouseLeave={() => setHoveredNav(null)}
         aria-label={item.name}
         aria-current={active ? 'page' : undefined}
-        className={`group relative flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all ${
+        className={`relative flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all ${
           isCollapsed ? 'justify-center' : ''
         } ${
           active
@@ -161,7 +164,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="flex-shrink-0">{item.icon}</div>
         <span className={`text-sm truncate leading-none ${isCollapsed ? 'md:hidden' : ''}`}>{item.name}</span>
         {isCollapsed && (
-          <span className="hidden md:group-hover:block absolute start-full ms-3 top-1/2 -translate-y-1/2 z-50 whitespace-nowrap rounded-lg bg-slate-900 text-white text-xs font-bold px-3 py-1.5 shadow-xl border border-white/10">
+          <span
+            className={`${hoveredNav === item.href ? 'md:block' : 'hidden'} absolute start-full ms-3 top-1/2 -translate-y-1/2 z-50 whitespace-nowrap rounded-lg bg-slate-900 text-white text-xs font-bold px-3 py-1.5 shadow-xl border border-white/10`}
+          >
             {item.name}
           </span>
         )}
@@ -170,7 +175,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
 
   return (
-    <div className={`${themeClass} min-h-screen bg-[var(--color-page)] flex flex-col md:flex-row font-sans relative`}>
+    <div className={`${themeClass} min-h-screen bg-[var(--color-page)] flex flex-col md:flex-row font-sans relative isolate`}>
       {/* Decorative background shapes -- fixed to the viewport (not the document) so every
           page reads the same regardless of how tall its content is, and so they stay put
           while the page scrolls */}
