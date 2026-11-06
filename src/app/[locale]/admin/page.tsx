@@ -1,147 +1,109 @@
 'use client';
 
 import { useLocale } from 'next-intl';
-import { Link } from '@/i18n/routing';
-import { Calendar, Users, Award, CheckSquare, ArrowUpRight, RefreshCw } from 'lucide-react';
-import type { AdminOverview } from '@/lib/adminTypes';
+import { Users, ListTodo, ArrowRightLeft, ClipboardList, Sparkles } from 'lucide-react';
+import type { AdminOverview, AdminEventsPage, AdminEventSummary } from '@/lib/adminTypes';
 import { AdminError, AdminLoading, formatAdminDate, useAdminQuery } from '@/components/admin/AdminData';
+import AdminCalendar from '@/components/admin/home/AdminCalendar';
+import HomeEventsTable from '@/components/admin/home/HomeEventsTable';
+
+function RequestsPanel({ icon: Icon, title, description, isAr }: { icon: typeof ArrowRightLeft; title: string; description: string; isAr: boolean }) {
+  return (
+    <div className="rounded-3xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/60 backdrop-blur-md p-5 shadow-xs flex flex-col">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-black font-cairo text-[var(--color-text-primary)] flex items-center gap-2">
+          <Icon size={17} className="text-[var(--color-accent)]" />
+          {title}
+        </h3>
+        <span className="text-[10px] font-bold text-[var(--color-text-muted)] bg-[var(--color-surface-2)] px-2 py-0.5 rounded-full">
+          {isAr ? 'قريبًا' : 'Coming soon'}
+        </span>
+      </div>
+      <div className="flex-1 flex flex-col items-center justify-center text-center py-6 border border-dashed border-[var(--color-border)] rounded-2xl">
+        <Sparkles className="text-[var(--color-text-muted)] mb-2" size={22} />
+        <p className="text-xs text-[var(--color-text-muted)] max-w-[220px]">{description}</p>
+      </div>
+    </div>
+  );
+}
 
 export default function AdminDashboardPage() {
   const locale = useLocale(); const isAr = locale === 'ar';
   const { data, loading, error, refresh } = useAdminQuery<AdminOverview>('getAdminOverview');
-  const cards = data ? [
-    { label: isAr ? 'إجمالي الأعضاء' : 'Total Members', value: data.counts.users, icon: Users, href: '/admin/users', token: 'var(--color-accent)' },
-    { label: isAr ? 'الفعاليات النشطة' : 'Active Events', value: data.counts.activeEvents, icon: Calendar, href: '/admin/events', token: 'var(--color-highlight)' },
-    { label: isAr ? 'إجمالي التسجيلات' : 'Total Registrations', value: data.counts.registrations, icon: CheckSquare, href: '/admin/reports', token: 'var(--color-success)' },
-    { label: isAr ? 'الشهادات المتاحة' : 'Available Certificates', value: data.counts.availableCertificates, icon: Award, href: '/admin/operations', token: 'var(--color-warning)' },
-  ] : [];
+  const { data: eventsPage } = useAdminQuery<AdminEventsPage>('getAdminEvents');
+  const events: AdminEventSummary[] = (eventsPage?.events ?? data?.events ?? []).map(e => ({
+    id: e.id,
+    title: e.title,
+    titleEn: e.titleEn,
+    state: e.state,
+    date: typeof e.date === 'string' ? e.date : e.date ? new Date(e.date).toISOString() : undefined,
+    registeredCount: e.registeredCount,
+    attendanceCount: e.attendanceCount,
+    capacity: e.capacity,
+    isUnlimitedCapacity: e.isUnlimitedCapacity,
+  }));
 
   return (
-    <div className="space-y-8">
-
+    <div className="space-y-6">
       {error ? (
         <AdminError message={error} retry={refresh} />
       ) : loading && !data ? (
         <AdminLoading />
       ) : data ? (
         <>
-          {/* Main Stat KPI Cards */}
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {cards.map(card => (
-              <Link
-                key={card.href + card.label}
-                href={card.href}
-                className="group relative rounded-3xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/60 backdrop-blur-md p-6 shadow-xs hover:shadow-xl hover:border-[var(--color-accent)]/40 transition-all duration-300 hover:-translate-y-1 overflow-hidden"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div
-                    className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-300"
-                    style={{ backgroundColor: card.token, color: 'var(--color-accent-contrast)' }}
-                  >
-                    <card.icon size={22} />
+          {/* Calendar + KPIs */}
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <AdminCalendar events={events} isAr={isAr} />
+            </div>
+            <div className="flex flex-col gap-4">
+              <div className="rounded-3xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/60 backdrop-blur-md p-6 shadow-xs flex-1 flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-11 h-11 rounded-2xl flex items-center justify-center shadow-md" style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-accent-contrast)' }}>
+                    <Users size={20} />
                   </div>
-                  <ArrowUpRight size={18} className="text-[var(--color-text-muted)] group-hover:text-[var(--color-accent)] transition-colors" />
                 </div>
-                <p className="text-xs font-bold text-[var(--color-text-secondary)] uppercase tracking-wider">{card.label}</p>
-                <p className="mt-1 text-3xl font-black text-[var(--color-text-primary)] font-cairo">{card.value.toLocaleString(locale)}</p>
-              </Link>
-            ))}
+                <div>
+                  <p className="text-xs font-bold text-[var(--color-text-secondary)] uppercase tracking-wider">{isAr ? 'إجمالي الأعضاء' : 'Total participants'}</p>
+                  <p className="mt-1 text-3xl font-black text-[var(--color-text-primary)] font-cairo">{data.counts.users.toLocaleString(locale)}</p>
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)]/40 backdrop-blur-md p-6 shadow-xs flex-1 flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-11 h-11 rounded-2xl flex items-center justify-center bg-[var(--color-surface-2)] text-[var(--color-text-muted)]">
+                    <ListTodo size={20} />
+                  </div>
+                  <span className="text-[10px] font-bold text-[var(--color-text-muted)] bg-[var(--color-surface-2)] px-2 py-0.5 rounded-full">
+                    {isAr ? 'قريبًا' : 'Coming soon'}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-[var(--color-text-secondary)] uppercase tracking-wider">{isAr ? 'المهام المتبقية' : 'Remaining tasks'}</p>
+                  <p className="mt-1 text-3xl font-black text-[var(--color-text-muted)] font-cairo">—</p>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Work Queue Section */}
-          <section className="rounded-3xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/60 backdrop-blur-md p-6 shadow-xs">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-black font-cairo text-[var(--color-text-primary)] flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[var(--color-accent)]" />
-                <span>{isAr ? 'قائمة المهام العاجلة' : 'Action Queue'}</span>
-              </h2>
-              <span className="text-xs text-[var(--color-accent)] font-bold bg-[var(--color-accent-soft)] px-3 py-1 rounded-full">
-                {isAr ? 'تحديث فوري' : 'Live'}
-              </span>
-            </div>
-            <div className="grid gap-3.5 sm:grid-cols-3">
-              {[
-                { label: isAr ? 'تسجيلات تنتظر الموافقة' : 'Pending Approvals', value: data.counts.pendingRegistrations, href: '/admin/events', alert: data.counts.pendingRegistrations > 0 },
-                { label: isAr ? 'شهادات قيد التجهيز / فاشلة' : 'Queued / Failed Certificates', value: data.counts.queuedCertificates + ' / ' + data.counts.failedCertificates, href: '/admin/operations', alert: data.counts.failedCertificates > 0 },
-                { label: isAr ? 'بريد فاشل / يحتاج مراجعة' : 'Failed / Review Mail', value: data.notifications.failed + ' / ' + data.notifications.review, href: '/admin/operations', alert: data.notifications.failed > 0 },
-              ].map(item => (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className={`flex items-center justify-between gap-3 rounded-2xl bg-[var(--color-surface-2)]/50 p-4 border transition-all hover:shadow-md ${
-                    item.alert ? 'border-[var(--color-warning)]/40 hover:border-[var(--color-warning)]/60' : 'border-[var(--color-border)]/50 hover:border-[var(--color-accent)]/40'
-                  }`}
-                >
-                  <span className="text-xs sm:text-sm font-bold text-[var(--color-text-secondary)]">{item.label}</span>
-                  <strong className={`text-base font-black font-mono px-3 py-1 rounded-xl border ${
-                    item.alert ? 'bg-[var(--color-warning-soft)] text-[var(--color-warning)] border-[var(--color-warning)]/30' : 'bg-[var(--color-surface-2)] text-[var(--color-accent)] border-[var(--color-border)]/50'
-                  }`}>
-                    {item.value}
-                  </strong>
-                </Link>
-              ))}
-            </div>
-          </section>
+          {/* Requests */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <RequestsPanel
+              icon={ArrowRightLeft}
+              title={isAr ? 'طلبات بين الفرق' : 'Inter-team requests'}
+              description={isAr ? 'عندما يطلب فريق شيئاً من فريق آخر، مثل الفعاليات من اللوجستيات، سيظهر هنا.' : 'When one team requests something from another — e.g. Events from Logistics — it will show up here.'}
+              isAr={isAr}
+            />
+            <RequestsPanel
+              icon={ClipboardList}
+              title={isAr ? 'مهام الفريق من القائد' : "Team tasks from the leader"}
+              description={isAr ? 'المهام التي يسندها قائد الفريق لأعضاء فريقه ستظهر هنا.' : 'Tasks a team leader assigns to their own team members will show up here.'}
+              isAr={isAr}
+            />
+          </div>
 
-          {/* Current & Upcoming Events */}
-          <section className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-black font-cairo text-[var(--color-text-primary)]">
-                  {isAr ? 'الفعاليات الجارية والقادمة' : 'Current & Upcoming Events'}
-                </h2>
-                <p className="text-xs text-[var(--color-text-secondary)]">
-                  {isAr ? 'اضغط على أي فعالية للدخول إلى لوحة إدارة الحضور والتحضير والشهادات.' : 'Click any event to open its check-in and certificate desk.'}
-                </p>
-              </div>
-              <Link
-                href="/admin/events/create"
-                className="rounded-2xl bg-gradient-to-r from-[var(--color-accent)] to-[var(--color-accent-strong)] hover:opacity-90 px-5 py-2.5 text-xs sm:text-sm font-bold text-[var(--color-accent-contrast)] shadow-md shadow-black/10 transition-all transform hover:-translate-y-0.5 active:translate-y-0"
-              >
-                {isAr ? '+ إنشاء فعالية جديدة' : '+ Create New Event'}
-              </Link>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              {data.events.map(event => (
-                <Link
-                  key={event.id}
-                  href={'/admin/events/' + event.id}
-                  className="group rounded-3xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/60 backdrop-blur-md p-5 shadow-xs hover:shadow-xl hover:border-[var(--color-accent)]/40 transition-all duration-300 hover:-translate-y-0.5"
-                >
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <h3 className="font-black text-[var(--color-text-primary)] group-hover:text-[var(--color-accent)] transition-colors text-base font-cairo line-clamp-1">
-                      {!isAr && event.titleEn ? event.titleEn : event.title}
-                    </h3>
-                    <ArrowUpRight size={18} className="shrink-0 text-[var(--color-text-muted)] group-hover:text-[var(--color-accent)] transition-colors" />
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)] mb-4">
-                    <span>{formatAdminDate(event.date, locale)}</span>
-                    <span>·</span>
-                    <span className="font-bold text-[var(--color-accent)] bg-[var(--color-accent-soft)] px-2 py-0.5 rounded-lg border border-[var(--color-accent)]/20">
-                      {event.state}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs pt-3 border-t border-[var(--color-border)]/50 text-[var(--color-text-secondary)]">
-                    <div>
-                      {isAr ? 'المسجلون:' : 'Registered:'} <strong className="text-[var(--color-text-primary)] font-bold">{event.registeredCount || 0}</strong>
-                    </div>
-                    <div>
-                      {isAr ? 'الحضور الفعلي:' : 'Attended:'} <strong className="text-[var(--color-success)] font-bold">{event.attendanceCount || 0}</strong>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-
-            {!data.events.length && (
-              <div className="rounded-3xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/60 backdrop-blur-md p-8 text-center text-[var(--color-text-muted)]">
-                <p className="text-sm">
-                  {isAr ? 'لا توجد فعاليات جارية ضمن هذه القائمة. افتح إدارة الفعاليات لعرض المسودات والأرشيف.' : 'No active events in this view. Open events manager for drafts and archives.'}
-                </p>
-              </div>
-            )}
-          </section>
+          {/* Events table */}
+          <HomeEventsTable events={events} locale={locale} isAr={isAr} />
 
           <p className="text-[11px] text-[var(--color-text-muted)] font-mono">
             {isAr ? 'آخر تحديث للبيانات:' : 'Last updated:'} {formatAdminDate(data.generatedAt, locale)}

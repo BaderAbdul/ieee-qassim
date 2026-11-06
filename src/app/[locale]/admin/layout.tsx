@@ -1,28 +1,22 @@
 'use client';
 
-import { hasAnyPrivilege, useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
 import { useRouter } from '@/i18n/routing';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Link } from '@/i18n/routing';
 import {
-  LayoutDashboard,
-  Calendar,
   ChevronLeft,
   ChevronRight,
   ShieldAlert,
   Home,
-  Settings,
-  Activity,
-  UsersRound,
   Sun,
   Moon,
-  Mail,
-  Layers,
-  CircleUserRound
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import ConfigurationNotice from '@/components/admin/ConfigurationNotice';
+import AdminTopbar from '@/components/admin/AdminTopbar';
+import { useAdminNav, type AdminNavItem } from '@/components/admin/useAdminNav';
 
 const subscribeSidebar = (notify: () => void) => {
   window.addEventListener('storage', notify);
@@ -74,6 +68,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
   const themeClass = `ieee-admin-theme${isDark ? ' dark' : ''}`;
 
+  const { navItems, footerItems } = useAdminNav(userData, isAr);
+
   const isDashboardUser = !!userData && userData.role !== 'student';
 
   useEffect(() => {
@@ -122,28 +118,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return pathname.includes(path);
   };
 
-  const isSuperAdmin = userData.isSuperAdmin === true || userData.role === 'super_admin';
-
-  const canEditContent = hasAnyPrivilege(userData, 'content');
-  const canViewMembers = hasAnyPrivilege(userData, 'members');
-
-  const navItems = [
-    { name: isAr ? 'الرئيسية' : 'Home', href: '/admin', icon: <LayoutDashboard size={20} /> },
-    ...(hasAnyPrivilege(userData, 'events') ? [{ name: isAr ? 'الفعاليات' : 'Events', href: '/admin/events', icon: <Calendar size={20} /> }] : []),
-    ...(canViewMembers || isSuperAdmin ? [{ name: isAr ? 'الهيكلة والطلاب' : 'Structure & Students', href: '/admin/people', icon: <UsersRound size={20} /> }] : []),
-    ...(canEditContent ? [{ name: isAr ? 'القوالب' : 'Templates', href: '/admin/templates', icon: <Layers size={20} /> }] : []),
-    ...(canEditContent ? [{ name: isAr ? 'البريد' : 'Mail', href: '/admin/mail', icon: <Mail size={20} /> }] : []),
-    ...(hasAnyPrivilege(userData, 'operations') ? [{ name: isAr ? 'مركز المهام' : 'Operations', href: '/admin/operations', icon: <Activity size={20} /> }] : []),
-  ];
-
-  // Shown at the bottom of the sidebar, separate from the main nav list.
-  const footerItems = [
-    { name: isAr ? 'صفحتي' : 'My page', href: '/profile', icon: <CircleUserRound size={20} /> },
-    ...(isSuperAdmin || canEditContent ? [{ name: isAr ? 'الإعدادات' : 'Settings', href: '/admin/settings', icon: <Settings size={20} /> }] : []),
-  ];
-
-  const renderNavLink = (item: { name: string; href: string; icon: React.ReactNode }) => {
+  const renderNavLink = (item: AdminNavItem) => {
     const active = isCurrentPath(item.href);
+    const Icon = item.icon;
     return (
       <Link
         key={item.href}
@@ -161,7 +138,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             : 'text-slate-300 hover:bg-white/10 hover:text-white font-medium'
         }`}
       >
-        <div className="flex-shrink-0">{item.icon}</div>
+        <div className="flex-shrink-0"><Icon size={20} /></div>
         <span className={`text-sm truncate leading-none ${isCollapsed ? 'md:hidden' : ''}`}>{item.name}</span>
         {isCollapsed && (
           <span
@@ -244,6 +221,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="md:hidden flex items-center gap-1 p-2 overflow-x-auto no-scrollbar border-b border-white/10 bg-slate-900/60">
             {[...navItems, ...footerItems].map((item) => {
               const active = isCurrentPath(item.href);
+              const Icon = item.icon;
               return (
                 <Link
                   key={item.href}
@@ -256,7 +234,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                       : 'text-slate-400 hover:text-white hover:bg-white/10'
                   }`}
                 >
-                  {item.icon}
+                  <Icon size={20} />
                 </Link>
               );
             })}
@@ -275,10 +253,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* Main Content */}
-      <div className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
-        <div className="max-w-6xl mx-auto">
-          <ConfigurationNotice />
-          {children}
+      <div className="min-w-0 flex-1 flex flex-col">
+        <AdminTopbar pageTitle={[...navItems, ...footerItems].find(item => isCurrentPath(item.href))?.name} />
+        <div className="p-4 sm:p-6 lg:p-8">
+          <div className="max-w-6xl mx-auto">
+            <ConfigurationNotice />
+            {children}
+          </div>
         </div>
       </div>
     </div>

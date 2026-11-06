@@ -22,7 +22,7 @@ export const transitions: Record<EventState, EventState[]> = {
   Archived: ['Draft', 'Published', 'Registration Open', 'Ongoing', 'Completed'],
 };
 
-const stateBadgeColors: Record<EventState, { bg: string; text: string; border: string }> = {
+export const stateBadgeColors: Record<EventState, { bg: string; text: string; border: string }> = {
   Draft: { bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-200' },
   Published: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
   'Registration Open': { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
