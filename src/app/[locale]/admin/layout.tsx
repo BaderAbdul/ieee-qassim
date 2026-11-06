@@ -150,8 +150,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         onClick={() => setMobileOpen(false)}
         aria-label={item.name}
         aria-current={active ? 'page' : undefined}
-        title={isCollapsed ? item.name : undefined}
-        className={`flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all ${
+        className={`group relative flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all ${
           isCollapsed ? 'justify-center' : ''
         } ${
           active
@@ -161,6 +160,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       >
         <div className="flex-shrink-0">{item.icon}</div>
         <span className={`text-sm truncate leading-none ${isCollapsed ? 'md:hidden' : ''}`}>{item.name}</span>
+        {isCollapsed && (
+          <span className="hidden md:group-hover:block absolute start-full ms-3 top-1/2 -translate-y-1/2 z-50 whitespace-nowrap rounded-lg bg-slate-900 text-white text-xs font-bold px-3 py-1.5 shadow-xl border border-white/10">
+            {item.name}
+          </span>
+        )}
       </Link>
     );
   };
@@ -178,7 +182,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Sidebar: floats over the background, glassmorphic, stays in view while the page scrolls */}
       <aside
-        className={`sticky top-3 self-start z-10 w-full m-3 md:ms-3 md:me-0 bg-slate-900/70 backdrop-blur-xl text-white md:h-[calc(100vh-1.5rem)] rounded-3xl overflow-hidden flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out border border-white/10 shadow-2xl ${
+        className={`sticky top-3 self-start z-10 w-full m-3 md:ms-3 md:me-0 bg-slate-900/70 backdrop-blur-xl text-white md:h-[calc(100vh-1.5rem)] rounded-3xl flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out border border-white/10 shadow-2xl ${
           isCollapsed ? 'md:w-20' : 'md:w-64'
         }`}
       >
@@ -255,7 +259,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Navigation Links */}
         <div id="admin-navigation-panel" className={`${mobileOpen ? 'flex' : 'hidden'} md:flex flex-1 flex-col min-h-0`}>
-          <nav aria-label={isAr ? 'التنقل الإداري' : 'Admin navigation'} className="flex-1 p-3 space-y-1.5 overflow-y-auto no-scrollbar">
+          <nav aria-label={isAr ? 'التنقل الإداري' : 'Admin navigation'} className="flex-1 p-3 space-y-1.5">
             {navItems.map(renderNavLink)}
           </nav>
           <div className="p-3 border-t border-white/10 space-y-1.5">
