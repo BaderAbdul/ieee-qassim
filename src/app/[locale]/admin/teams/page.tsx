@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { useAuth } from '@/context/AuthContext';
 import { apiSend, httpsCallable } from '@/lib/backend';
 import { apiGetArray } from '@/lib/backendResponse';
 import { AdminError, AdminLoading } from '@/components/admin/AdminData';
+import { useAdminTopbarActions } from '@/components/admin/AdminTopbarActions';
 import type { MemberSearchResult } from '@/lib/adminTypes';
 import { ArrowDown, ArrowUp, Edit2, Plus, Trash2, UserMinus, X } from 'lucide-react';
 
@@ -63,6 +64,17 @@ export default function AdminTeamsPage() {
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, memberPicker]);
+
+  const topbarActions = useMemo(() => (
+    <button
+      type="button"
+      onClick={() => setCreating(value => !value)}
+      className="cursor-pointer inline-flex items-center gap-2 rounded-xl bg-[var(--color-accent)] hover:opacity-90 px-3.5 py-2 text-xs font-bold text-[var(--color-accent-contrast)] transition-opacity"
+    >
+      <Plus size={16} />{isAr ? 'فريق جديد' : 'New team'}
+    </button>
+  ), [isAr]);
+  useAdminTopbarActions(topbarActions);
 
   if (userData && userData.isSuperAdmin !== true) {
     return <AdminError message={isAr ? 'إدارة الفرق مخصصة للمدير العام.' : 'Team management requires super admin access.'} />;
@@ -163,19 +175,13 @@ export default function AdminTeamsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 font-cairo">{isAr ? 'الفرق' : 'Teams'}</h1>
-          <p className="text-gray-500 text-sm">
-            {isAr
-              ? 'قائد الفريق يمكنه إدارة صلاحيات وأوسمة أعضاء فريقه فقط. الفرق العلنية تظهر على صفحة "الهيكلة" في الموقع، بالترتيب الظاهر هنا.'
-              : 'A team leader can manage privileges & badges only for their own team members. Public teams appear on the website\'s Structure page, in the order shown here.'}
-          </p>
-        </div>
-        <button type="button" onClick={() => setCreating(value => !value)}
-                className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2 text-sm font-bold text-white hover:bg-purple-700">
-          <Plus size={16} />{isAr ? 'فريق جديد' : 'New team'}
-        </button>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 font-cairo">{isAr ? 'الفرق' : 'Teams'}</h1>
+        <p className="text-gray-500 text-sm">
+          {isAr
+            ? 'قائد الفريق يمكنه إدارة صلاحيات وأوسمة أعضاء فريقه فقط. الفرق العلنية تظهر على صفحة "الهيكلة" في الموقع، بالترتيب الظاهر هنا.'
+            : 'A team leader can manage privileges & badges only for their own team members. Public teams appear on the website\'s Structure page, in the order shown here.'}
+        </p>
       </div>
 
       {error && <AdminError message={error} />}

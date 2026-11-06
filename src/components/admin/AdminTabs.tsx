@@ -8,15 +8,26 @@ export interface AdminTab {
   content: ReactNode;
 }
 
-export default function AdminTabs({ tabs }: { tabs: AdminTab[] }) {
-  const [activeKey, setActiveKey] = useState(tabs[0]?.key);
+interface AdminTabsProps {
+  tabs: AdminTab[];
+  /** Controlled mode: when provided (with onActiveKeyChange), the tab bar below is suppressed --
+   * the caller is rendering its own tab switcher elsewhere (e.g. in the top navbar). */
+  activeKey?: string;
+  onActiveKeyChange?: (key: string) => void;
+  hideTabBar?: boolean;
+}
+
+export default function AdminTabs({ tabs, activeKey: controlledKey, onActiveKeyChange, hideTabBar }: AdminTabsProps) {
+  const [uncontrolledKey, setUncontrolledKey] = useState(tabs[0]?.key);
+  const activeKey = controlledKey ?? uncontrolledKey;
+  const setActiveKey = onActiveKeyChange ?? setUncontrolledKey;
   const active = tabs.find((tab) => tab.key === activeKey) ?? tabs[0];
 
   if (!tabs.length) return null;
 
   return (
     <div className="space-y-5">
-      {tabs.length > 1 && (
+      {!hideTabBar && tabs.length > 1 && (
         <div className="flex flex-wrap gap-2 border-b border-[var(--color-border)] pb-3">
           {tabs.map((tab) => (
             <button
