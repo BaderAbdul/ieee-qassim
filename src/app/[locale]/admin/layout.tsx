@@ -168,6 +168,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             className={`${hoveredNav === item.href ? 'md:block' : 'hidden'} absolute start-full ms-3 top-1/2 -translate-y-1/2 z-50 whitespace-nowrap rounded-lg bg-slate-900 text-white text-xs font-bold px-3 py-1.5 shadow-xl border border-white/10`}
           >
             {item.name}
+            <span className="absolute top-1/2 -start-1.5 h-3.5 w-3.5 -translate-y-1/2 rotate-45 bg-slate-900 shadow-[1px_1px_2px_rgba(0,0,0,0.3)]" />
           </span>
         )}
       </Link>
