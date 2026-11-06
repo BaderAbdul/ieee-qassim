@@ -7,7 +7,6 @@ import { Link } from '@/i18n/routing';
 import {
   LayoutDashboard,
   Calendar,
-  Lightbulb,
   ChevronLeft,
   ChevronRight,
   ShieldAlert,
@@ -17,7 +16,9 @@ import {
   UsersRound,
   Sun,
   Moon,
-  Mail
+  Mail,
+  Layers,
+  CircleUserRound
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useLocale } from 'next-intl';
@@ -126,17 +127,46 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const canViewMembers = hasAnyPrivilege(userData, 'members');
 
   const navItems = [
-    { name: isAr ? 'مركز العمل' : 'Command center', href: '/admin', icon: <LayoutDashboard size={20} /> },
-    ...(hasAnyPrivilege(userData, 'events') ? [{ name: isAr ? 'إدارة الفعاليات' : 'Events', href: '/admin/events', icon: <Calendar size={20} /> }] : []),
+    { name: isAr ? 'الرئيسية' : 'Home', href: '/admin', icon: <LayoutDashboard size={20} /> },
+    ...(hasAnyPrivilege(userData, 'events') ? [{ name: isAr ? 'الفعاليات' : 'Events', href: '/admin/events', icon: <Calendar size={20} /> }] : []),
     ...(canViewMembers || isSuperAdmin ? [{ name: isAr ? 'الهيكلة والطلاب' : 'Structure & Students', href: '/admin/people', icon: <UsersRound size={20} /> }] : []),
-    ...(hasAnyPrivilege(userData, 'ideas') ? [{ name: isAr ? 'الأفكار والمبادرات' : 'Ideas & Proposals', href: '/admin/ideas', icon: <Lightbulb size={20} /> }] : []),
-    ...(canEditContent ? [{ name: isAr ? 'قوالب البريد والشهادات' : 'Email & certificate templates', href: '/admin/templates', icon: <Mail size={20} /> }] : []),
+    ...(canEditContent ? [{ name: isAr ? 'القوالب' : 'Templates', href: '/admin/templates', icon: <Layers size={20} /> }] : []),
+    ...(canEditContent ? [{ name: isAr ? 'البريد' : 'Mail', href: '/admin/mail', icon: <Mail size={20} /> }] : []),
     ...(hasAnyPrivilege(userData, 'operations') ? [{ name: isAr ? 'مركز المهام' : 'Operations', href: '/admin/operations', icon: <Activity size={20} /> }] : []),
+  ];
+
+  // Shown at the bottom of the sidebar, separate from the main nav list.
+  const footerItems = [
+    { name: isAr ? 'صفحتي' : 'My page', href: '/profile', icon: <CircleUserRound size={20} /> },
     ...(isSuperAdmin || canEditContent ? [{ name: isAr ? 'الإعدادات' : 'Settings', href: '/admin/settings', icon: <Settings size={20} /> }] : []),
   ];
 
+  const renderNavLink = (item: { name: string; href: string; icon: React.ReactNode }) => {
+    const active = isCurrentPath(item.href);
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        onClick={() => setMobileOpen(false)}
+        aria-label={item.name}
+        aria-current={active ? 'page' : undefined}
+        title={isCollapsed ? item.name : undefined}
+        className={`flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all ${
+          isCollapsed ? 'justify-center' : ''
+        } ${
+          active
+            ? 'bg-[#00629B] text-white shadow-md shadow-black/30 font-bold'
+            : 'text-slate-300 hover:bg-white/10 hover:text-white font-medium'
+        }`}
+      >
+        <div className="flex-shrink-0">{item.icon}</div>
+        <span className={`text-sm truncate leading-none ${isCollapsed ? 'md:hidden' : ''}`}>{item.name}</span>
+      </Link>
+    );
+  };
+
   return (
-    <div className={`${themeClass} min-h-screen bg-[var(--color-page)] flex flex-col md:flex-row font-sans relative overflow-hidden`}>
+    <div className={`${themeClass} min-h-screen bg-[var(--color-page)] flex flex-col md:flex-row font-sans relative`}>
       {/* Decorative background shapes -- purely visual, sits behind the glass sidebar and cards */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden -z-10" aria-hidden="true">
         <div className="absolute -top-24 -start-24 w-[28rem] h-[28rem] rounded-full bg-[var(--color-accent)]/20 blur-3xl animate-blob" />
@@ -144,14 +174,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="absolute bottom-0 start-1/4 w-[22rem] h-[22rem] rounded-full bg-[var(--color-accent)]/15 blur-3xl animate-blob animation-delay-4000" />
       </div>
 
-      {/* Sidebar: floats over the background, glassmorphic, kept dark regardless of theme */}
+      {/* Sidebar: floats over the background, glassmorphic, stays in view while the page scrolls */}
       <aside
-        className={`relative z-10 w-full m-3 md:ms-3 md:me-0 bg-slate-900/70 backdrop-blur-xl text-white md:h-[calc(100vh-1.5rem)] rounded-3xl overflow-hidden flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out border border-white/10 shadow-2xl ${
+        className={`sticky top-3 self-start z-10 w-full m-3 md:ms-3 md:me-0 bg-slate-900/70 backdrop-blur-xl text-white md:max-h-[calc(100vh-1.5rem)] rounded-3xl overflow-hidden flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out border border-white/10 shadow-2xl ${
           isCollapsed ? 'md:w-20' : 'md:w-64'
         }`}
       >
         {/* Header & Toggle Button */}
-        <div className="p-3 sm:p-5 border-b border-white/10 flex items-center justify-between">
+        <div className={`border-b border-white/10 flex items-center justify-between p-3 sm:p-5 ${isCollapsed ? 'md:flex-col md:justify-center md:gap-2 md:p-3' : ''}`}>
           <div className={`truncate ${isCollapsed ? 'md:hidden' : ''}`}>
             <h2 className="text-base sm:text-lg font-black font-cairo text-[#4DA8DA] tracking-wide">
               {isAr ? 'لوحة الإدارة' : 'Admin Portal'}
@@ -160,7 +190,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               IEEE Qassim
             </p>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className={`flex items-center gap-1.5 ${isCollapsed ? 'md:flex-col' : ''}`}>
             <button
               onClick={toggleTheme}
               aria-label={isDark ? (isAr ? 'الوضع الفاتح' : 'Light mode') : (isAr ? 'الوضع الداكن' : 'Dark mode')}
@@ -185,9 +215,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               onClick={toggleSidebar}
               aria-label={isCollapsed ? (isAr ? 'توسيع القائمة' : 'Expand sidebar') : (isAr ? 'طي القائمة' : 'Collapse sidebar')}
               aria-expanded={!isCollapsed}
-              className={`hidden md:block p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all ${
-                isCollapsed ? 'mx-auto' : ''
-              }`}
+              className="hidden md:block p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all"
               title={isCollapsed ? (isAr ? 'توسيع القائمة' : 'Expand Sidebar') : (isAr ? 'طَيّ القائمة (أيقونات فقط)' : 'Collapse Sidebar')}
             >
               {isCollapsed ? (
@@ -202,7 +230,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* Mobile quick icons strip when full menu is closed (partial collapse) */}
         {!mobileOpen && (
           <div className="md:hidden flex items-center gap-1 p-2 overflow-x-auto no-scrollbar border-b border-white/10 bg-slate-900/60">
-            {navItems.map((item) => {
+            {[...navItems, ...footerItems].map((item) => {
               const active = isCurrentPath(item.href);
               return (
                 <Link
@@ -222,39 +250,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             })}
           </div>
         )}
-        
+
         {/* Navigation Links */}
-        <div id="admin-navigation-panel" className={`${mobileOpen ? 'flex' : 'hidden'} md:flex flex-1 flex-col`}>
-        <nav aria-label={isAr ? 'التنقل الإداري' : 'Admin navigation'} className="flex-1 p-3 space-y-1.5 overflow-y-auto">
-          {navItems.map((item) => {
-            const active = isCurrentPath(item.href);
-            return (
-              <Link 
-                key={item.href} 
-                href={item.href}
-                onClick={() => setMobileOpen(false)}
-                aria-label={item.name}
-                aria-current={active ? 'page' : undefined}
-                title={isCollapsed ? item.name : undefined}
-                className={`flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all ${
-                  isCollapsed ? 'justify-center' : ''
-                } ${
-                  active
-                    ? 'bg-[#00629B] text-white shadow-md shadow-black/30 font-bold'
-                    : 'text-slate-300 hover:bg-white/10 hover:text-white font-medium'
-                }`}
-              >
-                <div className="flex-shrink-0">{item.icon}</div>
-                  <span className={`text-sm truncate leading-none ${isCollapsed ? 'md:hidden' : ''}`}>{item.name}</span>
-              </Link>
-            );
-          })}
-        </nav>
+        <div id="admin-navigation-panel" className={`${mobileOpen ? 'flex' : 'hidden'} md:flex flex-1 flex-col min-h-0`}>
+          <nav aria-label={isAr ? 'التنقل الإداري' : 'Admin navigation'} className="flex-1 p-3 space-y-1.5 overflow-y-auto">
+            {navItems.map(renderNavLink)}
+          </nav>
+          <div className="p-3 border-t border-white/10 space-y-1.5">
+            {footerItems.map(renderNavLink)}
+          </div>
         </div>
       </aside>
 
       {/* Main Content */}
-      <div className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+      <div className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
         <div className="max-w-6xl mx-auto">
           <ConfigurationNotice />
           {children}
