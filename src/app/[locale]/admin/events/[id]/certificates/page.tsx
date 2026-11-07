@@ -38,7 +38,6 @@ export default function CertificatesManagementPage() {
   const [issueRetryIds, setIssueRetryIds] = useState<string[]>([]);
   const [templates, setTemplates] = useState<{ id: string; nameAr: string }[]>([]);
   const [templateId, setTemplateId] = useState('');
-  const [vtoolsUUID, setVtoolsUUID] = useState('');
   const [genders, setGenders] = useState<Record<string, string>>({});
   const [revokeTarget, setRevokeTarget] = useState<Certificate | null>(null);
   const role = userData?.role;
@@ -116,7 +115,6 @@ export default function CertificatesManagementPage() {
         if (!active) return;
         setEvent(eventData);
         setTemplateId(prev => prev || eventData.certificateTemplateId || '');
-        setVtoolsUUID(prev => prev || eventData.vtoolsUuid || '');
 
         const certsByUserId: Record<string, Certificate> = {};
         certs.forEach(c => { certsByUserId[c.userId] = c; });
@@ -174,7 +172,7 @@ export default function CertificatesManagementPage() {
       for (let index = 0; index < eligibleUserIds.length; index += 100) {
         const batch = eligibleUserIds.slice(index, index + 100);
         try {
-          const response = await issueFn({ eventId, userIds: batch, templateId: templateId || undefined, vtoolsUUID,
+          const response = await issueFn({ eventId, userIds: batch, templateId: templateId || undefined,
             genders: Object.fromEntries(batch.map(id => [id, genders[id] || ''])) });
           outcome.push(...batch.map(id => {
             const result = response.data.results.find(item => item.userId === id);
@@ -353,8 +351,9 @@ export default function CertificatesManagementPage() {
       </div>
 
       <section className="space-y-3 rounded-2xl border border-slate-100 shadow-sm bg-white p-6 text-slate-900">
-        <label className="block space-y-2"><span className="text-sm font-bold text-slate-700">قالب الشهادة المعتمد</span><select disabled={processing} value={templateId} onChange={e => setTemplateId(e.target.value)} className="w-full rounded-xl border p-3"><option value="">التصميم الافتراضي</option>{templates.map(template => <option key={template.id} value={template.id}>{template.nameAr}</option>)}</select></label>
-        {templateId && <><label className="block space-y-2"><span className="text-sm font-bold text-slate-700">معرّف الفعالية في vTools (UUID)</span><input disabled={processing} dir="ltr" className="w-full rounded-xl border p-3" value={vtoolsUUID} onChange={e => setVtoolsUUID(e.target.value)} /></label><details><summary className="cursor-pointer font-bold">بيانات المخاطبة للمستفيدين</summary><p className="my-3 text-sm text-slate-500">حدد البيانات عند الحاجة للشروط. غير المحدد يستخدم النص البديل في القالب؛ لا نستنتج الجنس من الاسم.</p><div className="max-h-64 space-y-2 overflow-y-auto">{attendees.map(attendee => <label key={attendee.userId} className="flex items-center justify-between gap-3"><span>{attendee.name}</span><select disabled={processing} className="rounded-lg border p-2" value={genders[attendee.userId] || ''} onChange={e => setGenders(previous => ({ ...previous, [attendee.userId]: e.target.value }))}><option value="">غير محدد</option><option value="male">ذكر</option><option value="female">أنثى</option></select></label>)}</div></details></>}
+        <label className="block space-y-2"><span className="text-sm font-bold text-slate-700">قالب الشهادة المعتمد</span><select disabled={processing} value={templateId} onChange={e => setTemplateId(e.target.value)} className="w-full rounded-xl border p-3"><option value="">قالب الفعالية المرتبط، أو التصميم الافتراضي إن لم يُحدد</option>{templates.map(template => <option key={template.id} value={template.id}>{template.nameAr}</option>)}</select></label>
+        <p className="text-sm text-slate-500">تُملأ بيانات الفعالية وvTools من إعدادات الفعالية تلقائيًا، ويُستخدم اسم كل مشارك بالإنجليزية وتاريخ بصيغة 23 Nov, 2026.</p>
+        {(templateId || event?.certificateTemplateId) && <details><summary className="cursor-pointer font-bold">بيانات المخاطبة للمستفيدين</summary><p className="my-3 text-sm text-slate-500">حدد البيانات عند الحاجة للشروط. غير المحدد يستخدم النص البديل في القالب؛ لا نستنتج الجنس من الاسم.</p><div className="max-h-64 space-y-2 overflow-y-auto">{attendees.map(attendee => <label key={attendee.userId} className="flex items-center justify-between gap-3"><span>{attendee.name}</span><select disabled={processing} className="rounded-lg border p-2" value={genders[attendee.userId] || ''} onChange={e => setGenders(previous => ({ ...previous, [attendee.userId]: e.target.value }))}><option value="">غير محدد</option><option value="male">ذكر</option><option value="female">أنثى</option></select></label>)}</div></details>}
         <p className="text-xs text-slate-500">المسودات غير متاحة للإصدار. تُحفظ نسخة من القالب المعتمد وبياناته مع الشهادة عند إضافتها لقائمة الإصدار.</p>
       </section>
       {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">{error}</div>}

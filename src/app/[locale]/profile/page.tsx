@@ -171,7 +171,7 @@ export default function EngineeringProfilePage() {
 
   // Edit Name State
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingName, setEditingName] = useState({ first: '', middle: '', last: '' });
+  const [editingName, setEditingName] = useState({ first: '', middle: '', last: '', english: '' });
   const [isSaving, setIsSaving] = useState(false);
 
   // Edit Profile State
@@ -359,13 +359,15 @@ export default function EngineeringProfilePage() {
       await httpsCallable(null, 'saveProfile')({
         firstName: editingName.first.trim(),
         fatherName: editingName.middle.trim(),
-        familyName: editingName.last.trim()
+        familyName: editingName.last.trim(),
+        englishName: editingName.english.trim()
       });
       setShowEditModal(false);
+      retryAuth();
       alert(isAr ? 'تم حفظ الاسم بنجاح' : 'Name saved successfully');
     } catch(err) {
       console.error(err);
-      alert(isAr ? 'حدث خطأ أثناء التحديث.' : 'Error updating name');
+      alert(err instanceof Error ? err.message : (isAr ? 'حدث خطأ أثناء التحديث.' : 'Error updating name'));
     } finally {
       setIsSaving(false);
     }
@@ -457,7 +459,8 @@ export default function EngineeringProfilePage() {
               setEditingName({
                 first: userData?.firstName || parts[0] || '',
                 middle: userData?.fatherName || (parts.length > 2 ? parts.slice(1, -1).join(' ') : (parts.length === 2 ? parts[1] : '')),
-                last: userData?.familyName || (parts.length > 2 ? parts[parts.length - 1] : '')
+                last: userData?.familyName || (parts.length > 2 ? parts[parts.length - 1] : ''),
+                english: userData?.displayName || user?.displayName || ''
               });
               setShowEditModal(true);
             }}
@@ -950,22 +953,26 @@ export default function EngineeringProfilePage() {
             <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-xl flex gap-3 text-sm mb-5">
               <AlertCircle className="h-5 w-5 flex-shrink-0 text-amber-600" />
               <p className="font-medium">
-                {isAr ? 'تنبيه: هذا هو الاسم الذي سيظهر في الشهادات المعتمدة الخاصة بك. تأكد من كتابته بشكل صحيح (الاسم الأول والأب والعائلة).' : 'Note: This name will appear on your accredited certificates. Ensure it is written correctly.'}
+                {isAr ? 'يظهر اسمك العربي في ملفك، ويُستخدم اسمك بالإنجليزية في الشهادات الجديدة. تأكد من كتابة الاسمين بشكل صحيح.' : 'Your Arabic name appears on your profile. New certificates use your English name. Check that both are written correctly.'}
               </p>
             </div>
 
             <form onSubmit={handleSaveName} className="space-y-4">
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">{isAr ? 'الاسم الأول' : 'First Name'}</label>
+                  <label htmlFor="certificate-english-name" className="block text-sm font-bold text-slate-700 mb-1">{isAr ? 'الاسم بالإنجليزية (للشهادات)' : 'English name (for certificates)'}</label>
+                  <input id="certificate-english-name" type="text" required maxLength={100} dir="ltr" value={editingName.english} onChange={e => setEditingName({ ...editingName, english: e.target.value })} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Ahmed Mohammed Abdullah" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">{isAr ? 'الاسم الأول بالعربية' : 'First name (Arabic)'}</label>
                   <input type="text" required value={editingName.first} onChange={e => setEditingName({...editingName, first: e.target.value})} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder={isAr ? 'مثال: بدر' : 'e.g. Bader'} />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">{isAr ? 'اسم الأب' : 'Father Name'}</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">{isAr ? 'اسم الأب بالعربية' : 'Father name (Arabic)'}</label>
                   <input type="text" required value={editingName.middle} onChange={e => setEditingName({...editingName, middle: e.target.value})} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder={isAr ? 'مثال: عبدالله' : 'e.g. Abdullah'} />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">{isAr ? 'اسم العائلة' : 'Family Name'}</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">{isAr ? 'اسم العائلة بالعربية' : 'Family name (Arabic)'}</label>
                   <input type="text" required value={editingName.last} onChange={e => setEditingName({...editingName, last: e.target.value})} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder={isAr ? 'مثال: الدخيل الله' : 'e.g. Aldakhilallah'} />
                 </div>
               </div>

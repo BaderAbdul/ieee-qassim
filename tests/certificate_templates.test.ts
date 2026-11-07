@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { arabicTemplateName, fieldText, newField } from '../src/lib/certificateTemplates.ts';
+import { arabicTemplateName, fieldText, newField, testSources, qrGeometry } from '../src/lib/certificateTemplates.ts';
 
 test('Arabic-only names reject mixed-language input', () => {
   assert.ok(arabicTemplateName('شهادة حضور ورشة عمل'));
@@ -38,4 +38,20 @@ test('event date and partner name work as text and conditional context', () => {
   assert.equal(fieldText(newField('partner.name'), values), 'Test partner');
   const logic = { ...newField('conditional'), conditionSource: 'partner.name' as const, rules: [{ equals: 'Test partner', text: 'Thank you' }] };
   assert.equal(fieldText(logic, values), 'Thank you');
+});
+
+test('preview only asks for used sources, including condition and QR dependencies', () => {
+  assert.deepEqual(testSources([newField('student.name')]), ['student.name']);
+  assert.deepEqual(testSources([newField('student.name'), newField('conditional'), newField('certificate.QR')]), ['student.name', 'student.gender', 'certificate.UUID']);
+  assert.ok(!testSources([newField('student.name')]).includes('partner.name'));
+  assert.deepEqual(testSources([newField('partner.name')]), ['partner.name']);
+  assert.deepEqual(testSources([newField('event.title'), newField('event.name')]), ['event.name']);
+  assert.equal(fieldText(newField('event.title'), { 'event.name': 'Workshop' }), 'Workshop');
+});
+
+test('circular QR frame contains the square code without clipping its corners', () => {
+  const field = { ...newField('certificate.QR'), qrShape: 'circle' as const, qrSize: 120, qrBorderWidth: 3, qrPadding: 5 };
+  const { inset, inner } = qrGeometry(field);
+  assert.ok(inner * Math.sqrt(2) < 120 - 6);
+  assert.ok(Math.abs(inset * 2 + inner - 120) < 1e-8);
 });

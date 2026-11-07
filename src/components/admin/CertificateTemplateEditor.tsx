@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Download, Plus, Trash2, Upload, Check, ShieldCheck } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
 import { apiSend } from '@/lib/backend';
-import { arabicTemplateName, fieldGroups, fieldText, newField, sources, type CertificateTemplate, type Source, type TemplateDefinition, type TemplateField } from '@/lib/certificateTemplates';
+import { arabicTemplateName, fieldGroups, newField, sources, testSources, type CertificateTemplate, type Source, type TemplateDefinition, type TemplateField } from '@/lib/certificateTemplates';
 import TemplateDialog from './TemplateDialog';
+import CertificateFieldPreview from './CertificateFieldPreview';
+import CertificateAppearanceControls from './CertificateAppearanceControls';
 
 const input = 'w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2.5 text-sm';
 const button = 'inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--color-border)] px-4 py-2.5 text-sm font-bold disabled:opacity-40';
@@ -19,7 +20,7 @@ export default function CertificateTemplateEditor({ initial, isAr, canReview, ca
   const [nameAr, setName] = useState(initial?.nameAr || '');
   const [definition, setDefinition] = useState<TemplateDefinition>(initial?.definition || { background: '', width: 0, height: 0, fields: [] });
   const [selected, setSelected] = useState(initial?.definition.fields[0]?.id || '');
-  const [values, setValues] = useState<Record<string, string>>({ 'student.name': 'أحمد محمد عبدالله', 'student.gender': 'male', 'event.title': 'ورشة الابتكار', 'event.date': '2026-11-07', 'partner.name': 'الراعي التجريبي', 'event.vtoolsUUID': '00000000-0000-4000-8000-000000000001', 'certificate.UUID': '00000000-0000-4000-8000-000000000002' });
+  const [values, setValues] = useState<Record<string, string>>({ 'student.name': 'Ahmed Mohammed Abdullah', 'student.gender': 'male', 'event.name': 'Innovation Workshop', 'event.date': '23 Nov, 2026', 'partner.name': 'Example Partner', 'event.vtoolsUUID': '00000000-0000-4000-8000-000000000001', 'certificate.UUID': '00000000-0000-4000-8000-000000000002' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -28,6 +29,7 @@ export default function CertificateTemplateEditor({ initial, isAr, canReview, ca
   const dragging = useRef<string | null>(null);
   const uploading = useRef(0);
   const active = definition.fields.find(field => field.id === selected) || definition.fields[0];
+  const usedSources = testSources(definition.fields);
   useEffect(() => () => { if (pdfUrl) URL.revokeObjectURL(pdfUrl); }, [pdfUrl]);
   const changed = () => { setDirty(true); setPdfUrl(''); setError(''); };
   const patchField = (id: string, patch: Partial<TemplateField>) => {
@@ -58,7 +60,7 @@ export default function CertificateTemplateEditor({ initial, isAr, canReview, ca
     if (!validateStage()) return;
     setBusy(true); setError('');
     try {
-      const result = await apiSend<{ pdf: string }>('POST', '/api/admin/templates/preview', { nameAr, definition, values });
+      const result = await apiSend<{ pdf: string }>('POST', '/api/admin/templates/preview', { nameAr, definition, values: Object.fromEntries(usedSources.map(source => [source, values[source]])) });
       const bytes = Uint8Array.from(atob(result.pdf), character => character.charCodeAt(0));
       setPdfUrl(URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })));
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Preview failed'); } finally { setBusy(false); }
@@ -104,7 +106,7 @@ export default function CertificateTemplateEditor({ initial, isAr, canReview, ca
           <p className="text-xs text-[var(--color-text-muted)]" dir="ltr">{field.source}</p>
           {field.source === 'literal' && <input aria-label={t('النص الثابت', 'Static text')} className={input} value={field.value} maxLength={300} onChange={event => patchField(field.id, { value: event.target.value })} />}
           {field.source === 'conditional' && <div className="space-y-3">
-            <label className="block space-y-1"><span>{t('إذا كانت قيمة', 'When the value of')}</span><select className={input} value={field.conditionSource} onChange={event => patchField(field.id, { conditionSource: event.target.value as Source })}>{sources.map(source => <option key={source}>{source}</option>)}</select></label>
+            <label className="block space-y-1"><span>{t('إذا كانت قيمة', 'When the value of')}</span><select className={input} value={field.conditionSource} onChange={event => patchField(field.id, { conditionSource: event.target.value as Source })}>{field.conditionSource === 'event.title' && <option value="event.title">event.name (event.title)</option>}{sources.map(source => <option key={source}>{source}</option>)}</select></label>
             {field.rules?.map((rule, index) => <div key={index} className="flex flex-wrap items-center gap-2"><span>{t('تساوي', 'equals')}</span><input aria-label={`${t('قيمة الشرط', 'Condition value')} ${index + 1}`} className={`${input} flex-1`} maxLength={128} value={rule.equals} onChange={event => patchField(field.id, { rules: field.rules!.map((item, i) => i === index ? { ...item, equals: event.target.value } : item) })} /><span>{t('اعرض', 'show')}</span><input aria-label={`${t('نص النتيجة', 'Result text')} ${index + 1}`} className={`${input} flex-1`} maxLength={300} value={rule.text} onChange={event => patchField(field.id, { rules: field.rules!.map((item, i) => i === index ? { ...item, text: event.target.value } : item) })} /><button type="button" disabled={field.rules!.length === 1} aria-label={t('حذف الشرط', 'Remove condition')} onClick={() => patchField(field.id, { rules: field.rules!.filter((_, i) => i !== index) })}><Trash2 size={16} /></button></div>)}
             <button type="button" className={button} disabled={field.rules!.length >= 10} onClick={() => patchField(field.id, { rules: [...field.rules!, { equals: '', text: '' }] })}><Plus size={16} />{t('إضافة شرط', 'Add condition')}</button>
             <label className="block space-y-1"><span>{t('النص البديل إذا لم يتطابق أي شرط', 'Fallback when no condition matches')}</span><input className={input} value={field.fallback} maxLength={300} onChange={event => patchField(field.id, { fallback: event.target.value })} /></label>
@@ -122,12 +124,13 @@ export default function CertificateTemplateEditor({ initial, isAr, canReview, ca
                 const max = key === 'qrSize' ? 200 : 100;
                 return <label key={key} className="block space-y-1"><span>{key === 'x' ? t('الموضع الأفقي %', 'Horizontal position %') : key === 'y' ? t('الموضع الرأسي %', 'Vertical position %') : key === 'qrSize' ? t('حجم QR (نقطة)', 'QR size (points)') : t('حجم الخط (نقطة)', 'Font size (points)')}</span><input type="number" min={min} max={max} step={key === 'x' || key === 'y' ? 0.1 : 1} className={input} value={Math.round((active[key] ?? 80) * 10) / 10} onChange={event => { const value = Number(event.target.value); if (Number.isFinite(value) && value >= min && value <= max) patchField(active.id, { [key]: value }); }} /></label>;
               })}
-              <label className="block space-y-1"><span>{t('محاذاة النص', 'Text alignment')}</span><select className={input} value={active.align} onChange={event => patchField(active.id, { align: event.target.value as TemplateField['align'] })}><option value="left">{t('يسار', 'Left')}</option><option value="center">{t('وسط', 'Center')}</option><option value="right">{t('يمين', 'Right')}</option></select></label>
+              <label className="block space-y-1"><span>{t('الارتكاز واتجاه التوسع', 'Anchor and text growth')}</span><select className={input} value={active.align} onChange={event => patchField(active.id, { align: event.target.value as TemplateField['align'] })}><option value="left">{t('يسار ثابت — يتوسع يمينًا', 'Fixed left edge — grow right')}</option><option value="center">{t('وسط ثابت — يتوسع للجانبين', 'Fixed center — grow both ways')}</option><option value="right">{t('يمين ثابت — يتوسع يسارًا', 'Fixed right edge — grow left')}</option></select></label>
               <button type="button" className={button} onClick={() => patchField(active.id, { x: 50, align: 'center' })}>{t('توسيط في الشهادة', 'Center on certificate')}</button>
+              <CertificateAppearanceControls field={active} isAr={isAr} onChange={patch => patchField(active.id, patch)} />
               {active.source !== 'certificate.QR' && <><label className="flex items-center justify-between gap-2"><span>{t('لون النص', 'Text color')}</span><input type="color" value={active.color} onChange={event => patchField(active.id, { color: event.target.value })} /></label>
               <label className="flex items-center gap-2"><input type="checkbox" checked={active.bold} onChange={event => patchField(active.id, { bold: event.target.checked })} />{t('خط عريض', 'Bold')}</label></>}
             </>}
-          </fieldset> : <div className="space-y-3"><h3 className="font-bold">{t('بيانات التجربة', 'Test data')}</h3>{sources.map(source => <label key={source} className="block space-y-1 text-xs"><span dir="ltr">{source}</span>{source === 'student.gender' ? <select disabled={busy} className={input} value={values[source]} onChange={event => { setPdfUrl(''); setValues(previous => ({ ...previous, [source]: event.target.value })); }}><option value="male">{t('ذكر', 'Male')}</option><option value="female">{t('أنثى', 'Female')}</option><option value="">{t('غير محدد (اختبار النص البديل)', 'Unspecified (test fallback)')}</option></select> : <input disabled={busy} className={input} value={values[source]} maxLength={300} onChange={event => { setPdfUrl(''); setValues(previous => ({ ...previous, [source]: event.target.value })); }} />}</label>)}
+          </fieldset> : <div className="space-y-3"><h3 className="font-bold">{t('بيانات التجربة', 'Test data')}</h3><p className="text-xs text-[var(--color-text-muted)]">{t('هذه قيم تجريبية للمتغيرات المستخدمة فقط. عند الإصدار تُملأ تلقائيًا من الفعالية والمشارك، ويستخدم اسم المشارك بالإنجليزية.', 'Only variables used in this template are shown. These are test values; issuance fills them from the event and participant automatically, using the participant’s English name.')}</p>{usedSources.map(source => <label key={source} className="block space-y-1 text-xs"><span dir="ltr">{source}</span>{source === 'student.gender' ? <select disabled={busy} className={input} value={values[source]} onChange={event => { setPdfUrl(''); setValues(previous => ({ ...previous, [source]: event.target.value })); }}><option value="male">{t('ذكر', 'Male')}</option><option value="female">{t('أنثى', 'Female')}</option><option value="">{t('غير محدد (اختبار النص البديل)', 'Unspecified (test fallback)')}</option></select> : <input disabled={busy} className={input} value={values[source]} maxLength={300} onChange={event => { setPdfUrl(''); setValues(previous => ({ ...previous, [source]: event.target.value })); }} />}</label>)}
             <button type="button" className={primary} disabled={busy} onClick={() => void preview()}>{t('إنشاء نسخة PDF تجريبية', 'Generate test PDF')}</button>
             {pdfUrl && <a href={pdfUrl} download="certificate-test.pdf" className={button}><Download size={16} />{t('تنزيل الاختبار', 'Download test')}</a>}
           </div>}
@@ -138,14 +141,7 @@ export default function CertificateTemplateEditor({ initial, isAr, canReview, ca
               onPointerMove={move} onPointerUp={() => { dragging.current = null; }} onPointerCancel={() => { dragging.current = null; }}>
               <image href={definition.background} width="100%" height="100%" preserveAspectRatio="none" />
               {definition.fields.map(field => <g key={field.id} style={{ cursor: step === 2 && canEdit ? 'move' : 'default' }} onPointerDown={event => { if (step !== 2 || !canEdit || busy) return; setSelected(field.id); dragging.current = field.id; stage.current?.setPointerCapture(event.pointerId); }}>
-                {field.source === 'certificate.QR' ? <g transform={`translate(${field.x * 842 / 100 - (field.align === 'left' ? 0 : field.align === 'right' ? (field.qrSize || 80) : (field.qrSize || 80) / 2)}, ${field.y * (842 * definition.height / definition.width) / 100 - (field.qrSize || 80) / 2})`}>
-                  <QRCodeSVG value={fieldText(field, values) || ' '} size={field.qrSize || 80} level="M" marginSize={4} />
-                  <rect width={field.qrSize || 80} height={field.qrSize || 80} fill="transparent" stroke={step === 2 && field.id === active?.id ? '#38bdf8' : 'none'} strokeWidth={2} />
-                </g> : <text x={`${field.x}%`} y={`${field.y}%`} dominantBaseline="central" textAnchor={field.align === 'left' ? 'start' : field.align === 'right' ? 'end' : 'middle'} fontSize={field.fontSize} fill={field.color} fontWeight={field.bold ? 700 : 400} style={{ fontFamily: 'var(--font-cairo), sans-serif', userSelect: 'none' }}
-                stroke={step === 2 && field.id === active?.id ? '#38bdf8' : undefined} strokeWidth={.4}
-                onPointerDown={event => { if (step !== 2 || !canEdit || busy) return; setSelected(field.id); dragging.current = field.id; stage.current?.setPointerCapture(event.pointerId); }}>
-                {fieldText(field, values) || (step === 2 ? `[${field.label}]` : '')}
-              </text>}
+                <CertificateFieldPreview field={field} values={values} height={842 * definition.height / (definition.width || 1)} selected={step === 2 && field.id === active?.id} editing={step === 2} />
               </g>)}
             </svg>
           </div>
