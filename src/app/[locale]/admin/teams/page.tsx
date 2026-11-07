@@ -224,9 +224,9 @@ export default function AdminTeamsPage() {
         </div>
       )}
 
-      <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {sortedTeams.map((team) => (
-          <div key={team.id} className="rounded-3xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/60 backdrop-blur-md p-5 shadow-xs">
+          <div key={team.id} className="rounded-3xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/60 backdrop-blur-md p-5 shadow-xs flex flex-col">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="font-bold text-[var(--color-text-primary)] font-cairo">
@@ -263,7 +263,7 @@ export default function AdminTeamsPage() {
               </div>
             )}
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-4 flex-1 space-y-2">
               {sortedMembersOf(team).map((member) => {
                 const membersOnly = sortedMembersOf(team).filter(m => m.teamRole === 'member');
                 const memberIdx = membersOnly.findIndex(m => m.userId === member.userId);
@@ -274,33 +274,28 @@ export default function AdminTeamsPage() {
                   : { bg: 'bg-[var(--color-surface-2)]', text: 'text-[var(--color-text-secondary)]', Icon: null, label: isAr ? 'عضو' : 'Member' };
                 const accountLabel = (isAr ? member.roleNameAr : member.roleNameEn) || member.role;
                 return (
-                  <div key={member.userId} className="rounded-2xl border border-[var(--color-border)]/50 bg-[var(--color-surface-2)]/60 p-4 flex flex-col gap-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-9 h-9 rounded-xl bg-[var(--color-accent-soft)] text-[var(--color-accent)] flex items-center justify-center font-black shrink-0">
-                          {member.displayName.trim().charAt(0) || '?'}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-bold text-[var(--color-text-primary)] text-sm truncate">{member.displayName}</p>
-                          <p className="text-[11px] text-[var(--color-text-muted)] truncate">{accountLabel}</p>
-                        </div>
-                      </div>
-                      <button type="button" onClick={() => removeMember(team, member.userId)} className="cursor-pointer text-[var(--color-text-muted)] hover:text-[var(--color-danger)] shrink-0"><UserMinus size={16} /></button>
+                  <div key={member.userId} className="rounded-xl border border-[var(--color-border)]/50 bg-[var(--color-surface-2)]/60 p-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <div className="w-8 h-8 rounded-lg bg-[var(--color-accent-soft)] text-[var(--color-accent)] flex items-center justify-center font-black text-sm shrink-0">
+                      {member.displayName.trim().charAt(0) || '?'}
                     </div>
 
-                    <div className="flex items-center justify-between gap-2">
-                      <span className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold ${tierStyle.bg} ${tierStyle.text}`}>
-                        {tierStyle.Icon && <tierStyle.Icon size={12} />}
-                        {tierStyle.label}
-                      </span>
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--color-warning)]">
-                        <Star size={12} className="fill-current" />
-                        {member.totalPoints ?? 0}
-                      </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-[var(--color-text-primary)] text-sm truncate">{member.displayName}</p>
+                      <p className="text-[11px] text-[var(--color-text-muted)] truncate">{accountLabel}</p>
                     </div>
+
+                    <span className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold shrink-0 ${tierStyle.bg} ${tierStyle.text}`}>
+                      {tierStyle.Icon && <tierStyle.Icon size={12} />}
+                      {tierStyle.label}
+                    </span>
+
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--color-warning)] shrink-0">
+                      <Star size={12} className="fill-current" />
+                      {member.totalPoints ?? 0}
+                    </span>
 
                     {member.badges && member.badges.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex flex-wrap gap-1.5 basis-full">
                         {member.badges.map(badge => (
                           <span key={badge.key} className="inline-flex items-center gap-1 rounded-lg bg-[var(--color-accent-soft)] text-[var(--color-accent)] px-2 py-0.5 text-[10px] font-bold">
                             <BadgeCheck size={11} />
@@ -310,11 +305,11 @@ export default function AdminTeamsPage() {
                       </div>
                     )}
 
-                    <div className="flex items-center gap-1.5 mt-auto pt-2 border-t border-[var(--color-border)]/50">
+                    <div className="flex items-center gap-1.5 shrink-0 ms-auto">
                       <select
                         value={member.teamRole}
                         onChange={e => changeMemberRole(team, member.userId, e.target.value as TeamRole)}
-                        className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1.5 text-[11px] font-bold text-[var(--color-text-secondary)]"
+                        className="cursor-pointer rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1.5 text-[11px] font-bold text-[var(--color-text-secondary)]"
                       >
                         <option value="leader">{isAr ? 'قائد' : 'Leader'}</option>
                         <option value="vice_leader">{isAr ? 'نائب قائد' : 'Vice Leader'}</option>
@@ -326,6 +321,7 @@ export default function AdminTeamsPage() {
                           <button type="button" disabled={memberIdx === membersOnly.length - 1} onClick={() => moveMemberWithinTier(team, member.userId, 'down')} className="cursor-pointer p-0.5 text-[var(--color-text-muted)] hover:text-[var(--color-accent)] disabled:opacity-20"><ArrowDown size={12} /></button>
                         </div>
                       )}
+                      <button type="button" onClick={() => removeMember(team, member.userId)} className="cursor-pointer text-[var(--color-text-muted)] hover:text-[var(--color-danger)] shrink-0"><UserMinus size={16} /></button>
                     </div>
                   </div>
                 );
