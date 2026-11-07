@@ -7,6 +7,7 @@ import { downloadCSV, parseCSV, secureCertificateURL } from '@/lib/csv';
 import { runOperations, type OperationResult } from '@/lib/admin-operations';
 import { useAuth } from '@/context/AuthContext';
 import { useParams } from 'next/navigation';
+import ConfirmDialog from '@/components/admin/ConfirmDialog';
 import { FileText, CheckCircle, Clock, XCircle, AlertCircle, RefreshCw, XOctagon, Download, Upload } from 'lucide-react';
 import { Certificate, PlatformEvent } from '@/lib/types';
 
@@ -39,6 +40,7 @@ export default function CertificatesManagementPage() {
   const [templateId, setTemplateId] = useState('');
   const [vtoolsUUID, setVtoolsUUID] = useState('');
   const [genders, setGenders] = useState<Record<string, string>>({});
+  const [revokeTarget, setRevokeTarget] = useState<Certificate | null>(null);
   const role = userData?.role;
   const canIssue = event?.state === 'Completed' && event?.hasCertificate === true;
   const canAttachExternal = ['Ongoing', 'Completed'].includes(event?.state || '');
@@ -205,7 +207,6 @@ export default function CertificatesManagementPage() {
   };
 
   const handleRevoke = async (certificateId: string) => {
-    if (!confirm('Are you sure you want to revoke this certificate? This action cannot be fully undone.')) return;
     setProcessing(true);
     try {
       const revokeFn = httpsCallable(null, 'revokeCertificate');
@@ -229,7 +230,7 @@ export default function CertificatesManagementPage() {
       setResults([{ id: attendee.userId, name: attendee.name, success: true }]);
       setReloadKey(k => k + 1);
     } catch (err) {
-      alert('خطأ في حفظ الرابط: ' + (err instanceof Error ? err.message : 'أعد المحاولة'));
+      setError('خطأ في حفظ الرابط: ' + (err instanceof Error ? err.message : 'أعد المحاولة'));
     } finally {
       setProcessing(false);
     }
@@ -303,17 +304,17 @@ export default function CertificatesManagementPage() {
 
   return (
     <div className="space-y-6 p-6">
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
         <div>
-          <h1 className="text-2xl font-bold font-cairo">إدارة الشهادات</h1>
+          <h1 className="text-2xl font-black font-cairo text-slate-900">إدارة الشهادات</h1>
           <p className="mt-2 text-sm text-slate-500">اترك هذه الصفحة مفتوحة أثناء توليد الشهادات؛ تتم معالجتها واحدة تلو الأخرى. ويمكنك أيضًا إرفاق روابط شهادات خارجية.</p>
-          <p className="text-gray-500">{event?.title} ({event?.state})</p>
+          <p className="text-sm text-slate-500 mt-0.5">{event?.title} ({event?.state})</p>
         </div>
-        
+
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={handleExportCSV}
-            className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-xl font-bold transition-colors flex items-center gap-2 shadow-sm"
+            className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-xl font-bold transition-colors flex items-center gap-2 shadow-sm"
           >
             <Download className="h-4 w-4" />
             تصدير CSV الحضور
@@ -349,18 +350,18 @@ export default function CertificatesManagementPage() {
         </div>
       </div>
 
-      <section className="space-y-3 rounded-2xl border bg-white p-5 text-slate-900">
-        <label className="block space-y-2"><span className="font-bold">قالب الشهادة المعتمد</span><select disabled={processing} value={templateId} onChange={e => setTemplateId(e.target.value)} className="w-full rounded-xl border p-3"><option value="">التصميم الافتراضي</option>{templates.map(template => <option key={template.id} value={template.id}>{template.nameAr}</option>)}</select></label>
-        {templateId && <><label className="block space-y-2"><span>معرّف الفعالية في vTools (UUID)</span><input disabled={processing} dir="ltr" className="w-full rounded-xl border p-3" value={vtoolsUUID} onChange={e => setVtoolsUUID(e.target.value)} /></label><details><summary className="cursor-pointer font-bold">بيانات المخاطبة للمستفيدين</summary><p className="my-3 text-sm text-slate-500">حدد البيانات عند الحاجة للشروط. غير المحدد يستخدم النص البديل في القالب؛ لا نستنتج الجنس من الاسم.</p><div className="max-h-64 space-y-2 overflow-y-auto">{attendees.map(attendee => <label key={attendee.userId} className="flex items-center justify-between gap-3"><span>{attendee.name}</span><select disabled={processing} className="rounded-lg border p-2" value={genders[attendee.userId] || ''} onChange={e => setGenders(previous => ({ ...previous, [attendee.userId]: e.target.value }))}><option value="">غير محدد</option><option value="male">ذكر</option><option value="female">أنثى</option></select></label>)}</div></details></>}
+      <section className="space-y-3 rounded-2xl border border-slate-100 shadow-sm bg-white p-6 text-slate-900">
+        <label className="block space-y-2"><span className="text-sm font-bold text-slate-700">قالب الشهادة المعتمد</span><select disabled={processing} value={templateId} onChange={e => setTemplateId(e.target.value)} className="w-full rounded-xl border p-3"><option value="">التصميم الافتراضي</option>{templates.map(template => <option key={template.id} value={template.id}>{template.nameAr}</option>)}</select></label>
+        {templateId && <><label className="block space-y-2"><span className="text-sm font-bold text-slate-700">معرّف الفعالية في vTools (UUID)</span><input disabled={processing} dir="ltr" className="w-full rounded-xl border p-3" value={vtoolsUUID} onChange={e => setVtoolsUUID(e.target.value)} /></label><details><summary className="cursor-pointer font-bold">بيانات المخاطبة للمستفيدين</summary><p className="my-3 text-sm text-slate-500">حدد البيانات عند الحاجة للشروط. غير المحدد يستخدم النص البديل في القالب؛ لا نستنتج الجنس من الاسم.</p><div className="max-h-64 space-y-2 overflow-y-auto">{attendees.map(attendee => <label key={attendee.userId} className="flex items-center justify-between gap-3"><span>{attendee.name}</span><select disabled={processing} className="rounded-lg border p-2" value={genders[attendee.userId] || ''} onChange={e => setGenders(previous => ({ ...previous, [attendee.userId]: e.target.value }))}><option value="">غير محدد</option><option value="male">ذكر</option><option value="female">أنثى</option></select></label>)}</div></details></>}
         <p className="text-xs text-slate-500">المسودات غير متاحة للإصدار. تُحفظ نسخة من القالب المعتمد وبياناته مع الشهادة عند إضافتها لقائمة الإصدار.</p>
       </section>
-      {error && <div className="bg-red-50 text-red-600 p-4 rounded-xl">{error}</div>}
-      {issueRetryIds.length > 0 && <button disabled={processing || !canIssue} onClick={() => handleIssueCertificates(issueRetryIds)} className="rounded-xl bg-purple-600 px-4 py-3 text-white disabled:opacity-50">إعادة إرسال دفعات الإصدار المتعثرة فقط</button>}
-      {results.length > 0 && <section className="rounded-xl border bg-white p-4" aria-live="polite"><p>نجح {results.filter(row => row.success).length} / {results.length}.</p>{results.filter(row => !row.success).map(row => <p key={row.id} className="text-red-700">{row.name}: {row.message}</p>)}<button className="mt-2 underline" onClick={() => downloadCSV('certificate-operation-results.csv', [['Name', 'Success', 'Message'], ...results.map(row => [row.name, row.success, row.message || ''])])}>تنزيل تقرير النتائج</button>{retryRows.length > 0 && <button disabled={uploadingCSV} className="ms-4 rounded bg-blue-600 px-4 py-2 text-white" onClick={() => applyImport(retryRows)}>إعادة محاولة الفاشل فقط ({retryRows.length})</button>}</section>}
-      {importRows.length > 0 && <section className="rounded-xl border bg-blue-50 p-4"><h2 className="font-bold">معاينة قبل الحفظ — لم يُطبّق أي رابط بعد</h2><p>صالح {importRows.filter(row => !row.problem).length}، يحتاج مراجعة {importRows.filter(row => row.problem).length}.</p><div className="max-h-64 overflow-auto mt-3">{importRows.map(row => <p key={row.id} className={row.problem ? 'text-red-700' : 'text-green-800'}>صف {row.id}: {row.email} — {row.problem || 'جاهز للربط'}</p>)}</div><button disabled={uploadingCSV || !canAttachExternal || !importRows.some(row => !row.problem)} onClick={() => applyImport(importRows)} className="mt-3 rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-50">تطبيق الصفوف الصالحة فقط</button><button disabled={uploadingCSV} onClick={() => setImportRows([])} className="ms-3 underline">إلغاء الاستيراد</button></section>}
+      {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">{error}</div>}
+      {issueRetryIds.length > 0 && <button disabled={processing || !canIssue} onClick={() => handleIssueCertificates(issueRetryIds)} className="rounded-xl bg-purple-600 hover:bg-purple-700 transition-colors px-4 py-3 text-white font-bold disabled:opacity-50">إعادة إرسال دفعات الإصدار المتعثرة فقط</button>}
+      {results.length > 0 && <section className="rounded-2xl border border-slate-100 shadow-sm bg-white p-5" aria-live="polite"><p className="text-sm text-slate-700">نجح <span className="font-bold text-emerald-600">{results.filter(row => row.success).length}</span> / {results.length}.</p>{results.filter(row => !row.success).map(row => <p key={row.id} className="text-sm text-red-600 mt-1">{row.name}: {row.message}</p>)}<button className="mt-3 text-sm font-bold text-purple-600 hover:underline" onClick={() => downloadCSV('certificate-operation-results.csv', [['Name', 'Success', 'Message'], ...results.map(row => [row.name, row.success, row.message || ''])])}>تنزيل تقرير النتائج</button>{retryRows.length > 0 && <button disabled={uploadingCSV} className="ms-4 rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors px-4 py-2 text-sm font-bold text-white" onClick={() => applyImport(retryRows)}>إعادة محاولة الفاشل فقط ({retryRows.length})</button>}</section>}
+      {importRows.length > 0 && <section className="rounded-2xl border border-slate-100 bg-slate-50 p-5"><h2 className="font-bold text-slate-900">معاينة قبل الحفظ — لم يُطبّق أي رابط بعد</h2><p className="text-sm text-slate-600 mt-1">صالح {importRows.filter(row => !row.problem).length}، يحتاج مراجعة {importRows.filter(row => row.problem).length}.</p><div className="max-h-64 overflow-auto mt-3 space-y-0.5">{importRows.map(row => <p key={row.id} className={`text-sm ${row.problem ? 'text-red-700' : 'text-emerald-700'}`}>صف {row.id}: {row.email} — {row.problem || 'جاهز للربط'}</p>)}</div><button disabled={uploadingCSV || !canAttachExternal || !importRows.some(row => !row.problem)} onClick={() => applyImport(importRows)} className="mt-3 rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors px-4 py-2 text-sm font-bold text-white disabled:opacity-50">تطبيق الصفوف الصالحة فقط</button><button disabled={uploadingCSV} onClick={() => setImportRows([])} className="ms-3 text-sm font-bold text-slate-600 hover:underline">إلغاء الاستيراد</button></section>}
       
       {!canIssue && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-900 p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 p-5 rounded-2xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <AlertCircle className="h-6 w-6 text-amber-600 shrink-0" />
             <div>
@@ -387,9 +388,16 @@ export default function CertificatesManagementPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          <h3 className="text-base font-bold text-slate-900">سجل الحضور والشهادات</h3>
+          <span className="text-xs font-bold bg-slate-100 text-slate-600 px-3 py-1 rounded-full">
+            {attendees.filter(a => a.certificate?.status === 'Available' || a.certificate?.externalUrl).length} / {attendees.length} صادرة
+          </span>
+        </div>
+        <div className="overflow-x-auto">
         <table className="w-full text-start">
-          <thead className="bg-gray-50 text-gray-500 border-b border-gray-100">
+          <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
             <tr>
               <th className="py-4 px-6 font-medium">اسم الطالب</th>
               <th className="py-4 px-6 font-medium">البريد الإلكتروني</th>
@@ -398,58 +406,58 @@ export default function CertificatesManagementPage() {
               <th className="py-4 px-6 font-medium">الإجراءات</th>
             </tr>
           </thead>
-          <tbody className="divide-y border-gray-100">
+          <tbody className="divide-y border-slate-100">
             {attendees.map(attendee => (
-              <tr key={attendee.userId} className="hover:bg-gray-50 transition-colors">
-                <td className="py-4 px-6 font-bold">{attendee.name}</td>
-                <td className="py-4 px-6 text-gray-500">{attendee.email}</td>
+              <tr key={attendee.userId} className="hover:bg-slate-50 transition-colors">
+                <td className="py-4 px-6 font-bold text-slate-900">{attendee.name}</td>
+                <td className="py-4 px-6 text-slate-500">{attendee.email}</td>
                 <td className="py-4 px-6">
                   {attendee.certificate?.externalUrl ? (
                     <a href={attendee.certificate.externalUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-sm font-bold truncate block max-w-[150px]">
                       رابط خارجي
                     </a>
                   ) : (
-                    <span className="text-gray-400 text-sm">-</span>
+                    <span className="text-slate-400 text-sm">-</span>
                   )}
                 </td>
                 <td className="py-4 px-6">
                   {!attendee.certificate ? (
-                    <span className="text-gray-500">غير مصدرة</span>
+                    <span className="text-slate-500">غير مصدرة</span>
                   ) : attendee.certificate.status === 'Generating' ? (
                     <span className="inline-flex items-center text-blue-600"><Clock className="h-4 w-4 me-1 animate-pulse" /> جاري الإصدار</span>
                   ) : attendee.certificate.status === 'Available' ? (
-                    <span className="inline-flex items-center text-green-600"><CheckCircle className="h-4 w-4 me-1" /> متوفرة</span>
+                    <span className="inline-flex items-center text-emerald-600"><CheckCircle className="h-4 w-4 me-1" /> متوفرة</span>
                   ) : attendee.certificate.status === 'Failed' ? (
                     <span className="inline-flex items-center text-red-600"><XCircle className="h-4 w-4 me-1" /> فشل الإصدار</span>
                   ) : (
-                    <span className="inline-flex items-center text-gray-400"><XOctagon className="h-4 w-4 me-1" /> ملغاة</span>
+                    <span className="inline-flex items-center text-slate-400"><XOctagon className="h-4 w-4 me-1" /> ملغاة</span>
                   )}
                 </td>
                 <td className="py-4 px-6">
                   {attendee.certificate?.status === 'Failed' && (
-                    <button onClick={() => handleRetry(attendee.certificate!.id)} disabled={processing} className="text-blue-600 hover:bg-blue-50 px-3 py-1 rounded text-sm font-bold flex items-center">
+                    <button onClick={() => handleRetry(attendee.certificate!.id)} disabled={processing} className="text-blue-600 hover:bg-blue-50 px-3 py-1 rounded-lg text-sm font-bold flex items-center transition-colors">
                       <RefreshCw className="h-4 w-4 me-1" /> إعادة المحاولة
                     </button>
                   )}
                   {attendee.certificate?.status === 'Available' && (
-                    <button onClick={() => handleRevoke(attendee.certificate!.id)} disabled={processing} className="text-red-600 hover:bg-red-50 px-3 py-1 rounded text-sm font-bold mt-1 block">
+                    <button onClick={() => setRevokeTarget(attendee.certificate!)} disabled={processing} className="text-red-600 hover:bg-red-50 px-3 py-1 rounded-lg text-sm font-bold mt-1 block transition-colors">
                       إلغاء الشهادة
                     </button>
                   )}
                   {canAttachExternal && attendee.eligible && (!attendee.certificate || attendee.certificate.status === 'Failed') && (
                     <div className="flex gap-2 items-center mt-2">
-                      <input 
-                        type="url" 
+                      <input
+                        type="url"
                         placeholder="https://…"
                         aria-label={`رابط شهادة ${attendee.name}`}
                         value={manualLinks[attendee.userId] || ''}
                         onChange={(e) => setManualLinks(prev => ({ ...prev, [attendee.userId]: e.target.value }))}
-                        className="p-2 border rounded-lg text-sm flex-1 outline-none focus:ring-1 focus:ring-blue-500 dir-ltr text-left"
+                        className="p-2 border border-slate-200 rounded-lg text-sm flex-1 outline-none focus:ring-1 focus:ring-blue-500 dir-ltr text-left"
                       />
-                      <button 
+                      <button
                         onClick={() => saveManualLink(attendee)}
                         disabled={processing || uploadingCSV || !manualLinks[attendee.userId]}
-                        className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 disabled:opacity-50"
+                        className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors"
                       >
                         رفع
                       </button>
@@ -460,12 +468,25 @@ export default function CertificatesManagementPage() {
             ))}
             {attendees.length === 0 && (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-gray-500">لا يوجد حضور مسجل لهذه الفعالية.</td>
+                <td colSpan={5} className="py-8 text-center text-slate-500">لا يوجد حضور مسجل لهذه الفعالية.</td>
               </tr>
             )}
           </tbody>
         </table>
+        </div>
       </div>
+      <ConfirmDialog
+        open={!!revokeTarget}
+        icon={<XOctagon className="h-6 w-6" />}
+        tone="danger"
+        title="إلغاء الشهادة"
+        message="هل أنت متأكد من إلغاء هذه الشهادة؟ لا يمكن التراجع عن هذا الإجراء بالكامل."
+        confirmLabel="إلغاء الشهادة"
+        cancelLabel="تراجع"
+        busy={processing}
+        onCancel={() => setRevokeTarget(null)}
+        onConfirm={async () => { const id = revokeTarget!.id; setRevokeTarget(null); await handleRevoke(id); }}
+      />
     </div>
   );
 }

@@ -6,7 +6,7 @@ import { PlatformEvent, EventFeedbackResponse } from '@/lib/types';
 import { Link } from '@/i18n/routing';
 import { Star, Download, ArrowRight, Loader2, MessageSquare, BarChart3, Users, Award } from 'lucide-react';
 import { format } from 'date-fns';
-import { ar } from 'date-fns/locale';
+import { ar, enUS } from 'date-fns/locale';
 import { toJsDate } from '@/lib/dateUtils';
 import { downloadCSV } from '@/lib/csv';
 
@@ -15,6 +15,7 @@ const getMillis = (value: unknown): number => toJsDate(value)?.getTime() || 0;
 export default function EventFeedbackDashboardPage({ params }: { params: Promise<{ id: string; locale: string }> }) {
   const { id: eventId, locale } = use(params);
   const isAr = locale === 'ar';
+  const dateLocale = isAr ? ar : enUS;
 
   const [event, setEvent] = useState<PlatformEvent | null>(null);
   const [feedbacks, setFeedbacks] = useState<EventFeedbackResponse[]>([]);
@@ -180,7 +181,7 @@ export default function EventFeedbackDashboardPage({ params }: { params: Promise
       <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
         <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
           <BarChart3 className="w-5 h-5 text-purple-600" />
-          <span>{isAr ? 'توزيع التقييمات حسب النجوم ⭐' : 'Rating Distribution'}</span>
+          <span>{isAr ? 'توزيع التقييمات حسب النجوم' : 'Rating Distribution'}</span>
         </h3>
 
         <div className="space-y-3">
@@ -220,14 +221,19 @@ export default function EventFeedbackDashboardPage({ params }: { params: Promise
         </div>
 
         {feedbacks.length === 0 ? (
-          <div className="p-12 text-center text-slate-400 text-sm">
-            {isAr ? 'لا توجد تقييمات مسجلة لهذه الفعالية حتى الآن.' : 'No feedback submitted yet.'}
+          <div className="p-12 flex flex-col items-center justify-center text-center gap-3">
+            <div className="w-12 h-12 bg-slate-50 text-slate-300 rounded-2xl flex items-center justify-center">
+              <MessageSquare className="w-6 h-6" />
+            </div>
+            <p className="text-slate-400 text-sm">
+              {isAr ? 'لا توجد تقييمات مسجلة لهذه الفعالية حتى الآن.' : 'No feedback submitted yet.'}
+            </p>
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
             {feedbacks.map((item) => {
               const millis = getMillis(item.createdAt);
-              const dateStr = millis > 0 ? format(new Date(millis), 'dd MMM yyyy - HH:mm', { locale: ar }) : '';
+              const dateStr = millis > 0 ? format(new Date(millis), 'dd MMM yyyy - HH:mm', { locale: dateLocale }) : '';
 
               return (
                 <div key={item.id} className="p-6 hover:bg-slate-50/50 transition-colors">

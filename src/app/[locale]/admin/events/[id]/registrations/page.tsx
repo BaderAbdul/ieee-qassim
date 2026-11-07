@@ -7,7 +7,7 @@ import { apiGet, httpsCallable } from '@/lib/backend';
 import { apiGetArray } from '@/lib/backendResponse';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
-import { ArrowRight, Download, Users, Check, X, Clock, UserCheck, UserX, CheckSquare, Square, Trophy, QrCode, RefreshCw } from 'lucide-react';
+import { ArrowRight, Download, Users, Check, X, Clock, UserCheck, UserX, CheckSquare, Square, Trophy, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -379,26 +379,6 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
 
       {results.length > 0 && <section className="mb-6 rounded-xl border p-4 bg-white" aria-live="polite"><p>نجح {results.filter(item => item.success).length} / {results.length}. فشل {results.filter(item => !item.success).length}.</p>{results.filter(item => !item.success).map(item => <p key={item.id} className="text-red-700">{item.name}: {item.message}</p>)}{retryJob && <button disabled={isUpdatingBulk} onClick={() => performJob(retryJob)} className="mt-3 rounded-lg bg-blue-600 text-white px-4 py-2">إعادة محاولة الفاشل فقط</button>}</section>}
       <p className="mb-4 text-sm text-gray-500">المحمّل {registrations.length} من {totals.all}. التحديد يشمل الصفوف المحمّلة فقط؛ التصدير يشمل الجميع.</p>
-      
-      {/* Check-in Desk Link Section */}
-      <div className="bg-gradient-to-r from-blue-900 to-indigo-900 rounded-2xl p-6 mb-6 shadow-sm text-white flex flex-col md:flex-row items-center justify-between gap-6">
-        <div>
-          <h3 className="text-xl font-bold mb-2 flex items-center gap-2 font-cairo">
-            <QrCode size={24} className="text-blue-300" />
-            مكتب التحضير (Check-in Desk)
-          </h3>
-          <p className="text-blue-100 text-sm max-w-lg">
-            قم بالانتقال إلى مكتب التحضير لفتح شاشة الـ QR للطلاب، أو استخدام كاميرا الجهاز لمسح بطاقاتهم الرقمية للتحضير السريع والآمن.
-          </p>
-        </div>
-        <Link 
-          href={`/admin/events/${eventId}/checkin-desk`}
-          className="shrink-0 bg-white text-blue-900 hover:bg-blue-50 px-6 py-3 rounded-xl font-bold transition-colors flex items-center shadow-lg"
-        >
-          فتح مكتب التحضير
-          <ArrowRight className="w-5 h-5 ms-2 rtl:-scale-x-100" />
-        </Link>
-      </div>
 
       {selectedIds.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
