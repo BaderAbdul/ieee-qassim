@@ -1,0 +1,57 @@
+import type { EventDay, EventGender, EventType } from '@/lib/types';
+
+export type StageId = 'main' | 'time' | 'security' | 'interviewer' | 'design' | 'settings' | 'review' | 'publish';
+
+export interface StageMeta {
+  id: StageId;
+  labelAr: string;
+  labelEn: string;
+  implemented: boolean;
+}
+
+// Order matches Phase D of the events redesign plan. Stages 5-8 render as "coming soon"
+// placeholders until their own follow-up sub-phases build them.
+export const STAGES: StageMeta[] = [
+  { id: 'main', labelAr: 'البيانات الأساسية', labelEn: 'Main data', implemented: true },
+  { id: 'time', labelAr: 'الزمان والمكان', labelEn: 'Time & place', implemented: true },
+  { id: 'security', labelAr: 'التصريح الأمني', labelEn: 'Security screening', implemented: true },
+  { id: 'interviewer', labelAr: 'المحاور', labelEn: 'Interviewer', implemented: true },
+  { id: 'design', labelAr: 'التصميم', labelEn: 'Design', implemented: false },
+  { id: 'settings', labelAr: 'الإعدادات', labelEn: 'Settings', implemented: false },
+  { id: 'review', labelAr: 'نموذج التقييم', labelEn: 'Review form', implemented: false },
+  { id: 'publish', labelAr: 'النشر', labelEn: 'Publication', implemented: false },
+];
+
+export interface MainDataFields {
+  title: string;
+  titleEn: string;
+  description: string;
+  descriptionEn: string;
+  type: EventType;
+  gains: string; // newline-separated in the UI, array on the wire
+  gainsEn: string;
+}
+
+export interface TimePlaceFields {
+  days: EventDay[];
+  location: string;
+  locationEn: string;
+  capacity: number;
+  isUnlimitedCapacity: boolean;
+  hideExactCapacity: boolean;
+  gender: EventGender;
+}
+
+export interface SecurityFields {
+  securityFormAcknowledged: boolean;
+}
+
+export interface InterviewerFields {
+  interviewer: string;
+  interviewerEn: string;
+}
+
+export const input = 'w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]';
+export const label = 'block space-y-1.5 text-sm font-bold text-[var(--color-text-secondary)]';
+export const button = 'inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--color-border)] px-4 py-2.5 text-sm font-bold disabled:opacity-40';
+export const primaryButton = `${button} bg-[var(--color-accent)] text-[var(--color-accent-contrast)] border-transparent`;
