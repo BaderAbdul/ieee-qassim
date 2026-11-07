@@ -9,7 +9,7 @@ import { AdminError, AdminLoading } from './AdminData';
 import { Award, Shield, X } from 'lucide-react';
 
 interface Privilege { key: string; feature: string; action: string; labelAr: string; labelEn: string }
-interface Badge { key: string; nameAr: string; nameEn: string }
+interface Badge { key: string; nameAr: string; nameEn: string; privileges: string[] }
 interface Override { privilegeKey: string; granted: boolean }
 interface MemberOverview {
   member: {
@@ -20,6 +20,9 @@ interface MemberOverview {
     effectivePrivileges: string[];
   };
   canManagePrivileges: boolean;
+  // null = unrestricted (super_admin, or no cap configured on the team this was delegated
+  // through); otherwise the exact privilege keys a team leader/vice-leader may still grant.
+  privilegeCeiling: string[] | null;
 }
 
 export default function PrivilegesBadgesPanel({ userId, onClose }: { userId: string; onClose: () => void }) {
@@ -47,6 +50,8 @@ export default function PrivilegesBadgesPanel({ userId, onClose }: { userId: str
   useEffect(() => { void load(); }, [userId]);
 
   const overrideFor = (key: string) => data?.member.privilegeOverrides.find(o => o.privilegeKey === key);
+  // Revoking is never capped -- only granting (the "+" / badge-on button) is. null = unrestricted.
+  const grantAllowed = (key: string) => !data || data.privilegeCeiling === null || data.privilegeCeiling.includes(key);
 
   const setOverride = async (key: string, granted: boolean | null) => {
     setBusy(true); setError(null);
@@ -96,9 +101,11 @@ export default function PrivilegesBadgesPanel({ userId, onClose }: { userId: str
                 <div className="flex flex-wrap gap-2">
                   {badges.map(badge => {
                     const has = data.member.badges.some(b => b.key === badge.key);
+                    const blocked = !has && badge.privileges.some(p => !grantAllowed(p));
                     return (
-                      <button key={badge.key} type="button" disabled={busy || !data.canManagePrivileges}
+                      <button key={badge.key} type="button" disabled={busy || !data.canManagePrivileges || blocked}
                               onClick={() => toggleBadge(badge.key, has)}
+                              title={blocked ? (isAr ? 'يتجاوز الحد الأقصى لصلاحيات الفريق' : "Beyond your team's privilege ceiling") : undefined}
                               className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${has ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-500'} disabled:opacity-50`}>
                         <Award size={12} />{isAr ? badge.nameAr : badge.nameEn}
                       </button>
@@ -122,8 +129,9 @@ export default function PrivilegesBadgesPanel({ userId, onClose }: { userId: str
                         </span>
                         {data.canManagePrivileges && (
                           <div className="flex gap-1">
-                            <button type="button" disabled={busy} onClick={() => setOverride(privilege.key, true)}
-                                    className={`rounded px-2 py-0.5 ${override?.granted === true ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>+</button>
+                            <button type="button" disabled={busy || !grantAllowed(privilege.key)} onClick={() => setOverride(privilege.key, true)}
+                                    title={!grantAllowed(privilege.key) ? (isAr ? 'يتجاوز الحد الأقصى لصلاحيات الفريق' : "Beyond your team's privilege ceiling") : undefined}
+                                    className={`rounded px-2 py-0.5 disabled:opacity-40 ${override?.granted === true ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>+</button>
                             <button type="button" disabled={busy} onClick={() => setOverride(privilege.key, false)}
                                     className={`rounded px-2 py-0.5 ${override?.granted === false ? 'bg-rose-100 text-rose-700' : 'bg-gray-100 text-gray-500'}`}>-</button>
                             {override && (

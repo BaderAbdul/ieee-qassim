@@ -6,9 +6,10 @@ import { useAuth } from '@/context/AuthContext';
 import { apiSend, httpsCallable } from '@/lib/backend';
 import { apiGetArray } from '@/lib/backendResponse';
 import { AdminError, AdminLoading } from '@/components/admin/AdminData';
+import PrivilegesBadgesPanel from '@/components/admin/PrivilegesBadgesPanel';
 import { useAdminTopbarActions } from '@/components/admin/AdminTopbarActions';
 import type { MemberSearchResult } from '@/lib/adminTypes';
-import { ArrowDown, ArrowUp, BadgeCheck, Crown, Edit2, Plus, ShieldCheck, Star, Trash2, UserMinus, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, BadgeCheck, Crown, Edit2, KeyRound, Lock, Plus, ShieldCheck, Star, Trash2, UserMinus, X } from 'lucide-react';
 
 type TeamRole = 'leader' | 'vice_leader' | 'member';
 interface TeamBadge { key: string; nameAr: string; nameEn: string; icon: string | null }
@@ -22,8 +23,11 @@ const sortedMembersOf = (team: Team) =>
 interface Team {
   id: string; nameAr: string; nameEn: string; descriptionAr: string | null; descriptionEn: string | null;
   icon: string | null; position: number; isPublic: boolean; members: TeamMember[];
+  // null = uncapped; otherwise the only privileges a leader/vice-leader of this team may grant.
+  maxPrivileges: string[] | null;
 }
 interface SearchResultUser { id: string; email?: string; displayName?: string; arabicFullName?: string; photoURL?: string; role?: string }
+interface Privilege { key: string; feature: string; action: string; labelAr: string; labelEn: string }
 
 export default function AdminTeamsPage() {
   const isAr = useLocale() === 'ar';
@@ -41,6 +45,11 @@ export default function AdminTeamsPage() {
   const [searchResults, setSearchResults] = useState<SearchResultUser[]>([]);
   const [searching, setSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [privilegesUserId, setPrivilegesUserId] = useState<string | null>(null);
+  const [ceilingTeamId, setCeilingTeamId] = useState<string | null>(null);
+  const [ceilingSelection, setCeilingSelection] = useState<Set<string> | null>(null);
+  const [privilegeCatalog, setPrivilegeCatalog] = useState<Privilege[]>([]);
+  const isSuperAdmin = userData?.isSuperAdmin === true;
 
   // `silent` skips the loading-spinner toggle -- used for reloads after a mutation so the whole
   // page doesn't flash back to <AdminLoading /> every time a team/member is added, edited, etc.
@@ -77,23 +86,28 @@ export default function AdminTeamsPage() {
   }, [searchQuery, memberPicker]);
 
   const topbarActions = useMemo(() => (
-    <button
-      type="button"
-      onClick={() => setCreating(value => !value)}
-      className="cursor-pointer inline-flex items-center gap-2 rounded-xl bg-[var(--color-accent)] hover:opacity-90 px-3.5 py-2 text-xs font-bold text-[var(--color-accent-contrast)] transition-opacity"
-    >
-      <Plus size={16} />{isAr ? 'فريق جديد' : 'New team'}
-    </button>
-  ), [isAr]);
+    isSuperAdmin ? (
+      <button
+        type="button"
+        onClick={() => setCreating(value => !value)}
+        className="cursor-pointer inline-flex items-center gap-2 rounded-xl bg-[var(--color-accent)] hover:opacity-90 px-3.5 py-2 text-xs font-bold text-[var(--color-accent-contrast)] transition-opacity"
+      >
+        <Plus size={16} />{isAr ? 'فريق جديد' : 'New team'}
+      </button>
+    ) : null
+  ), [isAr, isSuperAdmin]);
   useAdminTopbarActions(topbarActions);
 
-  if (userData && userData.isSuperAdmin !== true) {
-    return <AdminError message={isAr ? 'إدارة الفرق مخصصة للمدير العام.' : 'Team management requires super admin access.'} />;
+  if (userData && userData.role === 'student') {
+    return <AdminError message={isAr ? 'هذه الصفحة مخصصة لفريق العمل.' : 'This page is for staff accounts only.'} />;
   }
   if (loading) return <AdminLoading />;
   if (error) return <AdminError message={error} retry={load} />;
 
-  const sortedTeams = [...teams].sort((a, b) => a.position - b.position);
+  // A viewer's own team(s) come first, so a leader/vice-leader lands on their own card without
+  // scrolling; ties keep the super-admin-configured display order.
+  const isMine = (team: Team) => !!userData && team.members.some(m => m.userId === userData.id);
+  const sortedTeams = [...teams].sort((a, b) => Number(isMine(b)) - Number(isMine(a)) || a.position - b.position);
 
   const createTeam = async () => {
     if (!newTeam.id || !newTeam.nameAr || !newTeam.nameEn) return;
@@ -179,14 +193,44 @@ export default function AdminTeamsPage() {
     setMemberPicker(null); setSearchQuery(''); setSearchResults([]);
   };
 
+  const openCeiling = async (team: Team) => {
+    setCeilingTeamId(team.id);
+    setCeilingSelection(team.maxPrivileges === null ? null : new Set(team.maxPrivileges));
+    if (privilegeCatalog.length === 0) {
+      try { setPrivilegeCatalog(await apiGetArray<Privilege>('/api/admin/privileges')); }
+      catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to load privileges'); }
+    }
+  };
+
+  const togglePrivilege = (key: string) => {
+    setCeilingSelection(prev => {
+      const next = new Set(prev ?? []);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const saveCeiling = async () => {
+    if (!ceilingTeamId) return;
+    setBusy(true); setError(null);
+    try {
+      await apiSend('PUT', `/api/admin/teams/${encodeURIComponent(ceilingTeamId)}/ceiling`, {
+        privileges: ceilingSelection === null ? null : [...ceilingSelection],
+      });
+      setCeilingTeamId(null); setCeilingSelection(null);
+      await load({ silent: true });
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to update the privilege ceiling'); }
+    finally { setBusy(false); }
+  };
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 font-cairo">{isAr ? 'الفرق' : 'Teams'}</h1>
         <p className="text-gray-500 text-sm">
           {isAr
-            ? 'قائد الفريق يمكنه إدارة صلاحيات وأوسمة أعضاء فريقه فقط. الفرق العلنية تظهر على صفحة "الهيكلة" في الموقع، بالترتيب الظاهر هنا.'
-            : 'A team leader can manage privileges & badges only for their own team members. Public teams appear on the website\'s Structure page, in the order shown here.'}
+            ? 'قائد الفريق أو نائبه يمكنه إدارة صلاحيات وأوسمة أعضاء فريقه فقط، ضمن الحد الأقصى الذي يضعه المدير العام لكل فريق. الفرق العلنية تظهر على صفحة "الهيكلة" في الموقع، بالترتيب الظاهر هنا.'
+            : "A team's leader or vice-leader can manage privileges & badges only for their own team members, capped by the maximum a super admin sets per team. Public teams appear on the website's Structure page, in the order shown here."}
         </p>
       </div>
 
@@ -238,13 +282,16 @@ export default function AdminTeamsPage() {
                 </p>
                 {(team.descriptionAr || team.descriptionEn) && <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">{isAr ? team.descriptionAr : team.descriptionEn}</p>}
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button type="button" onClick={() => startEdit(team)} className="cursor-pointer rounded-lg bg-[var(--color-surface-2)] p-1.5 hover:opacity-80 text-[var(--color-text-secondary)]"><Edit2 size={14} /></button>
-                <button type="button" onClick={() => deleteTeam(team.id)} className="cursor-pointer rounded-lg p-1.5 text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)]"><Trash2 size={16} /></button>
-              </div>
+              {isSuperAdmin && (
+                <div className="flex items-center gap-2 shrink-0">
+                  <button type="button" onClick={() => void openCeiling(team)} title={isAr ? 'الحد الأقصى لصلاحيات الفريق' : "Team's privilege ceiling"} className="cursor-pointer rounded-lg bg-[var(--color-surface-2)] p-1.5 hover:opacity-80 text-[var(--color-text-secondary)]"><Lock size={14} /></button>
+                  <button type="button" onClick={() => startEdit(team)} className="cursor-pointer rounded-lg bg-[var(--color-surface-2)] p-1.5 hover:opacity-80 text-[var(--color-text-secondary)]"><Edit2 size={14} /></button>
+                  <button type="button" onClick={() => deleteTeam(team.id)} className="cursor-pointer rounded-lg p-1.5 text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)]"><Trash2 size={16} /></button>
+                </div>
+              )}
             </div>
 
-            {editingId === team.id && (
+            {isSuperAdmin && editingId === team.id && (
               <div className="mt-3 border-t border-[var(--color-border)]/50 pt-3 space-y-3">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <input value={editTeam.nameAr} onChange={e => setEditTeam({ ...editTeam, nameAr: e.target.value })} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" placeholder="Arabic name" />
@@ -309,22 +356,27 @@ export default function AdminTeamsPage() {
                     )}
 
                     <div className="flex items-center gap-1.5 shrink-0 ms-auto">
-                      <select
-                        value={member.teamRole}
-                        onChange={e => changeMemberRole(team, member.userId, e.target.value as TeamRole)}
-                        className="cursor-pointer rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1.5 text-[11px] font-bold text-[var(--color-text-secondary)]"
-                      >
-                        <option value="leader">{isAr ? 'قائد' : 'Leader'}</option>
-                        <option value="vice_leader">{isAr ? 'نائب قائد' : 'Vice Leader'}</option>
-                        <option value="member">{isAr ? 'عضو' : 'Member'}</option>
-                      </select>
-                      {member.teamRole === 'member' && (
+                      {isSuperAdmin && (
+                        <select
+                          value={member.teamRole}
+                          onChange={e => changeMemberRole(team, member.userId, e.target.value as TeamRole)}
+                          className="cursor-pointer rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1.5 text-[11px] font-bold text-[var(--color-text-secondary)]"
+                        >
+                          <option value="leader">{isAr ? 'قائد' : 'Leader'}</option>
+                          <option value="vice_leader">{isAr ? 'نائب قائد' : 'Vice Leader'}</option>
+                          <option value="member">{isAr ? 'عضو' : 'Member'}</option>
+                        </select>
+                      )}
+                      {isSuperAdmin && member.teamRole === 'member' && (
                         <div className="flex flex-col gap-0.5 shrink-0">
                           <button type="button" disabled={memberIdx === 0} onClick={() => moveMemberWithinTier(team, member.userId, 'up')} className="cursor-pointer p-0.5 text-[var(--color-text-muted)] hover:text-[var(--color-accent)] disabled:opacity-20"><ArrowUp size={12} /></button>
                           <button type="button" disabled={memberIdx === membersOnly.length - 1} onClick={() => moveMemberWithinTier(team, member.userId, 'down')} className="cursor-pointer p-0.5 text-[var(--color-text-muted)] hover:text-[var(--color-accent)] disabled:opacity-20"><ArrowDown size={12} /></button>
                         </div>
                       )}
-                      <button type="button" onClick={() => removeMember(team, member.userId)} className="cursor-pointer text-[var(--color-text-muted)] hover:text-[var(--color-danger)] shrink-0"><UserMinus size={16} /></button>
+                      <button type="button" onClick={() => setPrivilegesUserId(member.userId)} title={isAr ? 'الصلاحيات والأوسمة' : 'Privileges & badges'} className="cursor-pointer text-[var(--color-text-muted)] hover:text-[var(--color-accent)] shrink-0"><KeyRound size={16} /></button>
+                      {isSuperAdmin && (
+                        <button type="button" onClick={() => removeMember(team, member.userId)} className="cursor-pointer text-[var(--color-text-muted)] hover:text-[var(--color-danger)] shrink-0"><UserMinus size={16} /></button>
+                      )}
                     </div>
                   </div>
                 );
@@ -332,21 +384,23 @@ export default function AdminTeamsPage() {
               {team.members.length === 0 && <p className="text-sm text-[var(--color-text-muted)] py-2">{isAr ? 'لا يوجد أعضاء بعد.' : 'No members yet.'}</p>}
             </div>
 
-            <div className="mt-3 flex gap-2">
-              <select onChange={e => {
-                        if (e.target.value) {
-                          setSearchQuery(''); setSearchResults([]); setHasSearched(false);
-                          setMemberPicker({ teamId: team.id, teamRole: e.target.value as TeamRole });
-                        }
-                        e.target.value = '';
-                      }}
-                      defaultValue="" className="cursor-pointer rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2 py-1.5 text-xs font-bold text-[var(--color-text-secondary)] hover:opacity-80">
-                <option value="" disabled>{isAr ? '+ إضافة عضو كـ…' : '+ Add member as…'}</option>
-                <option value="member">{isAr ? 'عضو' : 'Member'}</option>
-                <option value="vice_leader">{isAr ? 'نائب قائد' : 'Vice Leader'}</option>
-                <option value="leader">{isAr ? 'قائد' : 'Leader'}</option>
-              </select>
-            </div>
+            {isSuperAdmin && (
+              <div className="mt-3 flex gap-2">
+                <select onChange={e => {
+                          if (e.target.value) {
+                            setSearchQuery(''); setSearchResults([]); setHasSearched(false);
+                            setMemberPicker({ teamId: team.id, teamRole: e.target.value as TeamRole });
+                          }
+                          e.target.value = '';
+                        }}
+                        defaultValue="" className="cursor-pointer rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2 py-1.5 text-xs font-bold text-[var(--color-text-secondary)] hover:opacity-80">
+                  <option value="" disabled>{isAr ? '+ إضافة عضو كـ…' : '+ Add member as…'}</option>
+                  <option value="member">{isAr ? 'عضو' : 'Member'}</option>
+                  <option value="vice_leader">{isAr ? 'نائب قائد' : 'Vice Leader'}</option>
+                  <option value="leader">{isAr ? 'قائد' : 'Leader'}</option>
+                </select>
+              </div>
+            )}
           </div>
         ))}
         {sortedTeams.length === 0 && <p className="text-sm text-[var(--color-text-muted)]">{isAr ? 'لا توجد فرق بعد.' : 'No teams yet.'}</p>}
@@ -390,6 +444,43 @@ export default function AdminTeamsPage() {
           </div>
         </div>
       )}
+
+      {ceilingTeamId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setCeilingTeamId(null)}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-lg flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-2">
+              <h2 className="text-lg font-bold font-cairo flex items-center gap-2"><Lock size={18} />{isAr ? 'الحد الأقصى لصلاحيات الفريق' : "Team's privilege ceiling"}</h2>
+              <button type="button" onClick={() => setCeilingTeamId(null)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+            </div>
+            <p className="text-xs text-gray-500 mb-3">
+              {isAr
+                ? 'أقصى ما يمكن لقائد الفريق أو نائبه منحه لأعضاء هذا الفريق من صلاحيات أو أوسمة. سحب صلاحية لا يُقيَّد بهذا الحد أبدًا.'
+                : "The most a leader or vice-leader of this team can grant its members (privileges or badges). Revoking is never capped by this."}
+            </p>
+            <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3">
+              <input type="checkbox" checked={ceilingSelection === null} onChange={e => setCeilingSelection(e.target.checked ? null : new Set())} />
+              {isAr ? 'بلا حد (جميع الصلاحيات)' : 'Unrestricted (all privileges)'}
+            </label>
+            <div className="flex-1 overflow-y-auto space-y-1 border-t border-gray-100 pt-3">
+              {privilegeCatalog.map(privilege => (
+                <label key={privilege.key} className={`flex items-center gap-2 text-sm py-1 ${ceilingSelection === null ? 'opacity-40' : ''}`}>
+                  <input type="checkbox" disabled={ceilingSelection === null}
+                         checked={ceilingSelection?.has(privilege.key) ?? false}
+                         onChange={() => togglePrivilege(privilege.key)} />
+                  {isAr ? privilege.labelAr : privilege.labelEn}
+                </label>
+              ))}
+              {privilegeCatalog.length === 0 && <p className="text-xs text-gray-400">{isAr ? 'جارٍ التحميل…' : 'Loading…'}</p>}
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button type="button" disabled={busy} onClick={saveCeiling} className="cursor-pointer rounded-xl bg-[var(--color-accent)] px-4 py-2 text-sm font-bold text-[var(--color-accent-contrast)] disabled:opacity-50">{isAr ? 'حفظ' : 'Save'}</button>
+              <button type="button" onClick={() => setCeilingTeamId(null)} className="cursor-pointer rounded-xl bg-[var(--color-surface-2)] px-4 py-2 text-sm font-bold text-[var(--color-text-secondary)]">{isAr ? 'إلغاء' : 'Cancel'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {privilegesUserId && <PrivilegesBadgesPanel userId={privilegesUserId} onClose={() => setPrivilegesUserId(null)} />}
     </div>
   );
 }
