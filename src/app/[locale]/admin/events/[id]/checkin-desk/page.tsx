@@ -114,7 +114,7 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
     const fetchEvent = async () => {
       try {
         const eventData = await apiGet<PlatformEvent>(`/api/admin/events/${eventId}`);
-        setEvent({ ...eventData, checkinToken: undefined });
+        setEvent(eventData);
       } catch (error) {
         console.error("Error fetching event", error);
       } finally {
@@ -123,6 +123,30 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
     };
 
     fetchEvent();
+  }, [eventId]);
+
+  // Recovers a token a teammate already generated (one shared row per event server-side) instead
+  // of only ever showing the token from this tab's own `generateCheckInToken` call -- otherwise a
+  // second admin opening this page always saw "no token yet" and regenerated, silently
+  // invalidating the first admin's QR code.
+  useEffect(() => {
+    const fetchLiveToken = async () => {
+      try {
+        const live = await apiGet<{ token: string; expiresAt: number; durationMinutes: number } | null>(
+          `/api/admin/events/${eventId}/checkin-token`);
+        if (live) {
+          setEvent(prev => prev ? { ...prev, checkinToken: live.token } : prev);
+          setTokenExpiry(live.expiresAt);
+          setNow(Date.now());
+        }
+      } catch (error) {
+        console.error("Error fetching live check-in token", error);
+      }
+    };
+
+    fetchLiveToken();
+    const timer = window.setInterval(fetchLiveToken, 30000);
+    return () => window.clearInterval(timer);
   }, [eventId]);
 
   const executeCheckIn = async (userIdToSubmit: string) => {

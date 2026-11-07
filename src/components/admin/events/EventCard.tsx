@@ -4,13 +4,14 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { Link } from '@/i18n/routing';
 import {
-  ArrowUpRight, Calendar, Clock, Award, QrCode, Edit3, Layers, MapPin, Check, Eye, EyeOff,
+  ArrowUpRight, Calendar, Clock, Award, QrCode, Link2, MapPin, Eye, EyeOff,
 } from 'lucide-react';
 import { toJsDate } from '@/lib/dateUtils';
 import type { PlatformEvent, EventState } from '@/lib/types';
 import { formatAdminDate } from '@/components/admin/AdminData';
 import { eventStateLabel } from '@/components/admin/EventWorkspace';
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
+import EventLinkQrModal from '@/components/admin/events/EventLinkQrModal';
 
 export const transitions: Record<EventState, EventState[]> = {
   Draft: ['Published', 'Registration Open', 'Ongoing', 'Archived'],
@@ -37,28 +38,35 @@ interface EventCardProps {
   isAr: boolean;
   locale: string;
   busy: boolean;
-  isJustSavedTemplate: boolean;
   onChangeState: (state: EventState) => void;
   onToggleVisibility: (nextUnlisted: boolean) => void;
-  onSaveTemplate: () => void;
 }
 
 export default function EventCard({
-  event, isAr, locale, busy, isJustSavedTemplate, onChangeState, onToggleVisibility, onSaveTemplate,
+  event, isAr, locale, busy, onChangeState, onToggleVisibility,
 }: EventCardProps) {
   const [pendingState, setPendingState] = useState<EventState | null>(null);
   const [pendingUnlisted, setPendingUnlisted] = useState<boolean | null>(null);
+  const [showLinkModal, setShowLinkModal] = useState(false);
 
   const date = toJsDate(event.date);
   const badge = stateBadgeColors[event.state] || stateBadgeColors.Draft;
   const isVisible = !event.isUnlisted;
 
   return (
-    <article className="rounded-3xl border bg-[var(--color-surface)]/60 backdrop-blur-md p-5 sm:p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between border-[var(--color-border)]/50">
-      <div>
+    <article className="group relative rounded-3xl border bg-[var(--color-surface)]/60 backdrop-blur-md p-5 sm:p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between border-[var(--color-border)]/50">
+      {/* Stretched link: makes the whole card act as a button to the event's details, without
+          fighting the several real buttons/links still inside it -- those get `relative z-10`
+          below so they paint above this and stay independently clickable. */}
+      <Link
+        href={`/admin/events/${event.id}`}
+        className="absolute inset-0 rounded-3xl z-0"
+        aria-label={isAr ? event.title : (event.titleEn || event.title)}
+      />
+      <div className="pointer-events-none">
         {/* Status + visibility badge, kept at the card's top-left corner. The select is the
             actual status-change control; the eye icon just reflects whether the event is public. */}
-        <div className={`flex w-fit mr-auto items-center gap-1 rounded-full border shadow-sm mb-3 ${badge.bg} ${badge.text} ${badge.border} ps-2 pe-1 py-1`}>
+        <div className={`pointer-events-auto flex w-fit mr-auto items-center gap-1 rounded-full border shadow-sm mb-3 ${badge.bg} ${badge.text} ${badge.border} ps-2 pe-1 py-1`}>
           {isVisible ? (
             <Eye className="w-3 h-3 shrink-0" aria-label={isAr ? 'ظاهرة في الموقع' : 'Visible on site'} />
           ) : (
@@ -104,7 +112,7 @@ export default function EventCard({
               )}
             </div>
 
-            <Link href={`/admin/events/${event.id}`} className="group block mt-2">
+            <div className="mt-2">
               <h2 className="text-base font-bold text-[var(--color-text-primary)] group-hover:text-[var(--color-accent)] transition-colors font-cairo truncate">
                 {!isAr && event.titleEn ? event.titleEn : event.title}
               </h2>
@@ -120,7 +128,7 @@ export default function EventCard({
                   </span>
                 )}
               </div>
-            </Link>
+            </div>
           </div>
         </div>
 
@@ -144,50 +152,49 @@ export default function EventCard({
         </div>
       </div>
 
-      <div className="border-t border-[var(--color-border)] pt-3 flex flex-col gap-2.5">
+      <div className="pointer-events-none border-t border-[var(--color-border)] pt-3 flex flex-col gap-2.5">
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href={`/admin/events/${event.id}`}
-            className="bg-[var(--color-accent-soft)] hover:opacity-80 text-[var(--color-accent)] text-xs font-bold px-3 py-2 rounded-xl transition-opacity flex items-center gap-1"
+            className="pointer-events-auto bg-[var(--color-accent-soft)] hover:opacity-80 text-[var(--color-accent)] text-xs font-bold px-3 py-2 rounded-xl transition-opacity flex items-center gap-1"
           >
-            <span>{isAr ? 'مساحة العمل' : 'Workspace'}</span>
+            <span>{isAr ? 'التفاصيل' : 'Details'}</span>
             <ArrowUpRight size={14} />
           </Link>
           <Link
             href={`/admin/events/${event.id}/checkin-desk`}
-            className="bg-[var(--color-surface-2)] hover:opacity-80 text-[var(--color-text-secondary)] p-2 rounded-xl transition-opacity"
+            className="pointer-events-auto bg-[var(--color-surface-2)] hover:opacity-80 text-[var(--color-text-secondary)] p-2 rounded-xl transition-opacity"
             title={isAr ? 'مكتب التحضير المباشر' : 'Check-in desk'}
           >
             <QrCode size={15} />
           </Link>
-          <Link
-            href={`/admin/events/${event.id}/edit`}
-            className="bg-[var(--color-surface-2)] hover:opacity-80 text-[var(--color-text-secondary)] p-2 rounded-xl transition-opacity"
-            title={isAr ? 'تعديل الفعالية' : 'Edit event'}
-          >
-            <Edit3 size={15} />
-          </Link>
           <button
             type="button"
-            onClick={onSaveTemplate}
-            className={`text-xs font-bold px-2.5 py-2 rounded-xl transition-all flex items-center gap-1 border ${
-              isJustSavedTemplate ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200/70'
-            }`}
-            title={isAr ? 'نسخ وحفظ كقالب جديد' : 'Save as template'}
+            onClick={() => setShowLinkModal(true)}
+            className="pointer-events-auto bg-[var(--color-surface-2)] hover:opacity-80 text-[var(--color-text-secondary)] text-xs font-bold px-3 py-2 rounded-xl transition-opacity flex items-center gap-1"
+            title={isAr ? 'نسخ رابط الفعالية' : 'Copy event link'}
           >
-            {isJustSavedTemplate ? <Check size={14} /> : <Layers size={14} className="text-indigo-600" />}
-            <span className="hidden sm:inline">{isJustSavedTemplate ? (isAr ? 'تم الحفظ!' : 'Saved!') : (isAr ? 'حفظ كقالب' : 'Template')}</span>
+            <Link2 size={14} />
+            <span className="hidden sm:inline">{isAr ? 'نسخ الرابط' : 'Copy link'}</span>
           </button>
           <button
             type="button"
             disabled={busy}
             onClick={() => setPendingUnlisted(isVisible)}
-            className="text-xs font-bold px-3 py-2 rounded-xl bg-[var(--color-surface-2)] hover:opacity-80 text-[var(--color-text-secondary)] disabled:opacity-50 transition-opacity ms-auto"
+            className="pointer-events-auto text-xs font-bold px-3 py-2 rounded-xl bg-[var(--color-surface-2)] hover:opacity-80 text-[var(--color-text-secondary)] disabled:opacity-50 transition-opacity ms-auto"
           >
             {isVisible ? (isAr ? 'إخفاء' : 'Hide') : (isAr ? 'إظهار' : 'Show')}
           </button>
         </div>
       </div>
+
+      {showLinkModal && (
+        <EventLinkQrModal
+          url={`${typeof window !== 'undefined' ? window.location.origin : ''}/${locale}/events/${event.id}`}
+          isAr={isAr}
+          onClose={() => setShowLinkModal(false)}
+        />
+      )}
 
       <ConfirmDialog
         open={pendingState !== null}

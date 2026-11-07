@@ -22,10 +22,7 @@ import { eventStateLabel } from '@/components/admin/EventWorkspace';
 import EventTemplatesModal from '@/components/admin/EventTemplatesModal';
 import EventCard, { transitions } from '@/components/admin/events/EventCard';
 import { useAdminTopbarActions } from '@/components/admin/AdminTopbarActions';
-import {
-  getCustomEventTemplates,
-  createTemplateFromEvent
-} from '@/lib/customEventTemplates';
+import { getCustomEventTemplates } from '@/lib/customEventTemplates';
 
 const DRAFT_STATES: EventState[] = ['Draft', 'Published'];
 const OPEN_STATES: EventState[] = ['Registration Open', 'Registration Closed', 'Ongoing'];
@@ -53,7 +50,6 @@ export default function AdminEventsPage() {
   // Custom Templates Modal & State
   const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false);
   const [templatesCount, setTemplatesCount] = useState(() => getCustomEventTemplates().length);
-  const [savedAsTemplateSuccessId, setSavedAsTemplateSuccessId] = useState<string | null>(null);
 
   const refreshTemplatesCount = () => {
     setTemplatesCount(getCustomEventTemplates().length);
@@ -112,19 +108,6 @@ export default function AdminEventsPage() {
     } finally {
       setBusy(null);
     }
-  };
-
-  const handleSaveEventAsTemplate = (event: PlatformEvent) => {
-    const customName = prompt(
-      isAr ? 'أدخل اسماً لهذا القالب الجديد:' : 'Enter a name for this new template:',
-      `قالب: ${event.title}`
-    );
-    if (!customName) return;
-
-    createTemplateFromEvent(event, customName.trim());
-    setSavedAsTemplateSuccessId(event.id);
-    refreshTemplatesCount();
-    setTimeout(() => setSavedAsTemplateSuccessId(null), 2500);
   };
 
   // Metrics summary
@@ -373,10 +356,8 @@ export default function AdminEventsPage() {
                       isAr={isAr}
                       locale={locale}
                       busy={busy === event.id}
-                      isJustSavedTemplate={savedAsTemplateSuccessId === event.id}
                       onChangeState={(state) => void changeState(event, state)}
                       onToggleVisibility={(nextUnlisted) => void toggleVisibility(event, nextUnlisted)}
-                      onSaveTemplate={() => handleSaveEventAsTemplate(event)}
                     />
                   ))}
                 </div>
