@@ -55,18 +55,22 @@ export default function EventCard({
 
   return (
     <article className="group relative rounded-3xl border bg-[var(--color-surface)]/60 backdrop-blur-md p-5 sm:p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between border-[var(--color-border)]/50">
-      {/* Stretched link: makes the whole card act as a button to the event's details, without
-          fighting the several real buttons/links still inside it -- those get `relative z-10`
-          below so they paint above this and stay independently clickable. */}
+      {/* Stretched link: makes the whole card act as a button to the event's details. It's
+          position:absolute with z-0, so every real control below needs its own `relative z-10`
+          to paint above it and stay independently clickable (position:static elements lose to a
+          positioned sibling in the paint order regardless of pointer-events). */}
       <Link
         href={`/admin/events/${event.id}`}
         className="absolute inset-0 rounded-3xl z-0"
         aria-label={isAr ? event.title : (event.titleEn || event.title)}
       />
-      <div className="pointer-events-none">
+      <div>
         {/* Status + visibility badge, kept at the card's top-left corner. The select is the
-            actual status-change control; the eye icon just reflects whether the event is public. */}
-        <div className={`pointer-events-auto flex w-fit mr-auto items-center gap-1 rounded-full border shadow-sm mb-3 ${badge.bg} ${badge.text} ${badge.border} ps-2 pe-1 py-1`}>
+            actual status-change control; the eye icon just reflects whether the event is public.
+            `relative z-10` promotes it above the stretched link (both are position:absolute/
+            relative, so without this the link -- painted later in the stacking order -- would
+            win every click here instead of the select). */}
+        <div className={`relative z-10 flex w-fit mr-auto items-center gap-1 rounded-full border shadow-sm mb-3 ${badge.bg} ${badge.text} ${badge.border} ps-2 pe-1 py-1`}>
           {isVisible ? (
             <Eye className="w-3 h-3 shrink-0" aria-label={isAr ? 'ظاهرة في الموقع' : 'Visible on site'} />
           ) : (
@@ -152,18 +156,18 @@ export default function EventCard({
         </div>
       </div>
 
-      <div className="pointer-events-none border-t border-[var(--color-border)] pt-3 flex flex-col gap-2.5">
+      <div className="border-t border-[var(--color-border)] pt-3 flex flex-col gap-2.5">
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href={`/admin/events/${event.id}`}
-            className="pointer-events-auto bg-[var(--color-accent-soft)] hover:opacity-80 text-[var(--color-accent)] text-xs font-bold px-3 py-2 rounded-xl transition-opacity flex items-center gap-1"
+            className="relative z-10 bg-[var(--color-accent-soft)] hover:opacity-80 text-[var(--color-accent)] text-xs font-bold px-3 py-2 rounded-xl transition-opacity flex items-center gap-1"
           >
             <span>{isAr ? 'التفاصيل' : 'Details'}</span>
             <ArrowUpRight size={14} />
           </Link>
           <Link
             href={`/admin/events/${event.id}/checkin-desk`}
-            className="pointer-events-auto bg-[var(--color-surface-2)] hover:opacity-80 text-[var(--color-text-secondary)] p-2 rounded-xl transition-opacity"
+            className="relative z-10 bg-[var(--color-surface-2)] hover:opacity-80 text-[var(--color-text-secondary)] p-2 rounded-xl transition-opacity"
             title={isAr ? 'مكتب التحضير المباشر' : 'Check-in desk'}
           >
             <QrCode size={15} />
@@ -171,7 +175,7 @@ export default function EventCard({
           <button
             type="button"
             onClick={() => setShowLinkModal(true)}
-            className="pointer-events-auto bg-[var(--color-surface-2)] hover:opacity-80 text-[var(--color-text-secondary)] text-xs font-bold px-3 py-2 rounded-xl transition-opacity flex items-center gap-1"
+            className="relative z-10 bg-[var(--color-surface-2)] hover:opacity-80 text-[var(--color-text-secondary)] text-xs font-bold px-3 py-2 rounded-xl transition-opacity flex items-center gap-1"
             title={isAr ? 'نسخ رابط الفعالية' : 'Copy event link'}
           >
             <Link2 size={14} />
@@ -181,7 +185,7 @@ export default function EventCard({
             type="button"
             disabled={busy}
             onClick={() => setPendingUnlisted(isVisible)}
-            className="pointer-events-auto text-xs font-bold px-3 py-2 rounded-xl bg-[var(--color-surface-2)] hover:opacity-80 text-[var(--color-text-secondary)] disabled:opacity-50 transition-opacity ms-auto"
+            className="relative z-10 text-xs font-bold px-3 py-2 rounded-xl bg-[var(--color-surface-2)] hover:opacity-80 text-[var(--color-text-secondary)] disabled:opacity-50 transition-opacity ms-auto"
           >
             {isVisible ? (isAr ? 'إخفاء' : 'Hide') : (isAr ? 'إظهار' : 'Show')}
           </button>
