@@ -51,7 +51,7 @@ export async function apiSend<Output = unknown>(method: 'POST' | 'PATCH' | 'PUT'
     method,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: body === undefined ? undefined : JSON.stringify(body),
-    signal: AbortSignal.timeout(20000),
+    signal: AbortSignal.timeout(path === '/api/admin/mail/messages' && method === 'POST' ? 120000 : path === '/api/admin/mail/settings/verify' ? 35000 : 20000),
   });
   const result = await readBackendResponse(response, true, true);
   return result as Output;

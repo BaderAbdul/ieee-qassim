@@ -11,6 +11,7 @@ import AdminBadgesPage from '../badges/page';
 import AdminAuditPage from '../audit/page';
 import AdminAcademicTermPage from '../academic-term/page';
 import AdminEventProcessTeamsPage from '../event-process-teams/page';
+import EmailSettings from '@/components/admin/EmailSettings';
 
 export default function AdminSettingsPage() {
   const isAr = useLocale() === 'ar';
@@ -19,6 +20,7 @@ export default function AdminSettingsPage() {
   const canEditContent = isSuperAdmin || (userData?.privileges ?? []).some((key) => key.startsWith('content.'));
 
   const tabs: AdminTab[] = [
+    ...(isSuperAdmin || userData?.canManageEmail ? [{ key: 'email-sender', label: isAr ? 'البريد المرسل' : 'Email sender', content: <EmailSettings /> }] : []),
     ...(isSuperAdmin ? [{ key: 'roles', label: isAr ? 'الأدوار والصلاحيات' : 'Roles & Privileges', content: <AdminRolesPage /> }] : []),
     ...(canEditContent ? [{ key: 'content', label: isAr ? 'محتوى الموقع' : 'Site content', content: <AdminContentPage /> }] : []),
     ...(canEditContent ? [{ key: 'academic-term', label: isAr ? 'الفصل الدراسي' : 'Academic term', content: <AdminAcademicTermPage /> }] : []),

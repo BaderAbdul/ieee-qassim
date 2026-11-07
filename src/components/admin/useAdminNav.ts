@@ -25,8 +25,14 @@ export function useAdminNav(userData: UserData | null, isAr: boolean) {
 
   if (userData?.role === 'student' && userData.canReviewTemplates) {
     return {
-      navItems: [{ name: isAr ? 'القوالب' : 'Templates', href: '/admin/templates', icon: Layers }],
-      footerItems: [{ name: isAr ? 'صفحتي' : 'My page', href: '/profile', icon: CircleUserRound }],
+      navItems: [
+        { name: isAr ? 'القوالب' : 'Templates', href: '/admin/templates', icon: Layers },
+        ...(userData.canManageEmail ? [{ name: isAr ? 'البريد' : 'Mail', href: '/admin/mail', icon: Mail }] : []),
+      ],
+      footerItems: [
+        { name: isAr ? 'صفحتي' : 'My page', href: '/profile', icon: CircleUserRound },
+        ...(userData.canManageEmail ? [{ name: isAr ? 'الإعدادات' : 'Settings', href: '/admin/settings', icon: Settings }] : []),
+      ],
       isSuperAdmin, canEditContent, canViewMembers,
     };
   }
@@ -36,13 +42,13 @@ export function useAdminNav(userData: UserData | null, isAr: boolean) {
     ...(hasAnyPrivilege(userData, 'events') ? [{ name: isAr ? 'الفعاليات' : 'Events', href: '/admin/events', icon: Calendar }] : []),
     ...(canViewMembers || isSuperAdmin ? [{ name: isAr ? 'الهيكلة والطلاب' : 'Structure & Students', href: '/admin/people', icon: UsersRound }] : []),
     ...(canEditContent || userData?.canReviewTemplates ? [{ name: isAr ? 'القوالب' : 'Templates', href: '/admin/templates', icon: Layers }] : []),
-    ...(canEditContent ? [{ name: isAr ? 'البريد' : 'Mail', href: '/admin/mail', icon: Mail }] : []),
+    ...(isSuperAdmin || userData?.canManageEmail || userData?.privileges?.includes('operations.update') ? [{ name: isAr ? 'البريد' : 'Mail', href: '/admin/mail', icon: Mail }] : []),
     ...(hasAnyPrivilege(userData, 'operations') ? [{ name: isAr ? 'مركز المهام' : 'Operations', href: '/admin/operations', icon: Activity }] : []),
   ];
 
   const footerItems: AdminNavItem[] = [
     { name: isAr ? 'صفحتي' : 'My page', href: '/profile', icon: CircleUserRound },
-    ...(isSuperAdmin || canEditContent ? [{ name: isAr ? 'الإعدادات' : 'Settings', href: '/admin/settings', icon: Settings }] : []),
+    ...(isSuperAdmin || canEditContent || userData?.canManageEmail ? [{ name: isAr ? 'الإعدادات' : 'Settings', href: '/admin/settings', icon: Settings }] : []),
   ];
 
   return { navItems, footerItems, isSuperAdmin, canEditContent, canViewMembers };
