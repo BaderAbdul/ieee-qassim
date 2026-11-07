@@ -3,6 +3,7 @@ export type EventType = 'Workshop' | 'Camp' | 'Lecture' | 'Competition' | 'Meetu
 export type EventState = 'Draft' | 'Published' | 'Registration Open' | 'Registration Closed' | 'Ongoing' | 'Completed' | 'Archived';
 export type RegistrationMode = 'Auto' | 'Manual';
 export type EventGender = 'male' | 'female' | 'both';
+export type EventLocationType = 'online' | 'in_person';
 
 export interface EventDay {
   date: string; // 'YYYY-MM-DD'
@@ -15,10 +16,14 @@ export type QuestionType = 'choice' | 'text';
 export interface CustomQuestion {
   id: string;
   title: string;
+  titleEn: string;
   type: QuestionType;
   options?: string[]; // for 'choice' pill type
+  optionsEn?: string[]; // same length/order as options
   placeholder?: string; // for 'text' type
+  placeholderEn?: string;
   quickChips?: string[]; // for 'text' type auto suggestions
+  quickChipsEn?: string[];
   required: boolean;
 }
 
@@ -34,6 +39,7 @@ export interface PlatformEvent {
   date: Date | string;
   location: string;
   locationEn: string;
+  locationType?: EventLocationType;
   durationHours: number;
   gains: string[]; // e.g. ["Networking", "React skills"]
   gainsEn: string[];

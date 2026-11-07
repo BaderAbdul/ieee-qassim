@@ -166,7 +166,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
   
   const title = isAr ? event.title : event.titleEn || event.title;
   const description = isAr ? event.description : event.descriptionEn || event.description;
-  const location = isAr ? event.location : event.locationEn || event.location;
+  const location = event.locationType === 'online' ? (isAr ? 'عن بُعد' : 'Online') : (isAr ? event.location : event.locationEn || event.location);
   const gains = isAr ? event.gains : event.gainsEn || event.gains;
 
   return (

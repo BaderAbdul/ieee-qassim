@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Trash2 } from 'lucide-react';
 import { apiGet, httpsCallable } from '@/lib/backend';
+import { useAuth } from '@/context/AuthContext';
 import { useRouter } from '@/i18n/routing';
 import { Link } from '@/i18n/routing';
 import type { PlatformEvent } from '@/lib/types';
@@ -15,20 +16,23 @@ import SecurityScreeningStage from '@/components/admin/events/wizard/SecurityScr
 import InterviewerStage from '@/components/admin/events/wizard/InterviewerStage';
 import DesignStage from '@/components/admin/events/wizard/DesignStage';
 import SettingsStage from '@/components/admin/events/wizard/SettingsStage';
+import ReviewStage from '@/components/admin/events/wizard/ReviewStage';
 import EventActivityTrail from '@/components/admin/events/wizard/EventActivityTrail';
-import type { DesignFields, InterviewerFields, MainDataFields, SecurityFields, SettingsFields, StageId, TimePlaceFields } from '@/components/admin/events/wizard/wizardTypes';
+import type { DesignFields, InterviewerFields, MainDataFields, ReviewFields, SecurityFields, SettingsFields, StageId, TimePlaceFields } from '@/components/admin/events/wizard/wizardTypes';
 
 const emptyMainData: MainDataFields = { title: '', titleEn: '', description: '', descriptionEn: '', type: 'Workshop', gains: '', gainsEn: '' };
-const emptyTimePlace: TimePlaceFields = { days: [], location: '', locationEn: '', capacity: 50, isUnlimitedCapacity: false, hideExactCapacity: false, gender: 'both' };
+const emptyTimePlace: TimePlaceFields = { days: [], locationType: 'in_person', location: '', locationEn: '', capacity: 50, isUnlimitedCapacity: false, hideExactCapacity: false, gender: 'both' };
 const emptySecurity: SecurityFields = { securityFormAcknowledged: false };
 const emptyInterviewer: InterviewerFields = { interviewer: '', interviewerEn: '' };
 const emptyDesign: DesignFields = { coverUrl: '' };
 const emptySettings: SettingsFields = { requiresRegistration: true, registrationMode: 'Auto', vtoolsUuid: '', hasCertificate: false, certificateTemplateId: '' };
+const emptyReview: ReviewFields = { feedbackQuestions: [] };
 
 export default function CreateEventPage() {
   const router = useRouter();
   const locale = useLocale();
   const isAr = locale === 'ar';
+  const { userData } = useAuth();
   const searchParams = useSearchParams();
   const resumeParam = searchParams.get('eventId');
   const resumeId = resumeParam && /^\d+$/.test(resumeParam) ? Number(resumeParam) : null;
@@ -49,6 +53,8 @@ export default function CreateEventPage() {
   const [interviewerData, setInterviewerData] = useState<InterviewerFields>(emptyInterviewer);
   const [design, setDesign] = useState<DesignFields>(emptyDesign);
   const [settingsData, setSettingsData] = useState<SettingsFields>(emptySettings);
+  const [reviewData, setReviewData] = useState<ReviewFields>(emptyReview);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!resumeId) return;
@@ -61,7 +67,7 @@ export default function CreateEventPage() {
           type: event.type, gains: (event.gains || []).join('\n'), gainsEn: (event.gainsEn || []).join('\n'),
         });
         setTimePlace({
-          days: event.days || [], location: event.location, locationEn: event.locationEn,
+          days: event.days || [], locationType: event.locationType || 'in_person', location: event.location, locationEn: event.locationEn,
           capacity: event.capacity, isUnlimitedCapacity: !!event.isUnlimitedCapacity, hideExactCapacity: !!event.hideExactCapacity,
           gender: event.gender || 'both',
         });
@@ -73,12 +79,14 @@ export default function CreateEventPage() {
           vtoolsUuid: event.vtoolsUuid || '', hasCertificate: !!event.hasCertificate,
           certificateTemplateId: event.certificateTemplateId || '',
         });
+        setReviewData({ feedbackQuestions: event.feedbackQuestions || [] });
         const done = new Set<StageId>(['main']);
         if ((event.days || []).length) done.add('time');
         if (event.securityFormAcknowledged) done.add('security');
         if (event.interviewer || event.interviewerEn) done.add('interviewer');
         if (event.coverUrl) done.add('design');
         if (event.vtoolsUuid || event.hasCertificate || event.registrationMode === 'Manual' || event.requiresRegistration === false) done.add('settings');
+        if ((event.feedbackQuestions || []).length) done.add('review');
         setCompletedStages(done);
       } catch (error) {
         setLoadError(error instanceof Error ? error.message : (isAr ? 'تعذر تحميل مسودة الفعالية.' : 'Could not load the event draft.'));
@@ -116,7 +124,9 @@ export default function CreateEventPage() {
         <Link href="/admin/events" className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] me-4">
           <ArrowRight className="h-6 w-6 rtl:-scale-x-100" />
         </Link>
-        <h1 className="text-3xl font-bold text-[var(--color-text-primary)] font-cairo">{isAr ? 'إضافة فعالية جديدة' : 'Create a new event'}</h1>
+        <h1 className="text-3xl font-bold text-[var(--color-text-primary)] font-cairo">
+          {resumeId ? (isAr ? 'تعديل الفعالية' : 'Edit event') : (isAr ? 'إضافة فعالية جديدة' : 'Create a new event')}
+        </h1>
       </div>
 
       {loadError && <p role="alert" className="mb-4 rounded-xl p-4 text-sm" style={{ backgroundColor: 'var(--color-danger-soft)', color: 'var(--color-danger)' }}>{loadError}</p>}
@@ -162,7 +172,11 @@ export default function CreateEventPage() {
           <SettingsStage isAr={isAr} value={settingsData} onChange={setSettingsData} saving={saving}
             onSave={async fields => { await saveStage('settings', fields); }} />
         )}
-        {['review', 'publish'].includes(activeStage) && (
+        {activeStage === 'review' && eventId && (
+          <ReviewStage isAr={isAr} value={reviewData} onChange={setReviewData} saving={saving}
+            onSave={async fields => { await saveStage('review', fields); }} />
+        )}
+        {activeStage === 'publish' && (
           <div className="rounded-xl border border-dashed border-[var(--color-border)] p-10 text-center text-sm text-[var(--color-text-muted)]">
             {isAr ? 'هذه المرحلة قيد التطوير وستتوفر في تحديث قادم.' : 'This stage is still being built and will land in an upcoming update.'}
           </div>
@@ -171,10 +185,27 @@ export default function CreateEventPage() {
         {eventId && <EventActivityTrail isAr={isAr} eventId={eventId} stage={activeStage} refreshKey={activityRefreshKey} />}
 
         {eventId && (
-          <div className="flex justify-end border-t border-[var(--color-border)] pt-4">
+          <div className="flex items-center justify-between border-t border-[var(--color-border)] pt-4">
             <button type="button" onClick={() => router.push('/admin/events')} className="text-sm font-bold text-[var(--color-accent)] hover:underline">
               {isAr ? 'إنهاء لاحقًا والعودة إلى القائمة' : 'Finish later — back to the list'}
             </button>
+            {userData?.isSuperAdmin && (
+              <button type="button" disabled={deleting} onClick={async () => {
+                if (!confirm(isAr ? 'حذف هذه الفعالية نهائيًا؟ سيُحذف التسجيل والحضور والشهادات المرتبطة بها ولا يمكن التراجع.'
+                                  : 'Permanently delete this event? Its registrations, attendance and certificates are deleted too. This cannot be undone.')) return;
+                setDeleting(true);
+                try {
+                  await httpsCallable(null, 'deleteEvent')({ eventId });
+                  router.push('/admin/events');
+                } catch (error) {
+                  setSaveError(error instanceof Error ? error.message : (isAr ? 'تعذر حذف الفعالية.' : 'Could not delete the event.'));
+                  setDeleting(false);
+                }
+              }} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold disabled:opacity-40"
+                style={{ color: 'var(--color-danger)', backgroundColor: 'var(--color-danger-soft)' }}>
+                <Trash2 size={15} />{deleting ? (isAr ? 'جارٍ الحذف...' : 'Deleting...') : (isAr ? 'حذف الفعالية نهائيًا' : 'Permanently delete event')}
+              </button>
+            )}
           </div>
         )}
       </div>

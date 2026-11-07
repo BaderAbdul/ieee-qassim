@@ -129,7 +129,7 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
     if (event?.feedbackQuestions) {
       for (const q of event.feedbackQuestions) {
         if (q.required && (!answers[q.id] || answers[q.id].trim().length === 0)) {
-          setFormError(isAr ? `يرجى الإجابة على السؤال الإجباري: "${q.title}"` : `Please answer required question: "${q.title}"`);
+          setFormError(isAr ? `يرجى الإجابة على السؤال الإجباري: "${q.title}"` : `Please answer required question: "${q.titleEn || q.title}"`);
           return;
         }
       }
@@ -265,15 +265,16 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
                 {event.feedbackQuestions.map((q) => (
                   <div key={q.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
                     <label className="block text-sm font-bold text-slate-800 mb-2">
-                      {q.title}
+                      {(isAr ? q.title : q.titleEn) || q.title}
                       {q.required && <span className="text-red-500 font-normal mr-1">*</span>}
                     </label>
 
-                    {/* CHOICE PILLS */}
+                    {/* CHOICE PILLS -- the stored answer value is always the Arabic option (canonical), only the label localizes */}
                     {q.type === 'choice' && q.options && (
                       <div className="flex flex-wrap gap-2 mt-2">
-                        {q.options.map((opt) => {
+                        {q.options.map((opt, i) => {
                           const selected = answers[q.id] === opt;
+                          const optLabel = (isAr ? opt : q.optionsEn?.[i]) || opt;
                           return (
                             <button
                               key={opt}
@@ -286,7 +287,7 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
                                   : 'bg-white text-slate-700 border-slate-200 hover:border-blue-300 hover:bg-blue-50/50'
                               }`}
                             >
-                              {opt}
+                              {optLabel}
                             </button>
                           );
                         })}
@@ -298,25 +299,25 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
                       <div>
                         <textarea
                           rows={2}
-                          aria-label={q.title}
+                          aria-label={(isAr ? q.title : q.titleEn) || q.title}
                           aria-required={q.required}
                           value={answers[q.id] || ''}
                           onChange={(e) => handleTextAnswer(q.id, e.target.value)}
-                          placeholder={q.placeholder || (isAr ? 'اكتب انطباعك أو اقتراحك...' : 'Type feedback...')}
+                          placeholder={(isAr ? q.placeholder : q.placeholderEn) || q.placeholder || (isAr ? 'اكتب انطباعك أو اقتراحك...' : 'Type feedback...')}
                           className="w-full text-sm p-3 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all resize-none"
                         />
                         {/* Quick Auto-suggestion Chips */}
                         {q.quickChips && q.quickChips.length > 0 && (
                           <div className="mt-2 flex flex-wrap items-center gap-1.5">
                             <span className="text-[11px] text-slate-400 font-medium">{isAr ? 'مقترحات سريعة:' : 'Quick suggestions:'}</span>
-                            {q.quickChips.map((chip) => (
+                            {q.quickChips.map((chip, i) => (
                               <button
                                 key={chip}
                                 type="button"
                                 onClick={() => handleQuickChipClick(q.id, chip)}
                                 className="px-2.5 py-1 rounded-lg bg-slate-200/60 hover:bg-slate-200 text-slate-700 text-[11px] font-bold transition-colors"
                               >
-                                + {chip}
+                                + {(isAr ? chip : q.quickChipsEn?.[i]) || chip}
                               </button>
                             ))}
                           </div>

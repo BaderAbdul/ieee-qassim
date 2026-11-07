@@ -1,4 +1,4 @@
-import type { EventDay, EventGender, EventType, RegistrationMode } from '@/lib/types';
+import type { CustomQuestion, EventDay, EventGender, EventLocationType, EventType, RegistrationMode } from '@/lib/types';
 
 export type StageId = 'main' | 'time' | 'security' | 'interviewer' | 'design' | 'settings' | 'review' | 'publish';
 
@@ -18,7 +18,7 @@ export const STAGES: StageMeta[] = [
   { id: 'interviewer', labelAr: 'المحاور', labelEn: 'Interviewer', implemented: true },
   { id: 'design', labelAr: 'التصميم', labelEn: 'Design', implemented: true },
   { id: 'settings', labelAr: 'الإعدادات', labelEn: 'Settings', implemented: true },
-  { id: 'review', labelAr: 'نموذج التقييم', labelEn: 'Review form', implemented: false },
+  { id: 'review', labelAr: 'نموذج التقييم', labelEn: 'Review form', implemented: true },
   { id: 'publish', labelAr: 'النشر', labelEn: 'Publication', implemented: false },
 ];
 
@@ -34,12 +34,17 @@ export interface MainDataFields {
 
 export interface TimePlaceFields {
   days: EventDay[];
+  locationType: EventLocationType;
   location: string;
   locationEn: string;
   capacity: number;
   isUnlimitedCapacity: boolean;
   hideExactCapacity: boolean;
   gender: EventGender;
+}
+
+export interface ReviewFields {
+  feedbackQuestions: CustomQuestion[];
 }
 
 export interface SecurityFields {

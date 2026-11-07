@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Plus, Save, Trash2 } from 'lucide-react';
 import { parseRiyadhInput } from '@/lib/dateUtils';
-import type { EventDay, EventGender } from '@/lib/types';
+import type { EventDay, EventGender, EventLocationType } from '@/lib/types';
 import { input, label, primaryButton, button, type TimePlaceFields } from './wizardTypes';
 
 const minutes = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
@@ -33,7 +33,7 @@ export default function TimePlaceStage({ isAr, value, onChange, onSave, saving }
       setError(isAr ? 'أضف يومًا واحدًا على الأقل.' : 'Add at least one day.');
       return;
     }
-    if (!value.location.trim() || !value.locationEn.trim()) {
+    if (value.locationType === 'in_person' && (!value.location.trim() || !value.locationEn.trim())) {
       setError(isAr ? 'أكمل المكان بالعربية والإنجليزية.' : 'Complete the location in both languages.');
       return;
     }
@@ -58,9 +58,11 @@ export default function TimePlaceStage({ isAr, value, onChange, onSave, saving }
       return;
     }
     setError('');
+    const online = value.locationType === 'online';
     await onSave({
       days: value.days, date: earliest!.toISOString(), durationHours: Math.round(totalHours * 100) / 100,
-      location: value.location.trim(), locationEn: value.locationEn.trim(),
+      locationType: value.locationType,
+      location: online ? '' : value.location.trim(), locationEn: online ? '' : value.locationEn.trim(),
       capacity: value.isUnlimitedCapacity ? 0 : value.capacity,
       isUnlimitedCapacity: value.isUnlimitedCapacity, hideExactCapacity: value.hideExactCapacity,
       gender: value.gender,
@@ -92,13 +94,36 @@ export default function TimePlaceStage({ isAr, value, onChange, onSave, saving }
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <label className={label}><span>{isAr ? 'المكان (عربي)' : 'Location (Arabic)'}</span>
-          <input className={input} dir="rtl" value={value.location} onChange={e => set('location', e.target.value)} /></label>
-        <label className={label}><span>{isAr ? 'Location (English)' : 'Location (English)'}</span>
-          <input className={input} dir="ltr" value={value.locationEn} onChange={e => set('locationEn', e.target.value)} /></label>
+      <div className="space-y-2">
+        <span className="text-sm font-bold text-[var(--color-text-secondary)]">{isAr ? 'طريقة الحضور' : 'Attendance format'}</span>
+        <div className="flex gap-3">
+          {(['in_person', 'online'] as EventLocationType[]).map(opt => (
+            <label key={opt} className="flex flex-1 items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-bold cursor-pointer"
+              style={{
+                borderColor: value.locationType === opt ? 'var(--color-accent)' : 'var(--color-border)',
+                backgroundColor: value.locationType === opt ? 'var(--color-accent-soft)' : 'var(--color-surface-2)',
+                color: value.locationType === opt ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+              }}>
+              <input type="radio" name="locationType" className="hidden" checked={value.locationType === opt}
+                onChange={() => set('locationType', opt)} />
+              {opt === 'in_person' ? (isAr ? 'حضوري' : 'In person') : (isAr ? 'عن بُعد' : 'Online')}
+            </label>
+          ))}
+        </div>
+      </div>
 
-        <label className={label}><span>{isAr ? 'عدد المقاعد' : 'Seat count'}</span>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {value.locationType === 'in_person' && (
+          <>
+            <label className={label}><span>{isAr ? 'المكان (عربي)' : 'Location (Arabic)'}</span>
+              <input className={input} dir="rtl" value={value.location} onChange={e => set('location', e.target.value)} /></label>
+            <label className={label}><span>{isAr ? 'Location (English)' : 'Location (English)'}</span>
+              <input className={input} dir="ltr" value={value.locationEn} onChange={e => set('locationEn', e.target.value)} /></label>
+          </>
+        )}
+
+        <label className={label}>
+          <span>{value.locationType === 'online' ? (isAr ? 'المستهدف من الحضور' : 'Attendance goal') : (isAr ? 'عدد المقاعد' : 'Seat count')}</span>
           <input type="number" min={0} disabled={value.isUnlimitedCapacity} className={input} value={value.capacity}
             onChange={e => set('capacity', Number(e.target.value))} /></label>
         <label className={label}><span>{isAr ? 'الفئة المستهدفة' : 'Gender'}</span>

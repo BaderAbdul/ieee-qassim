@@ -48,7 +48,7 @@ export default function EventCard({ event, priority = false }: EventCardProps) {
   }
 
   const title = isAr ? event.title : event.titleEn || event.title;
-  const location = isAr ? event.location : event.locationEn || event.location;
+  const location = event.locationType === 'online' ? (isAr ? 'عن بُعد' : 'Online') : (isAr ? event.location : event.locationEn || event.location);
 
   // Capacity logic
   const capacityDisplay = eventCapacityLabel(event, isAr);

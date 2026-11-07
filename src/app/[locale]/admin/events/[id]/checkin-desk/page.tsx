@@ -128,7 +128,8 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
   // Recovers a token a teammate already generated (one shared row per event server-side) instead
   // of only ever showing the token from this tab's own `generateCheckInToken` call -- otherwise a
   // second admin opening this page always saw "no token yet" and regenerated, silently
-  // invalidating the first admin's QR code.
+  // invalidating the first admin's QR code. Checked once on load only; `handleGenerateToken`
+  // already updates this same state directly when a new token is created, so no polling is needed.
   useEffect(() => {
     const fetchLiveToken = async () => {
       try {
@@ -145,8 +146,6 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
     };
 
     fetchLiveToken();
-    const timer = window.setInterval(fetchLiveToken, 30000);
-    return () => window.clearInterval(timer);
   }, [eventId]);
 
   const executeCheckIn = async (userIdToSubmit: string) => {
