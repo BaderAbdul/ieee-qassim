@@ -8,9 +8,17 @@ import { apiGetArray } from '@/lib/backendResponse';
 import { AdminError, AdminLoading } from '@/components/admin/AdminData';
 import { useAdminTopbarActions } from '@/components/admin/AdminTopbarActions';
 import type { MemberSearchResult } from '@/lib/adminTypes';
-import { ArrowDown, ArrowUp, Edit2, Plus, Trash2, UserMinus, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, BadgeCheck, Crown, Edit2, Plus, ShieldCheck, Star, Trash2, UserMinus, X } from 'lucide-react';
 
-interface TeamMember { userId: string; teamRole: 'leader' | 'member'; position: number; displayName: string; role: string }
+type TeamRole = 'leader' | 'vice_leader' | 'member';
+interface TeamBadge { key: string; nameAr: string; nameEn: string; icon: string | null }
+interface TeamMember {
+  userId: string; teamRole: TeamRole; position: number; displayName: string; role: string;
+  roleNameAr?: string; roleNameEn?: string; totalPoints?: number; badges?: TeamBadge[];
+}
+const ROLE_TIER: Record<TeamRole, number> = { leader: 0, vice_leader: 1, member: 2 };
+const sortedMembersOf = (team: Team) =>
+  [...team.members].sort((a, b) => ROLE_TIER[a.teamRole] - ROLE_TIER[b.teamRole] || a.position - b.position);
 interface Team {
   id: string; nameAr: string; nameEn: string; descriptionAr: string | null; descriptionEn: string | null;
   icon: string | null; position: number; isPublic: boolean; members: TeamMember[];
@@ -28,7 +36,7 @@ export default function AdminTeamsPage() {
   const [newTeam, setNewTeam] = useState({ id: '', nameAr: '', nameEn: '', descriptionAr: '', descriptionEn: '', icon: '', isPublic: true });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTeam, setEditTeam] = useState({ nameAr: '', nameEn: '', descriptionAr: '', descriptionEn: '', icon: '', isPublic: true });
-  const [memberPicker, setMemberPicker] = useState<{ teamId: string; teamRole: 'leader' | 'member' } | null>(null);
+  const [memberPicker, setMemberPicker] = useState<{ teamId: string; teamRole: TeamRole } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResultUser[]>([]);
   const [searching, setSearching] = useState(false);
@@ -126,21 +134,6 @@ export default function AdminTeamsPage() {
     finally { setBusy(false); }
   };
 
-  const reorderTeams = async (order: string[]) => {
-    setBusy(true); setError(null);
-    try { await apiSend('PUT', '/api/admin/teams/order', { order }); await load(); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to reorder teams'); }
-    finally { setBusy(false); }
-  };
-
-  const moveTeam = (index: number, direction: 'up' | 'down') => {
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= sortedTeams.length) return;
-    const order = sortedTeams.map(t => t.id);
-    [order[index], order[targetIndex]] = [order[targetIndex], order[index]];
-    void reorderTeams(order);
-  };
-
   const saveMembers = async (team: Team, members: TeamMember[]) => {
     setBusy(true); setError(null);
     try {
@@ -152,12 +145,22 @@ export default function AdminTeamsPage() {
     finally { setBusy(false); }
   };
 
-  const moveMember = (team: Team, index: number, direction: 'up' | 'down') => {
-    const members = [...team.members].sort((a, b) => a.position - b.position);
+  // Leader and vice-leader are singular tiers shown first; only the plain "member" tier is
+  // actually reorderable, so this only ever shuffles within that subgroup.
+  const moveMemberWithinTier = (team: Team, userId: string, direction: 'up' | 'down') => {
+    const sorted = sortedMembersOf(team);
+    const topTier = sorted.filter(m => m.teamRole !== 'member');
+    const members = sorted.filter(m => m.teamRole === 'member');
+    const index = members.findIndex(m => m.userId === userId);
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= members.length) return;
+    if (index < 0 || targetIndex < 0 || targetIndex >= members.length) return;
     [members[index], members[targetIndex]] = [members[targetIndex], members[index]];
-    void saveMembers(team, members);
+    void saveMembers(team, [...topTier, ...members]);
+  };
+
+  const changeMemberRole = (team: Team, userId: string, teamRole: TeamRole) => {
+    const updated = team.members.map(m => m.userId === userId ? { ...m, teamRole } : m);
+    void saveMembers(team, [...updated].sort((a, b) => ROLE_TIER[a.teamRole] - ROLE_TIER[b.teamRole] || a.position - b.position));
   };
 
   const removeMember = (team: Team, userId: string) => {
@@ -187,123 +190,167 @@ export default function AdminTeamsPage() {
       {error && <AdminError message={error} />}
 
       {creating && (
-        <div className="rounded-2xl border border-purple-200 bg-purple-50 p-4 space-y-3">
+        <div className="rounded-2xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/80 backdrop-blur-md p-4 space-y-3">
           <div className="grid gap-3 sm:grid-cols-3">
             <input placeholder={isAr ? 'المعرف (مثال: web-team)' : 'id (e.g. web-team)'} value={newTeam.id}
-                   onChange={e => setNewTeam({ ...newTeam, id: e.target.value.trim().toLowerCase() })} className="rounded-lg border px-3 py-2 text-sm" dir="ltr" />
+                   onChange={e => setNewTeam({ ...newTeam, id: e.target.value.trim().toLowerCase() })} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" dir="ltr" />
             <input placeholder={isAr ? 'الاسم بالعربي' : 'Arabic name'} value={newTeam.nameAr}
-                   onChange={e => setNewTeam({ ...newTeam, nameAr: e.target.value })} className="rounded-lg border px-3 py-2 text-sm" />
+                   onChange={e => setNewTeam({ ...newTeam, nameAr: e.target.value })} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" />
             <input placeholder={isAr ? 'الاسم بالإنجليزي' : 'English name'} value={newTeam.nameEn}
-                   onChange={e => setNewTeam({ ...newTeam, nameEn: e.target.value })} className="rounded-lg border px-3 py-2 text-sm" />
+                   onChange={e => setNewTeam({ ...newTeam, nameEn: e.target.value })} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <textarea placeholder={isAr ? 'الوصف (عربي، اختياري)' : 'Description (Arabic, optional)'} value={newTeam.descriptionAr}
-                      onChange={e => setNewTeam({ ...newTeam, descriptionAr: e.target.value })} className="rounded-lg border px-3 py-2 text-sm" rows={2} />
+                      onChange={e => setNewTeam({ ...newTeam, descriptionAr: e.target.value })} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" rows={2} />
             <textarea placeholder={isAr ? 'الوصف (إنجليزي، اختياري)' : 'Description (English, optional)'} value={newTeam.descriptionEn}
-                      onChange={e => setNewTeam({ ...newTeam, descriptionEn: e.target.value })} className="rounded-lg border px-3 py-2 text-sm" rows={2} />
+                      onChange={e => setNewTeam({ ...newTeam, descriptionEn: e.target.value })} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" rows={2} />
           </div>
           <div className="flex items-center gap-4">
             <input placeholder={isAr ? 'اسم أيقونة (Lucide، اختياري)' : 'Icon name (Lucide, optional)'} value={newTeam.icon}
-                   onChange={e => setNewTeam({ ...newTeam, icon: e.target.value })} className="flex-1 rounded-lg border px-3 py-2 text-sm" dir="ltr" />
-            <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
+                   onChange={e => setNewTeam({ ...newTeam, icon: e.target.value })} className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" dir="ltr" />
+            <label className="flex items-center gap-2 text-sm font-bold text-[var(--color-text-secondary)]">
               <input type="checkbox" checked={newTeam.isPublic} onChange={e => setNewTeam({ ...newTeam, isPublic: e.target.checked })} />
               {isAr ? 'إظهار في صفحة الهيكلة العلنية' : 'Show on public Structure page'}
             </label>
           </div>
           <div className="flex gap-2">
-            <button type="button" disabled={busy} onClick={createTeam} className="rounded-xl bg-purple-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+            <button type="button" disabled={busy} onClick={createTeam} className="cursor-pointer rounded-xl bg-[var(--color-accent)] px-4 py-2 text-sm font-bold text-[var(--color-accent-contrast)] disabled:opacity-50">
               {isAr ? 'إنشاء' : 'Create'}
             </button>
-            <button type="button" onClick={() => setCreating(false)} className="rounded-xl bg-gray-100 px-4 py-2 text-sm font-bold">
+            <button type="button" onClick={() => setCreating(false)} className="cursor-pointer rounded-xl bg-[var(--color-surface-2)] px-4 py-2 text-sm font-bold text-[var(--color-text-secondary)]">
               {isAr ? 'إلغاء' : 'Cancel'}
             </button>
           </div>
         </div>
       )}
 
-      <div className="space-y-3">
-        {sortedTeams.map((team, index) => (
-          <div key={team.id} className="rounded-2xl border border-gray-200 bg-white p-4">
+      <div className="space-y-4">
+        {sortedTeams.map((team) => (
+          <div key={team.id} className="rounded-3xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/60 backdrop-blur-md p-5 shadow-xs">
             <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-2">
-                <div className="flex flex-col gap-0.5 pt-1">
-                  <button type="button" disabled={index === 0} onClick={() => moveTeam(index, 'up')} className="p-0.5 text-gray-400 hover:text-blue-600 disabled:opacity-20"><ArrowUp size={14} /></button>
-                  <button type="button" disabled={index === sortedTeams.length - 1} onClick={() => moveTeam(index, 'down')} className="p-0.5 text-gray-400 hover:text-blue-600 disabled:opacity-20"><ArrowDown size={14} /></button>
-                </div>
-                <div>
-                  <p className="font-bold text-gray-900">
-                    {isAr ? team.nameAr : team.nameEn} <span className="text-gray-400 text-xs">({team.id})</span>
-                    {!team.isPublic && <span className="ms-2 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-500">{isAr ? 'داخلي' : 'internal'}</span>}
-                  </p>
-                  {(team.descriptionAr || team.descriptionEn) && <p className="text-xs text-gray-500 mt-0.5">{isAr ? team.descriptionAr : team.descriptionEn}</p>}
-                </div>
+              <div>
+                <p className="font-bold text-[var(--color-text-primary)] font-cairo">
+                  {isAr ? team.nameAr : team.nameEn} <span className="text-[var(--color-text-muted)] text-xs font-normal">({team.id})</span>
+                  {!team.isPublic && <span className="ms-2 rounded-lg bg-[var(--color-surface-2)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--color-text-muted)]">{isAr ? 'داخلي' : 'internal'}</span>}
+                </p>
+                {(team.descriptionAr || team.descriptionEn) && <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">{isAr ? team.descriptionAr : team.descriptionEn}</p>}
               </div>
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={() => startEdit(team)} className="rounded-lg bg-gray-100 p-1.5 hover:bg-gray-200"><Edit2 size={14} /></button>
-                <button type="button" onClick={() => deleteTeam(team.id)} className="rounded-lg p-1.5 text-red-500 hover:bg-red-50"><Trash2 size={16} /></button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button type="button" onClick={() => startEdit(team)} className="cursor-pointer rounded-lg bg-[var(--color-surface-2)] p-1.5 hover:opacity-80 text-[var(--color-text-secondary)]"><Edit2 size={14} /></button>
+                <button type="button" onClick={() => deleteTeam(team.id)} className="cursor-pointer rounded-lg p-1.5 text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)]"><Trash2 size={16} /></button>
               </div>
             </div>
 
             {editingId === team.id && (
-              <div className="mt-3 border-t pt-3 space-y-3">
+              <div className="mt-3 border-t border-[var(--color-border)]/50 pt-3 space-y-3">
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <input value={editTeam.nameAr} onChange={e => setEditTeam({ ...editTeam, nameAr: e.target.value })} className="rounded-lg border px-3 py-2 text-sm" placeholder="Arabic name" />
-                  <input value={editTeam.nameEn} onChange={e => setEditTeam({ ...editTeam, nameEn: e.target.value })} className="rounded-lg border px-3 py-2 text-sm" placeholder="English name" />
-                  <textarea value={editTeam.descriptionAr} onChange={e => setEditTeam({ ...editTeam, descriptionAr: e.target.value })} className="rounded-lg border px-3 py-2 text-sm" rows={2} placeholder="Description (Arabic)" />
-                  <textarea value={editTeam.descriptionEn} onChange={e => setEditTeam({ ...editTeam, descriptionEn: e.target.value })} className="rounded-lg border px-3 py-2 text-sm" rows={2} placeholder="Description (English)" />
+                  <input value={editTeam.nameAr} onChange={e => setEditTeam({ ...editTeam, nameAr: e.target.value })} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" placeholder="Arabic name" />
+                  <input value={editTeam.nameEn} onChange={e => setEditTeam({ ...editTeam, nameEn: e.target.value })} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" placeholder="English name" />
+                  <textarea value={editTeam.descriptionAr} onChange={e => setEditTeam({ ...editTeam, descriptionAr: e.target.value })} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" rows={2} placeholder="Description (Arabic)" />
+                  <textarea value={editTeam.descriptionEn} onChange={e => setEditTeam({ ...editTeam, descriptionEn: e.target.value })} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" rows={2} placeholder="Description (English)" />
                 </div>
                 <div className="flex items-center gap-4">
-                  <input value={editTeam.icon} onChange={e => setEditTeam({ ...editTeam, icon: e.target.value })} className="flex-1 rounded-lg border px-3 py-2 text-sm" placeholder="Icon name" dir="ltr" />
-                  <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
+                  <input value={editTeam.icon} onChange={e => setEditTeam({ ...editTeam, icon: e.target.value })} className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" placeholder="Icon name" dir="ltr" />
+                  <label className="flex items-center gap-2 text-sm font-bold text-[var(--color-text-secondary)]">
                     <input type="checkbox" checked={editTeam.isPublic} onChange={e => setEditTeam({ ...editTeam, isPublic: e.target.checked })} />
                     {isAr ? 'إظهار علنيًا' : 'Public'}
                   </label>
                 </div>
                 <div className="flex gap-2">
-                  <button type="button" disabled={busy} onClick={saveEdit} className="rounded-xl bg-purple-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{isAr ? 'حفظ' : 'Save'}</button>
-                  <button type="button" onClick={() => setEditingId(null)} className="rounded-xl bg-gray-100 px-4 py-2 text-sm font-bold">{isAr ? 'إلغاء' : 'Cancel'}</button>
+                  <button type="button" disabled={busy} onClick={saveEdit} className="cursor-pointer rounded-xl bg-[var(--color-accent)] px-4 py-2 text-sm font-bold text-[var(--color-accent-contrast)] disabled:opacity-50">{isAr ? 'حفظ' : 'Save'}</button>
+                  <button type="button" onClick={() => setEditingId(null)} className="cursor-pointer rounded-xl bg-[var(--color-surface-2)] px-4 py-2 text-sm font-bold text-[var(--color-text-secondary)]">{isAr ? 'إلغاء' : 'Cancel'}</button>
                 </div>
               </div>
             )}
 
-            <ul className="mt-3 divide-y divide-gray-100">
-              {[...team.members].sort((a, b) => a.position - b.position).map((member, memberIdx) => (
-                <li key={member.userId} className="flex items-center justify-between py-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="flex flex-col gap-0.5">
-                      <button type="button" disabled={memberIdx === 0} onClick={() => moveMember(team, memberIdx, 'up')} className="p-0.5 text-gray-400 hover:text-blue-600 disabled:opacity-20"><ArrowUp size={12} /></button>
-                      <button type="button" disabled={memberIdx === team.members.length - 1} onClick={() => moveMember(team, memberIdx, 'down')} className="p-0.5 text-gray-400 hover:text-blue-600 disabled:opacity-20"><ArrowDown size={12} /></button>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {sortedMembersOf(team).map((member) => {
+                const membersOnly = sortedMembersOf(team).filter(m => m.teamRole === 'member');
+                const memberIdx = membersOnly.findIndex(m => m.userId === member.userId);
+                const tierStyle = member.teamRole === 'leader'
+                  ? { bg: 'bg-amber-500/10', text: 'text-amber-600', Icon: Crown, label: isAr ? 'قائد' : 'Leader' }
+                  : member.teamRole === 'vice_leader'
+                  ? { bg: 'bg-sky-500/10', text: 'text-sky-600', Icon: ShieldCheck, label: isAr ? 'نائب قائد' : 'Vice Leader' }
+                  : { bg: 'bg-[var(--color-surface-2)]', text: 'text-[var(--color-text-secondary)]', Icon: null, label: isAr ? 'عضو' : 'Member' };
+                const accountLabel = (isAr ? member.roleNameAr : member.roleNameEn) || member.role;
+                return (
+                  <div key={member.userId} className="rounded-2xl border border-[var(--color-border)]/50 bg-[var(--color-surface-2)]/60 p-4 flex flex-col gap-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-[var(--color-accent-soft)] text-[var(--color-accent)] flex items-center justify-center font-black shrink-0">
+                          {member.displayName.trim().charAt(0) || '?'}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-[var(--color-text-primary)] text-sm truncate">{member.displayName}</p>
+                          <p className="text-[11px] text-[var(--color-text-muted)] truncate">{accountLabel}</p>
+                        </div>
+                      </div>
+                      <button type="button" onClick={() => removeMember(team, member.userId)} className="cursor-pointer text-[var(--color-text-muted)] hover:text-[var(--color-danger)] shrink-0"><UserMinus size={16} /></button>
                     </div>
-                    <span>
-                      {member.displayName} <span className="text-gray-400 text-xs">({member.userId})</span>
-                      <span className={`ms-2 rounded px-2 py-0.5 text-xs font-bold ${member.teamRole === 'leader' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
-                        {member.teamRole === 'leader' ? (isAr ? 'قائد' : 'Leader') : (isAr ? 'عضو' : 'Member')}
+
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold ${tierStyle.bg} ${tierStyle.text}`}>
+                        {tierStyle.Icon && <tierStyle.Icon size={12} />}
+                        {tierStyle.label}
                       </span>
-                    </span>
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--color-warning)]">
+                        <Star size={12} className="fill-current" />
+                        {member.totalPoints ?? 0}
+                      </span>
+                    </div>
+
+                    {member.badges && member.badges.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {member.badges.map(badge => (
+                          <span key={badge.key} className="inline-flex items-center gap-1 rounded-lg bg-[var(--color-accent-soft)] text-[var(--color-accent)] px-2 py-0.5 text-[10px] font-bold">
+                            <BadgeCheck size={11} />
+                            {isAr ? badge.nameAr : badge.nameEn}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-1.5 mt-auto pt-2 border-t border-[var(--color-border)]/50">
+                      <select
+                        value={member.teamRole}
+                        onChange={e => changeMemberRole(team, member.userId, e.target.value as TeamRole)}
+                        className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1.5 text-[11px] font-bold text-[var(--color-text-secondary)]"
+                      >
+                        <option value="leader">{isAr ? 'قائد' : 'Leader'}</option>
+                        <option value="vice_leader">{isAr ? 'نائب قائد' : 'Vice Leader'}</option>
+                        <option value="member">{isAr ? 'عضو' : 'Member'}</option>
+                      </select>
+                      {member.teamRole === 'member' && (
+                        <div className="flex flex-col gap-0.5 shrink-0">
+                          <button type="button" disabled={memberIdx === 0} onClick={() => moveMemberWithinTier(team, member.userId, 'up')} className="cursor-pointer p-0.5 text-[var(--color-text-muted)] hover:text-[var(--color-accent)] disabled:opacity-20"><ArrowUp size={12} /></button>
+                          <button type="button" disabled={memberIdx === membersOnly.length - 1} onClick={() => moveMemberWithinTier(team, member.userId, 'down')} className="cursor-pointer p-0.5 text-[var(--color-text-muted)] hover:text-[var(--color-accent)] disabled:opacity-20"><ArrowDown size={12} /></button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <button type="button" onClick={() => removeMember(team, member.userId)} className="text-gray-400 hover:text-red-500"><UserMinus size={16} /></button>
-                </li>
-              ))}
-              {team.members.length === 0 && <li className="py-2 text-sm text-gray-400">{isAr ? 'لا يوجد أعضاء بعد.' : 'No members yet.'}</li>}
-            </ul>
+                );
+              })}
+              {team.members.length === 0 && <p className="text-sm text-[var(--color-text-muted)] py-2">{isAr ? 'لا يوجد أعضاء بعد.' : 'No members yet.'}</p>}
+            </div>
 
             <div className="mt-3 flex gap-2">
               <select onChange={e => {
                         if (e.target.value) {
                           setSearchQuery(''); setSearchResults([]); setHasSearched(false);
-                          setMemberPicker({ teamId: team.id, teamRole: e.target.value as 'leader' | 'member' });
+                          setMemberPicker({ teamId: team.id, teamRole: e.target.value as TeamRole });
                         }
                         e.target.value = '';
                       }}
-                      defaultValue="" className="rounded-lg border px-2 py-1.5 text-xs font-bold text-gray-600 hover:bg-gray-50">
+                      defaultValue="" className="cursor-pointer rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2 py-1.5 text-xs font-bold text-[var(--color-text-secondary)] hover:opacity-80">
                 <option value="" disabled>{isAr ? '+ إضافة عضو كـ…' : '+ Add member as…'}</option>
                 <option value="member">{isAr ? 'عضو' : 'Member'}</option>
+                <option value="vice_leader">{isAr ? 'نائب قائد' : 'Vice Leader'}</option>
                 <option value="leader">{isAr ? 'قائد' : 'Leader'}</option>
               </select>
             </div>
           </div>
         ))}
-        {sortedTeams.length === 0 && <p className="text-sm text-gray-400">{isAr ? 'لا توجد فرق بعد.' : 'No teams yet.'}</p>}
+        {sortedTeams.length === 0 && <p className="text-sm text-[var(--color-text-muted)]">{isAr ? 'لا توجد فرق بعد.' : 'No teams yet.'}</p>}
       </div>
 
       {memberPicker && (
