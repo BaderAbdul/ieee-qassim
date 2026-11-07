@@ -224,13 +224,13 @@ export default function AdminTeamsPage() {
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="space-y-4">
         {sortedTeams.map((team) => (
           <div key={team.id} className="rounded-3xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/60 backdrop-blur-md p-5 shadow-xs flex flex-col">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="font-bold text-[var(--color-text-primary)] font-cairo">
-                  {isAr ? team.nameAr : team.nameEn} <span className="text-[var(--color-text-muted)] text-xs font-normal">({team.id})</span>
+                  {isAr ? team.nameAr : team.nameEn} <span className="text-[var(--color-text-muted)] text-xs font-normal">({team.members.length} {isAr ? (team.members.length === 1 ? 'عضو' : 'أعضاء') : team.members.length === 1 ? 'member' : 'members'})</span>
                   {!team.isPublic && <span className="ms-2 rounded-lg bg-[var(--color-surface-2)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--color-text-muted)]">{isAr ? 'داخلي' : 'internal'}</span>}
                 </p>
                 {(team.descriptionAr || team.descriptionEn) && <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">{isAr ? team.descriptionAr : team.descriptionEn}</p>}
