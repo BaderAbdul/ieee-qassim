@@ -8,18 +8,20 @@ import { apiGet, httpsCallable } from '@/lib/backend';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from '@/i18n/routing';
 import { Link } from '@/i18n/routing';
-import type { PlatformEvent } from '@/lib/types';
+import type { EventReport, PlatformEvent } from '@/lib/types';
 import { normalizeFeedbackQuestions } from '@/lib/feedbackQuestionValidation';
 import EventWizardStepper from '@/components/admin/events/wizard/EventWizardStepper';
 import MainDataStage from '@/components/admin/events/wizard/MainDataStage';
 import TimePlaceStage from '@/components/admin/events/wizard/TimePlaceStage';
 import SecurityScreeningStage from '@/components/admin/events/wizard/SecurityScreeningStage';
 import InterviewerStage from '@/components/admin/events/wizard/InterviewerStage';
+import SponsorsStage from '@/components/admin/events/wizard/SponsorsStage';
+import ReportStage from '@/components/admin/events/wizard/ReportStage';
 import DesignStage from '@/components/admin/events/wizard/DesignStage';
 import SettingsStage from '@/components/admin/events/wizard/SettingsStage';
 import ReviewStage from '@/components/admin/events/wizard/ReviewStage';
 import EventActivityTrail from '@/components/admin/events/wizard/EventActivityTrail';
-import type { DesignFields, InterviewerFields, MainDataFields, ReviewFields, SecurityFields, SettingsFields, StageId, TimePlaceFields } from '@/components/admin/events/wizard/wizardTypes';
+import type { DesignFields, InterviewerFields, MainDataFields, ReviewFields, SecurityFields, SettingsFields, SponsorsFields, StageId, TimePlaceFields } from '@/components/admin/events/wizard/wizardTypes';
 
 const emptyMainData: MainDataFields = { title: '', titleEn: '', description: '', descriptionEn: '', type: 'Workshop', gains: '', gainsEn: '' };
 const emptyTimePlace: TimePlaceFields = { days: [], locationType: 'in_person', location: '', locationEn: '', capacity: 50, isUnlimitedCapacity: false, hideExactCapacity: false, gender: 'both' };
@@ -52,6 +54,8 @@ export default function CreateEventPage() {
   const [timePlace, setTimePlace] = useState<TimePlaceFields>(emptyTimePlace);
   const [security, setSecurity] = useState<SecurityFields>(emptySecurity);
   const [interviewerData, setInterviewerData] = useState<InterviewerFields>(emptyInterviewer);
+  const [sponsorsData, setSponsorsData] = useState<SponsorsFields>({ hasSponsors: null, sponsors: [] });
+  const [report, setReport] = useState<EventReport | null>(null);
   const [design, setDesign] = useState<DesignFields>(emptyDesign);
   const [settingsData, setSettingsData] = useState<SettingsFields>(emptySettings);
   const [reviewData, setReviewData] = useState<ReviewFields>(emptyReview);
@@ -74,6 +78,8 @@ export default function CreateEventPage() {
         });
         setSecurity({ securityFormAcknowledged: !!event.securityFormAcknowledged });
         setInterviewerData({ interviewer: event.interviewer || '', interviewerEn: event.interviewerEn || '' });
+        setSponsorsData({ hasSponsors: event.hasSponsors ?? null, sponsors: event.sponsors || [] });
+        setReport(event.report || null);
         setDesign({ coverUrl: event.coverUrl || '' });
         setSettingsData({
           requiresRegistration: event.requiresRegistration !== false, registrationMode: event.registrationMode || 'Auto',
@@ -85,6 +91,8 @@ export default function CreateEventPage() {
         if ((event.days || []).length) done.add('time');
         if (event.securityFormAcknowledged) done.add('security');
         if (event.interviewer || event.interviewerEn) done.add('interviewer');
+        if (typeof event.hasSponsors === 'boolean') done.add('sponsors');
+        if (event.report) done.add('report');
         if (event.coverUrl) done.add('design');
         if (event.vtoolsUuid || event.hasCertificate || event.registrationMode === 'Manual' || event.requiresRegistration === false) done.add('settings');
         if ((event.feedbackQuestions || []).length) done.add('review');
@@ -166,7 +174,11 @@ export default function CreateEventPage() {
         )}
         {activeStage === 'interviewer' && eventId && (
           <InterviewerStage isAr={isAr} value={interviewerData} onChange={setInterviewerData} saving={saving}
-            onSave={async fields => { if (await saveStage('interviewer', fields)) setActiveStage('design'); }} />
+            onSave={async fields => { if (await saveStage('interviewer', fields)) setActiveStage('sponsors'); }} />
+        )}
+        {activeStage === 'sponsors' && eventId && (
+          <SponsorsStage isAr={isAr} value={sponsorsData} onChange={setSponsorsData} saving={saving}
+            onSave={async fields => { if (await saveStage('sponsors', fields)) setActiveStage('design'); }} />
         )}
         {activeStage === 'design' && eventId && (
           <DesignStage isAr={isAr} eventId={eventId} value={design} onChange={setDesign} saving={saving}
@@ -185,6 +197,10 @@ export default function CreateEventPage() {
             {isAr ? 'هذه المرحلة قيد التطوير وستتوفر في تحديث قادم.' : 'This stage is still being built and will land in an upcoming update.'}
           </div>
         )}
+
+        {activeStage === 'report' && eventId && <ReportStage isAr={isAr} eventId={eventId} report={report} onSaved={saved => {
+          setReport(saved); setCompletedStages(previous => new Set(previous).add('report')); setActivityRefreshKey(k => k + 1);
+        }} />}
 
         {eventId && <EventActivityTrail isAr={isAr} eventId={eventId} stage={activeStage} refreshKey={activityRefreshKey} />}
 

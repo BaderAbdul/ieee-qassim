@@ -1,6 +1,6 @@
-import type { CustomQuestion, EventDay, EventGender, EventLocationType, EventType, RegistrationMode } from '@/lib/types';
+import type { CustomQuestion, EventDay, EventGender, EventLocationType, EventSponsor, EventType, RegistrationMode } from '@/lib/types';
 
-export type StageId = 'main' | 'time' | 'security' | 'interviewer' | 'design' | 'settings' | 'review' | 'publish';
+export type StageId = 'main' | 'time' | 'security' | 'interviewer' | 'sponsors' | 'design' | 'settings' | 'review' | 'publish' | 'report';
 
 export interface StageMeta {
   id: StageId;
@@ -9,17 +9,18 @@ export interface StageMeta {
   implemented: boolean;
 }
 
-// Order matches Phase D of the events redesign plan. Stages 5-8 render as "coming soon"
-// placeholders until their own follow-up sub-phases build them.
+// Shared with stage ownership settings and the activity trail.
 export const STAGES: StageMeta[] = [
   { id: 'main', labelAr: 'البيانات الأساسية', labelEn: 'Main data', implemented: true },
   { id: 'time', labelAr: 'الزمان والمكان', labelEn: 'Time & place', implemented: true },
   { id: 'security', labelAr: 'التصريح الأمني', labelEn: 'Security screening', implemented: true },
   { id: 'interviewer', labelAr: 'المحاور', labelEn: 'Interviewer', implemented: true },
+  { id: 'sponsors', labelAr: 'الرعاة', labelEn: 'Sponsors', implemented: true },
   { id: 'design', labelAr: 'التصميم', labelEn: 'Design', implemented: true },
   { id: 'settings', labelAr: 'الإعدادات', labelEn: 'Settings', implemented: true },
   { id: 'review', labelAr: 'نموذج التقييم', labelEn: 'Review form', implemented: true },
   { id: 'publish', labelAr: 'النشر', labelEn: 'Publication', implemented: false },
+  { id: 'report', labelAr: 'تقرير الفعالية', labelEn: 'Event report', implemented: true },
 ];
 
 export interface MainDataFields {
@@ -59,6 +60,8 @@ export interface InterviewerFields {
 export interface DesignFields {
   coverUrl: string;
 }
+
+export interface SponsorsFields { hasSponsors: boolean | null; sponsors: EventSponsor[] }
 
 export interface SettingsFields {
   requiresRegistration: boolean;

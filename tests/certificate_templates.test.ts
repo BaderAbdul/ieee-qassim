@@ -22,3 +22,20 @@ test('duplicate conditions use the first match and do not interpolate executable
   assert.equal(fieldText(field, { 'student.gender': 'male' }), 'الأول');
   assert.equal(fieldText({ ...field, source: 'literal', value: '${alert(1)}' }, {}), '${alert(1)}');
 });
+
+test('certificate QR always encodes the certificate ID used by the text field', () => {
+  const qr = newField('certificate.QR');
+  const id = newField('certificate.UUID');
+  const values = { 'certificate.UUID': 'test-certificate-id', 'certificate.QR': 'unrelated-value' };
+  assert.equal(fieldText(qr, values), fieldText(id, values));
+  assert.equal(fieldText(qr, {}), '');
+  assert.equal(qr.qrSize, 80);
+});
+
+test('event date and partner name work as text and conditional context', () => {
+  const values = { 'event.date': '2026-11-07', 'partner.name': 'Test partner' };
+  assert.equal(fieldText(newField('event.date'), values), '2026-11-07');
+  assert.equal(fieldText(newField('partner.name'), values), 'Test partner');
+  const logic = { ...newField('conditional'), conditionSource: 'partner.name' as const, rules: [{ equals: 'Test partner', text: 'Thank you' }] };
+  assert.equal(fieldText(logic, values), 'Thank you');
+});

@@ -27,6 +27,9 @@ export interface CustomQuestion {
   required: boolean;
 }
 
+export interface EventSponsor { id: string; name: string; email: string }
+export interface EventReport { fileName: string; uploadedAt: string; size: number }
+
 export interface PlatformEvent {
   id: number;
   title: string;
@@ -62,6 +65,9 @@ export interface PlatformEvent {
   gender?: EventGender;
   interviewer?: string;
   interviewerEn?: string;
+  hasSponsors?: boolean | null;
+  sponsors?: EventSponsor[];
+  report?: EventReport | null;
   securityFormAcknowledged?: boolean;
   vtoolsUuid?: string;
   certificateTemplateId?: string | null;

@@ -57,6 +57,29 @@ export async function apiSend<Output = unknown>(method: 'POST' | 'PATCH' | 'PUT'
   return result as Output;
 }
 
+export async function uploadEventReport(eventId: number, file: File): Promise<import('./types').EventReport> {
+  if (!/\.pdf$/i.test(file.name) || file.size === 0 || file.size > 10 * 1024 * 1024)
+    throw new Error('Choose a PDF up to 10 MB. / اختر ملف PDF حتى ١٠ ميجابايت.');
+  const token = await clerkToken();
+  const form = new FormData(); form.append('file', file);
+  const response = await fetch(`${API_BASE_URL}/api/admin/events/${eventId}/report`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form, signal: AbortSignal.timeout(90000),
+  });
+  return await readBackendResponse(response, true, true) as unknown as import('./types').EventReport;
+}
+
+export async function downloadEventReport(eventId: number, filename: string): Promise<void> {
+  const token = await clerkToken();
+  const response = await fetch(`${API_BASE_URL}/api/admin/events/${eventId}/report`, {
+    headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(45000),
+  });
+  if (!response.ok) { await readBackendResponse(response, true, true); return; }
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a'); link.href = url; link.download = filename;
+  document.body.appendChild(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
 import { compressImage } from './imageCompressor';
 
 export async function uploadImage(file: File, purpose: 'avatar' | 'event', previousUrl?: string | null) {
