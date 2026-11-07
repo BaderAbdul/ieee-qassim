@@ -13,32 +13,42 @@ import MainDataStage from '@/components/admin/events/wizard/MainDataStage';
 import TimePlaceStage from '@/components/admin/events/wizard/TimePlaceStage';
 import SecurityScreeningStage from '@/components/admin/events/wizard/SecurityScreeningStage';
 import InterviewerStage from '@/components/admin/events/wizard/InterviewerStage';
-import type { InterviewerFields, MainDataFields, SecurityFields, StageId, TimePlaceFields } from '@/components/admin/events/wizard/wizardTypes';
+import DesignStage from '@/components/admin/events/wizard/DesignStage';
+import SettingsStage from '@/components/admin/events/wizard/SettingsStage';
+import EventActivityTrail from '@/components/admin/events/wizard/EventActivityTrail';
+import type { DesignFields, InterviewerFields, MainDataFields, SecurityFields, SettingsFields, StageId, TimePlaceFields } from '@/components/admin/events/wizard/wizardTypes';
 
 const emptyMainData: MainDataFields = { title: '', titleEn: '', description: '', descriptionEn: '', type: 'Workshop', gains: '', gainsEn: '' };
 const emptyTimePlace: TimePlaceFields = { days: [], location: '', locationEn: '', capacity: 50, isUnlimitedCapacity: false, hideExactCapacity: false, gender: 'both' };
 const emptySecurity: SecurityFields = { securityFormAcknowledged: false };
 const emptyInterviewer: InterviewerFields = { interviewer: '', interviewerEn: '' };
+const emptyDesign: DesignFields = { coverUrl: '' };
+const emptySettings: SettingsFields = { requiresRegistration: true, registrationMode: 'Auto', vtoolsUuid: '', hasCertificate: false, certificateTemplateId: '' };
 
 export default function CreateEventPage() {
   const router = useRouter();
   const locale = useLocale();
   const isAr = locale === 'ar';
   const searchParams = useSearchParams();
-  const resumeId = searchParams.get('eventId');
+  const resumeParam = searchParams.get('eventId');
+  const resumeId = resumeParam && /^\d+$/.test(resumeParam) ? Number(resumeParam) : null;
 
-  const [eventId, setEventId] = useState<string | null>(null);
+  const [eventId, setEventId] = useState<number | null>(null);
   const [loadingDraft, setLoadingDraft] = useState(!!resumeId);
-  const [loadError, setLoadError] = useState('');
+  const [loadError, setLoadError] = useState(() =>
+    (resumeParam && !resumeId) ? (isAr ? 'رابط استكمال المسودة غير صالح.' : 'Invalid draft resume link.') : '');
   const [activeStage, setActiveStage] = useState<StageId>('main');
   const [completedStages, setCompletedStages] = useState<Set<StageId>>(new Set());
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [activityRefreshKey, setActivityRefreshKey] = useState(0);
 
   const [mainData, setMainData] = useState<MainDataFields>(emptyMainData);
   const [timePlace, setTimePlace] = useState<TimePlaceFields>(emptyTimePlace);
   const [security, setSecurity] = useState<SecurityFields>(emptySecurity);
   const [interviewerData, setInterviewerData] = useState<InterviewerFields>(emptyInterviewer);
+  const [design, setDesign] = useState<DesignFields>(emptyDesign);
+  const [settingsData, setSettingsData] = useState<SettingsFields>(emptySettings);
 
   useEffect(() => {
     if (!resumeId) return;
@@ -57,10 +67,18 @@ export default function CreateEventPage() {
         });
         setSecurity({ securityFormAcknowledged: !!event.securityFormAcknowledged });
         setInterviewerData({ interviewer: event.interviewer || '', interviewerEn: event.interviewerEn || '' });
+        setDesign({ coverUrl: event.coverUrl || '' });
+        setSettingsData({
+          requiresRegistration: event.requiresRegistration !== false, registrationMode: event.registrationMode || 'Auto',
+          vtoolsUuid: event.vtoolsUuid || '', hasCertificate: !!event.hasCertificate,
+          certificateTemplateId: event.certificateTemplateId || '',
+        });
         const done = new Set<StageId>(['main']);
         if ((event.days || []).length) done.add('time');
         if (event.securityFormAcknowledged) done.add('security');
         if (event.interviewer || event.interviewerEn) done.add('interviewer');
+        if (event.coverUrl) done.add('design');
+        if (event.vtoolsUuid || event.hasCertificate || event.registrationMode === 'Manual' || event.requiresRegistration === false) done.add('settings');
         setCompletedStages(done);
       } catch (error) {
         setLoadError(error instanceof Error ? error.message : (isAr ? 'تعذر تحميل مسودة الفعالية.' : 'Could not load the event draft.'));
@@ -69,16 +87,17 @@ export default function CreateEventPage() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resumeId]);
+  }, [resumeParam]);
 
   const saveStage = async (stage: StageId, fields: Record<string, unknown>) => {
     setSaving(true);
     setSaveError('');
     try {
       const payload = eventId ? { eventId, ...fields } : fields;
-      const result = await httpsCallable<typeof payload, { eventId: string }>(null, 'saveEvent')(payload);
+      const result = await httpsCallable<typeof payload, { eventId: number }>(null, 'saveEvent')(payload);
       if (!eventId) setEventId(result.data.eventId);
       setCompletedStages(prev => new Set(prev).add(stage));
+      setActivityRefreshKey(k => k + 1);
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : (isAr ? 'حدث خطأ أثناء الحفظ.' : 'Something went wrong while saving.'));
       throw error;
@@ -133,13 +152,23 @@ export default function CreateEventPage() {
         )}
         {activeStage === 'interviewer' && eventId && (
           <InterviewerStage isAr={isAr} value={interviewerData} onChange={setInterviewerData} saving={saving}
-            onSave={async fields => { await saveStage('interviewer', fields); }} />
+            onSave={async fields => { await saveStage('interviewer', fields); setActiveStage('design'); }} />
         )}
-        {['design', 'settings', 'review', 'publish'].includes(activeStage) && (
+        {activeStage === 'design' && eventId && (
+          <DesignStage isAr={isAr} eventId={eventId} value={design} onChange={setDesign} saving={saving}
+            onSave={async fields => { await saveStage('design', fields); setActiveStage('settings'); }} />
+        )}
+        {activeStage === 'settings' && eventId && (
+          <SettingsStage isAr={isAr} value={settingsData} onChange={setSettingsData} saving={saving}
+            onSave={async fields => { await saveStage('settings', fields); }} />
+        )}
+        {['review', 'publish'].includes(activeStage) && (
           <div className="rounded-xl border border-dashed border-[var(--color-border)] p-10 text-center text-sm text-[var(--color-text-muted)]">
             {isAr ? 'هذه المرحلة قيد التطوير وستتوفر في تحديث قادم.' : 'This stage is still being built and will land in an upcoming update.'}
           </div>
         )}
+
+        {eventId && <EventActivityTrail isAr={isAr} eventId={eventId} stage={activeStage} refreshKey={activityRefreshKey} />}
 
         {eventId && (
           <div className="flex justify-end border-t border-[var(--color-border)] pt-4">

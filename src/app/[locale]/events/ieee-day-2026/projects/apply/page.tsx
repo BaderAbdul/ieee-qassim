@@ -133,7 +133,7 @@ export default function ShowcaseApplicationPage() {
         const res = await httpsCallable<unknown, { application?: any }>(
           null, 
           'getMyShowcaseApplication'
-        )({ eventId: 'ieee-day-2026' });
+        )({ eventId: 5 }); // "IEEE Day 2026" event
 
         if (active) {
           if (res.data.application && res.data.application.applicantId === user.uid) {
@@ -251,7 +251,7 @@ export default function ShowcaseApplicationPage() {
         null,
         'submitShowcaseApplication'
       )({
-        eventId: 'ieee-day-2026',
+        eventId: 5, // "IEEE Day 2026" event
         fullName: fullName.trim(),
         email: email.trim(),
         whatsapp: whatsapp.trim(),

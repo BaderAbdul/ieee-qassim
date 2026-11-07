@@ -2,6 +2,13 @@
 export type EventType = 'Workshop' | 'Camp' | 'Lecture' | 'Competition' | 'Meetup' | 'Challenge' | 'Booth' | 'Other';
 export type EventState = 'Draft' | 'Published' | 'Registration Open' | 'Registration Closed' | 'Ongoing' | 'Completed' | 'Archived';
 export type RegistrationMode = 'Auto' | 'Manual';
+export type EventGender = 'male' | 'female' | 'both';
+
+export interface EventDay {
+  date: string; // 'YYYY-MM-DD'
+  startTime: string; // 'HH:MM', Riyadh wall time
+  endTime: string; // 'HH:MM', Riyadh wall time
+}
 
 export type QuestionType = 'choice' | 'text';
 
@@ -16,7 +23,7 @@ export interface CustomQuestion {
 }
 
 export interface PlatformEvent {
-  id: string;
+  id: number;
   title: string;
   titleAr?: string;
   titleEn: string;
@@ -45,13 +52,20 @@ export interface PlatformEvent {
   checkinToken?: string;
   feedbackQuestions?: CustomQuestion[];
   isPinned?: boolean;
+  days?: EventDay[]; // multi-day schedule from the creation wizard's "time & place" stage
+  gender?: EventGender;
+  interviewer?: string;
+  interviewerEn?: string;
+  securityFormAcknowledged?: boolean;
+  vtoolsUuid?: string;
+  certificateTemplateId?: string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
 }
 
 export interface EventFeedbackResponse {
   id: string;
-  eventId: string;
+  eventId: number;
   userId: string;
   userEmail?: string;
   userName?: string;
@@ -68,7 +82,7 @@ export interface PointTransaction {
   amount: number;
   source: PointTransactionSource;
   reason: string;
-  sourceEventId?: string;
+  sourceEventId?: number;
   createdBy: string;
   createdAt: Date | string;
 }
@@ -77,7 +91,7 @@ export type CertificateState = 'Not Issued' | 'Generating' | 'Available' | 'Fail
 
 export interface Certificate {
   id: string; // The deterministic certificateId (certificate_{eventId}_{userId})
-  eventId: string;
+  eventId: number;
   userId: string;
   status: CertificateState;
   storagePath?: string; // e.g. certificates/{eventId}/{id}.pdf
@@ -131,7 +145,7 @@ export type ShowcaseStatus =
 export interface ShowcaseApplication {
   id: string;
   referenceNumber: string;
-  eventId: string;
+  eventId: number;
   applicantId: string;
   // Section A: Applicant Information
   fullName: string;

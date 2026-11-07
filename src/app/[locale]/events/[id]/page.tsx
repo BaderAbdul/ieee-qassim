@@ -268,7 +268,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
              </div>
 
              {/* IEEE Day Projects Showcase CTA Banner */}
-             {(eventId === 'ieee-day-2026' || title.toLowerCase().includes('ieee day') || title.includes('يوم IEEE') || title.includes('معرض')) && (
+             {(eventId === '5' || title.toLowerCase().includes('ieee day') || title.includes('يوم IEEE') || title.includes('معرض')) && (
                <div className="relative bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 rounded-[2rem] p-6 sm:p-7 shadow-lg text-white overflow-hidden border border-amber-300/40">
                  <div className="absolute top-0 end-0 -mt-6 -me-6 w-32 h-32 bg-white/20 rounded-full blur-2xl pointer-events-none" />
                  <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-5">

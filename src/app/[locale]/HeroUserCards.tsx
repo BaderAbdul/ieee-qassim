@@ -40,7 +40,7 @@ export default function HeroUserCards({ latestEvent }: HeroUserCardsProps) {
     let active = true;
     (async () => {
       try {
-        const summary = await apiGet<MeSummary>('/api/me/summary', latestEvent ? { eventId: latestEvent.id } : undefined);
+        const summary = await apiGet<MeSummary>('/api/me/summary', latestEvent ? { eventId: String(latestEvent.id) } : undefined);
         if (!active) return;
         if (summary.registrationStatus) setLatestEventRegStatus(summary.registrationStatus);
         if (summary.latestCertificate) {

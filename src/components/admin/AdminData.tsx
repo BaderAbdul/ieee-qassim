@@ -6,7 +6,7 @@ import { httpsCallable } from '@/lib/backend';
 import { RefreshCw } from 'lucide-react';
 import { useLocale } from 'next-intl';
 
-export function useAdminQuery<T>(action: string, eventId?: string) {
+export function useAdminQuery<T>(action: string, eventId?: number) {
   const role = useAuth().userData?.role;
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);

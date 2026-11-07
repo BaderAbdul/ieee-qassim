@@ -15,8 +15,8 @@ export const eventCache = {
   },
   populate(events: PlatformEvent[]): void {
     for (const ev of events) {
-      if (ev && ev.id) {
-        globalEventCache.set(ev.id, ev);
+      if (ev && ev.id != null) {
+        globalEventCache.set(String(ev.id), ev);
       }
     }
   }

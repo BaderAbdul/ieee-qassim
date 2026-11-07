@@ -18,8 +18,8 @@ interface EventCardProps {
 }
 
 export default function EventCard({ event, priority = false }: EventCardProps) {
-  if (typeof window !== 'undefined' && event?.id) {
-    eventCache.set(event.id, event);
+  if (typeof window !== 'undefined' && event?.id != null) {
+    eventCache.set(String(event.id), event);
   }
   const locale = useLocale();
   const isAr = locale === 'ar';

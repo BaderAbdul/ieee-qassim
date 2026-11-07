@@ -13,7 +13,7 @@ import { eventCache } from '@/lib/eventCache';
 
 interface EventsListProps {
   events: PlatformEvent[];
-  nextCursor?: string | null;
+  nextCursor?: number | null;
   initialSearch?: string;
   initialType?: string;
   initialView?: string;
@@ -70,7 +70,7 @@ export default function EventsList({ events: initialEvents, nextCursor = null, i
     if (!cursor || loadingMore) return;
     setLoadingMore(true); setLoadError('');
     try {
-      const body = await apiGet<{ events: PlatformEvent[]; nextCursor: string | null }>('/api/public/events', { cursor, limit: '24' });
+      const body = await apiGet<{ events: PlatformEvent[]; nextCursor: number | null }>('/api/public/events', { cursor: String(cursor), limit: '24' });
       const more = body.events;
       setEvents(previous => sortEventsByClosestDate([...previous, ...more.filter(item => !previous.some(ev => ev.id === item.id))]));
       setCursor(body.nextCursor);

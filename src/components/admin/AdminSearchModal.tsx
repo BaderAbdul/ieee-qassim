@@ -17,7 +17,7 @@ export default function AdminSearchModal({ open, onClose }: { open: boolean; onC
   const { navItems, footerItems } = useAdminNav(userData, isAr);
   const [query, setQuery] = useState('');
   const [wasOpen, setWasOpen] = useState(open);
-  const [events, setEvents] = useState<{ id: string; title: string; titleEn?: string }[]>([]);
+  const [events, setEvents] = useState<{ id: number; title: string; titleEn?: string }[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Reset the search text when the modal transitions from closed to open (React's recommended

@@ -10,7 +10,7 @@ import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 import { useAdminQuery } from '@/components/admin/AdminData';
 
 export interface CalendarEvent {
-  id: string;
+  id: number;
   title: string;
   titleEn?: string;
   date?: string;

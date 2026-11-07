@@ -11,7 +11,7 @@ export default async function EventsPage({ params }: { params: Promise<{ locale:
   const { locale } = await params;
   setRequestLocale(locale);
   let events: PlatformEvent[] = [];
-  let nextCursor: string | null = null;
+  let nextCursor: number | null = null;
 
   // eslint-disable-next-line react-hooks/purity -- Prerender timestamp is refreshed on mount without hydration drift.
   const requestTime = Date.now();
@@ -19,7 +19,7 @@ export default async function EventsPage({ params }: { params: Promise<{ locale:
   try {
     const response = await fetch(`${API_BASE_URL}/api/public/events?limit=24`, { next: { revalidate: 60 } });
     if (!response.ok) throw new Error(`events fetch failed: ${response.status}`);
-    const body = await response.json() as { events: PlatformEvent[]; nextCursor: string | null };
+    const body = await response.json() as { events: PlatformEvent[]; nextCursor: number | null };
     events = sortEventsByClosestDate(body.events);
     nextCursor = body.nextCursor;
   } catch (error) {

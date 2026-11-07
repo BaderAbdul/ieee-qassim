@@ -1,9 +1,9 @@
 import type { EventState, PlatformEvent } from './types';
 
-export interface AdminEventsPage { events: PlatformEvent[]; nextCursor: string | null }
+export interface AdminEventsPage { events: PlatformEvent[]; nextCursor: number | null }
 
 export interface AdminEventSummary {
-  id: string; title: string; titleEn?: string; state: EventState; date?: string;
+  id: number; title: string; titleEn?: string; state: EventState; date?: string;
   registeredCount?: number; attendanceCount?: number; capacity?: number; isUnlimitedCapacity?: boolean;
 }
 export interface AdminOverview {
@@ -25,12 +25,12 @@ export interface MemberOverview {
   generatedAt: string;
 }
 export interface MemberActivityEntry {
-  id: string; eventId?: string; sourceEventId?: string; eventTitle?: string; status?: string;
+  id: string; eventId?: number; sourceEventId?: number; eventTitle?: string; status?: string;
   timestamp?: string; createdAt?: string; issueDate?: string; amount?: number; reason?: string; source?: string;
   balanceBefore?: number; balanceAfter?: number;
 }
 export interface MemberActivityResult { entries: MemberActivityEntry[]; nextCursor: string | null; order: 'documentId' }
-export interface OperationJob { id: string; status: string; to?: string; attempts?: number; eventId?: string; eventTitle?: string; studentName?: string; lastError?: string }
+export interface OperationJob { id: string; status: string; to?: string; attempts?: number; eventId?: number; eventTitle?: string; studentName?: string; lastError?: string }
 export interface AdminOperations { notificationJobs: OperationJob[]; certificateJobs: OperationJob[] }
 export interface AuditEntry { id: string; action: string; actorUid?: string; targetId?: string; createdAt?: string; reason?: string }
 export interface AuditResult { entries: AuditEntry[]; nextCursor: string | null }

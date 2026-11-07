@@ -1,4 +1,4 @@
-import type { EventDay, EventGender, EventType } from '@/lib/types';
+import type { EventDay, EventGender, EventType, RegistrationMode } from '@/lib/types';
 
 export type StageId = 'main' | 'time' | 'security' | 'interviewer' | 'design' | 'settings' | 'review' | 'publish';
 
@@ -16,8 +16,8 @@ export const STAGES: StageMeta[] = [
   { id: 'time', labelAr: 'الزمان والمكان', labelEn: 'Time & place', implemented: true },
   { id: 'security', labelAr: 'التصريح الأمني', labelEn: 'Security screening', implemented: true },
   { id: 'interviewer', labelAr: 'المحاور', labelEn: 'Interviewer', implemented: true },
-  { id: 'design', labelAr: 'التصميم', labelEn: 'Design', implemented: false },
-  { id: 'settings', labelAr: 'الإعدادات', labelEn: 'Settings', implemented: false },
+  { id: 'design', labelAr: 'التصميم', labelEn: 'Design', implemented: true },
+  { id: 'settings', labelAr: 'الإعدادات', labelEn: 'Settings', implemented: true },
   { id: 'review', labelAr: 'نموذج التقييم', labelEn: 'Review form', implemented: false },
   { id: 'publish', labelAr: 'النشر', labelEn: 'Publication', implemented: false },
 ];
@@ -49,6 +49,18 @@ export interface SecurityFields {
 export interface InterviewerFields {
   interviewer: string;
   interviewerEn: string;
+}
+
+export interface DesignFields {
+  coverUrl: string;
+}
+
+export interface SettingsFields {
+  requiresRegistration: boolean;
+  registrationMode: RegistrationMode;
+  vtoolsUuid: string;
+  hasCertificate: boolean;
+  certificateTemplateId: string; // '' = default/no template chosen yet
 }
 
 export const input = 'w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]';

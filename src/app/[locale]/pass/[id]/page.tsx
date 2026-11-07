@@ -48,7 +48,7 @@ export default function PublicPassPage({ params }: { params: Promise<{ id: strin
     setInitiatingLive(true);
     setCheckinError('');
     try {
-      const initiateFn = httpsCallable<{ eventId: string; targetUserId: string }, { status: string; awardedPoints: number }>(null, 'initiatePendingCheckIn');
+      const initiateFn = httpsCallable<{ eventId: number; targetUserId: string }, { status: string; awardedPoints: number }>(null, 'initiatePendingCheckIn');
       const resp = await initiateFn({ eventId: selectedEvent.id, targetUserId: userId });
       if (resp.data.status === 'already_checked_in') {
         setIsAttended(true);
