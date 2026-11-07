@@ -1,8 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { Check, Copy, X } from 'lucide-react';
+
+const subscribeNever = () => () => {};
 
 interface EventLinkQrModalProps {
   url: string;
@@ -12,6 +15,10 @@ interface EventLinkQrModalProps {
 
 export default function EventLinkQrModal({ url, isAr, onClose }: EventLinkQrModalProps) {
   const [copied, setCopied] = useState(false);
+  // EventCard (this modal's parent) uses backdrop-blur, which makes it a containing block for
+  // fixed-position descendants -- without a portal, this modal would be trapped inside the card
+  // instead of covering the page (see ConfirmDialog.tsx for the same issue/fix).
+  const mounted = useSyncExternalStore(subscribeNever, () => true, () => false);
 
   useEffect(() => {
     navigator.clipboard?.writeText(url).then(() => setCopied(true)).catch(() => {});
@@ -21,8 +28,10 @@ export default function EventLinkQrModal({ url, isAr, onClose }: EventLinkQrModa
     navigator.clipboard?.writeText(url).then(() => setCopied(true)).catch(() => {});
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+  if (!mounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl p-6 w-full max-w-sm flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-center w-full mb-4">
           <h2 className="text-lg font-bold font-cairo">{isAr ? 'رابط الفعالية' : 'Event link'}</h2>
@@ -54,6 +63,7 @@ export default function EventLinkQrModal({ url, isAr, onClose }: EventLinkQrModa
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
