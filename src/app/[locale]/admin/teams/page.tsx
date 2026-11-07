@@ -42,11 +42,14 @@ export default function AdminTeamsPage() {
   const [searching, setSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
-  const load = async () => {
-    setLoading(true); setError(null);
+  // `silent` skips the loading-spinner toggle -- used for reloads after a mutation so the whole
+  // page doesn't flash back to <AdminLoading /> every time a team/member is added, edited, etc.
+  const load = async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
+    setError(null);
     try { setTeams(await apiGetArray<Team>('/api/admin/teams')); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to load teams'); }
-    finally { setLoading(false); }
+    finally { if (!opts?.silent) setLoading(false); }
   };
   useEffect(() => { void load(); }, []);
 
@@ -102,7 +105,7 @@ export default function AdminTeamsPage() {
       });
       setCreating(false);
       setNewTeam({ id: '', nameAr: '', nameEn: '', descriptionAr: '', descriptionEn: '', icon: '', isPublic: true });
-      await load();
+      await load({ silent: true });
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to create team'); }
     finally { setBusy(false); }
   };
@@ -121,7 +124,7 @@ export default function AdminTeamsPage() {
         descriptionAr: editTeam.descriptionAr || null, descriptionEn: editTeam.descriptionEn || null, icon: editTeam.icon || null,
       });
       setEditingId(null);
-      await load();
+      await load({ silent: true });
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to save team'); }
     finally { setBusy(false); }
   };
@@ -129,7 +132,7 @@ export default function AdminTeamsPage() {
   const deleteTeam = async (id: string) => {
     if (!window.confirm(isAr ? 'حذف هذا الفريق؟' : 'Delete this team?')) return;
     setBusy(true); setError(null);
-    try { await apiSend('DELETE', `/api/admin/teams/${encodeURIComponent(id)}`); await load(); }
+    try { await apiSend('DELETE', `/api/admin/teams/${encodeURIComponent(id)}`); await load({ silent: true }); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to delete team'); }
     finally { setBusy(false); }
   };
@@ -140,7 +143,7 @@ export default function AdminTeamsPage() {
       await apiSend('PUT', `/api/admin/teams/${encodeURIComponent(team.id)}/members`, {
         members: members.map(m => ({ userId: m.userId, teamRole: m.teamRole })),
       });
-      await load();
+      await load({ silent: true });
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to update members'); }
     finally { setBusy(false); }
   };

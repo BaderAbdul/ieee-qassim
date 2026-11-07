@@ -46,7 +46,14 @@ export default function AdminTabs({ tabs, activeKey: controlledKey, onActiveKeyC
           ))}
         </div>
       )}
-      <div>{active?.content}</div>
+      {/* Every tab's content stays mounted (just hidden) instead of being torn down when you
+          switch away -- otherwise coming back to a tab re-ran its whole fetch-then-spinner cycle,
+          which read as the page "refreshing" on every switch. */}
+      {tabs.map((tab) => (
+        <div key={tab.key} className={tab.key === activeKey ? '' : 'hidden'}>
+          {tab.content}
+        </div>
+      ))}
     </div>
   );
 }
