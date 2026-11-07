@@ -9,6 +9,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from '@/i18n/routing';
 import { Link } from '@/i18n/routing';
 import type { PlatformEvent } from '@/lib/types';
+import { normalizeFeedbackQuestions } from '@/lib/feedbackQuestionValidation';
 import EventWizardStepper from '@/components/admin/events/wizard/EventWizardStepper';
 import MainDataStage from '@/components/admin/events/wizard/MainDataStage';
 import TimePlaceStage from '@/components/admin/events/wizard/TimePlaceStage';
@@ -79,7 +80,7 @@ export default function CreateEventPage() {
           vtoolsUuid: event.vtoolsUuid || '', hasCertificate: !!event.hasCertificate,
           certificateTemplateId: event.certificateTemplateId || '',
         });
-        setReviewData({ feedbackQuestions: event.feedbackQuestions || [] });
+        setReviewData({ feedbackQuestions: normalizeFeedbackQuestions(event.feedbackQuestions || []) });
         const done = new Set<StageId>(['main']);
         if ((event.days || []).length) done.add('time');
         if (event.securityFormAcknowledged) done.add('security');
@@ -106,9 +107,12 @@ export default function CreateEventPage() {
       if (!eventId) setEventId(result.data.eventId);
       setCompletedStages(prev => new Set(prev).add(stage));
       setActivityRefreshKey(k => k + 1);
+      return true;
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : (isAr ? 'حدث خطأ أثناء الحفظ.' : 'Something went wrong while saving.'));
-      throw error;
+      // The page owns this request/error boundary. Click handlers must not receive an
+      // unhandled rejection, and the wizard must remain on the stage that failed.
+      return false;
     } finally {
       setSaving(false);
     }
@@ -150,23 +154,23 @@ export default function CreateEventPage() {
 
         {activeStage === 'main' && (
           <MainDataStage isAr={isAr} value={mainData} onChange={setMainData} saving={saving}
-            onSave={async fields => { await saveStage('main', fields); if (!completedStages.has('time')) setActiveStage('time'); }} />
+            onSave={async fields => { if (await saveStage('main', fields) && !completedStages.has('time')) setActiveStage('time'); }} />
         )}
         {activeStage === 'time' && eventId && (
           <TimePlaceStage isAr={isAr} value={timePlace} onChange={setTimePlace} saving={saving}
-            onSave={async fields => { await saveStage('time', fields); setActiveStage('security'); }} />
+            onSave={async fields => { if (await saveStage('time', fields)) setActiveStage('security'); }} />
         )}
         {activeStage === 'security' && eventId && (
           <SecurityScreeningStage isAr={isAr} value={security} onChange={setSecurity} saving={saving}
-            onSave={async fields => { await saveStage('security', fields); setActiveStage('interviewer'); }} />
+            onSave={async fields => { if (await saveStage('security', fields)) setActiveStage('interviewer'); }} />
         )}
         {activeStage === 'interviewer' && eventId && (
           <InterviewerStage isAr={isAr} value={interviewerData} onChange={setInterviewerData} saving={saving}
-            onSave={async fields => { await saveStage('interviewer', fields); setActiveStage('design'); }} />
+            onSave={async fields => { if (await saveStage('interviewer', fields)) setActiveStage('design'); }} />
         )}
         {activeStage === 'design' && eventId && (
           <DesignStage isAr={isAr} eventId={eventId} value={design} onChange={setDesign} saving={saving}
-            onSave={async fields => { await saveStage('design', fields); setActiveStage('settings'); }} />
+            onSave={async fields => { if (await saveStage('design', fields)) setActiveStage('settings'); }} />
         )}
         {activeStage === 'settings' && eventId && (
           <SettingsStage isAr={isAr} value={settingsData} onChange={setSettingsData} saving={saving}

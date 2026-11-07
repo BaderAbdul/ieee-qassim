@@ -1,15 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { Languages, Loader2, Plus, Save, Trash2 } from 'lucide-react';
-import { httpsCallable } from '@/lib/backend';
+import { apiGet, httpsCallable } from '@/lib/backend';
+import { feedbackQuestionError } from '@/lib/feedbackQuestionValidation';
 import type { CustomQuestion, QuestionType } from '@/lib/types';
 import { button, input, label, primaryButton, type ReviewFields } from './wizardTypes';
 
 interface ReviewStageProps {
   isAr: boolean;
   value: ReviewFields;
-  onChange: (next: ReviewFields) => void;
+  onChange: Dispatch<SetStateAction<ReviewFields>>;
   onSave: (fields: Record<string, unknown>) => Promise<void>;
   saving: boolean;
 }
@@ -29,16 +30,26 @@ async function translate(text: string, target: 'ar' | 'en'): Promise<string> {
 export default function ReviewStage({ isAr, value, onChange, onSave, saving }: ReviewStageProps) {
   const [error, setError] = useState('');
   const [translatingId, setTranslatingId] = useState<string | null>(null);
+  const [translationState, setTranslationState] = useState<'loading' | 'ready' | 'unavailable'>('loading');
+
+  useEffect(() => {
+    let active = true;
+    apiGet<{ translationConfigured: boolean }>('/api/readiness')
+      .then(result => { if (active) setTranslationState(result.translationConfigured ? 'ready' : 'unavailable'); })
+      .catch(() => { if (active) setTranslationState('unavailable'); });
+    return () => { active = false; };
+  }, []);
 
   const questions = value.feedbackQuestions;
   const setQuestions = (next: CustomQuestion[]) => onChange({ feedbackQuestions: next });
   const patch = (id: string, fields: Partial<CustomQuestion>) =>
-    setQuestions(questions.map(q => q.id === id ? { ...q, ...fields } : q));
+    onChange(previous => ({ feedbackQuestions: previous.feedbackQuestions.map(q => q.id === id ? { ...q, ...fields } : q) }));
 
   const addQuestion = () => { if (questions.length < 25) setQuestions([...questions, newQuestion()]); };
   const removeQuestion = (id: string) => setQuestions(questions.filter(q => q.id !== id));
 
   const translateQuestion = async (q: CustomQuestion) => {
+    if (translationState !== 'ready' || translatingId || saving) return;
     setTranslatingId(q.id);
     setError('');
     try {
@@ -54,19 +65,10 @@ export default function ReviewStage({ isAr, value, onChange, onSave, saving }: R
   };
 
   const save = async () => {
-    const cleaned = questions.filter(q => q.title.trim());
-    for (const q of cleaned) {
-      if (!q.titleEn.trim()) {
-        setError(isAr ? 'أكمل الترجمة الإنجليزية لكل سؤال (استخدم زر الترجمة).' : 'Fill in the English translation for every question (use the translate button).');
-        return;
-      }
-      if (q.type === 'choice' && (!q.options?.length || (q.optionsEn || []).length !== q.options.length)) {
-        setError(isAr ? 'أكمل الترجمة الإنجليزية لخيارات كل سؤال.' : 'Translate every question’s options into English too.');
-        return;
-      }
-    }
+    const validationError = feedbackQuestionError(questions, isAr);
+    if (validationError) { setError(validationError); return; }
     setError('');
-    await onSave({ feedbackQuestions: cleaned });
+    await onSave({ feedbackQuestions: questions });
   };
 
   return (
@@ -77,14 +79,17 @@ export default function ReviewStage({ isAr, value, onChange, onSave, saving }: R
           : 'Attendees see these questions right after scanning the check-in QR code or link.'}
       </p>
       {error && <p role="alert" className="rounded-xl p-3 text-sm" style={{ backgroundColor: 'var(--color-danger-soft)', color: 'var(--color-danger)' }}>{error}</p>}
+      {translationState === 'unavailable' && <p role="status" className="rounded-xl bg-amber-500/10 p-3 text-sm text-amber-700">
+        {isAr ? 'الترجمة التلقائية غير متاحة حاليًا. أدخل النص الإنجليزي يدويًا؛ يمكنك حفظ النموذج دون الترجمة التلقائية.' : 'Automatic translation is currently unavailable. Enter the English text manually; saving does not require automatic translation.'}
+      </p>}
 
-      <div className="space-y-4">
+      <fieldset disabled={saving || translatingId !== null} className="space-y-4">
         {questions.map((q, idx) => (
           <div key={q.id} className="space-y-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] p-4">
             <div className="flex items-center justify-between gap-3">
               <span className="text-xs font-bold text-[var(--color-text-muted)]">{isAr ? `سؤال #${idx + 1}` : `Question #${idx + 1}`}</span>
               <div className="flex items-center gap-1.5">
-                <button type="button" onClick={() => translateQuestion(q)} disabled={translatingId === q.id || !q.title.trim()}
+                <button type="button" onClick={() => void translateQuestion(q)} disabled={translationState !== 'ready' || translatingId !== null || !q.title.trim()}
                   className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold disabled:opacity-40"
                   style={{ color: 'var(--color-accent)', backgroundColor: 'var(--color-accent-soft)' }}
                   title={isAr ? 'ترجمة السؤال والخيارات إلى الإنجليزية' : 'Translate the question and its options to English'}>
@@ -99,9 +104,9 @@ export default function ReviewStage({ isAr, value, onChange, onSave, saving }: R
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className={label}><span>{isAr ? 'نص السؤال (عربي)' : 'Question (Arabic)'}</span>
-                <input className={input} dir="rtl" value={q.title} onChange={e => patch(q.id, { title: e.target.value })} /></label>
+                <input className={input} dir="rtl" maxLength={1000} value={q.title} onChange={e => patch(q.id, { title: e.target.value })} /></label>
               <label className={label}><span>{isAr ? 'Question (English)' : 'Question (English)'}</span>
-                <input className={input} dir="ltr" value={q.titleEn} onChange={e => patch(q.id, { titleEn: e.target.value })} /></label>
+                <input className={input} dir="ltr" maxLength={1000} value={q.titleEn ?? ''} onChange={e => patch(q.id, { titleEn: e.target.value })} /></label>
             </div>
 
             <label className={label}><span>{isAr ? 'نوع الإجابة' : 'Answer type'}</span>
@@ -140,11 +145,11 @@ export default function ReviewStage({ isAr, value, onChange, onSave, saving }: R
           </div>
         ))}
         {!questions.length && <p className="text-sm text-[var(--color-text-muted)]">{isAr ? 'لا توجد أسئلة بعد.' : 'No questions yet.'}</p>}
-      </div>
+      </fieldset>
 
       <div className="flex items-center justify-between">
-        <button type="button" onClick={addQuestion} className={button}><Plus size={15} />{isAr ? 'إضافة سؤال' : 'Add question'}</button>
-        <button type="button" disabled={saving} onClick={save} className={primaryButton}>
+        <button type="button" disabled={saving || translatingId !== null || questions.length >= 25} onClick={addQuestion} className={button}><Plus size={15} />{isAr ? 'إضافة سؤال' : 'Add question'}</button>
+        <button type="button" disabled={saving || translatingId !== null} onClick={() => void save()} className={primaryButton}>
           <Save size={16} />{saving ? (isAr ? 'جارٍ الحفظ...' : 'Saving...') : (isAr ? 'حفظ' : 'Save')}
         </button>
       </div>
