@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Paperclip, Send, Smartphone, Trash2, Undo2 } from 'lucide-react';
 import { useRouter } from '@/i18n/routing';
 import { apiGet, apiSend } from '@/lib/backend';
-import { MAX_TEMPLATE_ATTACHMENTS, MAX_TEST_RECIPIENTS, type EmailTemplate, type EmailTemplateAttachment } from '@/lib/emailTemplates';
+import { EMAIL_VARIABLE_GROUPS, MAX_TEMPLATE_ATTACHMENTS, MAX_TEST_RECIPIENTS, variableToken, type EmailTemplate, type EmailTemplateAttachment } from '@/lib/emailTemplates';
 import TemplateDialog from './TemplateDialog';
 
 const input = 'w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2.5 text-sm';
@@ -37,6 +37,8 @@ export default function EmailTemplateEditor({ initial, startHtml, isAr, canManag
   const [testError, setTestError] = useState('');
   const [testOk, setTestOk] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
+  const subjectRef = useRef<HTMLInputElement>(null);
+  const savedRange = useRef<Range | null>(null);
   const [history, setHistory] = useState<string[]>([]);
   const mounted = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -54,6 +56,34 @@ export default function EmailTemplateEditor({ initial, startHtml, isAr, canManag
     setHistory(current => current.slice(0, -1));
     setDraft(current => ({ ...current, html: previous }));
     if (previewRef.current) previewRef.current.innerHTML = previous;
+  };
+  const saveSelection = () => {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount && previewRef.current?.contains(selection.anchorNode)) savedRange.current = selection.getRangeAt(0).cloneRange();
+  };
+  const insertVariable = (source: string) => {
+    const area = previewRef.current;
+    if (!area || !canEdit) return;
+    area.focus();
+    const selection = window.getSelection();
+    let range = savedRange.current;
+    if (!range || !area.contains(range.startContainer)) { range = document.createRange(); range.selectNodeContents(area); range.collapse(false); }
+    selection?.removeAllRanges(); selection?.addRange(range);
+    const node = document.createTextNode(variableToken(source));
+    range.deleteContents(); range.insertNode(node);
+    range.setStartAfter(node); range.setEndAfter(node);
+    selection?.removeAllRanges(); selection?.addRange(range);
+    savedRange.current = range.cloneRange();
+    commitHtml(area.innerHTML);
+  };
+  const insertSubjectVariable = (source: string) => {
+    const field = subjectRef.current;
+    const token = variableToken(source);
+    const start = field?.selectionStart ?? draft.subject.length;
+    const end = field?.selectionEnd ?? draft.subject.length;
+    const next = draft.subject.slice(0, start) + token + draft.subject.slice(end);
+    setDraft(previous => ({ ...previous, subject: next }));
+    requestAnimationFrame(() => { field?.focus(); field?.setSelectionRange(start + token.length, start + token.length); });
   };
 
   const save = useCallback(async (payload: Draft) => {
@@ -142,14 +172,23 @@ export default function EmailTemplateEditor({ initial, startHtml, isAr, canManag
             </div>
             <span className="text-xs text-[var(--color-text-muted)]">{saveState === 'saving' ? t('جارٍ الحفظ…', 'Saving…') : saveState === 'saved' ? t('تم الحفظ كمسودة', 'Saved as draft') : saveState === 'error' ? t('فشل الحفظ', 'Save failed') : ''}</span>
           </div>
+          {!mobile && canEdit && <div className="flex flex-wrap gap-1.5">{EMAIL_VARIABLE_GROUPS.flatMap(group => group.variables).map(variable => <button key={variable.source} type="button" title={variableToken(variable.source)}
+            className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2.5 py-1 text-xs font-bold hover:border-[var(--color-accent)]"
+            onMouseDown={event => event.preventDefault()} onClick={() => insertVariable(variable.source)}>{t(variable.ar, variable.en)}</button>)}</div>}
           {mobile ? <div className="mx-auto w-[375px] overflow-hidden rounded-2xl border-4 border-[var(--color-border)] bg-white"><iframe title={t('معاينة الجوال', 'Mobile preview')} sandbox="" referrerPolicy="no-referrer" srcDoc={draft.html} className="h-[600px] w-full" /></div>
             : <div ref={previewRef} contentEditable={canEdit} suppressContentEditableWarning onBlur={event => commitHtml(event.currentTarget.innerHTML)}
+                onMouseUp={saveSelection} onKeyUp={saveSelection}
                 className="min-h-[420px] rounded-xl border border-[var(--color-border)] bg-white p-4 text-black" dir="ltr" />}
-          <p className="text-xs text-[var(--color-text-muted)]">{t('المعاينة قابلة للتعديل مباشرة: غيّر النص مع الحفاظ على التنسيق. استخدم زر التراجع لاستعادة آخر تغيير تنسيق.', 'The preview is directly editable: change text while keeping formatting. Use Revert to undo the last formatting change.')}</p>
+          <p className="text-xs text-[var(--color-text-muted)]">{t('المعاينة قابلة للتعديل مباشرة: غيّر النص مع الحفاظ على التنسيق. استخدم زر التراجع لاستعادة آخر تغيير تنسيق. اضغط زر متغير لإدراجه في موضع المؤشر.', 'The preview is directly editable: change text while keeping formatting. Use Revert to undo the last formatting change. Click a variable button to insert it at the cursor.')}</p>
         </div>
         <fieldset disabled={!canEdit} className="space-y-4">
           <label className="block space-y-2"><span>{t('اسم القالب', 'Template name')}</span><input className={input} maxLength={120} value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} /></label>
-          <label className="block space-y-2"><span>{t('عنوان البريد', 'Email subject')}</span><input className={input} maxLength={200} value={draft.subject} onChange={event => setDraft({ ...draft, subject: event.target.value })} /></label>
+          <div className="space-y-2">
+            <label className="block space-y-2"><span>{t('عنوان البريد', 'Email subject')}</span><input ref={subjectRef} className={input} maxLength={200} value={draft.subject} onChange={event => setDraft({ ...draft, subject: event.target.value })} /></label>
+            {canEdit && <div className="flex flex-wrap gap-1.5">{EMAIL_VARIABLE_GROUPS.flatMap(group => group.variables).map(variable => <button key={variable.source} type="button" title={variableToken(variable.source)}
+              className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2 py-0.5 text-xs font-bold hover:border-[var(--color-accent)]"
+              onClick={() => insertSubjectVariable(variable.source)}>{t(variable.ar, variable.en)}</button>)}</div>}
+          </div>
           <label className="flex items-center gap-2"><input type="checkbox" checked={draft.allowAttachments} disabled={!draft.id} onChange={event => setDraft({ ...draft, allowAttachments: event.target.checked })} />{t('السماح بالمرفقات', 'Allow attachments')}</label>
           {!draft.id && <p className="text-xs text-[var(--color-text-muted)]">{t('سيُحفظ القالب أولًا كمسودة قبل تفعيل المرفقات.', 'The template saves as a draft first before attachments can be enabled.')}</p>}
           <button type="button" className={primary} disabled={!draft.id || testBusy} onClick={() => { setTestOpen(true); setTestOk(false); setTestError(''); }}><Send size={16} />{t('إرسال اختباري', 'Send test')}</button>
