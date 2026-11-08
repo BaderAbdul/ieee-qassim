@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Image as ImageIcon, Layers, Plus, Save, Trash2 } from 'lucide-react';
 import { apiGet, apiSend, uploadImage } from '@/lib/backend';
-import type { EmailBoilerplate, EmailBoilerplateSummary } from '@/lib/emailTemplates';
+import { imageDimensions, type EmailBoilerplate, type EmailBoilerplateSummary } from '@/lib/emailTemplates';
 import TemplateDialog from './TemplateDialog';
 
 const input = 'w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2.5 text-sm';
@@ -53,9 +53,13 @@ export default function EmailBoilerplateManager({ isAr, onClose }: { isAr: boole
     if (!editing) return;
     setImageBusy(true); setError('');
     try {
-      const url = await uploadImage(file, 'email');
+      const [url, natural] = await Promise.all([uploadImage(file, 'email'), imageDimensions(file)]);
+      // The width/height HTML attributes (not just CSS) are what keep some mail clients from
+      // mis-sizing the image -- without them a client with patchy max-width support can stretch
+      // it well past its native resolution, which looks pixelated even though the file is sharp.
+      const height = natural ? Math.round(imageWidth * natural.height / natural.width) : undefined;
       const align = imageAlign === 'center' ? 'display:block;margin:0 auto' : `float:${imageAlign};margin:${imageAlign === 'left' ? '0 12px 12px 0' : '0 0 12px 12px'}`;
-      const tag = `<img src="${url}" alt="" style="width:${imageWidth}px;max-width:100%;${align}" />`;
+      const tag = `<img src="${url}" alt="" width="${imageWidth}"${height ? ` height="${height}"` : ''} style="width:${imageWidth}px;max-width:100%;height:auto;${align}" />`;
       const field = htmlRef.current;
       const start = field?.selectionStart ?? editing.html.length;
       const end = field?.selectionEnd ?? editing.html.length;

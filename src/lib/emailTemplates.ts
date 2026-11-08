@@ -31,3 +31,15 @@ export const EMAIL_VARIABLE_GROUPS: { id: string; ar: string; en: string; variab
   { id: 'certificate', ar: 'الشهادة', en: 'Certificate', variables: [{ source: 'certificate.UUID', ar: 'معرّف الشهادة', en: 'Certificate ID' }] },
 ];
 export const variableToken = (source: string) => `{{ ${source} }}`;
+
+// Natural pixel size of an image file, used to emit a correct height alongside a chosen width --
+// some mail clients size <img> inconsistently from CSS alone without matching width/height attributes.
+export function imageDimensions(file: File): Promise<{ width: number; height: number } | null> {
+  return new Promise(resolve => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => { resolve({ width: image.naturalWidth, height: image.naturalHeight }); URL.revokeObjectURL(url); };
+    image.onerror = () => { resolve(null); URL.revokeObjectURL(url); };
+    image.src = url;
+  });
+}

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Image as ImageIcon, Paperclip, Send, ShieldCheck, Smartphone, Trash2, Undo2 } from 'lucide-react';
 import { useRouter } from '@/i18n/routing';
 import { apiGet, apiSend, uploadImage } from '@/lib/backend';
-import { EMAIL_VARIABLE_GROUPS, MAX_TEMPLATE_ATTACHMENTS, MAX_TEST_RECIPIENTS, variableToken, type EmailTemplate, type EmailTemplateAttachment } from '@/lib/emailTemplates';
+import { EMAIL_VARIABLE_GROUPS, MAX_TEMPLATE_ATTACHMENTS, MAX_TEST_RECIPIENTS, imageDimensions, variableToken, type EmailTemplate, type EmailTemplateAttachment } from '@/lib/emailTemplates';
 import TemplateDialog from './TemplateDialog';
 
 const input = 'w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2.5 text-sm';
@@ -111,6 +111,11 @@ export default function EmailTemplateEditor({ initial, startHtml, isAr, canManag
     if (!img) return;
     img.style.width = `${width}px`;
     img.style.maxWidth = '100%';
+    img.style.height = 'auto';
+    // Width/height HTML attributes (not just CSS) keep mail clients with patchy max-width
+    // support from stretching the image past its native resolution, which looks pixelated.
+    img.width = width;
+    if (img.naturalWidth) img.height = Math.round(width * img.naturalHeight / img.naturalWidth);
     if (align === 'center') { img.style.display = 'block'; img.style.margin = '0 auto'; img.style.float = ''; }
     else { img.style.float = align; img.style.display = ''; img.style.margin = align === 'left' ? '0 12px 12px 0' : '0 0 12px 12px'; }
     setImageWidth(width); setImageAlign(align);
@@ -135,8 +140,12 @@ export default function EmailTemplateEditor({ initial, startHtml, isAr, canManag
       let range = savedRange.current;
       if (!range || !area.contains(range.startContainer)) { range = document.createRange(); range.selectNodeContents(area); range.collapse(false); }
       selection?.removeAllRanges(); selection?.addRange(range);
+      const natural = await imageDimensions(file);
       const img = document.createElement('img');
-      img.src = url; img.alt = ''; img.style.display = 'block'; img.style.margin = '0 auto'; img.style.width = '320px'; img.style.maxWidth = '100%';
+      img.src = url; img.alt = ''; img.style.display = 'block'; img.style.margin = '0 auto';
+      img.style.width = '320px'; img.style.maxWidth = '100%'; img.style.height = 'auto';
+      img.width = 320;
+      if (natural) img.height = Math.round(320 * natural.height / natural.width);
       range.deleteContents(); range.insertNode(img);
       range.setStartAfter(img); range.setEndAfter(img);
       selection?.removeAllRanges(); selection?.addRange(range);
