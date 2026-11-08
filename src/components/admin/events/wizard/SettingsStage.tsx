@@ -61,8 +61,8 @@ export default function SettingsStage({ isAr, value, onChange, onSave, saving }:
       <div>
         <label className={label}>
           <span>{isAr ? 'معرف VTools' : 'VTools ID'}</span>
-          <input className={input} dir="ltr" placeholder="00000000-0000-0000-0000-000000000000"
-                 value={value.vtoolsUuid} onChange={e => set('vtoolsUuid', e.target.value)} />
+          <input className={input} dir="ltr" inputMode="numeric" placeholder="123456" maxLength={20}
+                 value={value.vtoolsUuid} onChange={e => set('vtoolsUuid', e.target.value.replace(/\D/g, ''))} />
         </label>
         <p className="mt-1.5 text-xs text-[var(--color-text-muted)]">
           {isAr

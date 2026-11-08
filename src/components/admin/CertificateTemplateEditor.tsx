@@ -20,7 +20,7 @@ export default function CertificateTemplateEditor({ initial, isAr, canReview, ca
   const [nameAr, setName] = useState(initial?.nameAr || '');
   const [definition, setDefinition] = useState<TemplateDefinition>(initial?.definition || { background: '', width: 0, height: 0, fields: [] });
   const [selected, setSelected] = useState(initial?.definition.fields[0]?.id || '');
-  const [values, setValues] = useState<Record<string, string>>({ 'student.name': 'Ahmed Mohammed Abdullah', 'student.gender': 'male', 'event.name': 'Innovation Workshop', 'event.date': '23 Nov, 2026', 'partner.name': 'Example Partner', 'event.vtoolsUUID': '00000000-0000-4000-8000-000000000001', 'certificate.UUID': '00000000-0000-4000-8000-000000000002' });
+  const [values, setValues] = useState<Record<string, string>>({ 'student.name': 'Ahmed Mohammed Abdullah', 'student.gender': 'male', 'event.name': 'Innovation Workshop', 'event.date': '23 Nov, 2026', 'partner.name': 'Example Partner', 'event.vtoolsUUID': '123456', 'certificate.UUID': '00000000-0000-4000-8000-000000000002' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
