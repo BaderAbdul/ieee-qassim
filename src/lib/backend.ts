@@ -82,7 +82,7 @@ export async function downloadEventReport(eventId: number, filename: string): Pr
 
 import { compressImage } from './imageCompressor';
 
-export async function uploadImage(file: File, purpose: 'avatar' | 'event', previousUrl?: string | null) {
+export async function uploadImage(file: File, purpose: 'avatar' | 'event' | 'email', previousUrl?: string | null) {
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
     throw new Error('Use JPG, PNG or WebP images.');
   }

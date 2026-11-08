@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { Layers, Plus, Save, Trash2 } from 'lucide-react';
-import { apiGet, apiSend } from '@/lib/backend';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Image as ImageIcon, Layers, Plus, Save, Trash2 } from 'lucide-react';
+import { apiGet, apiSend, uploadImage } from '@/lib/backend';
 import type { EmailBoilerplate, EmailBoilerplateSummary } from '@/lib/emailTemplates';
 import TemplateDialog from './TemplateDialog';
 
@@ -17,6 +17,11 @@ export default function EmailBoilerplateManager({ isAr, onClose }: { isAr: boole
   const [error, setError] = useState('');
   const [editing, setEditing] = useState<EmailBoilerplate | null>(null);
   const [busy, setBusy] = useState(false);
+  const [imageForm, setImageForm] = useState(false);
+  const [imageWidth, setImageWidth] = useState(320);
+  const [imageAlign, setImageAlign] = useState<'left' | 'center' | 'right'>('center');
+  const [imageBusy, setImageBusy] = useState(false);
+  const htmlRef = useRef<HTMLTextAreaElement>(null);
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try { setList((await apiGet<{ boilerplates: EmailBoilerplateSummary[] }>('/api/admin/mail/boilerplates')).boilerplates); }
@@ -44,12 +49,37 @@ export default function EmailBoilerplateManager({ isAr, onClose }: { isAr: boole
     try { await apiSend('DELETE', `/api/admin/mail/boilerplates/${id}`); await load(); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to delete boilerplate'); } finally { setBusy(false); }
   };
+  const insertImage = async (file: File) => {
+    if (!editing) return;
+    setImageBusy(true); setError('');
+    try {
+      const url = await uploadImage(file, 'email');
+      const align = imageAlign === 'center' ? 'display:block;margin:0 auto' : `float:${imageAlign};margin:${imageAlign === 'left' ? '0 12px 12px 0' : '0 0 12px 12px'}`;
+      const tag = `<img src="${url}" alt="" style="width:${imageWidth}px;max-width:100%;${align}" />`;
+      const field = htmlRef.current;
+      const start = field?.selectionStart ?? editing.html.length;
+      const end = field?.selectionEnd ?? editing.html.length;
+      const next = editing.html.slice(0, start) + tag + editing.html.slice(end);
+      setEditing({ ...editing, html: next });
+      setImageForm(false);
+      requestAnimationFrame(() => { field?.focus(); field?.setSelectionRange(start + tag.length, start + tag.length); });
+    } catch (reason) { setError(reason instanceof Error ? reason.message : t('تعذر رفع الصورة', 'Unable to upload the image')); } finally { setImageBusy(false); }
+  };
   if (editing) return <TemplateDialog title={editing.id ? t('تعديل القالب الأساسي', 'Edit boilerplate') : t('قالب أساسي جديد', 'New boilerplate')} onClose={() => setEditing(null)}>
     <div dir={isAr ? 'rtl' : 'ltr'} className="space-y-4">
       {error && <p role="alert" className="rounded-xl bg-red-500/10 p-4 text-red-600">{error}</p>}
       <p className="text-xs text-[var(--color-text-muted)]">{t('القوالب الأساسية تحتوي على تنسيق HTML/CSS فقط، بلا متغيرات.', 'Boilerplates hold pure HTML/CSS styling only -- no variables.')}</p>
       <label className="block space-y-2"><span>{t('الاسم', 'Name')}</span><input className={input} maxLength={120} value={editing.name} onChange={event => setEditing({ ...editing, name: event.target.value })} /></label>
-      <label className="block space-y-2"><span dir="ltr">HTML / CSS</span><textarea dir="ltr" rows={14} className={`${input} font-mono`} value={editing.html} onChange={event => setEditing({ ...editing, html: event.target.value })} /></label>
+      <div className="flex items-center justify-between"><span dir="ltr" className="text-sm font-bold">HTML / CSS</span><button type="button" className={button} onClick={() => setImageForm(previous => !previous)}><ImageIcon size={16} />{t('إدراج صورة', 'Insert image')}</button></div>
+      {imageForm && <div className="flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-[var(--color-border)] p-3 text-xs">
+        <label className="flex items-center gap-2"><span>{t('العرض (بكسل)', 'Width (px)')}</span><input type="number" min={40} max={1000} value={imageWidth} onChange={event => setImageWidth(Number(event.target.value) || imageWidth)} className="w-20 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1" /></label>
+        <select value={imageAlign} onChange={event => setImageAlign(event.target.value as typeof imageAlign)} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1">
+          <option value="left">{t('يسار', 'Left')}</option><option value="center">{t('وسط', 'Center')}</option><option value="right">{t('يمين', 'Right')}</option>
+        </select>
+        <input type="file" accept="image/png,image/jpeg,image/webp" disabled={imageBusy} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void insertImage(file); }} />
+        {imageBusy && <span>{t('جارٍ الرفع…', 'Uploading…')}</span>}
+      </div>}
+      <label className="block space-y-2"><span dir="ltr">HTML / CSS</span><textarea ref={htmlRef} dir="ltr" rows={14} className={`${input} font-mono`} value={editing.html} onChange={event => setEditing({ ...editing, html: event.target.value })} /></label>
       <details className="rounded-xl border border-[var(--color-border)] p-4"><summary className="cursor-pointer font-bold">{t('معاينة', 'Preview')}</summary><iframe title={t('معاينة القالب الأساسي', 'Boilerplate preview')} sandbox="" referrerPolicy="no-referrer" srcDoc={editing.html} className="mt-3 h-72 w-full rounded-lg bg-white" /></details>
       <div className="flex justify-end gap-2"><button type="button" className={primary} disabled={busy} onClick={() => void save()}><Save size={16} />{busy ? t('جارٍ الحفظ…', 'Saving…') : t('حفظ', 'Save')}</button></div>
     </div>

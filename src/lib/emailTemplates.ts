@@ -6,11 +6,13 @@ export interface EmailTemplateAttachment {
   filename?: string; contentType?: string; certificateTemplateId?: string;
 }
 export interface EmailTemplateSummary {
-  id: string; name: string; subject: string; allowAttachments: boolean; createdBy: string; revision: number; updatedAt: string;
+  id: string; name: string; subject: string; allowAttachments: boolean; createdBy: string; revision: number;
+  updatedAt: string; status: 'draft' | 'approved';
 }
 export interface EmailTemplate {
   id: string; name: string; subject: string; html: string; boilerplateId: string | null;
   allowAttachments: boolean; createdBy: string; revision: number; attachments: EmailTemplateAttachment[];
+  status: 'draft' | 'approved'; approvedBy: string | null; approvedAt: string | null;
 }
 
 export const MAX_TEST_RECIPIENTS = 5;
