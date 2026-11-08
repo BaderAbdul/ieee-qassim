@@ -157,6 +157,14 @@ export default function EmailTemplateEditor({ initial, startHtml, isAr, canManag
     } finally { setTestBusy(false); }
   };
 
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const deleteTemplate = async () => {
+    if (!draft.id || !window.confirm(t('حذف هذا القالب نهائيًا؟ لا يمكن التراجع عن هذا الإجراء.', 'Permanently delete this template? This cannot be undone.'))) return;
+    setDeleteBusy(true); setError('');
+    try { await apiSend('DELETE', `/api/admin/mail/templates/${draft.id}`); onClose(); onSaved(); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : t('تعذر حذف القالب', 'Unable to delete the template')); setDeleteBusy(false); }
+  };
+
   const close = () => { if (saveTimer.current) clearTimeout(saveTimer.current); onClose(); onSaved(); };
 
   return <TemplateDialog title={t('محرر قالب البريد', 'Email template editor')} onClose={close}>
@@ -192,6 +200,7 @@ export default function EmailTemplateEditor({ initial, startHtml, isAr, canManag
           <label className="flex items-center gap-2"><input type="checkbox" checked={draft.allowAttachments} disabled={!draft.id} onChange={event => setDraft({ ...draft, allowAttachments: event.target.checked })} />{t('السماح بالمرفقات', 'Allow attachments')}</label>
           {!draft.id && <p className="text-xs text-[var(--color-text-muted)]">{t('سيُحفظ القالب أولًا كمسودة قبل تفعيل المرفقات.', 'The template saves as a draft first before attachments can be enabled.')}</p>}
           <button type="button" className={primary} disabled={!draft.id || testBusy} onClick={() => { setTestOpen(true); setTestOk(false); setTestError(''); }}><Send size={16} />{t('إرسال اختباري', 'Send test')}</button>
+          {canEdit && draft.id && <button type="button" className={`${button} border-red-500/40 text-red-600 hover:bg-red-500/10`} disabled={deleteBusy} onClick={() => void deleteTemplate()}><Trash2 size={16} />{deleteBusy ? t('جارٍ الحذف…', 'Deleting…') : t('حذف القالب', 'Delete template')}</button>}
         </fieldset>
       </div>
       {draft.allowAttachments && draft.id && <section className="space-y-3 rounded-xl border border-[var(--color-border)] p-4">
