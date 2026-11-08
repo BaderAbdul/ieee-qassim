@@ -23,7 +23,9 @@ export default function EmailTemplateEditor({ initial, startHtml, isAr, canManag
   const canEdit = !initial || canManage || initial.createdBy === currentUserId;
   const [draft, setDraft] = useState<Draft>(initial
     ? { id: initial.id, name: initial.name, subject: initial.subject, html: initial.html, allowAttachments: initial.allowAttachments, boilerplateId: initial.boilerplateId, revision: initial.revision, status: initial.status }
-    : { id: '', name: '', subject: '', html: startHtml || '', allowAttachments: false, boilerplateId: null, revision: 0, status: 'draft' });
+    // Optimistic initial status for a brand-new template: matches what the first autosave will
+    // actually set server-side, so a privileged creator never sees a misleading "Draft" flash.
+    : { id: '', name: '', subject: '', html: startHtml || '', allowAttachments: false, boilerplateId: null, revision: 0, status: canManage ? 'approved' : 'draft' });
   const [attachments, setAttachments] = useState<EmailTemplateAttachment[]>(initial?.attachments || []);
   const [certOptions, setCertOptions] = useState<{ id: string; nameAr: string }[] | null>(null);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -88,30 +90,37 @@ export default function EmailTemplateEditor({ initial, startHtml, isAr, canManag
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [imageBusy, setImageBusy] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<HTMLImageElement | null>(null);
+  // The selected image is tracked by a data-attribute id, not the DOM node itself: every
+  // mutation below re-queries a fresh local reference instead of holding a live element in state.
+  const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const [imageWidth, setImageWidth] = useState(320);
   const [imageAlign, setImageAlign] = useState<'left' | 'center' | 'right'>('center');
+  const nextImageId = useRef(0);
+  const findSelectedImage = (): HTMLImageElement | null =>
+    selectedImageId ? previewRef.current?.querySelector<HTMLImageElement>(`[data-img-id="${selectedImageId}"]`) ?? null : null;
   const selectImage = (target: EventTarget | null) => {
     const img = target instanceof HTMLImageElement ? target : null;
-    setSelectedImage(img);
-    if (img) {
-      setImageWidth(Math.round(img.getBoundingClientRect().width) || img.naturalWidth || 320);
-      setImageAlign(img.style.float === 'left' ? 'left' : img.style.float === 'right' ? 'right' : 'center');
-    }
+    if (!img) { setSelectedImageId(null); return; }
+    if (!img.dataset.imgId) img.dataset.imgId = `img-${nextImageId.current++}`;
+    setSelectedImageId(img.dataset.imgId);
+    setImageWidth(Math.round(img.getBoundingClientRect().width) || img.naturalWidth || 320);
+    setImageAlign(img.style.float === 'left' ? 'left' : img.style.float === 'right' ? 'right' : 'center');
   };
   const applyImageStyle = (width: number, align: 'left' | 'center' | 'right') => {
-    if (!selectedImage) return;
-    selectedImage.style.width = `${width}px`;
-    selectedImage.style.maxWidth = '100%';
-    if (align === 'center') { selectedImage.style.display = 'block'; selectedImage.style.margin = '0 auto'; selectedImage.style.float = ''; }
-    else { selectedImage.style.float = align; selectedImage.style.display = ''; selectedImage.style.margin = align === 'left' ? '0 12px 12px 0' : '0 0 12px 12px'; }
+    const img = findSelectedImage();
+    if (!img) return;
+    img.style.width = `${width}px`;
+    img.style.maxWidth = '100%';
+    if (align === 'center') { img.style.display = 'block'; img.style.margin = '0 auto'; img.style.float = ''; }
+    else { img.style.float = align; img.style.display = ''; img.style.margin = align === 'left' ? '0 12px 12px 0' : '0 0 12px 12px'; }
     setImageWidth(width); setImageAlign(align);
     if (previewRef.current) commitHtml(previewRef.current.innerHTML);
   };
   const removeImage = () => {
-    if (!selectedImage) return;
-    selectedImage.remove();
-    setSelectedImage(null);
+    const img = findSelectedImage();
+    if (!img) return;
+    img.remove();
+    setSelectedImageId(null);
     if (previewRef.current) commitHtml(previewRef.current.innerHTML);
   };
   const insertImage = async (file: File) => {
@@ -254,12 +263,12 @@ export default function EmailTemplateEditor({ initial, startHtml, isAr, canManag
             : <div ref={previewRef} contentEditable={canEdit} suppressContentEditableWarning onBlur={event => commitHtml(event.currentTarget.innerHTML)}
                 onMouseUp={saveSelection} onKeyUp={saveSelection} onClick={event => selectImage(event.target)}
                 className="min-h-[420px] rounded-xl border border-[var(--color-border)] bg-white p-4 text-black" dir="ltr" />}
-          {selectedImage && <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3 text-xs">
+          {selectedImageId && <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3 text-xs">
             <span className="font-bold">{t('الصورة المحددة', 'Selected image')}</span>
             <label className="flex items-center gap-2"><span>{t('العرض (بكسل)', 'Width (px)')}</span><input type="number" min={40} max={1000} value={imageWidth} onChange={event => applyImageStyle(Number(event.target.value) || imageWidth, imageAlign)} className="w-20 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1" /></label>
             <div className="flex gap-1">{(['left', 'center', 'right'] as const).map(align => <button key={align} type="button" className={`rounded-lg border px-2 py-1 ${imageAlign === align ? 'border-[var(--color-accent)] text-[var(--color-accent)]' : 'border-[var(--color-border)]'}`} onClick={() => applyImageStyle(imageWidth, align)}>{align === 'left' ? t('يسار', 'Left') : align === 'center' ? t('وسط', 'Center') : t('يمين', 'Right')}</button>)}</div>
             <button type="button" className="inline-flex items-center gap-1 rounded-lg border border-red-500/40 px-2 py-1 text-red-600 hover:bg-red-500/10" onClick={removeImage}><Trash2 size={13} />{t('حذف', 'Remove')}</button>
-            <button type="button" className="rounded-lg border border-[var(--color-border)] px-2 py-1" onClick={() => setSelectedImage(null)}>{t('تم', 'Done')}</button>
+            <button type="button" className="rounded-lg border border-[var(--color-border)] px-2 py-1" onClick={() => setSelectedImageId(null)}>{t('تم', 'Done')}</button>
           </div>}
           <p className="text-xs text-[var(--color-text-muted)]">{t('المعاينة قابلة للتعديل مباشرة: غيّر النص مع الحفاظ على التنسيق. استخدم زر التراجع لاستعادة آخر تغيير تنسيق. اضغط زر متغير لإدراجه في موضع المؤشر. انقر صورة مُدرجة لتغيير حجمها وموضعها.', 'The preview is directly editable: change text while keeping formatting. Use Revert to undo the last formatting change. Click a variable button to insert it at the cursor. Click an inserted image to resize or reposition it.')}</p>
         </div>
