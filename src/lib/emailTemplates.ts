@@ -12,23 +12,28 @@ export interface EmailTemplateSummary {
 export interface EmailTemplate {
   id: string; name: string; subject: string; html: string; boilerplateId: string | null;
   allowAttachments: boolean; createdBy: string; revision: number; attachments: EmailTemplateAttachment[];
-  status: 'draft' | 'approved'; approvedBy: string | null; approvedAt: string | null;
+  status: 'draft' | 'approved'; approvedBy: string | null; approvedAt: string | null; canManage?: boolean;
 }
 
 export const MAX_TEST_RECIPIENTS = 5;
 export const MAX_TEMPLATE_ATTACHMENTS = 10;
 
-// Same source registry as certificate templates (see certificateTemplates.ts), minus the QR
-// source -- that renders as an image on the certificate PDF, not as plain email text.
+// Own registry for email body variables -- independent of certificateTemplates.ts' sources,
+// which serve the certificate PDF renderer and keep their own, differently-shaped field names.
 export const EMAIL_VARIABLE_GROUPS: { id: string; ar: string; en: string; variables: { source: string; ar: string; en: string }[] }[] = [
-  { id: 'student', ar: 'الطالب', en: 'Student', variables: [
-    { source: 'student.name', ar: 'الاسم', en: 'Name' }, { source: 'student.gender', ar: 'الجنس', en: 'Gender' },
-  ] },
   { id: 'event', ar: 'الفعالية', en: 'Event', variables: [
-    { source: 'event.name', ar: 'الاسم', en: 'Name' }, { source: 'event.date', ar: 'التاريخ', en: 'Date' }, { source: 'event.vtoolsUUID', ar: 'معرّف vTools', en: 'vTools UUID' },
+    { source: 'event.en.name', ar: 'الاسم (إنجليزي)', en: 'Name (English)' },
+    { source: 'event.ar.name', ar: 'الاسم (عربي)', en: 'Name (Arabic)' },
+    { source: 'event.en.date', ar: 'التاريخ (إنجليزي)', en: 'Date (English)' },
+    { source: 'event.ar.date', ar: 'التاريخ (عربي)', en: 'Date (Arabic)' },
+    { source: 'event.startingTime', ar: 'وقت البدء', en: 'Starting time' },
+    { source: 'event.endingTime', ar: 'وقت الانتهاء', en: 'Ending time' },
   ] },
-  { id: 'partner', ar: 'الراعي', en: 'Partner', variables: [{ source: 'partner.name', ar: 'الاسم', en: 'Name' }] },
-  { id: 'certificate', ar: 'الشهادة', en: 'Certificate', variables: [{ source: 'certificate.UUID', ar: 'معرّف الشهادة', en: 'Certificate ID' }] },
+  { id: 'student', ar: 'الطالب', en: 'Student', variables: [{ source: 'student.name', ar: 'الاسم', en: 'Name' }] },
+  { id: 'other', ar: 'أخرى', en: 'Other', variables: [
+    { source: 'other.vtoolsID', ar: 'معرّف vTools', en: 'vTools ID' },
+    { source: 'other.certificateID', ar: 'معرّف الشهادة', en: 'Certificate ID' },
+  ] },
 ];
 export const variableToken = (source: string) => `{{ ${source} }}`;
 
@@ -42,4 +47,14 @@ export function imageDimensions(file: File): Promise<{ width: number; height: nu
     image.onerror = () => { resolve(null); URL.revokeObjectURL(url); };
     image.src = url;
   });
+}
+
+// Splices text into a plain <input>/<textarea> at the current cursor, used for variable and
+// image-tag insertion in both the subject field and the raw HTML code editor.
+export function insertAtCursor(field: HTMLInputElement | HTMLTextAreaElement | null, current: string,
+                                setValue: (next: string) => void, insertText: string): void {
+  const start = field?.selectionStart ?? current.length;
+  const end = field?.selectionEnd ?? current.length;
+  setValue(current.slice(0, start) + insertText + current.slice(end));
+  requestAnimationFrame(() => { field?.focus(); field?.setSelectionRange(start + insertText.length, start + insertText.length); });
 }

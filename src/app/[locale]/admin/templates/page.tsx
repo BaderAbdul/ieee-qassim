@@ -3,20 +3,21 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Award, CheckCircle2, Clock3, Layers, Mail, Plus, Search, Settings2 } from 'lucide-react';
+import { Link, useRouter } from '@/i18n/routing';
 import { useAuth } from '@/context/AuthContext';
 import { apiGet } from '@/lib/backend';
 import type { CertificateTemplate } from '@/lib/certificateTemplates';
-import type { EmailBoilerplateSummary, EmailTemplate, EmailTemplateSummary } from '@/lib/emailTemplates';
+import type { EmailBoilerplateSummary, EmailTemplateSummary } from '@/lib/emailTemplates';
 import { useAdminTopbarActions } from '@/components/admin/AdminTopbarActions';
 import TemplateDialog from '@/components/admin/TemplateDialog';
 import CertificateTemplateEditor from '@/components/admin/CertificateTemplateEditor';
-import EmailTemplateEditor from '@/components/admin/EmailTemplateEditor';
 import EmailBoilerplateManager from '@/components/admin/EmailBoilerplateManager';
 
 const panel = 'rounded-2xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/60 backdrop-blur-md shadow-sm';
 
 export default function AdminTemplatesPage() {
   const isAr = useLocale() === 'ar';
+  const router = useRouter();
   const { userData } = useAuth();
   const [templates, setTemplates] = useState<CertificateTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,12 +28,9 @@ export default function AdminTemplatesPage() {
   const [status, setStatus] = useState('');
   const [chooser, setChooser] = useState(false);
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplateSummary[]>([]);
-  const [boilerplates, setBoilerplates] = useState<EmailBoilerplateSummary[]>([]);
   const [canManageBoilerplates, setCanManageBoilerplates] = useState(false);
-  const [starting, setStarting] = useState(false);
   const [boilerplateManager, setBoilerplateManager] = useState(false);
   const [editor, setEditor] = useState<{ initial?: CertificateTemplate } | null>(null);
-  const [emailEditor, setEmailEditor] = useState<{ initial?: EmailTemplate; startHtml?: string } | null>(null);
   const t = (ar: string, en: string) => isAr ? ar : en;
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -43,7 +41,7 @@ export default function AdminTemplatesPage() {
         apiGet<{ boilerplates: EmailBoilerplateSummary[]; canManage: boolean }>('/api/admin/mail/boilerplates'),
       ]);
       setTemplates(certificates.templates); setCanReview(certificates.canReview);
-      setEmailTemplates(mail.templates); setBoilerplates(boilerplateList.boilerplates); setCanManageBoilerplates(boilerplateList.canManage);
+      setEmailTemplates(mail.templates); setCanManageBoilerplates(boilerplateList.canManage);
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to load templates'); } finally { setLoading(false); }
   }, []);
   useEffect(() => { void load(); }, [load]);
@@ -51,18 +49,6 @@ export default function AdminTemplatesPage() {
     setBusy(true); setError('');
     try { setEditor({ initial: await apiGet<CertificateTemplate>(`/api/admin/templates/${id}`) }); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to open template'); } finally { setBusy(false); }
-  };
-  const openEmailTemplate = async (id: string) => {
-    setBusy(true); setError('');
-    try { setEmailEditor({ initial: await apiGet<EmailTemplate>(`/api/admin/mail/templates/${id}`) }); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to open template'); } finally { setBusy(false); }
-  };
-  const startFromBoilerplate = async (boilerplateId?: string) => {
-    setStarting(false); setChooser(false);
-    if (!boilerplateId) { setEmailEditor({}); return; }
-    setBusy(true); setError('');
-    try { setEmailEditor({ startHtml: (await apiGet<{ html: string }>(`/api/admin/mail/boilerplates/${boilerplateId}`)).html }); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to load boilerplate'); } finally { setBusy(false); }
   };
   const topbarActions = useMemo(() => <div className="flex gap-2">
     {canManageBoilerplates && <button type="button" onClick={() => setBoilerplateManager(true)} className="inline-flex items-center gap-2 rounded-xl border border-[var(--color-border)] px-3.5 py-2 text-xs font-bold"><Settings2 size={16} />{isAr ? 'القوالب الأساسية' : 'Boilerplates'}</button>}
@@ -82,16 +68,10 @@ export default function AdminTemplatesPage() {
     {loading ? <p role="status" className="p-10 text-center">{t('جارٍ تحميل القوالب…', 'Loading templates…')}</p> : visible.length ? <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{visible.map(template => <article key={template.id} className={`${panel} overflow-hidden`}><div className="flex h-28 items-center justify-center bg-[var(--color-accent-soft)] text-[var(--color-accent)]"><Award size={44} /></div><div className="space-y-4 p-5"><div className="flex items-start justify-between gap-2"><h2 dir="rtl" className="font-cairo text-lg font-bold">{template.nameAr}</h2><span className={`shrink-0 rounded-lg px-2 py-1 text-xs font-bold ${template.status === 'approved' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'}`}>{template.status === 'approved' ? t('معتمد', 'Approved') : t('مسودة', 'Draft')}</span></div><p className="text-xs text-[var(--color-text-muted)]">{t('الإصدار', 'Revision')} {template.revision} · {template.status === 'draft' ? t('الاختبار متاح · يلزم اعتماد تقني', 'Testing open · technical approval required') : t('متاح للاستخدام العام', 'Available for global use')}</p><button type="button" disabled={busy} onClick={() => void open(template.id)} className="w-full rounded-xl border border-[var(--color-border)] py-2.5 text-sm font-bold hover:bg-[var(--color-surface-2)] disabled:opacity-50">{t('فتح واختبار القالب', 'Open & test template')}</button></div></article>)}</div> : <div className={`${panel} p-14 text-center`}><Layers size={40} className="mx-auto mb-4 text-[var(--color-accent)]" /><h2 className="text-lg font-bold">{t('لا توجد قوالب مطابقة', 'No matching templates')}</h2><p className="mt-2 text-sm text-[var(--color-text-muted)]">{t('أنشئ قالب شهادة، أضف المتغيرات واختبره قبل المراجعة التقنية.', 'Create a certificate template, add variables and test it before technical review.')}</p></div>}
     <p className="text-xs text-[var(--color-text-muted)]">{t('تعرض الصفحة أحدث ٢٠٠ قالب متاح لك. تظهر المسودات لمنشئها وللمراجعين التقنيين.', 'Showing up to 200 accessible templates. Drafts are visible to their creator and technical reviewers.')}</p>
     <div className="flex items-center justify-between"><h2 className="text-lg font-bold">{t('قوالب البريد', 'Email templates')}</h2></div>
-    {emailTemplates.length ? <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{emailTemplates.map(template => <article key={template.id} className={`${panel} overflow-hidden`}><div className="flex h-28 items-center justify-center bg-sky-500/10 text-sky-500"><Mail size={44} /></div><div className="space-y-4 p-5"><div className="flex items-start justify-between gap-2"><h2 className="truncate text-lg font-bold">{template.name || t('(بدون اسم)', '(untitled)')}</h2><span className={`shrink-0 rounded-lg px-2 py-1 text-xs font-bold ${template.status === 'approved' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'}`}>{template.status === 'approved' ? t('معتمد', 'Approved') : t('مسودة', 'Draft')}</span></div><p className="truncate text-xs text-[var(--color-text-muted)]">{template.subject || t('بلا عنوان بريد بعد', 'No subject yet')}</p><button type="button" disabled={busy} onClick={() => void openEmailTemplate(template.id)} className="w-full rounded-xl border border-[var(--color-border)] py-2.5 text-sm font-bold hover:bg-[var(--color-surface-2)] disabled:opacity-50">{t('فتح القالب', 'Open template')}</button></div></article>)}</div>
+    {emailTemplates.length ? <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{emailTemplates.map(template => <article key={template.id} className={`${panel} overflow-hidden`}><div className="flex h-28 items-center justify-center bg-sky-500/10 text-sky-500"><Mail size={44} /></div><div className="space-y-4 p-5"><div className="flex items-start justify-between gap-2"><h2 className="truncate text-lg font-bold">{template.name || t('(بدون اسم)', '(untitled)')}</h2><span className={`shrink-0 rounded-lg px-2 py-1 text-xs font-bold ${template.status === 'approved' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'}`}>{template.status === 'approved' ? t('معتمد', 'Approved') : t('مسودة', 'Draft')}</span></div><p className="truncate text-xs text-[var(--color-text-muted)]">{template.subject || t('بلا عنوان بريد بعد', 'No subject yet')}</p><Link href={`/admin/mail/templates/${template.id}`} className="block w-full rounded-xl border border-[var(--color-border)] py-2.5 text-center text-sm font-bold hover:bg-[var(--color-surface-2)]">{t('فتح القالب', 'Open template')}</Link></div></article>)}</div>
       : <div className={`${panel} p-10 text-center text-sm text-[var(--color-text-muted)]`}>{t('لا توجد قوالب بريد بعد.', 'No email templates yet.')}</div>}
-    {chooser && <TemplateDialog title={t('إنشاء قالب', 'Create template')} onClose={() => setChooser(false)}><div className="grid gap-5 sm:grid-cols-2">{[{ Icon: Mail, name: t('إنشاء قالب بريد', 'Create email template'), description: t('رسائل البريد ومحتواها', 'Email messages and content'), action: () => setStarting(true) }, { Icon: Award, name: t('إنشاء قالب شهادة', 'Create certificate template'), description: t('شهادة فارغة، متغيرات، مواضع واختبار', 'Blank certificate, variables, placement and testing'), action: () => { setChooser(false); setEditor({}); } }].map(({ Icon, name, description, action }) => <button type="button" key={name} onClick={action} className={`${panel} flex min-h-56 flex-col items-center justify-center gap-4 p-8 text-center transition hover:border-[var(--color-accent)]`}><Icon size={40} className="text-[var(--color-accent)]" /><span className="text-xl font-bold">{name}</span><span className="text-sm text-[var(--color-text-muted)]">{description}</span></button>)}</div></TemplateDialog>}
-    {starting && <TemplateDialog title={t('بداية قالب البريد', 'Start the email template')} onClose={() => setStarting(false)}><div className="space-y-3">
-      <button type="button" onClick={() => void startFromBoilerplate()} className={`${panel} w-full p-5 text-start hover:border-[var(--color-accent)]`}><span className="font-bold">{t('بدء من الصفر', 'Start blank')}</span><p className="mt-1 text-sm text-[var(--color-text-muted)]">{t('بدون أي تنسيق مسبق.', 'No preset styling.')}</p></button>
-      {boilerplates.map(item => <button type="button" key={item.id} onClick={() => void startFromBoilerplate(item.id)} className={`${panel} w-full p-5 text-start hover:border-[var(--color-accent)]`}><span className="font-bold">{item.name || t('(بدون اسم)', '(untitled)')}</span></button>)}
-      {boilerplates.length === 0 && <p className="text-sm text-[var(--color-text-muted)]">{t('لا توجد قوالب أساسية جاهزة بعد؛ يمكنك البدء من الصفر.', 'No boilerplates are ready yet; start blank instead.')}</p>}
-    </div></TemplateDialog>}
+    {chooser && <TemplateDialog title={t('إنشاء قالب', 'Create template')} onClose={() => setChooser(false)}><div className="grid gap-5 sm:grid-cols-2">{[{ Icon: Mail, name: t('إنشاء قالب بريد', 'Create email template'), description: t('رسائل البريد ومحتواها', 'Email messages and content'), action: () => router.push('/admin/mail/templates/new') }, { Icon: Award, name: t('إنشاء قالب شهادة', 'Create certificate template'), description: t('شهادة فارغة، متغيرات، مواضع واختبار', 'Blank certificate, variables, placement and testing'), action: () => { setChooser(false); setEditor({}); } }].map(({ Icon, name, description, action }) => <button type="button" key={name} onClick={action} className={`${panel} flex min-h-56 flex-col items-center justify-center gap-4 p-8 text-center transition hover:border-[var(--color-accent)]`}><Icon size={40} className="text-[var(--color-accent)]" /><span className="text-xl font-bold">{name}</span><span className="text-sm text-[var(--color-text-muted)]">{description}</span></button>)}</div></TemplateDialog>}
     {editor && <CertificateTemplateEditor key={editor.initial?.id || 'new'} initial={editor.initial} isAr={isAr} canReview={canReview} canEdit={!editor.initial || canReview || editor.initial.createdBy === userData?.id} onClose={() => setEditor(null)} onSaved={() => { setEditor(null); void load(); }} />}
-    {emailEditor && <EmailTemplateEditor key={emailEditor.initial?.id || 'new'} initial={emailEditor.initial} startHtml={emailEditor.startHtml} isAr={isAr} canManage={canManageBoilerplates} currentUserId={userData?.id} onClose={() => setEmailEditor(null)} onSaved={() => void load()} />}
     {boilerplateManager && <EmailBoilerplateManager isAr={isAr} onClose={() => { setBoilerplateManager(false); void load(); }} />}
   </div>;
 }
