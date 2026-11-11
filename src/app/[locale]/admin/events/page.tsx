@@ -87,8 +87,23 @@ export default function AdminEventsPage() {
     setBusy(event.id);
     setError(null);
     try {
+      // Events saved before the backend learned about `locationType` and unlimited capacity can
+      // contain empty legacy fields. Repair only those compatibility fields before changing state.
+      // This makes already-completed online/open-registration drafts publishable without changing
+      // their public meaning.
+      const compatibilityPatch: Record<string, unknown> = {};
+      if (event.locationType === 'online' && !(event.location || '').trim()) {
+        compatibilityPatch.location = 'عن بُعد';
+        compatibilityPatch.locationEn = event.locationEn?.trim() || 'Online';
+      }
+      if (event.isUnlimitedCapacity && (!Number.isFinite(event.capacity) || event.capacity <= 0)) {
+        compatibilityPatch.capacity = 1;
+      }
+      if (Object.keys(compatibilityPatch).length) {
+        await httpsCallable(null, 'saveEvent')({ eventId: event.id, ...compatibilityPatch });
+      }
       await httpsCallable(null, 'changeEventState')({ eventId: event.id, state });
-      setEvents(prev => prev.map(item => item.id === event.id ? { ...item, state } : item));
+      setEvents(prev => prev.map(item => item.id === event.id ? { ...item, ...compatibilityPatch, state } : item));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to change state');
     } finally {
