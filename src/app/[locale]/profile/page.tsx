@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Link } from '@/i18n/routing';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth, isAdminRole } from '@/context/AuthContext';
 import { apiGet, uploadImage, httpsCallable, API_BASE_URL } from '@/lib/backend';
 import { readBackendResponse } from '@/lib/backendResponse';
 import ProfileSkeleton from '@/components/skeletons/ProfileSkeleton';
@@ -524,7 +524,7 @@ export default function EngineeringProfilePage() {
         </div>
 
         {/* Public Board Profile Edit Button (Admin/Organizer Only) */}
-        {(userData?.role === 'super_admin' || userData?.role === 'event_organizer') && (
+        {isAdminRole(userData) && (
           <div className="bg-white rounded-3xl p-5 border border-blue-100 shadow-sm flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="h-12 w-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">

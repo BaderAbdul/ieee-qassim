@@ -184,3 +184,11 @@ export function hasAnyPrivilege(userData: UserData | null | undefined, prefix: s
   return (userData.privileges ?? []).some(key => key.startsWith(`${prefix}.`));
 }
 
+// Mirrors the backend's ADMIN_ROLES (backend/app/validation.py) -- 'member' is a real admin-tier
+// role (read-only privileges by default, same as event_organizer/super_admin for site access),
+// not just the two historically "admin" roles. Use this instead of hand-rolling
+// `role === 'super_admin' || role === 'event_organizer'`, which silently excludes members.
+export function isAdminRole(userData: UserData | null | undefined): boolean {
+  return !!userData && (userData.role === 'member' || userData.role === 'event_organizer' || userData.role === 'super_admin');
+}
+

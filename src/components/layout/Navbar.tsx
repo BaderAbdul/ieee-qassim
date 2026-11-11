@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Link, usePathname } from '@/i18n/routing';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth, isAdminRole } from '@/context/AuthContext';
 import Image from 'next/image';
 import { 
   Calendar, 
@@ -52,7 +52,7 @@ export default function Navbar() {
     ...(user ? [
       { href: '/profile', label: t('profile'), icon: UserCircle },
     ] : []),
-    ...(userData?.role === 'super_admin' || userData?.role === 'event_organizer' ? [
+    ...(isAdminRole(userData) ? [
       { href: '/admin', label: t('admin'), icon: ShieldCheck, isAdmin: true }
     ] : []),
   ];
