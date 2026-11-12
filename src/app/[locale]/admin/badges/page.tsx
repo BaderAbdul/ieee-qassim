@@ -53,7 +53,7 @@ export default function AdminBadgesPage() {
   if (error) return <AdminError message={error} retry={load} />;
 
   const grid = (selected: Set<string>, onChange: (next: Set<string>) => void) => (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       {[...groups.entries()].map(([feature, items]) => {
         const keys = items.map(i => i.key);
         const allSelected = keys.every(k => selected.has(k));
@@ -121,7 +121,7 @@ export default function AdminBadgesPage() {
 
       {creating && (
         <div className="rounded-2xl border border-purple-200 bg-purple-50 p-4 space-y-3">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <input placeholder={isAr ? 'المفتاح' : 'key'} value={newBadge.key}
                    onChange={e => setNewBadge({ ...newBadge, key: e.target.value.trim().toLowerCase() })} className="rounded-lg border px-3 py-2 text-sm" dir="ltr" />
             <input placeholder={isAr ? 'الاسم بالعربي' : 'Arabic name'} value={newBadge.nameAr}

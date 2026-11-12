@@ -61,6 +61,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     window.dispatchEvent(new Event('ieee-sidebar'));
   };
 
+  const [topbarHidden, setTopbarHidden] = useState(false);
+  useEffect(() => {
+    let lastY = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      if (window.innerWidth >= 768) { setTopbarHidden(false); lastY = y; return; }
+      const delta = y - lastY;
+      if (Math.abs(delta) < 10) return; // ignore small jitter (rubber-banding, address-bar resize)
+      setTopbarHidden(delta > 0 && y > 72);
+      lastY = y;
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   const isDark = useSyncExternalStore(subscribeTheme, getThemeSnapshot, () => false);
   const toggleTheme = () => {
     try { localStorage.setItem('admin_theme', isDark ? 'light' : 'dark'); }
@@ -258,7 +273,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Main Content */}
       <div className="min-w-0 flex-1 flex flex-col">
         <AdminTopbarActionsProvider>
-          <AdminTopbar pageTitle={[...navItems, ...footerItems].find(item => isCurrentPath(item.href))?.name} />
+          <AdminTopbar pageTitle={[...navItems, ...footerItems].find(item => isCurrentPath(item.href))?.name} hidden={topbarHidden} />
           <div className="p-4 sm:p-6 lg:p-8">
             <div className="max-w-6xl mx-auto">
               <ConfigurationNotice />

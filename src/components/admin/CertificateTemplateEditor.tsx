@@ -97,7 +97,7 @@ export default function CertificateTemplateEditor({ initial, isAr, canReview, ca
       </fieldset>
       {step === 1 && <fieldset disabled={busy || !canEdit} className="space-y-4">
         <p className="text-sm text-[var(--color-text-muted)]">{t('أضف المتغيرات أو عبارات بشروط. أول شرط مطابق يحدد النص، وإلا يُستخدم النص البديل.', 'Add variables or conditional text. The first matching rule wins; otherwise the fallback appears.')}</p>
-        <div className="grid gap-3 sm:grid-cols-2">{fieldGroups.map(group => <section key={group.id} className="rounded-2xl border border-[var(--color-border)] p-4 space-y-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{fieldGroups.map(group => <section key={group.id} className="rounded-2xl border border-[var(--color-border)] p-4 space-y-3">
           <h3 className="font-bold">{t(group.ar, group.en)}</h3>
           <div className="flex flex-wrap gap-2">{group.fields.map(item => <button type="button" key={item.source} className={button} onClick={() => add(item.source)} disabled={definition.fields.length >= 30}><Plus size={16} />{t(item.ar, item.en)}</button>)}</div>
         </section>)}</div>

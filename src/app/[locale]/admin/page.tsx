@@ -55,7 +55,7 @@ export default function AdminDashboardPage() {
       ) : data ? (
         <>
           {/* Calendar + KPIs/day details */}
-          <div className="grid gap-4 lg:grid-cols-3 items-stretch">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 items-stretch">
             <div className="lg:col-span-2">
               <AdminCalendar events={events} isAr={isAr} selected={selectedDay} onSelectDay={setSelectedDay} />
             </div>
@@ -88,7 +88,7 @@ export default function AdminDashboardPage() {
           </div>
 
           {/* Requests */}
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <RequestsPanel
               icon={ArrowRightLeft}
               title={isAr ? 'طلبات بين الفرق' : 'Inter-team requests'}

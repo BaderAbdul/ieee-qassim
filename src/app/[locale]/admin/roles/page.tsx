@@ -36,7 +36,7 @@ function PrivilegeGrid({ privileges, selected, onChange, disabled, isAr }: {
     onChange(next);
   };
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       {[...groups.entries()].map(([feature, items]) => {
         const keys = items.map(item => item.key);
         const allSelected = keys.every(key => selected.has(key));
@@ -139,7 +139,7 @@ export default function AdminRolesPage() {
 
       {creating && (
         <div className="rounded-2xl border border-purple-200 bg-purple-50 p-4 space-y-3">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <input placeholder={isAr ? 'المفتاح (مثال: media_lead)' : 'key (e.g. media_lead)'} value={newRole.key}
                    onChange={e => setNewRole({ ...newRole, key: e.target.value.trim().toLowerCase() })}
                    className="rounded-lg border px-3 py-2 text-sm" dir="ltr" />

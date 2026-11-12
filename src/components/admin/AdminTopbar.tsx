@@ -22,7 +22,7 @@ function useClickOutside(onOutside: () => void) {
   return ref;
 }
 
-export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
+export default function AdminTopbar({ pageTitle, hidden }: { pageTitle?: string; hidden?: boolean }) {
   const locale = useLocale();
   const isAr = locale === 'ar';
   const { user, userData, logout } = useAuth();
@@ -53,7 +53,7 @@ export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
 
   return (
     <>
-      <header className="sticky top-3 z-30 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-white/10 bg-slate-900/70 backdrop-blur-xl shadow-2xl px-4 sm:px-6 py-3.5">
+      <header className={`sticky top-3 z-30 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-white/10 bg-slate-900/70 backdrop-blur-xl shadow-2xl px-4 sm:px-6 py-3.5 transition-all duration-300 md:translate-y-0 md:opacity-100 ${hidden ? '-translate-y-24 opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'}`}>
         <h1 className="text-base sm:text-lg font-black font-cairo text-white truncate shrink-0">
           {pageTitle || (isAr ? 'لوحة الإدارة' : 'Admin Portal')}
         </h1>

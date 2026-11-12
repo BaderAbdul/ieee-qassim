@@ -67,14 +67,14 @@ export default function AdminEventSummaryPage() {
       {error ? <AdminError message={error} retry={refresh} /> : loading ? <AdminLoading /> : data ? <>
         <section className="space-y-3">
           <h3 className="text-sm font-bold text-slate-500">{isAr ? 'التسجيل والحضور' : 'Registration & attendance'}</h3>
-          <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {registrationStats.map(stat => <StatTile key={stat.label} {...stat} locale={locale} />)}
           </dl>
         </section>
 
         <section className="space-y-3">
           <h3 className="text-sm font-bold text-slate-500">{isAr ? 'الشهادات' : 'Certificates'}</h3>
-          <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {certificateStats.map(stat => <StatTile key={stat.label} {...stat} locale={locale} />)}
           </dl>
         </section>

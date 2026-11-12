@@ -238,7 +238,7 @@ export default function AdminTeamsPage() {
 
       {creating && (
         <div className="rounded-2xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/80 backdrop-blur-md p-4 space-y-3">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <input placeholder={isAr ? 'المعرف (مثال: web-team)' : 'id (e.g. web-team)'} value={newTeam.id}
                    onChange={e => setNewTeam({ ...newTeam, id: e.target.value.trim().toLowerCase() })} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" dir="ltr" />
             <input placeholder={isAr ? 'الاسم بالعربي' : 'Arabic name'} value={newTeam.nameAr}
@@ -246,7 +246,7 @@ export default function AdminTeamsPage() {
             <input placeholder={isAr ? 'الاسم بالإنجليزي' : 'English name'} value={newTeam.nameEn}
                    onChange={e => setNewTeam({ ...newTeam, nameEn: e.target.value })} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" />
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <textarea placeholder={isAr ? 'الوصف (عربي، اختياري)' : 'Description (Arabic, optional)'} value={newTeam.descriptionAr}
                       onChange={e => setNewTeam({ ...newTeam, descriptionAr: e.target.value })} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" rows={2} />
             <textarea placeholder={isAr ? 'الوصف (إنجليزي، اختياري)' : 'Description (English, optional)'} value={newTeam.descriptionEn}
@@ -293,7 +293,7 @@ export default function AdminTeamsPage() {
 
             {isSuperAdmin && editingId === team.id && (
               <div className="mt-3 border-t border-[var(--color-border)]/50 pt-3 space-y-3">
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <input value={editTeam.nameAr} onChange={e => setEditTeam({ ...editTeam, nameAr: e.target.value })} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" placeholder="Arabic name" />
                   <input value={editTeam.nameEn} onChange={e => setEditTeam({ ...editTeam, nameEn: e.target.value })} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" placeholder="English name" />
                   <textarea value={editTeam.descriptionAr} onChange={e => setEditTeam({ ...editTeam, descriptionAr: e.target.value })} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" rows={2} placeholder="Description (Arabic)" />

@@ -363,7 +363,7 @@ export default function AdminEventsPage() {
                   </span>
                   <div className="flex-1 h-px bg-[var(--color-border)]" />
                 </div>
-                <div className="grid gap-4 lg:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                   {groupEvents.map((event) => (
                     <EventCard
                       key={event.id}

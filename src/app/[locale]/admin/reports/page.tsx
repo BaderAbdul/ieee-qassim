@@ -10,7 +10,7 @@ export default function AdminReportsPage() {
   const { data, loading, error, refresh } = useAdminQuery<AdminOverview>('getAdminOverview');
   return <div className="space-y-6"><header><h1 className="text-3xl font-black font-cairo">{isAr ? 'التقارير التشغيلية' : 'Operational reports'}</h1><p className="mt-2 text-sm text-slate-500">{isAr ? 'إجماليات من قاعدة البيانات. التسجيلات تشمل جميع الحالات، والشهادات المتاحة فقط تُعد مصدرة. تقرير كل فعالية موجود في مساحة عملها.' : 'Database totals. Registrations include all statuses; only available certificates count as issued. Each event has its own report in its workspace.'}</p></header>
     {error ? <AdminError message={error} retry={refresh} /> : loading ? <AdminLoading /> : data ? <>
-      <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{[
+      <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{[
         [isAr ? 'الأعضاء' : 'Members', data.counts.users], [isAr ? 'التسجيلات · كل الحالات' : 'Registrations · all statuses', data.counts.registrations],
         [isAr ? 'تسجيلات حضر أصحابها' : 'Attended registrations', data.counts.attendedRegistrations], [isAr ? 'بانتظار الموافقة' : 'Pending approvals', data.counts.pendingRegistrations],
         [isAr ? 'شهادات متاحة' : 'Available certificates', data.counts.availableCertificates], [isAr ? 'شهادات فاشلة' : 'Failed certificates', data.counts.failedCertificates],

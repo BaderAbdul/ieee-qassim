@@ -182,7 +182,7 @@ export default function MemberDetail({ id }: { id: string }) {
     </div>
     {summaryError && <AdminError message={summaryError} retry={() => setRevision(value => value + 1)} />}
     {summary && <>
-      <dl className="grid gap-4 rounded-2xl border bg-white p-5 sm:grid-cols-2 lg:grid-cols-3">
+      <dl className="grid grid-cols-1 gap-4 rounded-2xl border bg-white p-5 sm:grid-cols-2 lg:grid-cols-3">
         {[[lang === 0 ? 'البريد' : 'Email', summary.member.email], [lang === 0 ? 'الرقم الجامعي' : 'Student ID', summary.member.universityId], [lang === 0 ? 'التخصص' : 'Major', summary.member.major], [lang === 0 ? 'الصلاحية' : 'Role', summary.member.role], [lang === 0 ? 'حالة الحساب' : 'Account', summary.member.isRestricted ? (lang === 0 ? 'مقيّد / مؤرشف' : 'Restricted / archived') : (lang === 0 ? 'نشط' : 'Active')], [lang === 0 ? 'مجموع النقاط الحالي' : 'Current points balance', String(summary.member.totalPoints || 0)]].map(([label, value]) => <div key={label}><dt className="text-sm text-slate-500">{label}</dt><dd className="mt-1 break-words font-semibold">{value || '—'}</dd></div>)}
       </dl>
       <div className={`rounded-xl border p-4 ${summary.publicProjection.exists && summary.publicProjection.matchesBalance ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50'}`} role="status">
