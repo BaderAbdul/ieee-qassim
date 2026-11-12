@@ -53,17 +53,21 @@ export default function TimePlaceStage({ isAr, value, onChange, onSave, saving }
       setError(isAr ? 'إجمالي ساعات غير صالح.' : 'Invalid total hours.');
       return;
     }
-    if (!value.isUnlimitedCapacity && (!Number.isFinite(value.capacity) || value.capacity < 0)) {
+    if (!value.isUnlimitedCapacity && (!Number.isFinite(value.capacity) || value.capacity <= 0)) {
       setError(isAr ? 'عدد مقاعد غير صالح.' : 'Invalid seat count.');
       return;
     }
     setError('');
     const online = value.locationType === 'online';
+    // The current API still validates the legacy location/capacity fields before it considers
+    // locationType or isUnlimitedCapacity. Keep those compatibility fields valid so an online
+    // or open-registration event can leave Draft; public UI continues to use the explicit flags.
+    const capacity = value.isUnlimitedCapacity ? Math.max(1, value.capacity || 1) : value.capacity;
     await onSave({
       days: value.days, date: earliest!.toISOString(), durationHours: Math.round(totalHours * 100) / 100,
       locationType: value.locationType,
-      location: online ? '' : value.location.trim(), locationEn: online ? '' : value.locationEn.trim(),
-      capacity: value.isUnlimitedCapacity ? 0 : value.capacity,
+      location: online ? 'عن بُعد' : value.location.trim(), locationEn: online ? 'Online' : value.locationEn.trim(),
+      capacity,
       isUnlimitedCapacity: value.isUnlimitedCapacity, hideExactCapacity: value.hideExactCapacity,
       gender: value.gender,
     });
@@ -124,7 +128,7 @@ export default function TimePlaceStage({ isAr, value, onChange, onSave, saving }
 
         <label className={label}>
           <span>{value.locationType === 'online' ? (isAr ? 'المستهدف من الحضور' : 'Attendance goal') : (isAr ? 'عدد المقاعد' : 'Seat count')}</span>
-          <input type="number" min={0} disabled={value.isUnlimitedCapacity} className={input} value={value.capacity}
+          <input type="number" min={1} disabled={value.isUnlimitedCapacity} className={input} value={value.capacity}
             onChange={e => set('capacity', Number(e.target.value))} /></label>
         <label className={label}><span>{isAr ? 'الفئة المستهدفة' : 'Gender'}</span>
           <select className={input} value={value.gender} onChange={e => set('gender', e.target.value as EventGender)}>
