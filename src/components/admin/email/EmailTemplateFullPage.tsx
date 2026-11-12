@@ -276,9 +276,11 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
     {!canEdit && <p className="mb-3 rounded-xl bg-amber-500/10 p-3 text-sm text-amber-700">{t('هذا القالب لمنشئ آخر — للعرض فقط.', 'This template belongs to another author -- read only.')}</p>}
     {error && <p role="alert" className="mb-3 rounded-xl bg-red-500/10 p-4 text-red-600">{error}</p>}
 
-    <div ref={heightRef} className="grid min-h-0 items-start gap-6 lg:grid-cols-[1fr_380px]" style={height ? { height } : undefined}>
+    {/* dir="ltr" here only fixes the grid's own track order so the editor is always physically on
+        the left, as asked -- it does not affect the RTL/LTR direction of anything inside the columns. */}
+    <div ref={heightRef} dir="ltr" className="grid min-h-0 min-w-0 items-stretch gap-6 lg:grid-cols-[1fr_340px]" style={height ? { height } : undefined}>
       {/* Main: always-visible editor, on the left, directly editable without switching tabs */}
-      <div className={`${panel} flex min-w-0 min-h-0 flex-col p-5 ${height ? 'h-full overflow-hidden' : ''}`}>
+      <div dir={isAr ? 'rtl' : 'ltr'} className={`${panel} flex min-w-0 min-h-0 flex-col p-5 ${height ? 'h-full overflow-hidden' : ''}`}>
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[var(--color-border)] pb-3">
           <div className="flex gap-1">
             <button type="button" onClick={() => setTab('preview')} className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-bold ${tab === 'preview' ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : 'text-[var(--color-text-muted)]'}`}><Eye size={16} />{t('المعاينة', 'Preview')}</button>
@@ -306,7 +308,7 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
       </div>
 
       {/* Side panel: name, subject, attachments (and test-send/approve/delete below them) */}
-      <aside className={`${panel} flex min-h-0 flex-col gap-4 p-5 ${height ? 'h-full overflow-y-auto' : ''}`}>
+      <aside dir={isAr ? 'rtl' : 'ltr'} className={`${panel} flex min-h-0 min-w-0 flex-col gap-4 p-5 ${height ? 'h-full overflow-y-auto' : ''}`}>
         {canEdit && boilerplates.length > 0 && <label className="block space-y-2"><span className="text-xs font-bold">{t('ابدأ من قالب أساسي (اختياري)', 'Start from a boilerplate (optional)')}</span>
           <select className={input} value="" onChange={event => { if (event.target.value) void startFromBoilerplate(event.target.value); }}>
             <option value="">{t('ابدأ من الصفر', 'Start blank')}</option>
