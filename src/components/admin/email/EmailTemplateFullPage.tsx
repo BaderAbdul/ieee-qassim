@@ -156,19 +156,28 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
     const selection = window.getSelection();
     if (selection && selection.rangeCount && previewRef.current?.contains(selection.anchorNode)) savedRange.current = selection.getRangeAt(0).cloneRange();
   };
+  // Falls back to appending plain text at the end of the HTML if the Range/Selection APIs throw
+  // for any reason (they vary across browsers and can misbehave on an empty or unusual DOM) --
+  // inserting at the wrong spot is a minor inconvenience; crashing the whole page is not.
   const insertNodeInPreview = (node: Node) => {
     const area = previewRef.current;
     if (!area) return;
-    area.focus();
-    const selection = window.getSelection();
-    let range = savedRange.current;
-    if (!range || !area.contains(range.startContainer)) { range = document.createRange(); range.selectNodeContents(area); range.collapse(false); }
-    selection?.removeAllRanges(); selection?.addRange(range);
-    range.deleteContents(); range.insertNode(node);
-    range.setStartAfter(node); range.setEndAfter(node);
-    selection?.removeAllRanges(); selection?.addRange(range);
-    savedRange.current = range.cloneRange();
-    setDraft(previous => ({ ...previous, html: area.innerHTML }));
+    try {
+      area.focus();
+      const selection = window.getSelection();
+      let range = savedRange.current;
+      if (!range || !area.contains(range.startContainer)) { range = document.createRange(); range.selectNodeContents(area); range.collapse(false); }
+      selection?.removeAllRanges(); selection?.addRange(range);
+      range.deleteContents(); range.insertNode(node);
+      range.setStartAfter(node); range.setEndAfter(node);
+      selection?.removeAllRanges(); selection?.addRange(range);
+      savedRange.current = range.cloneRange();
+      setDraft(previous => ({ ...previous, html: area.innerHTML }));
+    } catch {
+      savedRange.current = null;
+      area.appendChild(node);
+      setDraft(previous => ({ ...previous, html: area.innerHTML }));
+    }
   };
   const insertInEditor = (text: string) => {
     if (tab === 'code') insertAtCursor(codeRef.current, draft.html, html => setDraft(previous => ({ ...previous, html })), text);
