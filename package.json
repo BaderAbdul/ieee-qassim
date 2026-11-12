@@ -24,6 +24,7 @@
     "qrcode.react": "^4.2.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "read-excel-file": "^9.3.15",
     "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {

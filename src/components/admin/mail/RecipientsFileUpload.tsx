@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { readSheet } from 'read-excel-file/browser';
 import { FileSpreadsheet, Upload } from 'lucide-react';
 import { looksLikeEmail, parseCSV } from '@/lib/csv';
 
@@ -19,15 +20,17 @@ export default function RecipientsFileUpload({ isAr, onExtracted }: {
   const openFile = async (file: File) => {
     setError('');
     try {
-      const text = await file.text();
-      const parsed = parseCSV(text);
+      const isXlsx = /\.xlsx$/i.test(file.name);
+      const parsed = isXlsx
+        ? (await readSheet(file)).map(row => row.map(cell => cell == null ? '' : String(cell)))
+        : parseCSV(await file.text());
       if (!parsed.length) throw new Error(t('الملف فارغ.', 'The file is empty.'));
       setRows(parsed);
       setFileName(file.name);
       setColumnIndex(0);
       setHasHeader(parsed[0].some(cell => !looksLikeEmail(cell)));
     } catch {
-      setError(t('تعذرت قراءة الملف. يجب أن يكون بصيغة CSV.', 'Could not read the file. It must be a .csv file.'));
+      setError(t('تعذرت قراءة الملف. يجب أن يكون بصيغة Excel (.xlsx) أو CSV.', 'Could not read the file. It must be an Excel (.xlsx) or .csv file.'));
     }
   };
 
@@ -38,12 +41,12 @@ export default function RecipientsFileUpload({ isAr, onExtracted }: {
   return <div className="space-y-3 rounded-xl border border-dashed border-[var(--color-border)] p-4">
     <label className="flex cursor-pointer items-center gap-2 text-sm font-bold text-[var(--color-accent)]">
       <Upload size={16} />
-      {t('رفع ملف CSV يحتوي على عناوين البريد', 'Upload a CSV file with email addresses')}
-      <input type="file" accept=".csv,text/csv" className="hidden"
+      {t('رفع ملف Excel أو CSV يحتوي على عناوين البريد', 'Upload an Excel or CSV file with email addresses')}
+      <input type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" className="hidden"
              onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void openFile(file); }} />
     </label>
     <p className="text-xs text-[var(--color-text-muted)]">
-      {t('صدّر ورقة Excel كـ CSV (ملف ← حفظ باسم ← CSV) ثم ارفعها هنا.', 'Export your Excel sheet as CSV (File → Save As → CSV), then upload it here.')}
+      {t('يدعم ملفات Excel بصيغة .xlsx وكذلك CSV.', 'Supports Excel (.xlsx) files as well as CSV.')}
     </p>
     {error && <p role="alert" className="text-xs" style={{ color: 'var(--color-danger)' }}>{error}</p>}
     {rows && (

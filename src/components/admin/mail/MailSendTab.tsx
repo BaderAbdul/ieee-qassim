@@ -7,9 +7,8 @@ import { looksLikeEmail } from '@/lib/csv';
 import RecipientsFileUpload from './RecipientsFileUpload';
 
 interface Stats { totalSent: number; sentToday: number; dailyLimit: number; remainingToday: number; totalStudents: number }
-interface MailTemplate { id: string; name: string; subject: string }
+interface MailTemplate { id: string; name: string; subject: string; studentOnly: boolean }
 interface CertTemplate { id: string; nameAr: string }
-interface LinkedEvent { id: number; title: string }
 
 const input = 'w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2.5 text-sm';
 const panel = 'rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 sm:p-7 space-y-4';
@@ -30,7 +29,6 @@ export default function MailSendTab({ isAr }: { isAr: boolean }) {
   const [stats, setStats] = useState<Stats | null>(null);
   const [mailTemplates, setMailTemplates] = useState<MailTemplate[]>([]);
   const [certTemplates, setCertTemplates] = useState<CertTemplate[]>([]);
-  const [linkedEvents, setLinkedEvents] = useState<LinkedEvent[]>([]);
   const [loadError, setLoadError] = useState('');
 
   const [recipientMode, setRecipientMode] = useState<'all' | 'limited'>('all');
@@ -40,7 +38,6 @@ export default function MailSendTab({ isAr }: { isAr: boolean }) {
 
   const [contentMode, setContentMode] = useState<'template' | 'manual'>('template');
   const [templateId, setTemplateId] = useState('');
-  const [eventId, setEventId] = useState('');
   const [manualSubject, setManualSubject] = useState('');
   const [manualHtml, setManualHtml] = useState('');
 
@@ -67,15 +64,6 @@ export default function MailSendTab({ isAr }: { isAr: boolean }) {
     })();
   }, []);
 
-  useEffect(() => {
-    if (contentMode !== 'template' || !templateId) { setLinkedEvents([]); setEventId(''); return; }
-    let active = true;
-    apiGet<{ events: LinkedEvent[] }>(`/api/admin/mail/templates/${templateId}/events`)
-      .then(res => { if (active) setLinkedEvents(res.events); })
-      .catch(() => { if (active) setLinkedEvents([]); });
-    return () => { active = false; };
-  }, [contentMode, templateId]);
-
   const addExtracted = (emails: string[]) => {
     if (recipientMode === 'all') setExtraEmails(prev => [...new Set([...prev.split(/[\s,;\n]+/).filter(Boolean), ...emails])].join('\n'));
     else setLimitedEmails(prev => [...new Set([...prev.split(/[\s,;\n]+/).filter(Boolean), ...emails])].join('\n'));
@@ -94,7 +82,8 @@ export default function MailSendTab({ isAr }: { isAr: boolean }) {
   const extraList = extraEmails.split(/[\s,;\n]+/).map(v => v.trim()).filter(looksLikeEmail);
   const limitedList = limitedEmails.split(/[\s,;\n]+/).map(v => v.trim()).filter(looksLikeEmail);
   const recipientCount = recipientMode === 'all' ? allLimit + extraList.length : limitedList.length;
-  const contentReady = contentMode === 'template' ? !!templateId : !!manualSubject.trim() && !!manualHtml.trim();
+  const selectedTemplate = mailTemplates.find(m => m.id === templateId);
+  const contentReady = contentMode === 'template' ? !!selectedTemplate?.studentOnly : !!manualSubject.trim() && !!manualHtml.trim();
   const canSend = recipientCount > 0 && contentReady && !busy;
 
   const send = async () => {
@@ -109,7 +98,7 @@ export default function MailSendTab({ isAr }: { isAr: boolean }) {
         ...(recipientMode === 'all' ? { allLimit, extraEmails: extraList } : { limitedEmails: limitedList }),
         contentMode,
         attachments,
-        ...(contentMode === 'template' ? { templateId, eventId: eventId ? Number(eventId) : null } : { subject: manualSubject, html: manualHtml }),
+        ...(contentMode === 'template' ? { templateId } : { subject: manualSubject, html: manualHtml }),
       };
       const res = await apiSend<{ recipientCount: number; queuedCount: number }>('POST', '/api/admin/mail/batch', payload);
       setResult(res);
@@ -174,18 +163,21 @@ export default function MailSendTab({ isAr }: { isAr: boolean }) {
             <span className="text-sm font-bold">{t('القالب', 'Template')}</span>
             <select className={input} value={templateId} onChange={e => setTemplateId(e.target.value)}>
               <option value="">{t('اختر قالبًا', 'Choose a template')}</option>
-              {mailTemplates.map(m => <option key={m.id} value={m.id}>{m.name || m.subject || m.id}</option>)}
+              {mailTemplates.map(m => (
+                <option key={m.id} value={m.id} disabled={!m.studentOnly}>
+                  {m.name || m.subject || m.id}{!m.studentOnly ? ` — ${t('يحتاج فعالية محددة', 'needs a specific event')}` : ''}
+                </option>
+              ))}
             </select>
+            <span className="block text-xs text-[var(--color-text-muted)]">
+              {t('يُشخصن اسم الطالب تلقائيًا من بيانات حسابه. القوالب التي تستخدم متغيرات الفعالية أو الراعي غير متاحة هنا — أرسلها من صفحة الفعالية نفسها.',
+                 'The student’s name is personalized automatically from their account. Templates using event or sponsor variables aren’t available here — send those from the event itself.')}
+            </span>
           </label>
-          {templateId && (
-            <label className="block space-y-1.5">
-              <span className="text-sm font-bold">{t('الفعالية المرتبطة (لتعبئة متغيرات الفعالية/الراعي)', 'Linked event (fills event/sponsor variables)')}</span>
-              <select className={input} value={eventId} onChange={e => setEventId(e.target.value)}>
-                <option value="">{t('بلا فعالية — استخدام قيم تجريبية', 'No event — use sample values')}</option>
-                {linkedEvents.map(ev => <option key={ev.id} value={ev.id}>{ev.title}</option>)}
-              </select>
-              {!linkedEvents.length && <span className="block text-xs text-[var(--color-text-muted)]">{t('لا توجد فعاليات مرتبطة بهذا القالب حاليًا.', 'No events are currently linked to this template.')}</span>}
-            </label>
+          {templateId && selectedTemplate && !selectedTemplate.studentOnly && (
+            <p role="alert" className="text-xs" style={{ color: 'var(--color-danger)' }}>
+              {t('هذا القالب يستخدم متغيرات غير متعلقة بالطالب ولا يمكن استخدامه هنا.', 'This template uses non-student variables and can’t be used here.')}
+            </p>
           )}
         </div>
       ) : (
