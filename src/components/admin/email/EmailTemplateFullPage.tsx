@@ -21,6 +21,26 @@ interface ApiErrorLike { code?: string; message?: string }
 type Draft = Pick<EmailTemplate, 'id' | 'name' | 'subject' | 'html' | 'allowAttachments' | 'revision' | 'status'> & { boilerplateId: string | null };
 const emptyDraft: Draft = { id: '', name: '', subject: '', html: '', allowAttachments: false, boilerplateId: null, revision: 0, status: 'draft' };
 
+// Available height below the sticky admin topbar, down to the bottom margin, so the page itself
+// never scrolls on desktop -- only the editor's own content scrolls inside that fixed box.
+// Returns null below the lg breakpoint, where the two columns stack and scroll normally.
+function useAvailableHeight(bottomMargin: number) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState<number | null>(null);
+  useEffect(() => {
+    const update = () => {
+      if (!ref.current || window.innerWidth < 1024) { setHeight(null); return; }
+      const top = ref.current.getBoundingClientRect().top;
+      setHeight(Math.max(360, window.innerHeight - top - bottomMargin));
+    };
+    update();
+    const raf = requestAnimationFrame(update);
+    window.addEventListener('resize', update);
+    return () => { window.removeEventListener('resize', update); cancelAnimationFrame(raf); };
+  }, [bottomMargin]);
+  return { ref, height };
+}
+
 export default function EmailTemplateFullPage({ templateId }: { templateId?: string }) {
   const isAr = useLocale() === 'ar';
   const t = (ar: string, en: string) => isAr ? ar : en;
@@ -43,6 +63,8 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
   const [imageBusy, setImageBusy] = useState(false);
   const [testOpen, setTestOpen] = useState(false);
   const [recipients, setRecipients] = useState('');
+  const [linkedEvents, setLinkedEvents] = useState<{ id: number; title: string }[]>([]);
+  const [testEventId, setTestEventId] = useState<number | ''>('');
   const [testBusy, setTestBusy] = useState(false);
   const [testError, setTestError] = useState('');
   const [testOk, setTestOk] = useState(false);
@@ -50,11 +72,14 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
   const [approveBusy, setApproveBusy] = useState(false);
 
   const canEdit = !templateId || canManage || createdBy === userData?.id;
+  const previewRef = useRef<HTMLDivElement>(null);
+  const savedRange = useRef<Range | null>(null);
   const codeRef = useRef<HTMLTextAreaElement>(null);
   const subjectRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const mounted = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const { ref: heightRef, height } = useAvailableHeight(24);
 
   const loadBoilerplates = useCallback(async () => {
     try {
@@ -78,6 +103,20 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [templateId]);
+
+  // The rich preview is only synced from state on load / tab switch / mobile toggle (each of
+  // which (re)mounts the contentEditable node) -- not on every keystroke, which would otherwise
+  // fight the browser's own caret position while typing.
+  useEffect(() => {
+    if (tab === 'preview' && !mobile && !loading && previewRef.current) previewRef.current.innerHTML = draft.html;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, mobile, draft.id, loading]);
+
+  useEffect(() => {
+    if (!draft.id) { setLinkedEvents([]); return; }
+    apiGet<{ events: { id: number; title: string }[] }>(`/api/admin/mail/templates/${draft.id}/events`)
+      .then(result => setLinkedEvents(result.events)).catch(() => setLinkedEvents([]));
+  }, [draft.id]);
 
   const save = useCallback(async (payload: Draft) => {
     setSaveState('saving'); setError('');
@@ -111,7 +150,31 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
   };
   useEffect(() => { if (draft.allowAttachments) void loadCertOptions(); }, [draft.allowAttachments]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const insertVariableInCode = (source: string) => insertAtCursor(codeRef.current, draft.html, html => setDraft(previous => ({ ...previous, html })), variableToken(source));
+  // Variable/image insertion targets whichever surface is on screen: the rich preview (via a
+  // DOM Range, so the result keeps styling intact) or the raw-code textarea (plain text splice).
+  const saveSelection = () => {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount && previewRef.current?.contains(selection.anchorNode)) savedRange.current = selection.getRangeAt(0).cloneRange();
+  };
+  const insertNodeInPreview = (node: Node) => {
+    const area = previewRef.current;
+    if (!area) return;
+    area.focus();
+    const selection = window.getSelection();
+    let range = savedRange.current;
+    if (!range || !area.contains(range.startContainer)) { range = document.createRange(); range.selectNodeContents(area); range.collapse(false); }
+    selection?.removeAllRanges(); selection?.addRange(range);
+    range.deleteContents(); range.insertNode(node);
+    range.setStartAfter(node); range.setEndAfter(node);
+    selection?.removeAllRanges(); selection?.addRange(range);
+    savedRange.current = range.cloneRange();
+    setDraft(previous => ({ ...previous, html: area.innerHTML }));
+  };
+  const insertInEditor = (text: string) => {
+    if (tab === 'code') insertAtCursor(codeRef.current, draft.html, html => setDraft(previous => ({ ...previous, html })), text);
+    else insertNodeInPreview(document.createTextNode(text));
+  };
+  const insertVariableInEditor = (source: string) => insertInEditor(variableToken(source));
   const insertVariableInSubject = (source: string) => insertAtCursor(subjectRef.current, draft.subject, subject => setDraft(previous => ({ ...previous, subject })), variableToken(source));
 
   const startFromBoilerplate = async (boilerplateId: string) => {
@@ -120,6 +183,7 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
     try {
       const boilerplate = await apiGet<{ html: string }>(`/api/admin/mail/boilerplates/${boilerplateId}`);
       setDraft(previous => ({ ...previous, html: boilerplate.html, boilerplateId }));
+      if (previewRef.current && tab === 'preview') previewRef.current.innerHTML = boilerplate.html;
     } catch (reason) { setError(reason instanceof Error ? reason.message : t('تعذر تحميل القالب الأساسي', 'Unable to load the boilerplate')); }
   };
 
@@ -128,10 +192,17 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
     try {
       const [url, natural] = await Promise.all([uploadImage(file, 'email'), imageDimensions(file)]);
       const width = 320;
-      const height = natural ? Math.round(width * natural.height / natural.width) : undefined;
-      const tag = `<img src="${url}" alt="" width="${width}"${height ? ` height="${height}"` : ''} style="display:block;margin:0 auto;width:${width}px;max-width:100%;height:auto;" />`;
-      insertAtCursor(codeRef.current, draft.html, html => setDraft(previous => ({ ...previous, html })), tag);
-      setTab('code');
+      const height2 = natural ? Math.round(width * natural.height / natural.width) : undefined;
+      if (tab === 'code') {
+        const tag = `<img src="${url}" alt="" width="${width}"${height2 ? ` height="${height2}"` : ''} style="display:block;margin:0 auto;width:${width}px;max-width:100%;height:auto;" />`;
+        insertAtCursor(codeRef.current, draft.html, html => setDraft(previous => ({ ...previous, html })), tag);
+      } else {
+        const img = document.createElement('img');
+        img.src = url; img.alt = ''; img.style.display = 'block'; img.style.margin = '0 auto';
+        img.style.width = `${width}px`; img.style.maxWidth = '100%'; img.style.height = 'auto';
+        img.width = width; if (height2) img.height = height2;
+        insertNodeInPreview(img);
+      }
     } catch (reason) { setError(reason instanceof Error ? reason.message : t('تعذر رفع الصورة', 'Unable to upload the image')); }
     finally { setImageBusy(false); }
   };
@@ -166,7 +237,7 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
     if (list.length === 0 || list.length > MAX_TEST_RECIPIENTS) { setTestError(t(`أدخل بين ١ و٥ عناوين.`, `Enter between 1 and ${MAX_TEST_RECIPIENTS} addresses.`)); return; }
     if (!draft.id) { setTestError(t('احفظ القالب أولًا.', 'Save the template first.')); return; }
     setTestBusy(true); setTestError(''); setTestOk(false);
-    try { await apiSend('POST', `/api/admin/mail/templates/${draft.id}/test-send`, { recipients: list }); setTestOk(true); }
+    try { await apiSend('POST', `/api/admin/mail/templates/${draft.id}/test-send`, { recipients: list, eventId: testEventId || undefined }); setTestOk(true); }
     catch (reason) {
       const apiError = reason as ApiErrorLike;
       if (apiError?.code === 'sender-not-configured') {
@@ -192,8 +263,8 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
   if (loading) return <p role="status" className="p-10 text-center">{t('جارٍ التحميل…', 'Loading…')}</p>;
   if (notFound) return <div className={`${panel} p-10 text-center`}>{t('القالب غير موجود.', 'Template not found.')}</div>;
 
-  return <div dir={isAr ? 'rtl' : 'ltr'} className="space-y-5 pb-16">
-    <div className="flex flex-wrap items-center justify-between gap-3">
+  return <div dir={isAr ? 'rtl' : 'ltr'} className="flex flex-col lg:h-full">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
       <Link href="/admin/templates" className="inline-flex items-center gap-2 text-sm font-bold text-[var(--color-text-muted)] hover:text-[var(--color-text)]">
         <ArrowRight size={16} className={isAr ? '' : 'rotate-180'} />{t('رجوع إلى القوالب', 'Back to templates')}
       </Link>
@@ -202,33 +273,40 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
         <span className="text-xs text-[var(--color-text-muted)]">{saveState === 'saving' ? t('جارٍ الحفظ…', 'Saving…') : saveState === 'saved' ? t('تم الحفظ', 'Saved') : saveState === 'error' ? t('فشل الحفظ', 'Save failed') : ''}</span>
       </div>
     </div>
-    {!canEdit && <p className="rounded-xl bg-amber-500/10 p-3 text-sm text-amber-700">{t('هذا القالب لمنشئ آخر — للعرض فقط.', 'This template belongs to another author -- read only.')}</p>}
-    {error && <p role="alert" className="rounded-xl bg-red-500/10 p-4 text-red-600">{error}</p>}
+    {!canEdit && <p className="mb-3 rounded-xl bg-amber-500/10 p-3 text-sm text-amber-700">{t('هذا القالب لمنشئ آخر — للعرض فقط.', 'This template belongs to another author -- read only.')}</p>}
+    {error && <p role="alert" className="mb-3 rounded-xl bg-red-500/10 p-4 text-red-600">{error}</p>}
 
-    <div className="grid items-start gap-6 lg:grid-cols-[1fr_380px]">
-      {/* Main: always-visible preview/code, never covered by side-panel actions */}
-      <div className={`${panel} min-w-0 space-y-3 p-5`}>
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-border)] pb-3">
+    <div ref={heightRef} className="grid min-h-0 items-start gap-6 lg:grid-cols-[1fr_380px]" style={height ? { height } : undefined}>
+      {/* Main: always-visible editor, on the left, directly editable without switching tabs */}
+      <div className={`${panel} flex min-w-0 min-h-0 flex-col p-5 ${height ? 'h-full overflow-hidden' : ''}`}>
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[var(--color-border)] pb-3">
           <div className="flex gap-1">
             <button type="button" onClick={() => setTab('preview')} className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-bold ${tab === 'preview' ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : 'text-[var(--color-text-muted)]'}`}><Eye size={16} />{t('المعاينة', 'Preview')}</button>
             <button type="button" onClick={() => setTab('code')} className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-bold ${tab === 'code' ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : 'text-[var(--color-text-muted)]'}`}><Code2 size={16} />{t('الكود', 'Code')}</button>
           </div>
           {tab === 'preview' && <button type="button" className={button} onClick={() => setMobile(previous => !previous)}><Smartphone size={16} />{mobile ? t('عرض سطح المكتب', 'Desktop view') : t('معاينة الجوال', 'Mobile preview')}</button>}
         </div>
-        {tab === 'code' && canEdit && <div className="flex flex-wrap items-center gap-1.5">
-          <VariablePicker isAr={isAr} onInsert={insertVariableInCode} />
+        {canEdit && <div className="mt-3 flex shrink-0 flex-wrap items-center gap-1.5">
+          {EMAIL_VARIABLE_GROUPS.map(group => <select key={group.id} className={smallSelect} value="" onChange={event => { if (event.target.value) insertVariableInEditor(event.target.value); event.target.value = ''; }}>
+            <option value="">{t(group.ar, group.en)}</option>
+            {group.variables.map(variable => <option key={variable.source} value={variable.source}>{t(variable.ar, variable.en)}</option>)}
+          </select>)}
           <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void insertImage(file); }} />
           <button type="button" disabled={imageBusy} className={`${smallSelect} inline-flex items-center gap-1.5 font-bold hover:border-[var(--color-accent)]`} onClick={() => imageInputRef.current?.click()}><ImageIcon size={14} />{imageBusy ? t('جارٍ الرفع…', 'Uploading…') : t('إدراج صورة', 'Insert image')}</button>
         </div>}
-        {tab === 'preview'
-          ? <div className={mobile ? 'mx-auto w-[375px] overflow-hidden rounded-2xl border-4 border-[var(--color-border)] bg-white' : 'overflow-hidden rounded-xl border border-[var(--color-border)] bg-white'}>
-              <iframe title={t('معاينة البريد', 'Email preview')} sandbox="" referrerPolicy="no-referrer" srcDoc={draft.html || '<p></p>'} className={mobile ? 'h-[600px] w-full' : 'h-[640px] w-full'} />
-            </div>
-          : <textarea ref={codeRef} dir="ltr" disabled={!canEdit} rows={28} className={`${input} font-mono text-xs`} value={draft.html} onChange={event => setDraft({ ...draft, html: event.target.value })} />}
+        <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
+          {tab === 'preview'
+            ? (mobile
+                ? <div className="mx-auto w-[375px] overflow-hidden rounded-2xl border-4 border-[var(--color-border)] bg-white"><iframe title={t('معاينة الجوال', 'Mobile preview')} sandbox="" referrerPolicy="no-referrer" srcDoc={draft.html || '<p></p>'} className="h-[600px] w-full" /></div>
+                : <div ref={previewRef} contentEditable={canEdit} suppressContentEditableWarning onBlur={event => setDraft(previous => ({ ...previous, html: event.currentTarget.innerHTML }))}
+                    onMouseUp={saveSelection} onKeyUp={saveSelection}
+                    className="min-h-full rounded-xl border border-[var(--color-border)] bg-white p-4 text-black" dir="ltr" />)
+            : <textarea ref={codeRef} dir="ltr" disabled={!canEdit} className={`${input} h-full font-mono text-xs`} value={draft.html} onChange={event => setDraft({ ...draft, html: event.target.value })} />}
+        </div>
       </div>
 
-      {/* Side panel: metadata, variables, attachments, test-send -- always visible regardless of main tab */}
-      <aside className={`${panel} space-y-4 p-5`}>
+      {/* Side panel: name, subject, attachments (and test-send/approve/delete below them) */}
+      <aside className={`${panel} flex min-h-0 flex-col gap-4 p-5 ${height ? 'h-full overflow-y-auto' : ''}`}>
         {canEdit && boilerplates.length > 0 && <label className="block space-y-2"><span className="text-xs font-bold">{t('ابدأ من قالب أساسي (اختياري)', 'Start from a boilerplate (optional)')}</span>
           <select className={input} value="" onChange={event => { if (event.target.value) void startFromBoilerplate(event.target.value); }}>
             <option value="">{t('ابدأ من الصفر', 'Start blank')}</option>
@@ -239,7 +317,10 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
           <label className="block space-y-2"><span>{t('اسم القالب', 'Template name')}</span><input className={input} maxLength={120} value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} /></label>
           <div className="space-y-2">
             <label className="block space-y-2"><span>{t('عنوان البريد', 'Email subject')}</span><input ref={subjectRef} className={input} maxLength={200} value={draft.subject} onChange={event => setDraft({ ...draft, subject: event.target.value })} /></label>
-            <VariablePicker isAr={isAr} onInsert={insertVariableInSubject} />
+            <div className="flex flex-wrap gap-1.5">{EMAIL_VARIABLE_GROUPS.map(group => <select key={group.id} className={smallSelect} value="" onChange={event => { if (event.target.value) insertVariableInSubject(event.target.value); event.target.value = ''; }}>
+              <option value="">{t(group.ar, group.en)}</option>
+              {group.variables.map(variable => <option key={variable.source} value={variable.source}>{t(variable.ar, variable.en)}</option>)}
+            </select>)}</div>
           </div>
           <label className="flex items-center gap-2"><input type="checkbox" checked={draft.allowAttachments} disabled={!draft.id} onChange={event => setDraft({ ...draft, allowAttachments: event.target.checked })} />{t('السماح بالمرفقات', 'Allow attachments')}</label>
           {!draft.id && <p className="text-xs text-[var(--color-text-muted)]">{t('سيُحفظ القالب أولًا كمسودة قبل تفعيل المرفقات.', 'The template saves as a draft first before attachments can be enabled.')}</p>}
@@ -261,6 +342,12 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
           <button type="button" className={primary} disabled={!draft.id || testBusy} onClick={() => { setTestOpen(previous => !previous); setTestOk(false); setTestError(''); }}><Send size={16} />{t('إرسال اختباري', 'Send test')}</button>
           {testOpen && <div className="space-y-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3">
             <label className="block space-y-2"><span className="text-xs">{t(`عناوين الاختبار (حتى ${MAX_TEST_RECIPIENTS})`, `Test recipients (up to ${MAX_TEST_RECIPIENTS})`)}</span><input dir="ltr" className={input} value={recipients} onChange={event => setRecipients(event.target.value)} placeholder="person@example.com, another@example.com" /></label>
+            {linkedEvents.length > 0 && <label className="block space-y-2"><span className="text-xs">{t('معاينة كفعالية (لإضافة مرفقاتها)', 'Preview as event (adds its attachments)')}</span>
+              <select className={input} value={testEventId} onChange={event => setTestEventId(event.target.value ? Number(event.target.value) : '')}>
+                <option value="">{t('بدون فعالية محددة', 'No specific event')}</option>
+                {linkedEvents.map(ev => <option key={ev.id} value={ev.id}>{ev.title}</option>)}
+              </select>
+            </label>}
             {testError && <p role="alert" className="text-sm text-red-600">{testError}</p>}
             {testOk && <p role="status" className="text-sm text-emerald-600">{t('تم إضافة الرسالة الاختبارية لقائمة الإرسال.', 'Test message queued for delivery.')}</p>}
             <button type="button" className={primary} disabled={testBusy} onClick={() => void sendTest()}><Check size={16} />{testBusy ? t('جارٍ الإرسال…', 'Sending…') : t('إرسال', 'Send')}</button>
@@ -272,16 +359,6 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
       </aside>
     </div>
   </div>;
-}
-
-function VariablePicker({ isAr, onInsert }: { isAr: boolean; onInsert: (source: string) => void }) {
-  const t = (ar: string, en: string) => isAr ? ar : en;
-  return <select className={smallSelect} value="" onChange={event => { if (event.target.value) onInsert(event.target.value); event.target.value = ''; }}>
-    <option value="">{t('إدراج متغيّر…', 'Insert variable…')}</option>
-    {EMAIL_VARIABLE_GROUPS.map(group => <optgroup key={group.id} label={t(group.ar, group.en)}>
-      {group.variables.map(variable => <option key={variable.source} value={variable.source}>{t(variable.ar, variable.en)}</option>)}
-    </optgroup>)}
-  </select>;
 }
 
 function FixedAttachmentForm({ isAr, busy, onSubmit }: { isAr: boolean; busy: boolean; onSubmit: (file: File, title: string) => void }) {

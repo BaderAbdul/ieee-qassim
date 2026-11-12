@@ -69,6 +69,7 @@ export interface SettingsFields {
   vtoolsUuid: string;
   hasCertificate: boolean;
   certificateTemplateId: string; // '' = default/no template chosen yet
+  emailTemplateId: string; // '' = none chosen yet
 }
 
 export const input = 'w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]';

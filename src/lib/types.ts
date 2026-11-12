@@ -71,6 +71,7 @@ export interface PlatformEvent {
   securityFormAcknowledged?: boolean;
   vtoolsUuid?: string;
   certificateTemplateId?: string | null;
+  emailTemplateId?: string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
 }

@@ -30,6 +30,7 @@ export const EMAIL_VARIABLE_GROUPS: { id: string; ar: string; en: string; variab
     { source: 'event.endingTime', ar: 'وقت الانتهاء', en: 'Ending time' },
   ] },
   { id: 'student', ar: 'الطالب', en: 'Student', variables: [{ source: 'student.name', ar: 'الاسم', en: 'Name' }] },
+  { id: 'sponsor', ar: 'الراعي', en: 'Sponsor', variables: [{ source: 'sponsor.name', ar: 'الاسم', en: 'Name' }] },
   { id: 'other', ar: 'أخرى', en: 'Other', variables: [
     { source: 'other.vtoolsID', ar: 'معرّف vTools', en: 'vTools ID' },
     { source: 'other.certificateID', ar: 'معرّف الشهادة', en: 'Certificate ID' },

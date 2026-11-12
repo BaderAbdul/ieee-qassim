@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Save } from 'lucide-react';
-import { apiGet } from '@/lib/backend';
+import { Paperclip, Save, Trash2 } from 'lucide-react';
+import { apiGet, apiSend } from '@/lib/backend';
 import { input, label, primaryButton, type SettingsFields } from './wizardTypes';
 
 interface CertTemplate { id: string; nameAr: string }
+interface MailTemplate { id: string; name: string; subject: string }
+interface EventAttachment { id: string; title: string; filename: string; contentType: string }
 
 interface SettingsStageProps {
   isAr: boolean;
@@ -13,11 +15,19 @@ interface SettingsStageProps {
   onChange: (next: SettingsFields) => void;
   onSave: (fields: Record<string, unknown>) => Promise<void>;
   saving: boolean;
+  eventId?: number | null;
 }
 
-export default function SettingsStage({ isAr, value, onChange, onSave, saving }: SettingsStageProps) {
+export default function SettingsStage({ isAr, value, onChange, onSave, saving, eventId }: SettingsStageProps) {
+  const t = (ar: string, en: string) => isAr ? ar : en;
   const [templates, setTemplates] = useState<CertTemplate[]>([]);
   const [templatesError, setTemplatesError] = useState('');
+  const [mailTemplates, setMailTemplates] = useState<MailTemplate[]>([]);
+  const [mailTemplatesError, setMailTemplatesError] = useState('');
+  const [eventAttachments, setEventAttachments] = useState<EventAttachment[]>([]);
+  const [attachBusy, setAttachBusy] = useState(false);
+  const [attachError, setAttachError] = useState('');
+  const [attachTitle, setAttachTitle] = useState('');
 
   useEffect(() => {
     if (!value.hasCertificate) return;
@@ -29,6 +39,41 @@ export default function SettingsStage({ isAr, value, onChange, onSave, saving }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value.hasCertificate]);
 
+  useEffect(() => {
+    let active = true;
+    apiGet<{ templates: MailTemplate[] }>('/api/admin/mail/templates', { scope: 'approved' })
+      .then(result => { if (active) setMailTemplates(result.templates); })
+      .catch(error => { if (active) setMailTemplatesError(error instanceof Error ? error.message : (isAr ? 'تعذر تحميل قوالب البريد.' : 'Could not load email templates.')); });
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const loadEventAttachments = () => {
+    if (!eventId) return;
+    apiGet<{ attachments: EventAttachment[] }>(`/api/admin/events/${eventId}/email-attachments`)
+      .then(result => setEventAttachments(result.attachments)).catch(() => {});
+  };
+  useEffect(() => { loadEventAttachments(); }, [eventId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const addEventAttachment = async (file: File) => {
+    if (!eventId) return;
+    setAttachBusy(true); setAttachError('');
+    try {
+      const contentBase64 = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(',')[1]); reader.onerror = reject; reader.readAsDataURL(file); });
+      await apiSend('POST', `/api/admin/events/${eventId}/email-attachments`, {
+        title: attachTitle.trim() || file.name.replace(/\.[^./\\]+$/, ''), filename: file.name,
+        contentType: file.type || 'application/octet-stream', contentBase64,
+      });
+      setAttachTitle(''); loadEventAttachments();
+    } catch (reason) { setAttachError(reason instanceof Error ? reason.message : t('تعذر إضافة المرفق', 'Unable to add attachment')); } finally { setAttachBusy(false); }
+  };
+  const removeEventAttachment = async (id: string) => {
+    if (!eventId) return;
+    setAttachBusy(true); setAttachError('');
+    try { await apiSend('DELETE', `/api/admin/events/${eventId}/email-attachments/${id}`); loadEventAttachments(); }
+    catch (reason) { setAttachError(reason instanceof Error ? reason.message : t('تعذر حذف المرفق', 'Unable to remove attachment')); } finally { setAttachBusy(false); }
+  };
+
   const set = <K extends keyof SettingsFields>(key: K, val: SettingsFields[K]) => onChange({ ...value, [key]: val });
 
   const save = async () => onSave({
@@ -37,6 +82,7 @@ export default function SettingsStage({ isAr, value, onChange, onSave, saving }:
     vtoolsUuid: value.vtoolsUuid.trim(),
     hasCertificate: value.hasCertificate,
     certificateTemplateId: value.hasCertificate && value.certificateTemplateId ? value.certificateTemplateId : null,
+    emailTemplateId: value.emailTemplateId || null,
   });
 
   return (
@@ -88,9 +134,32 @@ export default function SettingsStage({ isAr, value, onChange, onSave, saving }:
         {templatesError && <p role="alert" className="text-xs" style={{ color: 'var(--color-danger)' }}>{templatesError}</p>}
       </div>
 
-      <div className="rounded-xl border border-dashed border-[var(--color-border)] p-4 opacity-60">
-        <p className="text-sm font-bold text-[var(--color-text-muted)]">{isAr ? 'متغيرات قالب البريد الإلكتروني' : 'Email-template variables'}</p>
-        <p className="mt-1 text-xs text-[var(--color-text-muted)]">{isAr ? 'قريبًا.' : 'Coming soon.'}</p>
+      <div className="space-y-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] p-4">
+        <label className={label}><span>{isAr ? 'قالب البريد الإلكتروني' : 'Email template'}</span>
+          <select className={input} value={value.emailTemplateId} onChange={e => set('emailTemplateId', e.target.value)}>
+            <option value="">{isAr ? 'بلا قالب' : 'No template'}</option>
+            {mailTemplates.map(m => <option key={m.id} value={m.id}>{m.name || m.subject || m.id}</option>)}
+          </select>
+        </label>
+        {mailTemplatesError && <p role="alert" className="text-xs" style={{ color: 'var(--color-danger)' }}>{mailTemplatesError}</p>}
+        {value.emailTemplateId && (
+          <div className="space-y-2 border-t border-[var(--color-border)] pt-3">
+            <p className="flex items-center gap-2 text-sm font-bold text-[var(--color-text-secondary)]"><Paperclip size={15} />{isAr ? 'مرفقات خاصة بهذه الفعالية' : 'Attachments specific to this event'}</p>
+            <p className="text-xs text-[var(--color-text-muted)]">{isAr ? 'تُضاف إلى مرفقات القالب نفسه عند إرسال بريد هذه الفعالية.' : 'Added on top of the template’s own attachments when sending this event’s email.'}</p>
+            {!eventId && <p className="text-xs text-[var(--color-text-muted)]">{isAr ? 'احفظ الفعالية أولًا لإضافة مرفقات.' : 'Save the event first to add attachments.'}</p>}
+            {eventId && <>
+              {eventAttachments.length > 0 && <ul className="space-y-1.5">{eventAttachments.map(a => (
+                <li key={a.id} className="flex items-center justify-between gap-2 rounded-lg bg-[var(--color-surface)] px-3 py-2 text-sm">
+                  <span className="truncate">{a.title}</span>
+                  <button type="button" disabled={attachBusy} aria-label={isAr ? 'حذف' : 'Remove'} onClick={() => void removeEventAttachment(a.id)}><Trash2 size={15} /></button>
+                </li>
+              ))}</ul>}
+              <input className={input} placeholder={isAr ? 'عنوان المرفق (اختياري)' : 'Attachment title (optional)'} value={attachTitle} onChange={e => setAttachTitle(e.target.value)} />
+              <input type="file" disabled={attachBusy} onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void addEventAttachment(file); }} />
+              {attachError && <p role="alert" className="text-xs" style={{ color: 'var(--color-danger)' }}>{attachError}</p>}
+            </>}
+          </div>
+        )}
       </div>
 
       <div className="flex justify-end">

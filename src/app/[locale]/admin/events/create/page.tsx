@@ -28,7 +28,7 @@ const emptyTimePlace: TimePlaceFields = { days: [], locationType: 'in_person', l
 const emptySecurity: SecurityFields = { securityFormAcknowledged: false };
 const emptyInterviewer: InterviewerFields = { interviewer: '', interviewerEn: '' };
 const emptyDesign: DesignFields = { coverUrl: '' };
-const emptySettings: SettingsFields = { requiresRegistration: true, registrationMode: 'Auto', vtoolsUuid: '', hasCertificate: false, certificateTemplateId: '' };
+const emptySettings: SettingsFields = { requiresRegistration: true, registrationMode: 'Auto', vtoolsUuid: '', hasCertificate: false, certificateTemplateId: '', emailTemplateId: '' };
 const emptyReview: ReviewFields = { feedbackQuestions: [] };
 
 export default function CreateEventPage() {
@@ -84,7 +84,7 @@ export default function CreateEventPage() {
         setSettingsData({
           requiresRegistration: event.requiresRegistration !== false, registrationMode: event.registrationMode || 'Auto',
           vtoolsUuid: event.vtoolsUuid || '', hasCertificate: !!event.hasCertificate,
-          certificateTemplateId: event.certificateTemplateId || '',
+          certificateTemplateId: event.certificateTemplateId || '', emailTemplateId: event.emailTemplateId || '',
         });
         setReviewData({ feedbackQuestions: normalizeFeedbackQuestions(event.feedbackQuestions || []) });
         const done = new Set<StageId>(['main']);
@@ -185,7 +185,7 @@ export default function CreateEventPage() {
             onSave={async fields => { if (await saveStage('design', fields)) setActiveStage('settings'); }} />
         )}
         {activeStage === 'settings' && eventId && (
-          <SettingsStage isAr={isAr} value={settingsData} onChange={setSettingsData} saving={saving}
+          <SettingsStage isAr={isAr} value={settingsData} onChange={setSettingsData} saving={saving} eventId={eventId}
             onSave={async fields => { await saveStage('settings', fields); }} />
         )}
         {activeStage === 'review' && eventId && (
