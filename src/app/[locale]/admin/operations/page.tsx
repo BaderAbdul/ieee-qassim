@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useLocale } from 'next-intl';
 import {
-  Activity, BookOpen, Briefcase, LayoutDashboard, Lightbulb, ListTodo, MessageSquare, Target,
+  BookOpen, Briefcase, LayoutDashboard, Lightbulb, ListTodo, MessageSquare, Target,
 } from 'lucide-react';
 import { hasAnyPrivilege, useAuth } from '@/context/AuthContext';
 import { useAdminTopbarActions } from '@/components/admin/AdminTopbarActions';
@@ -14,9 +14,8 @@ import TaskCenterGoalsTab from '@/components/admin/operations/TaskCenterGoalsTab
 import TaskCenterCheckinTab from '@/components/admin/operations/TaskCenterCheckinTab';
 import TaskCenterIdeasTab from '@/components/admin/operations/TaskCenterIdeasTab';
 import TaskCenterResourcesTab from '@/components/admin/operations/TaskCenterResourcesTab';
-import TaskCenterSystemTab from '@/components/admin/operations/TaskCenterSystemTab';
 
-type TabId = 'overview' | 'projects' | 'tasks' | 'goals' | 'checkin' | 'ideas' | 'resources' | 'system';
+type TabId = 'overview' | 'projects' | 'tasks' | 'goals' | 'checkin' | 'ideas' | 'resources';
 
 export default function AdminOperationsPage() {
   const isAr = useLocale() === 'ar';
@@ -32,7 +31,6 @@ export default function AdminOperationsPage() {
     { id: 'checkin', labelAr: 'تسجيل الحضور', labelEn: 'Check-in', Icon: MessageSquare },
     { id: 'ideas', labelAr: 'بنك الأفكار', labelEn: 'Idea Bank', Icon: Lightbulb },
     { id: 'resources', labelAr: 'الموارد', labelEn: 'Resources', Icon: BookOpen },
-    { id: 'system', labelAr: 'النظام', labelEn: 'System', Icon: Activity },
   ];
 
   const topbarActions = useMemo(() => (
@@ -56,6 +54,5 @@ export default function AdminOperationsPage() {
     {tab === 'checkin' && <TaskCenterCheckinTab isAr={isAr} />}
     {tab === 'ideas' && <TaskCenterIdeasTab isAr={isAr} canModerate={canModerate} />}
     {tab === 'resources' && <TaskCenterResourcesTab isAr={isAr} />}
-    {tab === 'system' && <TaskCenterSystemTab isAr={isAr} />}
   </div>;
 }

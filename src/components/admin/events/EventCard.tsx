@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { Link } from '@/i18n/routing';
 import {
-  ArrowUpRight, Calendar, Clock, Award, QrCode, Link2, MapPin, Eye, EyeOff,
+  ArrowUpRight, Calendar, CheckCircle2, Clock, Award, QrCode, Link2, MapPin, Eye, EyeOff, AlertTriangle,
 } from 'lucide-react';
 import { toJsDate } from '@/lib/dateUtils';
 import type { PlatformEvent, EventState } from '@/lib/types';
@@ -12,6 +12,7 @@ import { formatAdminDate } from '@/components/admin/AdminData';
 import { eventStateLabel } from '@/components/admin/EventWorkspace';
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
 import EventLinkQrModal from '@/components/admin/events/EventLinkQrModal';
+import { eventReadiness } from '@/lib/eventReadiness';
 
 export const transitions: Record<EventState, EventState[]> = {
   Draft: ['Published', 'Registration Open', 'Ongoing', 'Archived'],
@@ -52,6 +53,13 @@ export default function EventCard({
   const date = toJsDate(event.date);
   const badge = stateBadgeColors[event.state] || stateBadgeColors.Draft;
   const isVisible = !event.isUnlisted;
+  const readiness = eventReadiness(event);
+  const readinessHref = readiness && !readiness.ready
+    ? `/admin/events/create?eventId=${event.id}&stage=${readiness.missingStage}&field=${readiness.missingField}`
+    : null;
+  const readinessLabel = readiness && (readiness.mode === 'open'
+    ? (readiness.ready ? (isAr ? 'جاهز للفتح' : 'Ready to open') : (isAr ? 'باقي بعض البيانات للفتح' : 'Some data left to open'))
+    : (readiness.ready ? (isAr ? 'جاهز للاغلاق' : 'Ready to close') : (isAr ? 'باقي بعض البيانات للاغلاق' : 'Some data left to close')));
 
   return (
     <article className="group relative rounded-3xl border bg-[var(--color-surface)]/60 backdrop-blur-md p-5 sm:p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between border-[var(--color-border)]/50">
@@ -93,6 +101,21 @@ export default function EventCard({
             <span className="text-[11px] font-bold px-0.5">{isAr ? 'مؤرشفة' : 'Archived'}</span>
           )}
         </div>
+
+        {readiness && (
+          readinessHref ? (
+            <Link
+              href={readinessHref}
+              className="relative z-10 mb-3 flex w-fit items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700 hover:opacity-80"
+            >
+              <AlertTriangle className="h-3 w-3 shrink-0" />{readinessLabel}
+            </Link>
+          ) : (
+            <span className="relative z-10 mb-3 flex w-fit items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
+              <CheckCircle2 className="h-3 w-3 shrink-0" />{readinessLabel}
+            </span>
+          )
+        )}
 
         <div className="flex items-start gap-3 mb-3">
           <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden bg-[var(--color-surface-2)] flex items-center justify-center text-[var(--color-text-muted)] flex-shrink-0">

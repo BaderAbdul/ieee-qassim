@@ -16,10 +16,15 @@ interface SettingsStageProps {
   onSave: (fields: Record<string, unknown>) => Promise<void>;
   saving: boolean;
   eventId?: number | null;
+  /** Field name to outline in red, deep-linked from the events list's readiness badge. */
+  highlightField?: string;
 }
 
-export default function SettingsStage({ isAr, value, onChange, onSave, saving, eventId }: SettingsStageProps) {
+const invalidClass = 'border-2 border-[var(--color-danger)]';
+
+export default function SettingsStage({ isAr, value, onChange, onSave, saving, eventId, highlightField }: SettingsStageProps) {
   const t = (ar: string, en: string) => isAr ? ar : en;
+  const [highlight, setHighlight] = useState(highlightField);
   const [templates, setTemplates] = useState<CertTemplate[]>([]);
   const [templatesError, setTemplatesError] = useState('');
   const [mailTemplates, setMailTemplates] = useState<MailTemplate[]>([]);
@@ -74,7 +79,10 @@ export default function SettingsStage({ isAr, value, onChange, onSave, saving, e
     catch (reason) { setAttachError(reason instanceof Error ? reason.message : t('تعذر حذف المرفق', 'Unable to remove attachment')); } finally { setAttachBusy(false); }
   };
 
-  const set = <K extends keyof SettingsFields>(key: K, val: SettingsFields[K]) => onChange({ ...value, [key]: val });
+  const set = <K extends keyof SettingsFields>(key: K, val: SettingsFields[K]) => {
+    if (highlight === key) setHighlight(undefined);
+    onChange({ ...value, [key]: val });
+  };
 
   const save = async () => onSave({
     requiresRegistration: value.requiresRegistration,
@@ -107,7 +115,7 @@ export default function SettingsStage({ isAr, value, onChange, onSave, saving, e
       <div>
         <label className={label}>
           <span>{isAr ? 'معرف VTools' : 'VTools ID'}</span>
-          <input className={input} dir="ltr" inputMode="numeric" placeholder="123456" maxLength={20}
+          <input className={`${input} ${highlight === 'vtoolsUuid' ? invalidClass : ''}`} dir="ltr" inputMode="numeric" placeholder="123456" maxLength={20}
                  value={value.vtoolsUuid} onChange={e => set('vtoolsUuid', e.target.value.replace(/\D/g, ''))} />
         </label>
         <p className="mt-1.5 text-xs text-[var(--color-text-muted)]">
@@ -124,7 +132,7 @@ export default function SettingsStage({ isAr, value, onChange, onSave, saving, e
         </label>
         {value.hasCertificate && (
           <label className={label}><span>{isAr ? 'قالب الشهادة' : 'Certificate template'}</span>
-            <select className={input} value={value.certificateTemplateId}
+            <select className={`${input} ${highlight === 'certificateTemplateId' ? invalidClass : ''}`} value={value.certificateTemplateId}
                     onChange={e => set('certificateTemplateId', e.target.value)}>
               <option value="">{isAr ? 'التصميم الافتراضي' : 'Default design'}</option>
               {templates.map(t => <option key={t.id} value={t.id}>{t.nameAr}</option>)}

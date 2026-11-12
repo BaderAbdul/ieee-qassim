@@ -22,7 +22,7 @@ import SettingsStage from '@/components/admin/events/wizard/SettingsStage';
 import ReviewStage from '@/components/admin/events/wizard/ReviewStage';
 import ShareStage from '@/components/admin/events/wizard/ShareStage';
 import EventActivityTrail from '@/components/admin/events/wizard/EventActivityTrail';
-import type { DesignFields, InterviewerFields, MainDataFields, ReviewFields, SecurityFields, SettingsFields, ShareFields, SponsorsFields, StageId, TimePlaceFields } from '@/components/admin/events/wizard/wizardTypes';
+import { STAGES, type DesignFields, type InterviewerFields, type MainDataFields, type ReviewFields, type SecurityFields, type SettingsFields, type ShareFields, type SponsorsFields, type StageId, type TimePlaceFields } from '@/components/admin/events/wizard/wizardTypes';
 
 const emptyMainData: MainDataFields = { title: '', titleEn: '', description: '', descriptionEn: '', type: 'Workshop', gains: '', gainsEn: '' };
 const emptyTimePlace: TimePlaceFields = { days: [], locationType: 'in_person', location: '', locationEn: '', capacity: 50, isUnlimitedCapacity: false, hideExactCapacity: false, gender: 'both' };
@@ -41,12 +41,15 @@ export default function CreateEventPage() {
   const searchParams = useSearchParams();
   const resumeParam = searchParams.get('eventId');
   const resumeId = resumeParam && /^\d+$/.test(resumeParam) ? Number(resumeParam) : null;
+  const rawStageParam = searchParams.get('stage');
+  const stageParam = STAGES.some(stage => stage.id === rawStageParam) ? (rawStageParam as StageId) : null;
+  const highlightField = searchParams.get('field') || undefined;
 
   const [eventId, setEventId] = useState<number | null>(null);
   const [loadingDraft, setLoadingDraft] = useState(!!resumeId);
   const [loadError, setLoadError] = useState(() =>
     (resumeParam && !resumeId) ? (isAr ? 'رابط استكمال المسودة غير صالح.' : 'Invalid draft resume link.') : '');
-  const [activeStage, setActiveStage] = useState<StageId>('main');
+  const [activeStage, setActiveStage] = useState<StageId>(stageParam || 'main');
   const [completedStages, setCompletedStages] = useState<Set<StageId>>(new Set());
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -167,10 +170,12 @@ export default function CreateEventPage() {
 
         {activeStage === 'main' && (
           <MainDataStage isAr={isAr} value={mainData} onChange={setMainData} saving={saving}
+            highlightField={highlightField}
             onSave={async fields => { if (await saveStage('main', fields) && !completedStages.has('time')) setActiveStage('time'); }} />
         )}
         {activeStage === 'time' && eventId && (
           <TimePlaceStage isAr={isAr} value={timePlace} onChange={setTimePlace} saving={saving}
+            highlightField={highlightField}
             onSave={async fields => { if (await saveStage('time', fields)) setActiveStage('security'); }} />
         )}
         {activeStage === 'security' && eventId && (
@@ -191,6 +196,7 @@ export default function CreateEventPage() {
         )}
         {activeStage === 'settings' && eventId && (
           <SettingsStage isAr={isAr} value={settingsData} onChange={setSettingsData} saving={saving} eventId={eventId}
+            highlightField={highlightField}
             onSave={async fields => { await saveStage('settings', fields); }} />
         )}
         {activeStage === 'review' && eventId && (

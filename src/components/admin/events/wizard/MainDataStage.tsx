@@ -18,11 +18,19 @@ interface MainDataStageProps {
   onChange: (next: MainDataFields) => void;
   onSave: (fields: Record<string, unknown>) => Promise<void>;
   saving: boolean;
+  /** Field name to outline in red, deep-linked from the events list's readiness badge. */
+  highlightField?: string;
 }
 
-export default function MainDataStage({ isAr, value, onChange, onSave, saving }: MainDataStageProps) {
+const invalidClass = 'border-2 border-[var(--color-danger)]';
+
+export default function MainDataStage({ isAr, value, onChange, onSave, saving, highlightField }: MainDataStageProps) {
   const [error, setError] = useState('');
-  const set = <K extends keyof MainDataFields>(key: K, val: MainDataFields[K]) => onChange({ ...value, [key]: val });
+  const [highlight, setHighlight] = useState(highlightField);
+  const set = <K extends keyof MainDataFields>(key: K, val: MainDataFields[K]) => {
+    if (highlight === key) setHighlight(undefined);
+    onChange({ ...value, [key]: val });
+  };
 
   const save = async () => {
     if (!value.title.trim() || !value.titleEn.trim() || !value.description.trim() || !value.descriptionEn.trim()) {
@@ -44,11 +52,11 @@ export default function MainDataStage({ isAr, value, onChange, onSave, saving }:
       {error && <p role="alert" className="rounded-xl p-3 text-sm" style={{ backgroundColor: 'var(--color-danger-soft)', color: 'var(--color-danger)' }}>{error}</p>}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <label className={label}><span>{isAr ? 'عنوان الفعالية (عربي)' : 'Title (Arabic)'}</span>
-          <input className={input} dir="rtl" value={value.title} onChange={e => set('title', e.target.value)} /></label>
+          <input className={`${input} ${highlight === 'title' ? invalidClass : ''}`} dir="rtl" value={value.title} onChange={e => set('title', e.target.value)} /></label>
         <label className={label}><span>{isAr ? 'Event title (English)' : 'Event title (English)'}</span>
           <input className={input} dir="ltr" value={value.titleEn} onChange={e => set('titleEn', e.target.value)} /></label>
         <label className={`${label} sm:col-span-2`}><span>{isAr ? 'الوصف (عربي)' : 'Description (Arabic)'}</span>
-          <textarea className={input} dir="rtl" rows={3} value={value.description} onChange={e => set('description', e.target.value)} /></label>
+          <textarea className={`${input} ${highlight === 'description' ? invalidClass : ''}`} dir="rtl" rows={3} value={value.description} onChange={e => set('description', e.target.value)} /></label>
         <label className={`${label} sm:col-span-2`}><span>{isAr ? 'الوصف (إنجليزي)' : 'Description (English)'}</span>
           <textarea className={input} dir="ltr" rows={3} value={value.descriptionEn} onChange={e => set('descriptionEn', e.target.value)} /></label>
         <label className={label}><span>{isAr ? 'نوع الفعالية' : 'Event type'}</span>

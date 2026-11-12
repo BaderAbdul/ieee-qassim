@@ -14,11 +14,19 @@ interface TimePlaceStageProps {
   onChange: (next: TimePlaceFields) => void;
   onSave: (fields: Record<string, unknown>) => Promise<void>;
   saving: boolean;
+  /** Field name to outline in red, deep-linked from the events list's readiness badge. */
+  highlightField?: string;
 }
 
-export default function TimePlaceStage({ isAr, value, onChange, onSave, saving }: TimePlaceStageProps) {
+const invalidClass = 'border-2 border-[var(--color-danger)]';
+
+export default function TimePlaceStage({ isAr, value, onChange, onSave, saving, highlightField }: TimePlaceStageProps) {
   const [error, setError] = useState('');
-  const set = <K extends keyof TimePlaceFields>(key: K, val: TimePlaceFields[K]) => onChange({ ...value, [key]: val });
+  const [highlight, setHighlight] = useState(highlightField);
+  const set = <K extends keyof TimePlaceFields>(key: K, val: TimePlaceFields[K]) => {
+    if (highlight === key) setHighlight(undefined);
+    onChange({ ...value, [key]: val });
+  };
 
   const addDay = () => {
     if (value.days.length >= 30) return;
@@ -120,7 +128,7 @@ export default function TimePlaceStage({ isAr, value, onChange, onSave, saving }
         {value.locationType === 'in_person' && (
           <>
             <label className={label}><span>{isAr ? 'المكان (عربي)' : 'Location (Arabic)'}</span>
-              <input className={input} dir="rtl" value={value.location} onChange={e => set('location', e.target.value)} /></label>
+              <input className={`${input} ${highlight === 'location' ? invalidClass : ''}`} dir="rtl" value={value.location} onChange={e => set('location', e.target.value)} /></label>
             <label className={label}><span>{isAr ? 'Location (English)' : 'Location (English)'}</span>
               <input className={input} dir="ltr" value={value.locationEn} onChange={e => set('locationEn', e.target.value)} /></label>
           </>
@@ -128,7 +136,7 @@ export default function TimePlaceStage({ isAr, value, onChange, onSave, saving }
 
         <label className={label}>
           <span>{value.locationType === 'online' ? (isAr ? 'المستهدف من الحضور' : 'Attendance goal') : (isAr ? 'عدد المقاعد' : 'Seat count')}</span>
-          <input type="number" min={1} disabled={value.isUnlimitedCapacity} className={input} value={value.capacity}
+          <input type="number" min={1} disabled={value.isUnlimitedCapacity} className={`${input} ${highlight === 'capacity' ? invalidClass : ''}`} value={value.capacity}
             onChange={e => set('capacity', Number(e.target.value))} /></label>
         <label className={label}><span>{isAr ? 'الفئة المستهدفة' : 'Gender'}</span>
           <select className={input} value={value.gender} onChange={e => set('gender', e.target.value as EventGender)}>
