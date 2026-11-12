@@ -44,7 +44,7 @@ export default function MailTrackingTab({ isAr }: { isAr: boolean }) {
       ].map(({ label, value, Icon, color }) => (
         <div key={label} className={`${panel} flex items-center gap-3.5 p-5`}>
           <div className={`rounded-xl bg-[var(--color-surface-2)] p-3 ${color}`}><Icon size={24} /></div>
-          <div><p className="text-xs font-bold text-[var(--color-text-muted)]">{label}</p><p className="mt-1 text-2xl font-black">{value ?? '…'}</p></div>
+          <div><p className="text-xs font-bold text-[var(--color-text-muted)]">{label}</p><p dir="ltr" className="mt-1 text-2xl font-black">{value ?? '…'}</p></div>
         </div>
       ))}
     </div>

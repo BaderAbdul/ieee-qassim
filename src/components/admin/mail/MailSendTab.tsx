@@ -135,7 +135,7 @@ export default function MailSendTab({ isAr }: { isAr: boolean }) {
       {recipientMode === 'all' ? (
         <div className="space-y-3">
           <label className="block space-y-1.5">
-            <span className="text-sm font-bold">{t('عدد الطلاب المرسل إليهم', 'Number of students to send to')}: <strong>{allLimit}</strong> / {stats.totalStudents}</span>
+            <span className="text-sm font-bold">{t('عدد الطلاب المرسل إليهم', 'Number of students to send to')}: <span dir="ltr"><strong>{allLimit}</strong> / {stats.totalStudents}</span></span>
             <input type="range" min={0} max={Math.min(stats.totalStudents, stats.remainingToday)} value={allLimit}
                    onChange={e => setAllLimit(Number(e.target.value))} className="w-full" />
           </label>
