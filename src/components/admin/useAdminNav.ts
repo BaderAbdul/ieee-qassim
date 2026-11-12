@@ -7,7 +7,6 @@ import {
   UsersRound,
   Mail,
   Layers,
-  CircleUserRound,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 
@@ -30,7 +29,6 @@ export function useAdminNav(userData: UserData | null, isAr: boolean) {
         ...(userData.canManageEmail ? [{ name: isAr ? 'البريد' : 'Mail', href: '/admin/mail', icon: Mail }] : []),
       ],
       footerItems: [
-        { name: isAr ? 'صفحتي' : 'My page', href: '/profile', icon: CircleUserRound },
         ...(userData.canManageEmail ? [{ name: isAr ? 'الإعدادات' : 'Settings', href: '/admin/settings', icon: Settings }] : []),
       ],
       isSuperAdmin, canEditContent, canViewMembers,
@@ -47,7 +45,6 @@ export function useAdminNav(userData: UserData | null, isAr: boolean) {
   ];
 
   const footerItems: AdminNavItem[] = [
-    { name: isAr ? 'صفحتي' : 'My page', href: '/profile', icon: CircleUserRound },
     ...(isSuperAdmin || canEditContent || userData?.canManageEmail ? [{ name: isAr ? 'الإعدادات' : 'Settings', href: '/admin/settings', icon: Settings }] : []),
   ];
 
