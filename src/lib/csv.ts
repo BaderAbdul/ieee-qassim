@@ -49,3 +49,8 @@ export function secureCertificateURL(value: string): string {
   if (url.protocol !== 'https:' || url.username || url.password || url.href.length > 2000) throw new Error('يلزم رابط HTTPS صحيح دون بيانات دخول');
   return url.href;
 }
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export function looksLikeEmail(value: string): boolean {
+  return EMAIL_RE.test(value.trim());
+}
