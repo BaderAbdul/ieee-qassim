@@ -78,44 +78,46 @@ export default function EventCard({
             `relative z-10` promotes it above the stretched link (both are position:absolute/
             relative, so without this the link -- painted later in the stacking order -- would
             win every click here instead of the select). */}
-        <div className={`relative z-10 flex w-fit mr-auto items-center gap-1 rounded-full border shadow-sm mb-3 ${badge.bg} ${badge.text} ${badge.border} ps-2 pe-1 py-1`}>
-          {isVisible ? (
-            <Eye className="w-3 h-3 shrink-0" aria-label={isAr ? 'ظاهرة في الموقع' : 'Visible on site'} />
-          ) : (
-            <EyeOff className="w-3 h-3 shrink-0" aria-label={isAr ? 'مخفية عن الموقع' : 'Hidden from site'} />
-          )}
-          {transitions[event.state]?.length ? (
-            <select
-              aria-label={isAr ? `تغيير حالة ${event.title}` : `Change ${event.title} state`}
-              value={event.state}
-              disabled={busy}
-              onChange={(e) => setPendingState(e.target.value as EventState)}
-              className="bg-transparent border-none px-0.5 py-0 text-[11px] font-bold disabled:opacity-50 transition-all focus:outline-none"
-            >
-              <option value={event.state}>{eventStateLabel(event.state, isAr)}</option>
-              {transitions[event.state].map((st) => (
-                <option key={st} value={st}>{eventStateLabel(st, isAr)}</option>
-              ))}
-            </select>
-          ) : (
-            <span className="text-[11px] font-bold px-0.5">{isAr ? 'مؤرشفة' : 'Archived'}</span>
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <div className={`relative z-10 flex w-fit items-center gap-1 rounded-full border shadow-sm ${badge.bg} ${badge.text} ${badge.border} ps-2 pe-1 py-1`}>
+            {isVisible ? (
+              <Eye className="w-3 h-3 shrink-0" aria-label={isAr ? 'ظاهرة في الموقع' : 'Visible on site'} />
+            ) : (
+              <EyeOff className="w-3 h-3 shrink-0" aria-label={isAr ? 'مخفية عن الموقع' : 'Hidden from site'} />
+            )}
+            {transitions[event.state]?.length ? (
+              <select
+                aria-label={isAr ? `تغيير حالة ${event.title}` : `Change ${event.title} state`}
+                value={event.state}
+                disabled={busy}
+                onChange={(e) => setPendingState(e.target.value as EventState)}
+                className="bg-transparent border-none px-0.5 py-0 text-[11px] font-bold disabled:opacity-50 transition-all focus:outline-none"
+              >
+                <option value={event.state}>{eventStateLabel(event.state, isAr)}</option>
+                {transitions[event.state].map((st) => (
+                  <option key={st} value={st}>{eventStateLabel(st, isAr)}</option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-[11px] font-bold px-0.5">{isAr ? 'مؤرشفة' : 'Archived'}</span>
+            )}
+          </div>
+
+          {readiness && (
+            readinessHref ? (
+              <Link
+                href={readinessHref}
+                className="relative z-10 flex w-fit items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700 hover:opacity-80"
+              >
+                <AlertTriangle className="h-3 w-3 shrink-0" />{readinessLabel}
+              </Link>
+            ) : (
+              <span className="relative z-10 flex w-fit items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
+                <CheckCircle2 className="h-3 w-3 shrink-0" />{readinessLabel}
+              </span>
+            )
           )}
         </div>
-
-        {readiness && (
-          readinessHref ? (
-            <Link
-              href={readinessHref}
-              className="relative z-10 mb-3 flex w-fit items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700 hover:opacity-80"
-            >
-              <AlertTriangle className="h-3 w-3 shrink-0" />{readinessLabel}
-            </Link>
-          ) : (
-            <span className="relative z-10 mb-3 flex w-fit items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
-              <CheckCircle2 className="h-3 w-3 shrink-0" />{readinessLabel}
-            </span>
-          )
-        )}
 
         <div className="flex items-start gap-3 mb-3">
           <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden bg-[var(--color-surface-2)] flex items-center justify-center text-[var(--color-text-muted)] flex-shrink-0">
