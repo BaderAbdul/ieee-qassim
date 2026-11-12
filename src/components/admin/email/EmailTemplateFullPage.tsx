@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { ArrowRight, Check, Code2, Eye, Image as ImageIcon, Paperclip, Send, ShieldCheck, Smartphone, Trash2 } from 'lucide-react';
 import { Link, useRouter } from '@/i18n/routing';
@@ -309,9 +309,7 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
           {tab === 'preview'
             ? (mobile
                 ? <div className="mx-auto w-[375px] overflow-hidden rounded-2xl border-4 border-[var(--color-border)] bg-white"><iframe title={t('معاينة الجوال', 'Mobile preview')} sandbox="" referrerPolicy="no-referrer" srcDoc={draft.html || '<p></p>'} className="h-[600px] w-full" /></div>
-                : <div ref={previewRef} contentEditable={canEdit} suppressContentEditableWarning onBlur={event => setDraft(previous => ({ ...previous, html: event.currentTarget.innerHTML }))}
-                    onMouseUp={saveSelection} onKeyUp={saveSelection}
-                    className="min-h-full rounded-xl border border-[var(--color-border)] bg-white p-4 text-black" dir="ltr" />)
+                : <RichPreview previewRef={previewRef} canEdit={canEdit} onCommit={html => setDraft(previous => ({ ...previous, html }))} onSelect={saveSelection} />)
             : <textarea ref={codeRef} dir="ltr" disabled={!canEdit} className={`${input} h-full font-mono text-xs`} value={draft.html} onChange={event => setDraft({ ...draft, html: event.target.value })} />}
         </div>
       </div>
@@ -371,6 +369,22 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
     </div>
   </div>;
 }
+
+// React's own reconciler can crash (TypeError: Cannot read properties of null (reading
+// 'innerHTML')) when it tries to diff a contentEditable node whose children were just mutated
+// imperatively (e.g. replacing a text selection via Range.deleteContents()/insertNode()) --
+// confirmed live: it only happened when inserting a variable over a selection, never into a
+// collapsed cursor. Freezing this node behind an always-equal memo stops React from ever
+// touching its children again after the first mount, which removes the conflict entirely.
+// canEdit/onCommit/onSelect are effectively captured only at mount; onCommit/onSelect are safe
+// because they only use refs and functional state updates, never a stale closure value.
+const RichPreview = memo(function RichPreview({ previewRef, canEdit, onCommit, onSelect }: {
+  previewRef: React.RefObject<HTMLDivElement | null>; canEdit: boolean; onCommit: (html: string) => void; onSelect: () => void;
+}) {
+  return <div ref={previewRef} contentEditable={canEdit} suppressContentEditableWarning
+    onBlur={event => onCommit(event.currentTarget.innerHTML)} onMouseUp={onSelect} onKeyUp={onSelect}
+    className="min-h-full rounded-xl border border-[var(--color-border)] bg-white p-4 text-black" dir="ltr" />;
+}, () => true);
 
 function FixedAttachmentForm({ isAr, busy, onSubmit }: { isAr: boolean; busy: boolean; onSubmit: (file: File, title: string) => void }) {
   const t = (ar: string, en: string) => isAr ? ar : en;
