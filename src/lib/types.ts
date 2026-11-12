@@ -28,6 +28,8 @@ export interface CustomQuestion {
 }
 
 export interface EventSponsor { id: string; name: string; email: string }
+export type SocialPlatform = 'linkedin' | 'x' | 'tiktok' | 'snapchat' | 'instagram' | 'telegram' | 'discord';
+export interface SocialLink { platform: SocialPlatform; url: string }
 export interface EventReport { fileName: string; uploadedAt: string; size: number }
 
 export interface PlatformEvent {
@@ -72,6 +74,7 @@ export interface PlatformEvent {
   vtoolsUuid?: string;
   certificateTemplateId?: string | null;
   emailTemplateId?: string | null;
+  socialLinks?: SocialLink[];
   createdAt: Date | string;
   updatedAt: Date | string;
 }

@@ -1,6 +1,6 @@
-import type { CustomQuestion, EventDay, EventGender, EventLocationType, EventSponsor, EventType, RegistrationMode } from '@/lib/types';
+import type { CustomQuestion, EventDay, EventGender, EventLocationType, EventSponsor, EventType, RegistrationMode, SocialLink } from '@/lib/types';
 
-export type StageId = 'main' | 'time' | 'security' | 'interviewer' | 'sponsors' | 'design' | 'settings' | 'review' | 'publish' | 'report';
+export type StageId = 'main' | 'time' | 'security' | 'interviewer' | 'sponsors' | 'design' | 'settings' | 'review' | 'share' | 'publish' | 'report';
 
 export interface StageMeta {
   id: StageId;
@@ -19,6 +19,7 @@ export const STAGES: StageMeta[] = [
   { id: 'design', labelAr: 'التصميم', labelEn: 'Design', implemented: true },
   { id: 'settings', labelAr: 'الإعدادات', labelEn: 'Settings', implemented: true },
   { id: 'review', labelAr: 'نموذج التقييم', labelEn: 'Review form', implemented: true },
+  { id: 'share', labelAr: 'المشاركة', labelEn: 'Share', implemented: true },
   { id: 'publish', labelAr: 'النشر', labelEn: 'Publication', implemented: false },
   { id: 'report', labelAr: 'تقرير الفعالية', labelEn: 'Event report', implemented: true },
 ];
@@ -62,6 +63,17 @@ export interface DesignFields {
 }
 
 export interface SponsorsFields { hasSponsors: boolean | null; sponsors: EventSponsor[] }
+
+export interface ShareFields { socialLinks: SocialLink[] }
+export const SOCIAL_PLATFORMS: { id: SocialLink['platform']; labelAr: string; labelEn: string }[] = [
+  { id: 'linkedin', labelAr: 'لينكدإن', labelEn: 'LinkedIn' },
+  { id: 'x', labelAr: 'إكس (تويتر)', labelEn: 'X (Twitter)' },
+  { id: 'tiktok', labelAr: 'تيك توك', labelEn: 'TikTok' },
+  { id: 'snapchat', labelAr: 'سناب شات', labelEn: 'Snapchat' },
+  { id: 'instagram', labelAr: 'إنستغرام', labelEn: 'Instagram' },
+  { id: 'telegram', labelAr: 'تيليجرام', labelEn: 'Telegram' },
+  { id: 'discord', labelAr: 'ديسكورد', labelEn: 'Discord' },
+];
 
 export interface SettingsFields {
   requiresRegistration: boolean;

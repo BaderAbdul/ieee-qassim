@@ -20,8 +20,9 @@ import ReportStage from '@/components/admin/events/wizard/ReportStage';
 import DesignStage from '@/components/admin/events/wizard/DesignStage';
 import SettingsStage from '@/components/admin/events/wizard/SettingsStage';
 import ReviewStage from '@/components/admin/events/wizard/ReviewStage';
+import ShareStage from '@/components/admin/events/wizard/ShareStage';
 import EventActivityTrail from '@/components/admin/events/wizard/EventActivityTrail';
-import type { DesignFields, InterviewerFields, MainDataFields, ReviewFields, SecurityFields, SettingsFields, SponsorsFields, StageId, TimePlaceFields } from '@/components/admin/events/wizard/wizardTypes';
+import type { DesignFields, InterviewerFields, MainDataFields, ReviewFields, SecurityFields, SettingsFields, ShareFields, SponsorsFields, StageId, TimePlaceFields } from '@/components/admin/events/wizard/wizardTypes';
 
 const emptyMainData: MainDataFields = { title: '', titleEn: '', description: '', descriptionEn: '', type: 'Workshop', gains: '', gainsEn: '' };
 const emptyTimePlace: TimePlaceFields = { days: [], locationType: 'in_person', location: '', locationEn: '', capacity: 50, isUnlimitedCapacity: false, hideExactCapacity: false, gender: 'both' };
@@ -30,6 +31,7 @@ const emptyInterviewer: InterviewerFields = { interviewer: '', interviewerEn: ''
 const emptyDesign: DesignFields = { coverUrl: '' };
 const emptySettings: SettingsFields = { requiresRegistration: true, registrationMode: 'Auto', vtoolsUuid: '', hasCertificate: false, certificateTemplateId: '', emailTemplateId: '' };
 const emptyReview: ReviewFields = { feedbackQuestions: [] };
+const emptyShare: ShareFields = { socialLinks: [] };
 
 export default function CreateEventPage() {
   const router = useRouter();
@@ -59,6 +61,7 @@ export default function CreateEventPage() {
   const [design, setDesign] = useState<DesignFields>(emptyDesign);
   const [settingsData, setSettingsData] = useState<SettingsFields>(emptySettings);
   const [reviewData, setReviewData] = useState<ReviewFields>(emptyReview);
+  const [shareData, setShareData] = useState<ShareFields>(emptyShare);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -87,6 +90,7 @@ export default function CreateEventPage() {
           certificateTemplateId: event.certificateTemplateId || '', emailTemplateId: event.emailTemplateId || '',
         });
         setReviewData({ feedbackQuestions: normalizeFeedbackQuestions(event.feedbackQuestions || []) });
+        setShareData({ socialLinks: event.socialLinks || [] });
         const done = new Set<StageId>(['main']);
         if ((event.days || []).length) done.add('time');
         if (event.securityFormAcknowledged) done.add('security');
@@ -96,6 +100,7 @@ export default function CreateEventPage() {
         if (event.coverUrl) done.add('design');
         if (event.vtoolsUuid || event.hasCertificate || event.registrationMode === 'Manual' || event.requiresRegistration === false) done.add('settings');
         if ((event.feedbackQuestions || []).length) done.add('review');
+        if ((event.socialLinks || []).length) done.add('share');
         setCompletedStages(done);
       } catch (error) {
         setLoadError(error instanceof Error ? error.message : (isAr ? 'تعذر تحميل مسودة الفعالية.' : 'Could not load the event draft.'));
@@ -191,6 +196,10 @@ export default function CreateEventPage() {
         {activeStage === 'review' && eventId && (
           <ReviewStage isAr={isAr} value={reviewData} onChange={setReviewData} saving={saving}
             onSave={async fields => { await saveStage('review', fields); }} />
+        )}
+        {activeStage === 'share' && eventId && (
+          <ShareStage isAr={isAr} value={shareData} onChange={setShareData} saving={saving}
+            onSave={async fields => { await saveStage('share', fields); }} />
         )}
         {activeStage === 'publish' && (
           <div className="rounded-xl border border-dashed border-[var(--color-border)] p-10 text-center text-sm text-[var(--color-text-muted)]">
