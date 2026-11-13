@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#00629B">
+<title>غير متصل · Offline — IEEE Qassim</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{display:flex;align-items:center;justify-content:center;padding:24px;background:#f8fafc;color:#0f172a;
+    font-family:system-ui,-apple-system,"Segoe UI",Tahoma,Arial,sans-serif;text-align:center;-webkit-tap-highlight-color:transparent}
+  main{max-width:360px}
+  img{width:84px;height:84px;margin-bottom:18px}
+  h1{font-size:1.35rem;margin:0 0 6px}
+  p{margin:0 0 6px;color:#475569;line-height:1.7}
+  button{margin-top:18px;border:0;border-radius:14px;padding:12px 28px;background:#00629B;color:#fff;font:inherit;font-weight:700;cursor:pointer;touch-action:manipulation}
+  button:active{opacity:.85}
+</style>
+</head>
+<body>
+<main>
+  <img src="/icons/icon-192.png" alt="" width="84" height="84">
+  <h1>لا يوجد اتصال بالإنترنت</h1>
+  <p>تحقق من اتصالك ثم أعد المحاولة.</p>
+  <p dir="ltr" lang="en">You're offline. Check your connection and try again.</p>
+  <button type="button" onclick="location.reload()">إعادة المحاولة · Retry</button>
+</main>
+<script>addEventListener('online',function(){location.reload()})</script>
+</body>
+</html>

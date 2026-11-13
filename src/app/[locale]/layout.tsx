@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from '@clerk/nextjs';
 import { getClerkLocalization } from '@/lib/clerkLocalization';
 import { NextIntlClientProvider } from 'next-intl';
@@ -18,6 +18,9 @@ import Footer from '@/components/layout/Footer';
 import IdeaFloatingButton from '@/components/ui/IdeaFloatingButton';
 import { FeedbackSurfaceProvider } from '@/components/events/RequiredFeedbackDialog';
 import PendingAttendanceModal from '@/components/events/PendingAttendanceModal';
+import PwaRegister from '@/components/pwa/PwaRegister';
+import InstallPrompt from '@/components/pwa/InstallPrompt';
+import OfflineIndicator from '@/components/pwa/OfflineIndicator';
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import { clerkAppearance } from '@/lib/clerkAppearance';
@@ -50,7 +53,18 @@ const inter = Inter({
 
 
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#00629B',
+};
+
 export const metadata: Metadata = {
+  applicationName: 'IEEE Qassim',
+  appleWebApp: { capable: true, title: 'IEEE Qassim', statusBarStyle: 'default' },
+  formatDetection: { telephone: false },
+  icons: { apple: '/icons/apple-touch-icon.png' },
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://www.ieeequ.online'),
   title: "IEEE Qassim Tech Community",
   description: "The Official IEEE Qassim Technology Community Platform",
@@ -135,6 +149,9 @@ export default async function RootLayout({
                 <IdeaFloatingButton />
                 <PendingAttendanceModal />
                 <ClerkScrollLockFix />
+                <OfflineIndicator />
+                <InstallPrompt />
+                <PwaRegister />
               </div>
             </ProfileGuard>
             </AccountEnhancements>
