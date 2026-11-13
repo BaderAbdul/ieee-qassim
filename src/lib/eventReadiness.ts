@@ -61,7 +61,6 @@ export const completionReadiness = (event: PlatformEvent): EventReadiness => eva
 
 /** For the events-list readiness badge: whichever gate is next for this event, or null once both are satisfied. */
 export function eventReadiness(event: PlatformEvent): EventReadiness | null {
-  if (event.isUnlisted) return visibilityReadiness(event);
-  if (event.state !== 'Completed') return completionReadiness(event);
-  return null;
+  if (event.state === 'Completed') return null; // finished: nothing left to nudge about, hidden or not
+  return event.isUnlisted ? visibilityReadiness(event) : completionReadiness(event);
 }
