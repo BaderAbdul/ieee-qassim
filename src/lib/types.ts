@@ -54,7 +54,7 @@ export interface PlatformEvent {
   isUnlimitedCapacity?: boolean;
   hideExactCapacity?: boolean;
   requiresRegistration?: boolean; // false for walk-in booths / visits
-  isUnlisted?: boolean; // hidden from the public site entirely (listing, search and direct link) until an admin shows it
+  isUnlisted?: boolean; // off the public listing; fully private while still 'Published', reachable by direct link/QR after that
   registeredCount?: number;
   attendanceCount?: number;
   points: number;
