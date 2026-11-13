@@ -185,7 +185,7 @@ export default function AdminCalendar({
                       <button
                         type="button"
                         onClick={() => onSelectDay(selected && isSameDay(selected, day) ? null : day)}
-                        className={`cursor-pointer relative h-8 w-full flex flex-col items-center justify-center text-xs border transition-colors ${
+                        className={`cursor-pointer relative h-14 w-full flex flex-col items-center justify-center text-xs border transition-colors ${
                           connectsPrev ? 'rounded-s-none border-s-0' : 'rounded-s-xl'
                         } ${connectsNext ? 'rounded-e-none border-e-0' : 'rounded-e-xl'} ${ringClass} ${
                           active
