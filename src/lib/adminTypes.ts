@@ -14,7 +14,7 @@ export interface AdminOverview {
 }
 export interface AdminMember {
   id: string; displayName?: string; arabicFullName?: string; email?: string;
-  photoURL?: string; role?: string; totalPoints?: number; isRestricted?: boolean;
+  photoURL?: string; role?: string; totalPoints?: number; adminPoints?: number; isRestricted?: boolean;
 }
 export interface MemberSearchResult { users: AdminMember[]; nextCursor: string | null; hasMore?: boolean; truncated?: boolean }
 export type MemberActivitySection = 'registrations' | 'attendance' | 'points' | 'certificates';

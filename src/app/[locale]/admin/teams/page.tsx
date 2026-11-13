@@ -7,23 +7,25 @@ import { apiSend, httpsCallable } from '@/lib/backend';
 import { apiGetArray } from '@/lib/backendResponse';
 import { AdminError, AdminLoading } from '@/components/admin/AdminData';
 import { useToast } from '@/context/ToastContext';
+import { Link } from '@/i18n/routing';
 import PrivilegesBadgesPanel from '@/components/admin/PrivilegesBadgesPanel';
 import { useAdminTopbarActions } from '@/components/admin/AdminTopbarActions';
 import type { MemberSearchResult } from '@/lib/adminTypes';
-import { ArrowDown, ArrowUp, BadgeCheck, Crown, Edit2, KeyRound, Lock, Plus, ShieldCheck, Star, Trash2, UserMinus, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, BadgeCheck, Briefcase, Crown, Edit2, KeyRound, Lock, Plus, ShieldCheck, Star, Trash2, UserMinus, X } from 'lucide-react';
 
 type TeamRole = 'leader' | 'vice_leader' | 'member';
+type TeamKind = 'administrative' | 'specialized';
 interface TeamBadge { key: string; nameAr: string; nameEn: string; icon: string | null }
 interface TeamMember {
   userId: string; teamRole: TeamRole; position: number; displayName: string; role: string;
-  roleNameAr?: string; roleNameEn?: string; totalPoints?: number; badges?: TeamBadge[];
+  roleNameAr?: string; roleNameEn?: string; totalPoints?: number; adminPoints?: number; badges?: TeamBadge[];
 }
 const ROLE_TIER: Record<TeamRole, number> = { leader: 0, vice_leader: 1, member: 2 };
 const sortedMembersOf = (team: Team) =>
   [...team.members].sort((a, b) => ROLE_TIER[a.teamRole] - ROLE_TIER[b.teamRole] || a.position - b.position);
 interface Team {
   id: string; nameAr: string; nameEn: string; descriptionAr: string | null; descriptionEn: string | null;
-  icon: string | null; position: number; isPublic: boolean; members: TeamMember[];
+  icon: string | null; position: number; isPublic: boolean; kind: TeamKind; members: TeamMember[];
   // null = uncapped; otherwise the only privileges a leader/vice-leader of this team may grant.
   maxPrivileges: string[] | null;
 }
@@ -39,9 +41,12 @@ export default function AdminTeamsPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [newTeam, setNewTeam] = useState({ id: '', nameAr: '', nameEn: '', descriptionAr: '', descriptionEn: '', icon: '', isPublic: true });
+  const [kindTab, setKindTab] = useState<TeamKind>('specialized');
+  const [newTeam, setNewTeam] = useState<{ id: string; nameAr: string; nameEn: string; descriptionAr: string; descriptionEn: string; icon: string; isPublic: boolean; kind: TeamKind }>(
+    { id: '', nameAr: '', nameEn: '', descriptionAr: '', descriptionEn: '', icon: '', isPublic: true, kind: 'specialized' });
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editTeam, setEditTeam] = useState({ nameAr: '', nameEn: '', descriptionAr: '', descriptionEn: '', icon: '', isPublic: true });
+  const [editTeam, setEditTeam] = useState<{ nameAr: string; nameEn: string; descriptionAr: string; descriptionEn: string; icon: string; isPublic: boolean; kind: TeamKind }>(
+    { nameAr: '', nameEn: '', descriptionAr: '', descriptionEn: '', icon: '', isPublic: true, kind: 'specialized' });
   const [memberPicker, setMemberPicker] = useState<{ teamId: string; teamRole: TeamRole } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResultUser[]>([]);
@@ -109,18 +114,32 @@ export default function AdminTeamsPage() {
   // A viewer's own team(s) come first, so a leader/vice-leader lands on their own card without
   // scrolling; ties keep the super-admin-configured display order.
   const isMine = (team: Team) => !!userData && team.members.some(m => m.userId === userData.id);
-  const sortedTeams = [...teams].sort((a, b) => Number(isMine(b)) - Number(isMine(a)) || a.position - b.position);
+  const sortedTeams = [...teams]
+    .filter(team => team.kind === kindTab)
+    .sort((a, b) => Number(isMine(b)) - Number(isMine(a)) || a.position - b.position);
+  const kindCounts = { administrative: teams.filter(t => t.kind === 'administrative').length, specialized: teams.filter(t => t.kind === 'specialized').length };
+  const kindOptions: { key: TeamKind; label: string }[] = [
+    { key: 'administrative', label: isAr ? 'الأقسام الإدارية' : 'Administrative departments' },
+    { key: 'specialized', label: isAr ? 'الأقسام التخصصية' : 'Specialized departments' },
+  ];
+  const kindSelect = (value: TeamKind, onChange: (kind: TeamKind) => void) => (
+    <select value={value} onChange={e => onChange(e.target.value as TeamKind)}
+            className="cursor-pointer rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm font-bold">
+      {kindOptions.map(option => <option key={option.key} value={option.key}>{option.label}</option>)}
+    </select>
+  );
 
   const createTeam = async () => {
     if (!newTeam.id || !newTeam.nameAr || !newTeam.nameEn) return;
     setBusy(true);
     try {
       await apiSend('POST', '/api/admin/teams', {
-        id: newTeam.id, nameAr: newTeam.nameAr, nameEn: newTeam.nameEn, isPublic: newTeam.isPublic,
+        id: newTeam.id, nameAr: newTeam.nameAr, nameEn: newTeam.nameEn, isPublic: newTeam.isPublic, kind: newTeam.kind,
         descriptionAr: newTeam.descriptionAr || null, descriptionEn: newTeam.descriptionEn || null, icon: newTeam.icon || null,
       });
       setCreating(false);
-      setNewTeam({ id: '', nameAr: '', nameEn: '', descriptionAr: '', descriptionEn: '', icon: '', isPublic: true });
+      setKindTab(newTeam.kind);
+      setNewTeam({ id: '', nameAr: '', nameEn: '', descriptionAr: '', descriptionEn: '', icon: '', isPublic: true, kind: 'specialized' });
       await load({ silent: true });
       showToast(isAr ? 'تم إنشاء الفريق.' : 'Team created.', 'success');
     } catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to create team', 'error'); }
@@ -129,7 +148,7 @@ export default function AdminTeamsPage() {
 
   const startEdit = (team: Team) => {
     setEditingId(team.id);
-    setEditTeam({ nameAr: team.nameAr, nameEn: team.nameEn, descriptionAr: team.descriptionAr ?? '', descriptionEn: team.descriptionEn ?? '', icon: team.icon ?? '', isPublic: team.isPublic });
+    setEditTeam({ nameAr: team.nameAr, nameEn: team.nameEn, descriptionAr: team.descriptionAr ?? '', descriptionEn: team.descriptionEn ?? '', icon: team.icon ?? '', isPublic: team.isPublic, kind: team.kind });
   };
 
   const saveEdit = async () => {
@@ -137,10 +156,11 @@ export default function AdminTeamsPage() {
     setBusy(true);
     try {
       await apiSend('PATCH', `/api/admin/teams/${encodeURIComponent(editingId)}`, {
-        nameAr: editTeam.nameAr, nameEn: editTeam.nameEn, isPublic: editTeam.isPublic,
+        nameAr: editTeam.nameAr, nameEn: editTeam.nameEn, isPublic: editTeam.isPublic, kind: editTeam.kind,
         descriptionAr: editTeam.descriptionAr || null, descriptionEn: editTeam.descriptionEn || null, icon: editTeam.icon || null,
       });
       setEditingId(null);
+      setKindTab(editTeam.kind);
       await load({ silent: true });
       showToast(isAr ? 'تم الحفظ.' : 'Saved.', 'success');
     } catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to save team', 'error'); }
@@ -241,6 +261,22 @@ export default function AdminTeamsPage() {
 
       {error && <AdminError message={error} />}
 
+      <div role="tablist" aria-label={isAr ? 'نوع الأقسام' : 'Department type'}
+           className="grid grid-cols-2 gap-1.5 rounded-2xl border border-[var(--color-border)]/50 bg-[var(--color-surface-2)] p-1.5">
+        {kindOptions.map(option => {
+          const active = kindTab === option.key;
+          return (
+            <button key={option.key} type="button" role="tab" aria-selected={active} onClick={() => { setKindTab(option.key); setNewTeam(current => ({ ...current, kind: option.key })); }}
+                    className={`cursor-pointer flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm sm:text-base font-black font-cairo transition-all ${
+                      active ? 'bg-[var(--color-accent)] text-[var(--color-accent-contrast)] shadow-md' : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)]'
+                    }`}>
+              {option.label}
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${active ? 'bg-white/20' : 'bg-[var(--color-surface)]'}`}>{kindCounts[option.key]}</span>
+            </button>
+          );
+        })}
+      </div>
+
       {creating && (
         <div className="rounded-2xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/80 backdrop-blur-md p-4 space-y-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -257,9 +293,10 @@ export default function AdminTeamsPage() {
             <textarea placeholder={isAr ? 'الوصف (إنجليزي، اختياري)' : 'Description (English, optional)'} value={newTeam.descriptionEn}
                       onChange={e => setNewTeam({ ...newTeam, descriptionEn: e.target.value })} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" rows={2} />
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
+            {kindSelect(newTeam.kind, kind => setNewTeam({ ...newTeam, kind }))}
             <input placeholder={isAr ? 'اسم أيقونة (Lucide، اختياري)' : 'Icon name (Lucide, optional)'} value={newTeam.icon}
-                   onChange={e => setNewTeam({ ...newTeam, icon: e.target.value })} className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" dir="ltr" />
+                   onChange={e => setNewTeam({ ...newTeam, icon: e.target.value })} className="flex-1 min-w-[10rem] rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" dir="ltr" />
             <label className="flex items-center gap-2 text-sm font-bold text-[var(--color-text-secondary)]">
               <input type="checkbox" checked={newTeam.isPublic} onChange={e => setNewTeam({ ...newTeam, isPublic: e.target.checked })} />
               {isAr ? 'إظهار في صفحة الهيكلة العلنية' : 'Show on public Structure page'}
@@ -304,8 +341,9 @@ export default function AdminTeamsPage() {
                   <textarea value={editTeam.descriptionAr} onChange={e => setEditTeam({ ...editTeam, descriptionAr: e.target.value })} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" rows={2} placeholder="Description (Arabic)" />
                   <textarea value={editTeam.descriptionEn} onChange={e => setEditTeam({ ...editTeam, descriptionEn: e.target.value })} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" rows={2} placeholder="Description (English)" />
                 </div>
-                <div className="flex items-center gap-4">
-                  <input value={editTeam.icon} onChange={e => setEditTeam({ ...editTeam, icon: e.target.value })} className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" placeholder="Icon name" dir="ltr" />
+                <div className="flex flex-wrap items-center gap-4">
+                  {kindSelect(editTeam.kind, kind => setEditTeam({ ...editTeam, kind }))}
+                  <input value={editTeam.icon} onChange={e => setEditTeam({ ...editTeam, icon: e.target.value })} className="flex-1 min-w-[10rem] rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" placeholder="Icon name" dir="ltr" />
                   <label className="flex items-center gap-2 text-sm font-bold text-[var(--color-text-secondary)]">
                     <input type="checkbox" checked={editTeam.isPublic} onChange={e => setEditTeam({ ...editTeam, isPublic: e.target.checked })} />
                     {isAr ? 'إظهار علنيًا' : 'Public'}
@@ -335,7 +373,8 @@ export default function AdminTeamsPage() {
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <p className="font-bold text-[var(--color-text-primary)] text-sm truncate">{member.displayName}</p>
+                      <Link href={`/admin/users/${encodeURIComponent(member.userId)}`}
+                            className="block font-bold text-[var(--color-text-primary)] text-sm truncate hover:text-[var(--color-accent)] hover:underline">{member.displayName}</Link>
                       <p className="text-[11px] text-[var(--color-text-muted)] truncate">{accountLabel}</p>
                     </div>
 
@@ -344,9 +383,13 @@ export default function AdminTeamsPage() {
                       {tierStyle.label}
                     </span>
 
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--color-warning)] shrink-0">
+                    <span title={isAr ? 'النقاط العادية' : 'Regular points'} className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--color-warning)] shrink-0">
                       <Star size={12} className="fill-current" />
                       {member.totalPoints ?? 0}
+                    </span>
+                    <span title={isAr ? 'النقاط الإدارية' : 'Administrative points'} className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--color-accent)] shrink-0">
+                      <Briefcase size={12} />
+                      {member.adminPoints ?? 0}
                     </span>
 
                     {member.badges && member.badges.length > 0 && (
@@ -408,7 +451,11 @@ export default function AdminTeamsPage() {
             )}
           </div>
         ))}
-        {sortedTeams.length === 0 && <p className="text-sm text-[var(--color-text-muted)]">{isAr ? 'لا توجد فرق بعد.' : 'No teams yet.'}</p>}
+        {sortedTeams.length === 0 && (
+          <p className="rounded-2xl border border-dashed border-[var(--color-border)] p-8 text-center text-sm text-[var(--color-text-muted)]">
+            {isAr ? 'لا توجد أقسام في هذا النوع بعد. غيّر نوع أي قسم من زر التعديل لنقله إلى هنا.' : 'No departments of this type yet. Change a department’s type from its edit button to move it here.'}
+          </p>
+        )}
       </div>
 
       {memberPicker && (
