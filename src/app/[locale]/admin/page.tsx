@@ -10,10 +10,9 @@ import { AdminError, AdminLoading, useAdminQuery } from '@/components/admin/Admi
 import AdminCalendar, { type CalendarEvent, type VacationSettings } from '@/components/admin/home/AdminCalendar';
 import DayDetailsPanel from '@/components/admin/home/DayDetailsPanel';
 import HomeEventsTable from '@/components/admin/home/HomeEventsTable';
-import TeamLeaderboardPanel from '@/components/admin/home/TeamLeaderboardPanel';
 import {
   overviewApi, projectsApi, crossTeamRequestsApi, tasksApi,
-  type TeamLeaderboardEntry, type RemainingTasksEntry, type CrossTeamRequest, type Project, type TCTask,
+  type RemainingTasksEntry, type CrossTeamRequest, type Project, type TCTask,
 } from '@/lib/taskCenterApi';
 
 function RequestsPanel({ icon: Icon, title, children, emptyLabel }: {
@@ -45,7 +44,6 @@ export default function AdminDashboardPage() {
   const { data: vacation } = useAdminQuery<VacationSettings>('getVacationDays');
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
 
-  const [leaderboard, setLeaderboard] = useState<TeamLeaderboardEntry[]>([]);
   const [remainingTasks, setRemainingTasks] = useState<RemainingTasksEntry[]>([]);
   const [showRemainingBreakdown, setShowRemainingBreakdown] = useState(false);
   const [crossTeamRequests, setCrossTeamRequests] = useState<CrossTeamRequest[]>([]);
@@ -56,7 +54,6 @@ export default function AdminDashboardPage() {
   const ledTeams = (userData?.teams || []).filter(team => team.isLeader);
 
   useEffect(() => {
-    void overviewApi.leaderboard().then(setLeaderboard).catch(() => {});
     void overviewApi.remainingTasks().then(setRemainingTasks).catch(() => {});
     void crossTeamRequestsApi.listAll().then(setCrossTeamRequests).catch(() => {});
     void projectsApi.list().then(setProjectDeadlines).catch(() => {});
@@ -142,9 +139,6 @@ export default function AdminDashboardPage() {
               <DayDetailsPanel selected={selectedDay} events={calendarEvents} isAr={isAr} vacation={vacation ?? null} />
             </div>
           </div>
-
-          {/* Team leaderboard */}
-          <TeamLeaderboardPanel teams={leaderboard} isAr={isAr} />
 
           {/* Requests */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

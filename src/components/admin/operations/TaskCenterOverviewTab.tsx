@@ -1,13 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Briefcase, CheckSquare, ListTodo, Target, TrendingUp } from 'lucide-react';
-import { apiGetArray } from '@/lib/backendResponse';
-import { goalsApi, projectsApi, tasksApi, type Goal, type Project, type TCTask } from '@/lib/taskCenterApi';
+import { Briefcase, CheckSquare, ListTodo, TrendingUp } from 'lucide-react';
+import { goalsApi, overviewApi, projectsApi, tasksApi, type Goal, type Project, type TCTask, type TeamLeaderboardEntry } from '@/lib/taskCenterApi';
 import { AdminError, AdminLoading } from '@/components/admin/AdminData';
+import TeamLeaderboardPanel from '@/components/admin/home/TeamLeaderboardPanel';
 import { card } from './taskCenterUi';
-
-interface TeamOption { id: string; nameAr: string; nameEn: string }
 
 export default function TaskCenterOverviewTab({ isAr }: { isAr: boolean }) {
   const t = (ar: string, en: string) => isAr ? ar : en;
@@ -15,17 +13,17 @@ export default function TaskCenterOverviewTab({ isAr }: { isAr: boolean }) {
   const [myTasks, setMyTasks] = useState<TCTask[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
-  const [teams, setTeams] = useState<TeamOption[]>([]);
+  const [leaderboard, setLeaderboard] = useState<TeamLeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true); setError(null);
     try {
-      const [tasksList, myTasksList, projectsList, goalsList, teamsList] = await Promise.all([
-        tasksApi.list(), tasksApi.list({ mine: true }), projectsApi.list(), goalsApi.list(), apiGetArray<TeamOption>('/api/admin/teams'),
+      const [tasksList, myTasksList, projectsList, goalsList, leaderboardList] = await Promise.all([
+        tasksApi.list(), tasksApi.list({ mine: true }), projectsApi.list(), goalsApi.list(), overviewApi.leaderboard(),
       ]);
-      setTasks(tasksList); setMyTasks(myTasksList); setProjects(projectsList); setGoals(goalsList); setTeams(teamsList);
+      setTasks(tasksList); setMyTasks(myTasksList); setProjects(projectsList); setGoals(goalsList); setLeaderboard(leaderboardList);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to load overview');
     } finally {
@@ -75,20 +73,7 @@ export default function TaskCenterOverviewTab({ isAr }: { isAr: boolean }) {
       ))}</ul> : <p className="text-sm text-[var(--color-text-muted)]">{t('لا توجد مهام مفتوحة حاليًا.', 'No open tasks right now.')}</p>}
     </div>
 
-    <div className={`${card} p-5`}>
-      <h3 className="mb-3 flex items-center gap-2 font-bold"><Target size={17} />{t('ملخص الأقسام', 'Department summary')}</h3>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {teams.map(team => {
-          const teamTasks = tasks.filter(task => task.teamIds.includes(team.id));
-          const teamDone = teamTasks.filter(task => task.status === 'done').length;
-          return <div key={team.id} className="rounded-xl border border-[var(--color-border)] p-3 text-sm">
-            <p className="font-bold">{isAr ? team.nameAr : team.nameEn}</p>
-            <p className="mt-1 text-xs text-[var(--color-text-muted)]">{t(`${teamTasks.length} مهمة، ${teamDone} مكتملة`, `${teamTasks.length} tasks, ${teamDone} done`)}</p>
-          </div>;
-        })}
-        {teams.length === 0 && <p className="text-sm text-[var(--color-text-muted)]">{t('لا توجد أقسام بعد.', 'No departments yet.')}</p>}
-      </div>
-    </div>
+    <TeamLeaderboardPanel teams={leaderboard} isAr={isAr} />
 
     <div className={`${card} p-5`}>
       <h3 className="mb-3 font-bold">{t('أهداف الربع الحالي', 'Current quarter goals')}</h3>
