@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { apiGet, API_BASE_URL } from '@/lib/backend';
+import { useToast } from '@/context/ToastContext';
 import { Lightbulb, Calendar, Rocket, Clock, CheckCircle, XCircle } from 'lucide-react';
 
 type Idea = {
@@ -29,6 +30,7 @@ async function adminIdeaRequest(method: 'PATCH' | 'DELETE', id: string, body?: R
 }
 
 export default function AdminIdeasPage() {
+  const { showToast } = useToast();
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -48,7 +50,7 @@ export default function AdminIdeasPage() {
       setIdeas(ideas.map(idea => idea.id === id ? { ...idea, status: newStatus } : idea));
     } catch (error) {
       console.error('Error updating status:', error);
-      alert('حدث خطأ أثناء تحديث الحالة');
+      showToast('حدث خطأ أثناء تحديث الحالة', 'error');
     }
   };
 
@@ -59,7 +61,7 @@ export default function AdminIdeasPage() {
       setIdeas(ideas.map(idea => idea.id === id ? { ...idea, isPublic: newIsPublic } : idea));
     } catch (error) {
       console.error('Error toggling public status:', error);
-      alert('حدث خطأ أثناء تحديث النشر');
+      showToast('حدث خطأ أثناء تحديث النشر', 'error');
     }
   };
 

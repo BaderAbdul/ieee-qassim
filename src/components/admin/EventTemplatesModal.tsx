@@ -26,6 +26,7 @@ import {
 } from '@/lib/customEventTemplates';
 import type { PlatformEvent } from '@/lib/types';
 import { httpsCallable } from '@/lib/backend';
+import { useToast } from '@/context/ToastContext';
 
 interface EventTemplatesModalProps {
   isOpen: boolean;
@@ -44,6 +45,7 @@ export default function EventTemplatesModal({
   currentQuestions,
   mode = 'select'
 }: EventTemplatesModalProps) {
+  const { showToast } = useToast();
   const [templates, setTemplates] = useState<CustomEventTemplate[]>([]);
   const [activeTab, setActiveTab] = useState<'my_templates' | 'from_events'>('my_templates');
   const [searchQuery, setSearchQuery] = useState('');
@@ -118,7 +120,7 @@ export default function EventTemplatesModal({
     if (!newTemplateName.trim()) return;
 
     if (!currentFormData) {
-      alert('لا توجد بيانات فعالية حالية لحفظها كقالب.');
+      showToast('لا توجد بيانات فعالية حالية لحفظها كقالب.', 'error');
       return;
     }
 
@@ -147,7 +149,7 @@ export default function EventTemplatesModal({
     setNewTemplateName('');
     setShowSaveCurrentForm(false);
     refreshTemplates();
-    alert('تم حفظ القالب بنجاح في مكتبة القوالب الخاصة بك!');
+    showToast('تم حفظ القالب بنجاح في مكتبة القوالب الخاصة بك!', 'success');
   };
 
   const handleCreateFromPastEvent = (event: PlatformEvent) => {
@@ -157,7 +159,7 @@ export default function EventTemplatesModal({
     const created = createTemplateFromEvent(event, customName);
     refreshTemplates();
     setActiveTab('my_templates');
-    alert(`تم إنشاء القالب "${created.name}" بنجاح!`);
+    showToast(`تم إنشاء القالب "${created.name}" بنجاح!`, 'success');
   };
 
   const filteredTemplates = templates.filter(t => {

@@ -56,6 +56,7 @@ export interface SecurityFields {
 export interface InterviewerFields {
   interviewer: string;
   interviewerEn: string;
+  speakers: string;
 }
 
 export interface DesignFields {

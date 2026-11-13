@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { httpsCallable } from '@/lib/backend';
 import { hasAnyPrivilege, useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { apiGetArray } from '@/lib/backendResponse';
 import { Search, Trophy, Shield, ShieldAlert, Trash2, Edit3, Lock, Unlock, Filter, ArrowUpDown, KeyRound } from 'lucide-react';
 import type { MemberSearchResult } from '@/lib/adminTypes';
@@ -23,6 +24,7 @@ interface AdminUserItem {
 
 export default function AdminUsersPage() {
   const { userData, loading: authLoading } = useAuth();
+  const { showToast } = useToast();
   const [users, setUsers] = useState<AdminUserItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<Error | null>(null);
@@ -134,19 +136,19 @@ export default function AdminUsersPage() {
   };
 
   const handleRoleChange = async (userId: string, newRole: string) => {
-    if (!isSuperAdmin) return alert('غير مصرح لك بتغيير الصلاحيات');
+    if (!isSuperAdmin) return showToast('غير مصرح لك بتغيير الصلاحيات', 'error');
     if (!confirm('هل أنت متأكد من تغيير صلاحية هذا المستخدم؟')) return;
     try {
       await httpsCallable(null, 'manageUser')({ userId, change: 'role', role: newRole });
       setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء تغيير الصلاحية.');
+      showToast('حدث خطأ أثناء تغيير الصلاحية.', 'error');
     }
   };
 
   const handleToggleRestrict = async (userId: string, currentRestricted: boolean) => {
-    if (!isSuperAdmin) return alert('غير مصرح لك بتقييد الحسابات');
+    if (!isSuperAdmin) return showToast('غير مصرح لك بتقييد الحسابات', 'error');
     const actionStr = currentRestricted ? 'فك التقييد عن' : 'تقييد';
     if (!confirm(`هل أنت متأكد من ${actionStr} هذا المستخدم؟`)) return;
     try {
@@ -154,19 +156,19 @@ export default function AdminUsersPage() {
       setUsers(users.map(u => u.id === userId ? { ...u, isRestricted: !currentRestricted } : u));
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء تعديل حالة التقييد.');
+      showToast('حدث خطأ أثناء تعديل حالة التقييد.', 'error');
     }
   };
 
   const handleDeleteUser = async (userId: string) => {
-    if (!isSuperAdmin) return alert('غير مصرح لك بحذف الحسابات');
+    if (!isSuperAdmin) return showToast('غير مصرح لك بحذف الحسابات', 'error');
     if (!confirm('أرشفة هذا الحساب ومنعه من استخدام المنصة؟ ستُحفظ سجلاته السابقة ويمكن فك التقييد لاحقًا.')) return;
     try {
       await httpsCallable(null, 'manageUser')({ userId, change: 'delete' });
       setUsers(users.map(u => u.id === userId ? { ...u, isRestricted: true } : u));
     } catch (err) {
       console.error(err);
-      alert(err instanceof Error ? err.message : 'حدث خطأ أثناء أرشفة الحساب.');
+      showToast(err instanceof Error ? err.message : 'حدث خطأ أثناء أرشفة الحساب.', 'error');
     }
   };
 

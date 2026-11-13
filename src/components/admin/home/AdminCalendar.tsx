@@ -17,6 +17,8 @@ export interface CalendarEvent {
 }
 
 interface AcademicTerm { startDate: string | null; endDate: string | null }
+interface VacationRange { start: string; end: string; label?: string }
+interface VacationSettings { weeklyDays: number[]; ranges: VacationRange[] }
 
 export default function AdminCalendar({
   events, isAr, selected, onSelectDay,
@@ -28,6 +30,14 @@ export default function AdminCalendar({
 }) {
   const [month, setMonth] = useState(() => new Date());
   const { data: term } = useAdminQuery<AcademicTerm>('getAcademicTerm');
+  const { data: vacation } = useAdminQuery<VacationSettings>('getVacationDays');
+
+  const isVacationDay = (day: Date) => {
+    if (!vacation) return false;
+    if (vacation.weeklyDays?.includes(day.getDay())) return true;
+    const key = format(day, 'yyyy-MM-dd');
+    return (vacation.ranges || []).some(r => key >= r.start && key <= r.end);
+  };
 
   const eventsByDay = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
@@ -89,10 +99,16 @@ export default function AdminCalendar({
         </div>
       </div>
 
-      {/* Legend: explains what the colored dot on a day means */}
-      <div className="flex items-center gap-1.5 mb-3 text-[10px] font-bold text-[var(--color-text-muted)]">
-        <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-highlight)]" />
-        {isAr ? 'فعالية في هذا اليوم' : 'Event on this day'}
+      {/* Legend: explains what the colored day boxes mean */}
+      <div className="flex items-center flex-wrap gap-x-4 gap-y-1 mb-3 text-[10px] font-bold text-[var(--color-text-muted)]">
+        <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-sm bg-[var(--color-highlight)]/30 border border-[var(--color-highlight)]/60" />
+          {isAr ? 'يوجد فعالية' : 'Has an event'}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-sm bg-rose-100 border border-rose-300" />
+          {isAr ? 'عطلة' : 'Vacation'}
+        </span>
       </div>
 
       <div className={`grid ${showWeekNumbers ? 'grid-cols-[1.5rem_1fr]' : ''} gap-1`}>
@@ -108,36 +124,44 @@ export default function AdminCalendar({
           return (
             <Fragment key={wi}>
               {showWeekNumbers && (
-                <div key={`wn-${wi}`} className="flex items-center justify-center text-[9px] font-bold text-[var(--color-text-muted)]">
-                  {weekNum ? `${isAr ? 'أ' : 'W'}${weekNum}` : ''}
+                <div key={`wn-${wi}`} className="flex items-center justify-center text-sm font-black text-[var(--color-text-secondary)]">
+                  {weekNum ?? ''}
                 </div>
               )}
-              <div key={`w-${wi}`} className="grid grid-cols-7 gap-1">
-                {week.map(day => {
+              <div key={`w-${wi}`} className="grid grid-cols-7">
+                {week.map((day, di) => {
                   const key = format(day, 'yyyy-MM-dd');
                   const dayEvents = eventsByDay.get(key) || [];
+                  const hasEvents = dayEvents.length > 0;
                   const inMonth = isSameMonth(day, month);
                   const active = selected && isSameDay(day, selected);
+                  const vacation = isVacationDay(day);
+                  const connectsPrev = hasEvents && di > 0 && (eventsByDay.get(format(week[di - 1], 'yyyy-MM-dd'))?.length ?? 0) > 0;
+                  const connectsNext = hasEvents && di < 6 && (eventsByDay.get(format(week[di + 1], 'yyyy-MM-dd'))?.length ?? 0) > 0;
                   return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => onSelectDay(selected && isSameDay(selected, day) ? null : day)}
-                      className={`cursor-pointer relative aspect-square rounded-xl border flex flex-col items-center justify-center text-xs font-bold transition-colors ${
-                        active
-                          ? 'bg-[var(--color-accent)] text-[var(--color-accent-contrast)] border-[var(--color-accent)]'
-                          : isToday(day)
-                          ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)] border-[var(--color-accent)]/30'
-                          : inMonth
-                          ? 'text-[var(--color-text-primary)] border-[var(--color-border)]/40 hover:bg-[var(--color-surface-2)]'
-                          : 'text-[var(--color-text-muted)]/50 border-[var(--color-border)]/20 hover:bg-[var(--color-surface-2)]'
-                      }`}
-                    >
-                      {day.getDate()}
-                      {dayEvents.length > 0 && (
-                        <span className={`absolute bottom-1 w-1 h-1 rounded-full ${active ? 'bg-[var(--color-accent-contrast)]' : 'bg-[var(--color-highlight)]'}`} />
-                      )}
-                    </button>
+                    <div key={key} className={`p-0.5 ${connectsPrev ? 'ps-0' : ''} ${connectsNext ? 'pe-0' : ''}`}>
+                      <button
+                        type="button"
+                        onClick={() => onSelectDay(selected && isSameDay(selected, day) ? null : day)}
+                        className={`cursor-pointer relative aspect-square w-full flex flex-col items-center justify-center text-xs border transition-colors ${
+                          connectsPrev ? 'rounded-s-none border-s-0' : 'rounded-s-xl'
+                        } ${connectsNext ? 'rounded-e-none border-e-0' : 'rounded-e-xl'} ${
+                          active
+                            ? 'bg-[var(--color-accent)] text-[var(--color-accent-contrast)] border-[var(--color-accent)]'
+                            : hasEvents
+                            ? 'bg-[var(--color-highlight)]/30 border-[var(--color-highlight)]/60 text-[var(--color-text-primary)] hover:bg-[var(--color-highlight)]/40'
+                            : vacation
+                            ? 'bg-rose-100 border-rose-300 text-rose-700 hover:bg-rose-200/70'
+                            : isToday(day)
+                            ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)] border-[var(--color-accent)]/30'
+                            : inMonth
+                            ? 'text-[var(--color-text-primary)] border-[var(--color-border)]/40 hover:bg-[var(--color-surface-2)]'
+                            : 'text-[var(--color-text-muted)]/50 border-[var(--color-border)]/20 hover:bg-[var(--color-surface-2)]'
+                        }`}
+                      >
+                        <span className="font-extrabold">{day.getDate()}</span>
+                      </button>
+                    </div>
                   );
                 })}
               </div>

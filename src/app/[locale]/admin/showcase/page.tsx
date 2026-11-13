@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { AdminError, AdminLoading, formatAdminDate, useAdminQuery } from '@/components/admin/AdminData';
 import { httpsCallable } from '@/lib/backend';
+import { useToast } from '@/context/ToastContext';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import type { 
   ShowcaseApplication, 
@@ -84,6 +85,7 @@ export default function AdminShowcasePage() {
   const locale = useLocale();
   const isAr = locale === 'ar';
   
+  const { showToast } = useToast();
   const { data, loading, error, refresh } = useAdminQuery<ShowcaseOverviewData>('getShowcaseApplications');
 
   // Search & Filter State
@@ -180,7 +182,7 @@ export default function AdminShowcasePage() {
       refresh();
       setSettingsOpen(false);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error saving settings');
+      showToast(err instanceof Error ? err.message : 'Error saving settings', 'error');
     } finally {
       setSavingSettings(false);
     }

@@ -13,7 +13,10 @@ interface InterviewerStageProps {
 
 export default function InterviewerStage({ isAr, value, onChange, onSave, saving }: InterviewerStageProps) {
   const set = <K extends keyof InterviewerFields>(key: K, val: InterviewerFields[K]) => onChange({ ...value, [key]: val });
-  const save = async () => onSave({ interviewer: value.interviewer.trim(), interviewerEn: value.interviewerEn.trim() });
+  const save = async () => onSave({
+    interviewer: value.interviewer.trim(), interviewerEn: value.interviewerEn.trim(),
+    speakers: value.speakers.split('\n').map(s => s.trim()).filter(Boolean),
+  });
 
   return (
     <div className="space-y-5">
@@ -26,6 +29,10 @@ export default function InterviewerStage({ isAr, value, onChange, onSave, saving
         <label className={label}><span>{isAr ? 'Interviewer name (English)' : 'Interviewer name (English)'}</span>
           <input className={input} dir="ltr" value={value.interviewerEn} onChange={e => set('interviewerEn', e.target.value)} /></label>
       </div>
+      <label className={label}>
+        <span>{isAr ? 'المتحدثون (اختياري -- سطر لكل متحدث)' : 'Speakers (optional — one per line)'}</span>
+        <textarea className={input} rows={3} value={value.speakers} onChange={e => set('speakers', e.target.value)} />
+      </label>
       <div className="flex justify-end">
         <button type="button" disabled={saving} onClick={save} className={primaryButton}>
           <Save size={16} />{saving ? (isAr ? 'جارٍ الحفظ...' : 'Saving...') : (isAr ? 'حفظ' : 'Save')}

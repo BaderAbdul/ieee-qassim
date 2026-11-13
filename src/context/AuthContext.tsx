@@ -44,6 +44,7 @@ export interface UserData {
     avatar?: string;
     linkedin?: string;
     bio?: string;
+    showAvatar?: boolean;
   };
   cardPreferences?: {
     theme?: string;

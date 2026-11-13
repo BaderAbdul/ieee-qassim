@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import { useAuth, isAdminRole } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { apiGet, uploadImage, httpsCallable, API_BASE_URL } from '@/lib/backend';
 import { readBackendResponse } from '@/lib/backendResponse';
 import ProfileSkeleton from '@/components/skeletons/ProfileSkeleton';
@@ -142,6 +143,7 @@ export default function EngineeringProfilePage() {
   const dateLocale = isAr ? ar : enUS;
 
   const { user, userData, loading: authLoading, login, logout, retry: retryAuth } = useAuth();
+  const { showToast } = useToast();
   const userBadges = userData?.badges || [];
 
   const [loading, setLoading] = useState(true);
@@ -204,11 +206,11 @@ export default function EngineeringProfilePage() {
       });
       retryAuth();
       setShowCardModal(false);
-      alert(isAr ? 'تم حفظ التخصيص بنجاح' : 'Card customization saved');
-      setReloadKey(k => k + 1);
+      showToast(isAr ? 'تم حفظ التخصيص بنجاح' : 'Card customization saved', 'success');
+setReloadKey(k => k + 1);
     } catch(err) {
       console.error(err);
-      alert(isAr ? 'حدث خطأ أثناء الحفظ.' : 'Error saving customization');
+      showToast(isAr ? 'حدث خطأ أثناء الحفظ.' : 'Error saving customization', 'error');
     } finally {
       setIsSavingCard(false);
     }
@@ -221,7 +223,8 @@ export default function EngineeringProfilePage() {
   const [editingPublicProfile, setEditingPublicProfile] = useState({
     linkedin: '',
     bio: '',
-    avatar: ''
+    avatar: '',
+    showAvatar: true
   });
   const [isSavingPublicProfile, setIsSavingPublicProfile] = useState(false);
 
@@ -245,17 +248,18 @@ export default function EngineeringProfilePage() {
         publicProfile: {
           linkedin: editingPublicProfile.linkedin.trim(),
           bio: editingPublicProfile.bio.trim(),
-          avatar: avatarUrl
+          avatar: avatarUrl,
+          showAvatar: editingPublicProfile.showAvatar
         }
       });
       retryAuth();
-      alert(isAr ? 'تم الحفظ بنجاح!' : 'Saved successfully!');
+      showToast(isAr ? 'تم الحفظ بنجاح!' : 'Saved successfully!', 'success');
       setShowPublicProfileModal(false);
       setAvatarFile(null);
       setReloadKey(k => k + 1); // reload data
     } catch (err) {
       console.error('Error saving public profile:', err);
-      alert(isAr ? 'حدث خطأ أثناء الحفظ.' : 'Error saving profile.');
+      showToast(isAr ? 'حدث خطأ أثناء الحفظ.' : 'Error saving profile.', 'error');
     } finally {
       setIsSavingPublicProfile(false);
     }
@@ -364,10 +368,10 @@ export default function EngineeringProfilePage() {
       });
       setShowEditModal(false);
       retryAuth();
-      alert(isAr ? 'تم حفظ الاسم بنجاح' : 'Name saved successfully');
+      showToast(isAr ? 'تم حفظ الاسم بنجاح' : 'Name saved successfully', 'success');
     } catch(err) {
       console.error(err);
-      alert(err instanceof Error ? err.message : (isAr ? 'حدث خطأ أثناء التحديث.' : 'Error updating name'));
+      showToast(err instanceof Error ? err.message : (isAr ? 'حدث خطأ أثناء التحديث.' : 'Error updating name'), 'error');
     } finally {
       setIsSaving(false);
     }
@@ -386,10 +390,10 @@ export default function EngineeringProfilePage() {
         isQassimStudent: userData?.isQassimStudent === true,
       });
       setShowProfileModal(false);
-      alert(isAr ? 'تم تحديث الملف الشخصي بنجاح' : 'Profile updated successfully');
+      showToast(isAr ? 'تم تحديث الملف الشخصي بنجاح' : 'Profile updated successfully', 'success');
     } catch(err) {
       console.error(err);
-      alert(isAr ? 'حدث خطأ أثناء التحديث.' : 'Error updating profile');
+      showToast(isAr ? 'حدث خطأ أثناء التحديث.' : 'Error updating profile', 'error');
     } finally {
       setIsSavingProfile(false);
     }
@@ -540,7 +544,8 @@ export default function EngineeringProfilePage() {
                 setEditingPublicProfile({
                   linkedin: userData?.publicProfile?.linkedin || '',
                   bio: userData?.publicProfile?.bio || '',
-                  avatar: userData?.publicProfile?.avatar || ''
+                  avatar: userData?.publicProfile?.avatar || '',
+                  showAvatar: userData?.publicProfile?.showAvatar !== false
                 });
                 setShowPublicProfileModal(true);
               }}
@@ -1104,6 +1109,20 @@ export default function EngineeringProfilePage() {
                     </p>
                   </div>
                 </div>
+                <label className="flex items-center gap-2 mt-3 text-sm text-slate-600 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={editingPublicProfile.showAvatar}
+                    onChange={(e) => setEditingPublicProfile({ ...editingPublicProfile, showAvatar: e.target.checked })}
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500/30"
+                  />
+                  {isAr ? 'إظهار صورتي الشخصية للعامة في صفحة الهيكلة' : 'Show my photo publicly on the Structure page'}
+                </label>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  {isAr
+                    ? 'إن أوقفت هذا، يظهر اسمك ودورك بدون صورة لزوار الموقع.'
+                    : 'If turned off, your name and role still show, without your photo, to site visitors.'}
+                </p>
               </div>
 
               <div>

@@ -8,6 +8,7 @@ import { Cairo, Inter } from 'next/font/google';
 import localFont from 'next/font/local';
 import { routing } from '@/i18n/routing';
 import { AuthProvider } from '@/context/AuthContext';
+import { ToastProvider } from '@/context/ToastContext';
 import SessionRecoveryBoundary from '@/components/auth/SessionRecoveryBoundary';
 import ProfileGuard from '@/components/auth/ProfileGuard';
 import ClerkScrollLockFix from '@/components/auth/ClerkScrollLockFix';
@@ -121,6 +122,7 @@ export default async function RootLayout({
         <NextIntlClientProvider messages={messages}>
           <SessionRecoveryBoundary>
           <AuthProvider>
+            <ToastProvider>
             <FeedbackSurfaceProvider>
             <AccountEnhancements>
             <ProfileGuard>
@@ -137,6 +139,7 @@ export default async function RootLayout({
             </ProfileGuard>
             </AccountEnhancements>
             </FeedbackSurfaceProvider>
+            </ToastProvider>
           </AuthProvider>
           </SessionRecoveryBoundary>
         </NextIntlClientProvider>

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { User, Link as LinkIcon, ExternalLink, X, Users } from 'lucide-react';
+import { User, Link as LinkIcon, ExternalLink, X, Users, Crown } from 'lucide-react';
 import Image from 'next/image';
 import { apiGet } from '@/lib/backend';
 
@@ -58,6 +58,11 @@ function getShortName(fullName: string): string {
   }
 
   return `${firstName} ${familyName}`;
+}
+
+// The backend marks the committee head via team_role = 'leader', surfaced here as role/englishRole.
+function isCommitteeLeader(member: CommitteeMember): boolean {
+  return member.role === 'قائد' || member.englishRole === 'Leader';
 }
 
 export default function StructureAccordion({ committees, isAr }: StructureAccordionProps) {
@@ -194,18 +199,28 @@ export default function StructureAccordion({ committees, isAr }: StructureAccord
             <div>
               {committee.members && committee.members.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-                  {committee.members.map((member) => {
+                  {[...committee.members].sort((a, b) => Number(isCommitteeLeader(b)) - Number(isCommitteeLeader(a))).map((member) => {
                     const memberName = (!isAr && member.englishName) ? member.englishName : member.name;
                     const memberRole = (!isAr && member.englishRole) ? member.englishRole : member.role;
                     const displayName = getShortName(memberName);
-                    
+                    const leader = isCommitteeLeader(member);
+
                     return (
-                      <div 
-                        key={member.userId || member.name} 
+                      <div
+                        key={member.userId || member.name}
                         onClick={() => { setRichProfile(null); setIsLoadingProfile(Boolean(member.userId)); setSelectedMember(member); }}
-                        className="group bg-white rounded-2xl p-3 sm:p-4 text-center border border-slate-100 hover:border-blue-200 hover:shadow-md hover:bg-slate-50/50 transition-all cursor-pointer flex flex-col items-center"
+                        className={`group bg-white rounded-2xl p-3 sm:p-4 text-center border hover:shadow-md transition-all cursor-pointer flex flex-col items-center ${
+                          leader ? 'border-amber-300 bg-amber-50/40 hover:border-amber-400 hover:bg-amber-50/70' : 'border-slate-100 hover:border-blue-200 hover:bg-slate-50/50'
+                        }`}
                       >
-                        <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-slate-100 text-slate-400 mb-3 flex items-center justify-center overflow-hidden border border-slate-200">
+                        <div className={`relative w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-slate-100 text-slate-400 mb-3 flex items-center justify-center overflow-hidden border-2 ${
+                          leader ? 'border-amber-400 ring-2 ring-amber-200' : 'border-slate-200'
+                        }`}>
+                          {leader && (
+                            <span className="absolute -top-2 start-1/2 -translate-x-1/2 rtl:translate-x-1/2 z-10 flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white shadow-sm" title={isAr ? 'قائد اللجنة' : 'Committee leader'}>
+                              <Crown className="h-3 w-3" />
+                            </span>
+                          )}
                           {member.avatar ? (
                             <Image 
                               src={member.avatar} 
@@ -241,7 +256,7 @@ export default function StructureAccordion({ committees, isAr }: StructureAccord
                         <h3 className="font-bold text-slate-900 text-xs sm:text-sm transition-colors line-clamp-1 w-full px-1" title={memberName}>
                           {displayName}
                         </h3>
-                        <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5 line-clamp-1 w-full" title={memberRole}>
+                        <p className={`text-[10px] sm:text-xs mt-0.5 line-clamp-1 w-full font-semibold ${leader ? 'text-amber-700' : 'text-slate-500 font-normal'}`} title={memberRole}>
                           {memberRole}
                         </p>
                       </div>

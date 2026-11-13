@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { Lightbulb, X, Send, Loader2 } from 'lucide-react';
 import { API_BASE_URL } from '@/lib/backend';
 import { readBackendResponse } from '@/lib/backendResponse';
@@ -21,6 +22,7 @@ async function postIdea(data: Record<string, unknown>) {
 
 export default function IdeaFloatingButton() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [type, setType] = useState('idea');
   const [title, setTitle] = useState('');
@@ -52,7 +54,7 @@ export default function IdeaFloatingButton() {
       }, 3000);
     } catch (error) {
       console.error('Error submitting idea:', error);
-      alert(isAr ? 'حدث خطأ أثناء الإرسال. حاول مرة أخرى.' : 'Error submitting. Please try again.');
+      showToast(isAr ? 'حدث خطأ أثناء الإرسال. حاول مرة أخرى.' : 'Error submitting. Please try again.', 'error');
     } finally {
       setIsSubmitting(false);
     }

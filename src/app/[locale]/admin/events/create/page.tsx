@@ -27,7 +27,7 @@ import { STAGES, type DesignFields, type InterviewerFields, type MainDataFields,
 const emptyMainData: MainDataFields = { title: '', titleEn: '', description: '', descriptionEn: '', type: 'Workshop', gains: '', gainsEn: '' };
 const emptyTimePlace: TimePlaceFields = { days: [], locationType: 'in_person', location: '', locationEn: '', capacity: 50, isUnlimitedCapacity: false, hideExactCapacity: false, gender: 'both' };
 const emptySecurity: SecurityFields = { securityFormAcknowledged: false };
-const emptyInterviewer: InterviewerFields = { interviewer: '', interviewerEn: '' };
+const emptyInterviewer: InterviewerFields = { interviewer: '', interviewerEn: '', speakers: '' };
 const emptyDesign: DesignFields = { coverUrl: '' };
 const emptySettings: SettingsFields = { requiresRegistration: true, registrationMode: 'Auto', vtoolsUuid: '', hasCertificate: false, certificateTemplateId: '', emailTemplateId: '' };
 const emptyReview: ReviewFields = { feedbackQuestions: [] };
@@ -83,7 +83,7 @@ export default function CreateEventPage() {
           gender: event.gender || 'both',
         });
         setSecurity({ securityFormAcknowledged: !!event.securityFormAcknowledged });
-        setInterviewerData({ interviewer: event.interviewer || '', interviewerEn: event.interviewerEn || '' });
+        setInterviewerData({ interviewer: event.interviewer || '', interviewerEn: event.interviewerEn || '', speakers: (event.speakers || []).join('\n') });
         setSponsorsData({ hasSponsors: event.hasSponsors ?? null, sponsors: event.sponsors || [] });
         setReport(event.report || null);
         setDesign({ coverUrl: event.coverUrl || '' });

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { httpsCallable } from '@/lib/backend';
 import { AdminError, AdminLoading, formatAdminDate } from '@/components/admin/AdminData';
 import type { MemberActivityEntry, MemberActivityResult, MemberActivitySection, MemberOverview } from '@/lib/adminTypes';
@@ -15,6 +16,7 @@ const statuses: Record<string, [string, string]> = { approved: ['مقبول', 'A
 export default function MemberDetail({ id }: { id: string }) {
   const locale = useLocale(); const lang = locale === 'ar' ? 0 : 1;
   const { userData, loading: authLoading } = useAuth(); const role = userData?.role;
+  const { showToast } = useToast();
   const authorized = role === 'super_admin' || role === 'event_organizer';
   const [summary, setSummary] = useState<MemberOverview | null>(null);
   const [section, setSection] = useState<MemberActivitySection>('registrations');
@@ -100,7 +102,7 @@ export default function MemberDetail({ id }: { id: string }) {
       setEntries(prev => prev.filter(e => e.id !== entry.id));
       setRevision(v => v + 1);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error voiding transaction');
+      showToast(err instanceof Error ? err.message : 'Error voiding transaction', 'error');
     } finally {
       setLoading(false);
     }

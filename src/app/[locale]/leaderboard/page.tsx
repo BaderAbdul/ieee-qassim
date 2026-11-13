@@ -3,6 +3,7 @@ import { Trophy } from 'lucide-react';
 import { setRequestLocale } from 'next-intl/server';
 import { API_BASE_URL } from '@/lib/apiBase';
 import LeaderboardList, { type LeaderboardUser } from './LeaderboardList';
+import LeaderboardGuard from './LeaderboardGuard';
 
 export const revalidate = 30;
 
@@ -27,29 +28,31 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ lo
   }));
 
   return (
-    <div className="min-h-screen bg-slate-50 pt-24 pb-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto space-y-8">
-        
-        {/* Header */}
-        <div className="text-center space-y-4">
-          <div className="inline-flex items-center justify-center p-4 bg-amber-100 rounded-3xl mb-2 text-amber-600 shadow-xs">
-            <Trophy className="h-10 w-10 sm:h-12 sm:w-12" />
+    <LeaderboardGuard>
+      <div className="min-h-screen bg-slate-50 pt-24 pb-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto space-y-8">
+
+          {/* Header */}
+          <div className="text-center space-y-4">
+            <div className="inline-flex items-center justify-center p-4 bg-amber-100 rounded-3xl mb-2 text-amber-600 shadow-xs">
+              <Trophy className="h-10 w-10 sm:h-12 sm:w-12" />
+            </div>
+            <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-900 font-cairo">
+              {isAr ? 'المتصدرون' : 'Leaderboard'}
+            </h1>
+            <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
+              {isAr
+                ? 'أعلى 50 عضوًا حسب مجموع نقاط المشاركة. عند تساوي النقاط، يُحافظ على ترتيب ثابت.'
+                : 'Top 50 members by lifetime participation points. Members with equal scores have a consistent order.'}
+            </p>
           </div>
-          <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-900 font-cairo">
-            {isAr ? 'المتصدرون' : 'Leaderboard'}
-          </h1>
-          <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
-            {isAr 
-              ? 'أعلى 50 عضوًا حسب مجموع نقاط المشاركة. عند تساوي النقاط، يُحافظ على ترتيب ثابت.'
-              : 'Top 50 members by lifetime participation points. Members with equal scores have a consistent order.'}
-          </p>
+
+          {/* Board Container */}
+          <LeaderboardList users={topUsers} />
+
         </div>
-
-        {/* Board Container */}
-        <LeaderboardList users={topUsers} />
-
       </div>
-    </div>
+    </LeaderboardGuard>
   );
 }
 
