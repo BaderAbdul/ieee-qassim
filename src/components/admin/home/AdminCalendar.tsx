@@ -3,7 +3,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek,
-  eachDayOfInterval, isSameMonth, isSameDay, isToday,
+  eachDayOfInterval, isSameMonth, isSameDay, isToday, isBefore, startOfDay,
   addMonths, subMonths, format, differenceInCalendarWeeks,
 } from 'date-fns';
 import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
@@ -15,6 +15,7 @@ export interface CalendarEvent {
   titleEn?: string;
   date?: string;
   kind?: 'event' | 'projectDeadline' | 'taskDeadline';
+  completed?: boolean;
 }
 
 interface AcademicTerm { startDate: string | null; endDate: string | null }
@@ -85,8 +86,8 @@ export default function AdminCalendar({
   const showWeekNumbers = !!(termStart && termEnd);
 
   return (
-    <div className="rounded-3xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/80 backdrop-blur-md p-5 shadow-xs">
-      <div className="flex items-center justify-between mb-3">
+    <div className="rounded-3xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/80 backdrop-blur-md p-4 shadow-xs">
+      <div className="flex items-center justify-between mb-2">
         <h2 className="text-base font-black font-cairo text-[var(--color-text-primary)] flex items-center gap-2">
           <CalendarDays size={18} className="text-[var(--color-accent)]" />
           {monthLabel}
@@ -105,14 +106,22 @@ export default function AdminCalendar({
       </div>
 
       {/* Legend: explains what the colored/outlined day boxes mean */}
-      <div className="flex items-center flex-wrap gap-x-4 gap-y-1 mb-3 text-[10px] font-bold text-[var(--color-text-muted)]">
+      <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 mb-2 text-[10px] font-bold text-[var(--color-text-muted)]">
         <span className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-sm bg-[var(--color-highlight)]/30 border border-[var(--color-highlight)]/60" />
           {isAr ? 'يوجد فعالية' : 'Has an event'}
         </span>
         <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-sm bg-emerald-100 border border-emerald-400" />
+          {isAr ? 'فعالية مكتملة' : 'Completed event'}
+        </span>
+        <span className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-sm bg-[var(--color-accent-soft)]" />
           {isAr ? 'اليوم' : 'Today'}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-sm bg-slate-100 border border-slate-300" />
+          {isAr ? 'يوم سابق' : 'Past day'}
         </span>
         <span className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-sm bg-transparent border-2 border-amber-500" />
@@ -132,7 +141,7 @@ export default function AdminCalendar({
         {showWeekNumbers && <div />}
         <div className="grid grid-cols-7 gap-1 text-center">
           {weekdayLabels.map((w, i) => (
-            <div key={i} className="text-[10px] font-bold text-[var(--color-text-muted)] py-1">{w}</div>
+            <div key={i} className="text-[10px] font-bold text-[var(--color-text-muted)] py-0.5">{w}</div>
           ))}
         </div>
 
@@ -152,13 +161,16 @@ export default function AdminCalendar({
                   // Only real events (not deadlines) ever share a background, and only when it's
                   // literally the same event continuing onto the next day (shared id) -- two
                   // unrelated events that happen to land on adjacent days never merge.
-                  const dayEventIds = dayItems.filter(ev => !ev.kind || ev.kind === 'event').map(ev => ev.id);
+                  const dayEventItems = dayItems.filter(ev => !ev.kind || ev.kind === 'event');
+                  const dayEventIds = dayEventItems.map(ev => ev.id);
                   const hasEvent = dayEventIds.length > 0;
+                  const allEventsCompleted = hasEvent && dayEventItems.every(ev => ev.completed);
                   const hasTaskDeadline = dayItems.some(ev => ev.kind === 'taskDeadline');
                   const hasProjectDeadline = dayItems.some(ev => ev.kind === 'projectDeadline');
                   const inMonth = isSameMonth(day, month);
                   const active = selected && isSameDay(day, selected);
                   const vacation = isVacationDay(day);
+                  const isPastDay = isBefore(day, startOfDay(new Date())) && !isToday(day);
                   const eventIdsOf = (d: Date) =>
                     (eventsByDay.get(format(d, 'yyyy-MM-dd')) || []).filter(ev => !ev.kind || ev.kind === 'event').map(ev => ev.id);
                   const connectsPrev = hasEvent && di > 0 && dayEventIds.some(id => eventIdsOf(week[di - 1]).includes(id));
@@ -173,17 +185,21 @@ export default function AdminCalendar({
                       <button
                         type="button"
                         onClick={() => onSelectDay(selected && isSameDay(selected, day) ? null : day)}
-                        className={`cursor-pointer relative aspect-square w-full flex flex-col items-center justify-center text-xs border transition-colors ${
+                        className={`cursor-pointer relative h-8 w-full flex flex-col items-center justify-center text-xs border transition-colors ${
                           connectsPrev ? 'rounded-s-none border-s-0' : 'rounded-s-xl'
                         } ${connectsNext ? 'rounded-e-none border-e-0' : 'rounded-e-xl'} ${ringClass} ${
                           active
                             ? 'bg-[var(--color-accent)] text-[var(--color-accent-contrast)] border-[var(--color-accent)]'
+                            : hasEvent && allEventsCompleted
+                            ? 'bg-emerald-100 border-emerald-400 text-emerald-700 hover:bg-emerald-200/70'
                             : hasEvent
                             ? 'bg-[var(--color-highlight)]/30 border-[var(--color-highlight)]/60 text-[var(--color-text-primary)] hover:bg-[var(--color-highlight)]/40'
                             : vacation
                             ? 'bg-rose-100 border-rose-300 text-rose-700 hover:bg-rose-200/70'
                             : isToday(day)
                             ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)] border-[var(--color-accent)]/30'
+                            : isPastDay && inMonth
+                            ? 'bg-slate-100 border-slate-200 text-slate-400 hover:bg-slate-200/70'
                             : inMonth
                             ? 'text-[var(--color-text-primary)] border-[var(--color-border)]/40 hover:bg-[var(--color-surface-2)]'
                             : 'text-[var(--color-text-muted)]/50 border-[var(--color-border)]/20 hover:bg-[var(--color-surface-2)]'

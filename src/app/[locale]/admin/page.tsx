@@ -81,7 +81,7 @@ export default function AdminDashboardPage() {
   }));
 
   const calendarEvents: CalendarEvent[] = [
-    ...events.map(e => ({ id: e.id, title: e.title, titleEn: e.titleEn, date: e.date, kind: 'event' as const })),
+    ...events.map(e => ({ id: e.id, title: e.title, titleEn: e.titleEn, date: e.date, kind: 'event' as const, completed: e.state === 'Completed' })),
     ...projectDeadlines.filter(p => p.deadline).map(p => ({ id: p.id, title: p.name, date: p.deadline!, kind: 'projectDeadline' as const })),
     ...allTasks.filter(task => task.deadline).map(task => ({ id: task.id, title: task.title, date: task.deadline!, kind: 'taskDeadline' as const })),
   ];
