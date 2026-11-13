@@ -7,6 +7,7 @@ import {
   ArrowUpRight, Calendar, CheckCircle2, Clock, Award, QrCode, Link2, MapPin, Eye, EyeOff, AlertTriangle,
 } from 'lucide-react';
 import { toJsDate } from '@/lib/dateUtils';
+import { apiGet } from '@/lib/backend';
 import type { PlatformEvent, EventState } from '@/lib/types';
 import { formatAdminDate } from '@/components/admin/AdminData';
 import { eventStateLabel } from '@/components/admin/EventWorkspace';
@@ -47,6 +48,7 @@ export default function EventCard({
   const [pendingUnlisted, setPendingUnlisted] = useState<boolean | null>(null);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [missing, setMissing] = useState<EventReadiness | null>(null);
+  const [checkingReadiness, setCheckingReadiness] = useState(false);
 
   const date = toJsDate(event.date);
   const badge = stateBadgeColors[event.state] || stateBadgeColors.Published;
@@ -59,15 +61,27 @@ export default function EventCard({
     ? (readiness.ready ? (isAr ? 'جاهز للإظهار' : 'Ready to show') : (isAr ? 'باقي بعض البيانات للإظهار' : 'Some data left to show it'))
     : (readiness.ready ? (isAr ? 'جاهز للإنهاء' : 'Ready to complete') : (isAr ? 'باقي بعض البيانات للإنهاء' : 'Some data left to complete it')));
 
-  const requestStateChange = (state: EventState) => {
+  // Gate transitions on the event's full, current record rather than the card's `event` prop: the
+  // list row is a lighter projection fetched once, so it can be stale (edited in the wizard since)
+  // and would name the wrong missing field.
+  const freshEvent = async (): Promise<PlatformEvent> => {
+    try { return await apiGet<PlatformEvent>(`/api/admin/events/${event.id}`); }
+    catch { return event; }
+  };
+
+  const requestStateChange = async (state: EventState) => {
     if (state === 'Completed') {
-      const check = completionReadiness(event);
+      setCheckingReadiness(true);
+      const check = completionReadiness(await freshEvent());
+      setCheckingReadiness(false);
       if (!check.ready) { setMissing(check); return; }
     }
     setPendingState(state);
   };
-  const requestShow = () => {
-    const check = visibilityReadiness(event);
+  const requestShow = async () => {
+    setCheckingReadiness(true);
+    const check = visibilityReadiness(await freshEvent());
+    setCheckingReadiness(false);
     if (!check.ready) { setMissing(check); return; }
     setPendingUnlisted(false);
   };
@@ -100,8 +114,8 @@ export default function EventCard({
               <select
                 aria-label={isAr ? `تغيير حالة ${event.title}` : `Change ${event.title} state`}
                 value={event.state}
-                disabled={busy}
-                onChange={(e) => requestStateChange(e.target.value as EventState)}
+                disabled={busy || checkingReadiness}
+                onChange={(e) => void requestStateChange(e.target.value as EventState)}
                 className="bg-transparent border-none px-0.5 py-0 text-[11px] font-bold disabled:opacity-50 transition-all focus:outline-none"
               >
                 <option value={event.state}>{eventStateLabel(event.state, isAr)}</option>
@@ -219,11 +233,11 @@ export default function EventCard({
           </button>
           <button
             type="button"
-            disabled={busy}
-            onClick={() => (isVisible ? setPendingUnlisted(true) : requestShow())}
+            disabled={busy || checkingReadiness}
+            onClick={() => (isVisible ? setPendingUnlisted(true) : void requestShow())}
             className="relative z-10 text-xs font-bold px-3 py-2 rounded-xl bg-[var(--color-surface-2)] hover:opacity-80 text-[var(--color-text-secondary)] disabled:opacity-50 transition-opacity ms-auto"
           >
-            {isVisible ? (isAr ? 'إخفاء' : 'Hide') : (isAr ? 'إظهار' : 'Show')}
+            {isVisible ? (isAr ? 'إخفاء' : 'Hide') : checkingReadiness ? (isAr ? 'جارٍ التحقق...' : 'Checking...') : (isAr ? 'إظهار' : 'Show')}
           </button>
         </div>
       </div>
