@@ -1,11 +1,14 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import { useAdminEvent } from '@/components/admin/EventWorkspace';
 import { AdminError, AdminLoading, useAdminQuery } from '@/components/admin/AdminData';
 import type { EventReport } from '@/lib/adminTypes';
-import { Users, Clock, UserCheck, CheckCircle, Award, XCircle, RefreshCw, Star } from 'lucide-react';
+import { apiGet, httpsCallable } from '@/lib/backend';
+import { useToast } from '@/context/ToastContext';
+import { Users, Clock, UserCheck, CheckCircle, Award, XCircle, RefreshCw, Star, AlertTriangle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 type StatColor = 'purple' | 'amber' | 'blue' | 'slate' | 'emerald' | 'red';
@@ -32,18 +35,46 @@ function StatTile({ label, value, icon: Icon, color, locale }: { label: string; 
   );
 }
 
+interface RejectedCheckin {
+  userId: string; userName: string; userEmail?: string; universityId?: string;
+  attempts: number; lastAttemptAt: string; code: string; message: string;
+}
+
 export default function AdminEventSummaryPage() {
   const event = useAdminEvent(); const locale = useLocale(); const isAr = locale === 'ar';
   const { data, loading, error, refresh } = useAdminQuery<EventReport>('getEventReport', event?.id);
+  const { showToast } = useToast();
+  const [rejected, setRejected] = useState<RejectedCheckin[]>([]);
+  const [busyUser, setBusyUser] = useState<string | null>(null);
+  const rejectedCount = data?.counts.rejectedCheckins ?? 0;
+  useEffect(() => {
+    if (!event?.id || rejectedCount === 0) return;
+    let active = true;
+    void apiGet<{ attempts: RejectedCheckin[] }>(`/api/admin/events/${event.id}/rejected-checkins`)
+      .then(result => { if (active) setRejected(result.attempts); }).catch(() => {});
+    return () => { active = false; };
+  }, [event?.id, rejectedCount]);
+
+  const recordManually = async (userId: string) => {
+    if (!event) return;
+    setBusyUser(userId);
+    try {
+      await httpsCallable(null, 'initiatePendingCheckIn')({ eventId: event.id, targetUserId: userId });
+      setRejected(list => list.filter(item => item.userId !== userId));
+      showToast(isAr ? 'تم تسجيل حضوره.' : 'Attendance recorded.', 'success');
+      refresh();
+    } catch (reason) {
+      showToast(reason instanceof Error ? reason.message : (isAr ? 'تعذر تسجيل الحضور.' : 'Could not record attendance.'), 'error');
+    } finally { setBusyUser(null); }
+  };
 
   const registrationStats: { label: string; value: number; icon: LucideIcon; color: StatColor }[] = data ? [
-    { label: isAr ? 'كل السجلات (تشمل الملغاة والمرفوضة والانتظار)' : 'All records (incl. cancelled, rejected, waitlisted)', value: data.counts.registrations, icon: Users, color: 'purple' },
-    { label: isAr ? 'مقاعد محجوزة (هي رقم «المسجلون» في بطاقة الفعالية)' : 'Seats held (the “Registered” number on the event card)', value: data.counts.pending + data.counts.approved + data.counts.attended, icon: UserCheck, color: 'blue' },
+    { label: isAr ? 'كل السجلات (تسجيل مسبق + زوار بدون تسجيل)' : 'All records (pre-registered + walk-ins)', value: data.counts.registrations, icon: Users, color: 'purple' },
+    { label: isAr ? 'مسجلون مسبقًا (رقم «المسجلون» في بطاقة الفعالية)' : 'Pre-registered (the “Registered” number on the event card)', value: data.counts.registrations - (data.counts.walkIns ?? 0), icon: UserCheck, color: 'blue' },
+    { label: isAr ? 'زوار بدون تسجيل مسبق' : 'Walk-ins (no prior registration)', value: data.counts.walkIns ?? 0, icon: Users, color: 'slate' },
     { label: isAr ? 'بانتظار الموافقة' : 'Pending', value: data.counts.pending, icon: Clock, color: 'amber' },
     { label: isAr ? 'مقبول · لم يحضر بعد' : 'Approved · not attended', value: data.counts.approved, icon: UserCheck, color: 'blue' },
     { label: isAr ? 'قائمة الانتظار' : 'Waitlist', value: data.counts.waitlisted, icon: Users, color: 'slate' },
-    { label: isAr ? 'ملغاة' : 'Cancelled', value: data.counts.cancelled, icon: XCircle, color: 'slate' },
-    { label: isAr ? 'مرفوضة' : 'Rejected', value: data.counts.rejected, icon: XCircle, color: 'red' },
     { label: isAr ? 'الحضور المؤكد' : 'Confirmed attendance', value: data.counts.attended, icon: CheckCircle, color: 'emerald' },
   ] : [];
 
@@ -70,10 +101,36 @@ export default function AdminEventSummaryPage() {
       {error ? <AdminError message={error} retry={refresh} /> : loading ? <AdminLoading /> : data ? <>
         <section className="space-y-3">
           <h3 className="text-sm font-bold text-slate-500">{isAr ? 'التسجيل والحضور' : 'Registration & attendance'}</h3>
-          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {registrationStats.map(stat => <StatTile key={stat.label} {...stat} locale={locale} />)}
           </dl>
         </section>
+
+        {rejectedCount > 0 && (
+          <section className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-5">
+            <h3 className="flex items-center gap-2 font-bold text-amber-900">
+              <AlertTriangle className="h-5 w-5" />
+              {isAr ? `${rejectedCount} طالبًا حاولوا تسجيل الحضور ورُفضت محاولتهم` : `${rejectedCount} people tried to check in and were refused`}
+            </h3>
+            <p className="text-xs text-amber-800">
+              {isAr ? 'عادةً بسبب انتهاء رمز QR أو إغلاق الفعالية أو اشتراط التسجيل. يمكنك تسجيل حضورهم يدويًا (الفعالية يجب أن تكون قيد التنفيذ أو مكتملة).' : 'Usually an expired QR, a closed event or a registration requirement. You can record their attendance manually (the event must be Ongoing or Completed).'}
+            </p>
+            <ul className="divide-y divide-amber-100 rounded-xl bg-white">
+              {rejected.map(item => (
+                <li key={item.userId} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
+                  <div className="min-w-0">
+                    <p className="font-bold text-slate-900">{item.userName} <span className="font-normal text-slate-400">{item.universityId ?? ''}</span></p>
+                    <p className="truncate text-xs text-slate-500">{item.message} · {item.attempts}×</p>
+                  </div>
+                  <button type="button" disabled={busyUser === item.userId} onClick={() => void recordManually(item.userId)}
+                          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">
+                    {isAr ? 'تسجيل حضوره' : 'Record attendance'}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         <section className="space-y-3">
           <h3 className="text-sm font-bold text-slate-500">{isAr ? 'الشهادات' : 'Certificates'}</h3>

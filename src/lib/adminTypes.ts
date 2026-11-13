@@ -35,6 +35,6 @@ export interface AdminOperations { notificationJobs: OperationJob[]; certificate
 export interface AuditEntry { id: string; action: string; actorUid?: string; targetId?: string; createdAt?: string; reason?: string }
 export interface AuditResult { entries: AuditEntry[]; nextCursor: string | null }
 export interface EventReport {
-  counts: { registrations: number; pending: number; approved: number; waitlisted: number; rejected: number; cancelled: number; attended: number; certificatesAvailable: number; certificatesFailed: number; certificatesQueued: number };
+  counts: { registrations: number; pending: number; approved: number; waitlisted: number; rejected: number; cancelled: number; attended: number; walkIns?: number; rejectedCheckins?: number; certificatesAvailable: number; certificatesFailed: number; certificatesQueued: number };
   feedback: { responses: number; averageRating: number | null };
 }
