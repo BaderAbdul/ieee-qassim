@@ -1,18 +1,43 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { Briefcase, CheckSquare, ListTodo, Target, TrendingUp } from 'lucide-react';
-import { useLocalCollection } from '@/hooks/useLocalCollection';
-import { TASK_CENTER_DEPARTMENTS, type TCGoal, type TCProject, type TCTask } from '@/lib/taskCenter';
-import { SEED_GOALS, SEED_PROJECTS, SEED_TASKS } from './taskCenterSeed';
+import { apiGetArray } from '@/lib/backendResponse';
+import { goalsApi, projectsApi, tasksApi, type Goal, type Project, type TCTask } from '@/lib/taskCenterApi';
+import { AdminError, AdminLoading } from '@/components/admin/AdminData';
 import { card } from './taskCenterUi';
+
+interface TeamOption { id: string; nameAr: string; nameEn: string }
 
 export default function TaskCenterOverviewTab({ isAr }: { isAr: boolean }) {
   const t = (ar: string, en: string) => isAr ? ar : en;
-  const { items: tasks } = useLocalCollection<TCTask>('task_center_tasks', SEED_TASKS);
-  const { items: projects } = useLocalCollection<TCProject>('task_center_projects', SEED_PROJECTS);
-  const { items: goals } = useLocalCollection<TCGoal>('task_center_goals', SEED_GOALS);
+  const [tasks, setTasks] = useState<TCTask[]>([]);
+  const [myTasks, setMyTasks] = useState<TCTask[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [teams, setTeams] = useState<TeamOption[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const openTasks = tasks.filter(task => task.status !== 'done');
+  const load = async () => {
+    setLoading(true); setError(null);
+    try {
+      const [tasksList, myTasksList, projectsList, goalsList, teamsList] = await Promise.all([
+        tasksApi.list(), tasksApi.list({ mine: true }), projectsApi.list(), goalsApi.list(), apiGetArray<TeamOption>('/api/admin/teams'),
+      ]);
+      setTasks(tasksList); setMyTasks(myTasksList); setProjects(projectsList); setGoals(goalsList); setTeams(teamsList);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Unable to load overview');
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => { void load(); }, []);
+
+  if (loading) return <AdminLoading />;
+  if (error) return <AdminError message={error} retry={load} />;
+
+  const openTasks = myTasks.filter(task => task.status !== 'done');
   const doneCount = tasks.filter(task => task.status === 'done').length;
   const completion = tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0;
   const activeProjects = projects.filter(p => p.status !== 'done').length;
@@ -45,7 +70,7 @@ export default function TaskCenterOverviewTab({ isAr }: { isAr: boolean }) {
       <h3 className="mb-3 font-bold">{t('مهامي المفتوحة', 'My open tasks')} ({openTasks.length})</h3>
       {openTasks.length ? <ul className="space-y-2">{openTasks.slice(0, 6).map(task => (
         <li key={task.id} className="flex items-center justify-between rounded-xl bg-[var(--color-surface-2)] px-3 py-2 text-sm">
-          <span>{task.title}</span><span className="text-xs text-[var(--color-text-muted)]">{task.department}</span>
+          <span>{task.title}</span><span className="text-xs text-[var(--color-text-muted)]">{task.teams.map(team => isAr ? team.nameAr : team.nameEn).join(', ') || '—'}</span>
         </li>
       ))}</ul> : <p className="text-sm text-[var(--color-text-muted)]">{t('لا توجد مهام مفتوحة حاليًا.', 'No open tasks right now.')}</p>}
     </div>
@@ -53,23 +78,24 @@ export default function TaskCenterOverviewTab({ isAr }: { isAr: boolean }) {
     <div className={`${card} p-5`}>
       <h3 className="mb-3 flex items-center gap-2 font-bold"><Target size={17} />{t('ملخص الأقسام', 'Department summary')}</h3>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {TASK_CENTER_DEPARTMENTS.map(dept => {
-          const deptTasks = tasks.filter(task => task.department === dept);
-          const deptDone = deptTasks.filter(task => task.status === 'done').length;
-          return <div key={dept} className="rounded-xl border border-[var(--color-border)] p-3 text-sm">
-            <p className="font-bold">{dept}</p>
-            <p className="mt-1 text-xs text-[var(--color-text-muted)]">{t(`${deptTasks.length} مهمة، ${deptDone} مكتملة`, `${deptTasks.length} tasks, ${deptDone} done`)}</p>
+        {teams.map(team => {
+          const teamTasks = tasks.filter(task => task.teamIds.includes(team.id));
+          const teamDone = teamTasks.filter(task => task.status === 'done').length;
+          return <div key={team.id} className="rounded-xl border border-[var(--color-border)] p-3 text-sm">
+            <p className="font-bold">{isAr ? team.nameAr : team.nameEn}</p>
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">{t(`${teamTasks.length} مهمة، ${teamDone} مكتملة`, `${teamTasks.length} tasks, ${teamDone} done`)}</p>
           </div>;
         })}
+        {teams.length === 0 && <p className="text-sm text-[var(--color-text-muted)]">{t('لا توجد أقسام بعد.', 'No departments yet.')}</p>}
       </div>
     </div>
 
     <div className={`${card} p-5`}>
       <h3 className="mb-3 font-bold">{t('أهداف الربع الحالي', 'Current quarter goals')}</h3>
-      {goals.length ? <ol className="space-y-3">{[...goals].sort((a, b) => a.order - b.order).map(goal => (
+      {goals.length ? <ol className="space-y-3">{goals.map((goal, i) => (
         <li key={goal.id} className="flex gap-3">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-xs font-black text-[var(--color-accent)]">{goal.order}</span>
-          <div><p className="font-bold">{goal.title}</p>{goal.rationale && <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{goal.rationale}</p>}</div>
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-xs font-black text-[var(--color-accent)]">{i + 1}</span>
+          <div><p className="font-bold">{goal.title}</p>{goal.why && <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{goal.why}</p>}</div>
         </li>
       ))}</ol> : <p className="text-sm text-[var(--color-text-muted)]">{t('لا توجد أهداف محددة بعد.', 'No goals set yet.')}</p>}
     </div>

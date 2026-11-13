@@ -1,13 +1,5 @@
-/** مركز المهام (Task Center): local-only design/logic layer modeled on the team's external
- * task tool. Everything here lives in the browser (localStorage) -- no backend wiring yet, by
- * design: this phase is UI/UX and interaction only. Swapping this for real API calls later only
- * touches this file and useTaskCenterCollection, not the tab components. */
-
-export const TASK_CENTER_DEPARTMENTS = [
-  'الإدارة التنظيمية', 'الإعلام والتصميم', 'الابحاث والتطوير',
-  'التقنية', 'العلاقات والمجتمع', 'الفعاليات والبرامج', 'القيادة',
-] as const;
-export type TaskCenterDepartment = typeof TASK_CENTER_DEPARTMENTS[number];
+/** Checkin/Ideas/Resources tabs (still local-only) plus the shared status/priority vocab that
+ * lib/taskCenterApi.ts's real, backend-persisted Goals/Projects/Tasks also use for color maps. */
 
 export const TASK_STATUSES = ['todo', 'doing', 'done', 'blocked'] as const;
 export type TaskStatus = typeof TASK_STATUSES[number];
@@ -44,40 +36,6 @@ export const IDEA_STATUS_LABELS: Record<IdeaStatus, { ar: string; en: string }> 
 };
 
 export const IDEA_CATEGORIES = ['Events', 'Technical', 'Community', 'Other'] as const;
-
-export interface TCProject {
-  id: string;
-  title: string;
-  description: string;
-  department: TaskCenterDepartment;
-  category: string;
-  status: ProjectStatus;
-  progress: number; // 0-100
-  dueDate: string; // yyyy-mm-dd
-  goalId: string | null;
-  createdBy: string;
-  createdAt: string;
-}
-
-export interface TCTask {
-  id: string;
-  title: string;
-  description: string;
-  status: TaskStatus;
-  priority: TaskPriority;
-  dueDate: string;
-  department: TaskCenterDepartment;
-  projectId: string | null;
-  createdBy: string;
-  createdAt: string;
-}
-
-export interface TCGoal {
-  id: string;
-  title: string;
-  rationale: string;
-  order: number;
-}
 
 export interface TCIdea {
   id: string;

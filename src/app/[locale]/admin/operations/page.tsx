@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useLocale } from 'next-intl';
+import { useSearchParams } from 'next/navigation';
 import {
   BookOpen, Briefcase, LayoutDashboard, Lightbulb, ListTodo, MessageSquare, Target,
 } from 'lucide-react';
@@ -16,11 +17,18 @@ import TaskCenterIdeasTab from '@/components/admin/operations/TaskCenterIdeasTab
 import TaskCenterResourcesTab from '@/components/admin/operations/TaskCenterResourcesTab';
 
 type TabId = 'overview' | 'projects' | 'tasks' | 'goals' | 'checkin' | 'ideas' | 'resources';
+const TAB_IDS: TabId[] = ['overview', 'projects', 'tasks', 'goals', 'checkin', 'ideas', 'resources'];
 
 export default function AdminOperationsPage() {
   const isAr = useLocale() === 'ar';
   const { userData } = useAuth();
-  const [tab, setTab] = useState<TabId>('overview');
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get('tab');
+  const [tab, setTab] = useState<TabId>(
+    TAB_IDS.includes(initialTab as TabId) ? (initialTab as TabId) : 'overview');
+  const initialProjectId = searchParams.get('projectId');
+  const initialAssigneeId = searchParams.get('assigneeId');
+  const initialTeamId = searchParams.get('teamId');
   const canModerate = userData?.isSuperAdmin === true || hasAnyPrivilege(userData, 'operations');
 
   const tabs: { id: TabId; labelAr: string; labelEn: string; Icon: typeof LayoutDashboard }[] = [
@@ -49,7 +57,7 @@ export default function AdminOperationsPage() {
   return <div className="space-y-6">
     {tab === 'overview' && <TaskCenterOverviewTab isAr={isAr} />}
     {tab === 'projects' && <TaskCenterProjectsTab isAr={isAr} />}
-    {tab === 'tasks' && <TaskCenterTasksTab isAr={isAr} />}
+    {tab === 'tasks' && <TaskCenterTasksTab isAr={isAr} initialProjectId={initialProjectId ? Number(initialProjectId) : null} initialAssigneeId={initialAssigneeId} initialTeamId={initialTeamId} />}
     {tab === 'goals' && <TaskCenterGoalsTab isAr={isAr} />}
     {tab === 'checkin' && <TaskCenterCheckinTab isAr={isAr} />}
     {tab === 'ideas' && <TaskCenterIdeasTab isAr={isAr} canModerate={canModerate} />}

@@ -14,30 +14,35 @@ export interface CalendarEvent {
   title: string;
   titleEn?: string;
   date?: string;
+  kind?: 'event' | 'projectDeadline' | 'taskDeadline';
 }
 
 interface AcademicTerm { startDate: string | null; endDate: string | null }
-interface VacationRange { start: string; end: string; label?: string }
-interface VacationSettings { weeklyDays: number[]; ranges: VacationRange[] }
+export interface VacationRange { start: string; end: string; label?: string }
+export interface VacationSettings { weeklyDays: number[]; ranges: VacationRange[] }
+
+export function vacationInfoFor(day: Date, vacation: VacationSettings | null): { isVacation: boolean; label: string | null } {
+  if (!vacation) return { isVacation: false, label: null };
+  const key = format(day, 'yyyy-MM-dd');
+  const range = (vacation.ranges || []).find(r => key >= r.start && key <= r.end);
+  if (range) return { isVacation: true, label: range.label || null };
+  if (vacation.weeklyDays?.includes(day.getDay())) return { isVacation: true, label: null };
+  return { isVacation: false, label: null };
+}
 
 export default function AdminCalendar({
-  events, isAr, selected, onSelectDay,
+  events, isAr, selected, onSelectDay, vacation,
 }: {
   events: CalendarEvent[];
   isAr: boolean;
   selected: Date | null;
   onSelectDay: (date: Date | null) => void;
+  vacation: VacationSettings | null;
 }) {
   const [month, setMonth] = useState(() => new Date());
   const { data: term } = useAdminQuery<AcademicTerm>('getAcademicTerm');
-  const { data: vacation } = useAdminQuery<VacationSettings>('getVacationDays');
 
-  const isVacationDay = (day: Date) => {
-    if (!vacation) return false;
-    if (vacation.weeklyDays?.includes(day.getDay())) return true;
-    const key = format(day, 'yyyy-MM-dd');
-    return (vacation.ranges || []).some(r => key >= r.start && key <= r.end);
-  };
+  const isVacationDay = (day: Date) => vacationInfoFor(day, vacation).isVacation;
 
   const eventsByDay = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
@@ -99,11 +104,23 @@ export default function AdminCalendar({
         </div>
       </div>
 
-      {/* Legend: explains what the colored day boxes mean */}
+      {/* Legend: explains what the colored/outlined day boxes mean */}
       <div className="flex items-center flex-wrap gap-x-4 gap-y-1 mb-3 text-[10px] font-bold text-[var(--color-text-muted)]">
         <span className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-sm bg-[var(--color-highlight)]/30 border border-[var(--color-highlight)]/60" />
           {isAr ? 'يوجد فعالية' : 'Has an event'}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-sm bg-[var(--color-accent-soft)]" />
+          {isAr ? 'اليوم' : 'Today'}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-sm bg-transparent border-2 border-amber-500" />
+          {isAr ? 'مهمة' : 'Task'}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-sm bg-transparent border-2 border-violet-500" />
+          {isAr ? 'موعد تسليم مشروع' : 'Project deadline'}
         </span>
         <span className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-sm bg-rose-100 border border-rose-300" />
@@ -131,13 +148,26 @@ export default function AdminCalendar({
               <div key={`w-${wi}`} className="grid grid-cols-7">
                 {week.map((day, di) => {
                   const key = format(day, 'yyyy-MM-dd');
-                  const dayEvents = eventsByDay.get(key) || [];
-                  const hasEvents = dayEvents.length > 0;
+                  const dayItems = eventsByDay.get(key) || [];
+                  // Only real events (not deadlines) ever share a background, and only when it's
+                  // literally the same event continuing onto the next day (shared id) -- two
+                  // unrelated events that happen to land on adjacent days never merge.
+                  const dayEventIds = dayItems.filter(ev => !ev.kind || ev.kind === 'event').map(ev => ev.id);
+                  const hasEvent = dayEventIds.length > 0;
+                  const hasTaskDeadline = dayItems.some(ev => ev.kind === 'taskDeadline');
+                  const hasProjectDeadline = dayItems.some(ev => ev.kind === 'projectDeadline');
                   const inMonth = isSameMonth(day, month);
                   const active = selected && isSameDay(day, selected);
                   const vacation = isVacationDay(day);
-                  const connectsPrev = hasEvents && di > 0 && (eventsByDay.get(format(week[di - 1], 'yyyy-MM-dd'))?.length ?? 0) > 0;
-                  const connectsNext = hasEvents && di < 6 && (eventsByDay.get(format(week[di + 1], 'yyyy-MM-dd'))?.length ?? 0) > 0;
+                  const eventIdsOf = (d: Date) =>
+                    (eventsByDay.get(format(d, 'yyyy-MM-dd')) || []).filter(ev => !ev.kind || ev.kind === 'event').map(ev => ev.id);
+                  const connectsPrev = hasEvent && di > 0 && dayEventIds.some(id => eventIdsOf(week[di - 1]).includes(id));
+                  const connectsNext = hasEvent && di < 6 && dayEventIds.some(id => eventIdsOf(week[di + 1]).includes(id));
+                  // Task/project deadlines are outlines layered on top of the background, not a
+                  // fill of their own -- a day can have an event AND a task deadline at once.
+                  const ringClass = hasTaskDeadline
+                    ? 'ring-2 ring-inset ring-amber-500'
+                    : hasProjectDeadline ? 'ring-2 ring-inset ring-violet-500' : '';
                   return (
                     <div key={key} className={`p-0.5 ${connectsPrev ? 'ps-0' : ''} ${connectsNext ? 'pe-0' : ''}`}>
                       <button
@@ -145,10 +175,10 @@ export default function AdminCalendar({
                         onClick={() => onSelectDay(selected && isSameDay(selected, day) ? null : day)}
                         className={`cursor-pointer relative aspect-square w-full flex flex-col items-center justify-center text-xs border transition-colors ${
                           connectsPrev ? 'rounded-s-none border-s-0' : 'rounded-s-xl'
-                        } ${connectsNext ? 'rounded-e-none border-e-0' : 'rounded-e-xl'} ${
+                        } ${connectsNext ? 'rounded-e-none border-e-0' : 'rounded-e-xl'} ${ringClass} ${
                           active
                             ? 'bg-[var(--color-accent)] text-[var(--color-accent-contrast)] border-[var(--color-accent)]'
-                            : hasEvents
+                            : hasEvent
                             ? 'bg-[var(--color-highlight)]/30 border-[var(--color-highlight)]/60 text-[var(--color-text-primary)] hover:bg-[var(--color-highlight)]/40'
                             : vacation
                             ? 'bg-rose-100 border-rose-300 text-rose-700 hover:bg-rose-200/70'
