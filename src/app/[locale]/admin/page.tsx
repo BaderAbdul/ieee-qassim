@@ -15,8 +15,8 @@ import {
   type RemainingTasksEntry, type CrossTeamRequest, type Project, type TCTask,
 } from '@/lib/taskCenterApi';
 
-function RequestsPanel({ icon: Icon, title, children, emptyLabel }: {
-  icon: typeof ArrowRightLeft; title: string; children: React.ReactNode; emptyLabel: string;
+function RequestsPanel({ icon: Icon, title, children, isEmpty, emptyLabel }: {
+  icon: typeof ArrowRightLeft; title: string; children: React.ReactNode; isEmpty: boolean; emptyLabel: string;
 }) {
   return (
     <div className="rounded-3xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/80 backdrop-blur-md p-5 shadow-xs flex flex-col">
@@ -25,12 +25,12 @@ function RequestsPanel({ icon: Icon, title, children, emptyLabel }: {
         {title}
       </h3>
       <div className="flex-1 space-y-2">
-        {children || (
+        {isEmpty ? (
           <div className="flex flex-col items-center justify-center text-center py-6 border border-dashed border-[var(--color-border)] rounded-2xl">
             <Sparkles className="text-[var(--color-text-muted)] mb-2" size={22} />
             <p className="text-xs text-[var(--color-text-muted)] max-w-[220px]">{emptyLabel}</p>
           </div>
-        )}
+        ) : children}
       </div>
     </div>
   );
@@ -143,6 +143,7 @@ export default function AdminDashboardPage() {
           {/* Requests */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <RequestsPanel icon={ArrowRightLeft} title={isAr ? 'طلبات بين الفرق' : 'Inter-team requests'}
+                            isEmpty={crossTeamRequests.length === 0}
                             emptyLabel={isAr ? 'عندما يطلب فريق شيئاً من فريق آخر، مثل الفعاليات من اللوجستيات، سيظهر هنا.' : 'When one team requests something from another — e.g. Events from Logistics — it will show up here.'}>
               {crossTeamRequests.slice(0, 6).map(request => (
                 <Link key={request.id} href={`/admin/operations/projects/${request.projectId}`}
@@ -153,6 +154,7 @@ export default function AdminDashboardPage() {
               ))}
             </RequestsPanel>
             <RequestsPanel icon={ClipboardList} title={isAr ? 'مهام الفريق من القائد' : 'Team tasks from the leader'}
+                            isEmpty={leaderTasks.length === 0}
                             emptyLabel={ledTeams.length
                               ? (isAr ? 'لا توجد مهام مفتوحة لفريقك حاليًا.' : 'No open tasks for your team right now.')
                               : (isAr ? 'المهام التي يسندها قائد الفريق لأعضاء فريقه ستظهر هنا.' : 'Tasks a team leader assigns to their own team members will show up here.')}>
