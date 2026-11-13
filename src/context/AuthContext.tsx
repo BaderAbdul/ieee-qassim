@@ -34,6 +34,10 @@ export interface UserData {
   fatherName?: string | null;
   familyName?: string | null;
   arabicFullName?: string;
+  englishFullName?: string | null;
+  titleAr?: string | null;
+  titleEn?: string | null;
+  adminPoints?: number;
   college?: string | null;
   major?: string | null;
   academicLevel?: string | null;
@@ -45,6 +49,7 @@ export interface UserData {
     linkedin?: string;
     bio?: string;
     showAvatar?: boolean;
+    socials?: Partial<Record<'linkedin' | 'x' | 'instagram' | 'github' | 'youtube' | 'snapchat' | 'tiktok' | 'website', string>>;
   };
   cardPreferences?: {
     theme?: string;
@@ -183,6 +188,11 @@ export function hasAnyPrivilege(userData: UserData | null | undefined, prefix: s
   if (!userData) return false;
   if (userData.isSuperAdmin) return true;
   return (userData.privileges ?? []).some(key => key.startsWith(`${prefix}.`));
+}
+
+/** True when the user holds at least one privilege under any of the given feature prefixes. */
+export function hasAnyPrivilegeOf(userData: UserData | null | undefined, ...prefixes: string[]): boolean {
+  return prefixes.some(prefix => hasAnyPrivilege(userData, prefix));
 }
 
 // Mirrors the backend's ADMIN_ROLES (backend/app/validation.py) -- 'member' is a real admin-tier

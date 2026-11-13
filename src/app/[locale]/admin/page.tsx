@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Users, ListTodo, ArrowRightLeft, ClipboardList, Sparkles, ChevronDown } from 'lucide-react';
 import { Link } from '@/i18n/routing';
-import { useAuth } from '@/context/AuthContext';
+import { hasPrivilege, useAuth } from '@/context/AuthContext';
 import type { AdminOverview, AdminEventsPage, AdminEventSummary } from '@/lib/adminTypes';
 import { AdminError, AdminLoading, useAdminQuery } from '@/components/admin/AdminData';
 import AdminCalendar, { type CalendarEvent, type VacationSettings } from '@/components/admin/home/AdminCalendar';
@@ -53,15 +53,23 @@ export default function AdminDashboardPage() {
 
   const ledTeams = (userData?.teams || []).filter(team => team.isLeader);
 
-  useEffect(() => {
-    void overviewApi.remainingTasks().then(setRemainingTasks).catch(() => {});
-    void crossTeamRequestsApi.listAll().then(setCrossTeamRequests).catch(() => {});
-    void projectsApi.list().then(setProjectDeadlines).catch(() => {});
-    void tasksApi.list().then(setAllTasks).catch(() => {});
-  }, []);
+  // Each home-page widget is its own privilege: the calendar's three layers, the task counters and
+  // the inter-team requests. A widget the user can't use is hidden instead of failing quietly.
+  const canSeeTasks = hasPrivilege(userData, 'tasks.read');
+  const canSeeRequests = hasPrivilege(userData, 'cross_team_requests.read');
+  const showEventsOnCalendar = hasPrivilege(userData, 'calendar_events.read') && hasPrivilege(userData, 'events.read');
+  const showProjectsOnCalendar = hasPrivilege(userData, 'calendar_projects.read') && hasPrivilege(userData, 'projects.read');
+  const showTasksOnCalendar = hasPrivilege(userData, 'calendar_tasks.read') && canSeeTasks;
 
   useEffect(() => {
-    if (ledTeams.length === 0) { setLeaderTasks([]); return; }
+    if (canSeeTasks) void overviewApi.remainingTasks().then(setRemainingTasks).catch(() => {});
+    if (canSeeRequests) void crossTeamRequestsApi.listAll().then(setCrossTeamRequests).catch(() => {});
+    if (showProjectsOnCalendar) void projectsApi.list().then(setProjectDeadlines).catch(() => {});
+    if (showTasksOnCalendar) void tasksApi.list().then(setAllTasks).catch(() => {});
+  }, [canSeeTasks, canSeeRequests, showProjectsOnCalendar, showTasksOnCalendar]);
+
+  useEffect(() => {
+    if (ledTeams.length === 0 || !canSeeTasks) { setLeaderTasks([]); return; }
     void Promise.all(ledTeams.map(team => tasksApi.list({ teamId: team.id })))
       .then(lists => setLeaderTasks(lists.flat().filter(task => task.status !== 'done').slice(0, 8)))
       .catch(() => {});
@@ -81,7 +89,7 @@ export default function AdminDashboardPage() {
   }));
 
   const calendarEvents: CalendarEvent[] = [
-    ...events.map(e => ({ id: e.id, title: e.title, titleEn: e.titleEn, date: e.date, kind: 'event' as const, completed: e.state === 'Completed' })),
+    ...(showEventsOnCalendar ? events : []).map(e => ({ id: e.id, title: e.title, titleEn: e.titleEn, date: e.date, kind: 'event' as const, completed: e.state === 'Completed' })),
     ...projectDeadlines.filter(p => p.deadline).map(p => ({ id: p.id, title: p.name, date: p.deadline!, kind: 'projectDeadline' as const })),
     ...allTasks.filter(task => task.deadline).map(task => ({ id: task.id, title: task.title, date: task.deadline!, kind: 'taskDeadline' as const })),
   ];
@@ -111,7 +119,7 @@ export default function AdminDashboardPage() {
                   <p className="mt-0.5 text-xl font-black text-[var(--color-text-primary)] font-cairo">{data.counts.users.toLocaleString(locale)}</p>
                 </div>
 
-                <button type="button" onClick={() => setShowRemainingBreakdown(v => !v)}
+                {canSeeTasks && <button type="button" onClick={() => setShowRemainingBreakdown(v => !v)}
                         className="text-start cursor-pointer rounded-2xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/80 backdrop-blur-md p-4 shadow-xs hover:border-[var(--color-accent)]/40 transition-colors">
                   <div className="flex items-center justify-between mb-2">
                     <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[var(--color-accent-soft)] text-[var(--color-accent)]">
@@ -121,10 +129,10 @@ export default function AdminDashboardPage() {
                   </div>
                   <p className="text-[10px] font-bold text-[var(--color-text-secondary)] uppercase tracking-wider truncate">{isAr ? 'المهام المتبقية' : 'Remaining tasks'}</p>
                   <p className="mt-0.5 text-xl font-black text-[var(--color-text-primary)] font-cairo">{totalRemaining}</p>
-                </button>
+                </button>}
               </div>
 
-              {showRemainingBreakdown && (
+              {canSeeTasks && showRemainingBreakdown && (
                 <div className="shrink-0 rounded-2xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/80 backdrop-blur-md p-3 shadow-xs max-h-48 overflow-y-auto space-y-1">
                   {remainingTasks.length ? remainingTasks.map(u => (
                     <Link key={u.userId} href={`/admin/operations?tab=tasks&assigneeId=${u.userId}`}
@@ -142,7 +150,7 @@ export default function AdminDashboardPage() {
 
           {/* Requests */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <RequestsPanel icon={ArrowRightLeft} title={isAr ? 'طلبات بين الفرق' : 'Inter-team requests'}
+            {canSeeRequests && <RequestsPanel icon={ArrowRightLeft} title={isAr ? 'طلبات بين الفرق' : 'Inter-team requests'}
                             isEmpty={crossTeamRequests.length === 0}
                             emptyLabel={isAr ? 'عندما يطلب فريق شيئاً من فريق آخر، مثل الفعاليات من اللوجستيات، سيظهر هنا.' : 'When one team requests something from another — e.g. Events from Logistics — it will show up here.'}>
               {crossTeamRequests.slice(0, 6).map(request => (
@@ -152,8 +160,8 @@ export default function AdminDashboardPage() {
                   <span className="shrink-0 text-[var(--color-text-muted)]">{isAr ? request.fromTeamNameAr : request.fromTeamNameEn} → {isAr ? request.toTeamNameAr : request.toTeamNameEn}</span>
                 </Link>
               ))}
-            </RequestsPanel>
-            <RequestsPanel icon={ClipboardList} title={isAr ? 'مهام الفريق من القائد' : 'Team tasks from the leader'}
+            </RequestsPanel>}
+            {canSeeTasks && <RequestsPanel icon={ClipboardList} title={isAr ? 'مهام الفريق من القائد' : 'Team tasks from the leader'}
                             isEmpty={leaderTasks.length === 0}
                             emptyLabel={ledTeams.length
                               ? (isAr ? 'لا توجد مهام مفتوحة لفريقك حاليًا.' : 'No open tasks for your team right now.')
@@ -165,11 +173,11 @@ export default function AdminDashboardPage() {
                   <span className="shrink-0 text-[var(--color-text-muted)]">{task.assignees.map(a => a.name).join(', ') || '—'}</span>
                 </Link>
               ))}
-            </RequestsPanel>
+            </RequestsPanel>}
           </div>
 
           {/* Events table */}
-          <HomeEventsTable events={events} locale={locale} isAr={isAr} />
+          {hasPrivilege(userData, 'events.read') && <HomeEventsTable events={events} locale={locale} isAr={isAr} />}
         </>
       ) : null}
     </div>

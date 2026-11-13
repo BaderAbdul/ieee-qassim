@@ -37,10 +37,13 @@ export default function AdminEventSummaryPage() {
   const { data, loading, error, refresh } = useAdminQuery<EventReport>('getEventReport', event?.id);
 
   const registrationStats: { label: string; value: number; icon: LucideIcon; color: StatColor }[] = data ? [
-    { label: isAr ? 'كل التسجيلات' : 'All registrations', value: data.counts.registrations, icon: Users, color: 'purple' },
+    { label: isAr ? 'كل السجلات (تشمل الملغاة والمرفوضة والانتظار)' : 'All records (incl. cancelled, rejected, waitlisted)', value: data.counts.registrations, icon: Users, color: 'purple' },
+    { label: isAr ? 'مقاعد محجوزة (هي رقم «المسجلون» في بطاقة الفعالية)' : 'Seats held (the “Registered” number on the event card)', value: data.counts.pending + data.counts.approved + data.counts.attended, icon: UserCheck, color: 'blue' },
     { label: isAr ? 'بانتظار الموافقة' : 'Pending', value: data.counts.pending, icon: Clock, color: 'amber' },
     { label: isAr ? 'مقبول · لم يحضر بعد' : 'Approved · not attended', value: data.counts.approved, icon: UserCheck, color: 'blue' },
     { label: isAr ? 'قائمة الانتظار' : 'Waitlist', value: data.counts.waitlisted, icon: Users, color: 'slate' },
+    { label: isAr ? 'ملغاة' : 'Cancelled', value: data.counts.cancelled, icon: XCircle, color: 'slate' },
+    { label: isAr ? 'مرفوضة' : 'Rejected', value: data.counts.rejected, icon: XCircle, color: 'red' },
     { label: isAr ? 'الحضور المؤكد' : 'Confirmed attendance', value: data.counts.attended, icon: CheckCircle, color: 'emerald' },
   ] : [];
 

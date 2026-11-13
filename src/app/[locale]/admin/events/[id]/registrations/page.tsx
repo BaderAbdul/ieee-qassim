@@ -476,7 +476,7 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
                 <Users size={24} />
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-500 mb-1">إجمالي المسجلين</p>
+                <p className="text-sm font-medium text-gray-500 mb-1">إجمالي السجلات (يشمل الملغاة والمرفوضة)</p>
                 <h3 className="text-2xl font-bold text-gray-900">{totals.all}</h3>
               </div>
             </div>

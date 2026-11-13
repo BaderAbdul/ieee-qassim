@@ -1,4 +1,4 @@
-import { hasAnyPrivilege, type UserData } from '@/context/AuthContext';
+import { hasAnyPrivilege, hasAnyPrivilegeOf, hasPrivilege, type UserData } from '@/context/AuthContext';
 import {
   LayoutDashboard,
   Calendar,
@@ -19,7 +19,7 @@ export interface AdminNavItem {
 /** Single source of truth for the admin sidebar's nav list, also reused by the topbar search. */
 export function useAdminNav(userData: UserData | null, isAr: boolean) {
   const isSuperAdmin = userData?.isSuperAdmin === true || userData?.role === 'super_admin';
-  const canEditContent = hasAnyPrivilege(userData, 'content');
+  const canEditContent = hasPrivilege(userData, 'content.update');
   const canViewMembers = hasAnyPrivilege(userData, 'members');
 
   if (userData?.role === 'student' && userData.canReviewTemplates) {
@@ -39,13 +39,13 @@ export function useAdminNav(userData: UserData | null, isAr: boolean) {
     { name: isAr ? 'الرئيسية' : 'Home', href: '/admin', icon: LayoutDashboard },
     ...(hasAnyPrivilege(userData, 'events') ? [{ name: isAr ? 'الفعاليات' : 'Events', href: '/admin/events', icon: Calendar }] : []),
     ...(canViewMembers || isSuperAdmin ? [{ name: isAr ? 'الهيكلة والطلاب' : 'Structure & Students', href: '/admin/people', icon: UsersRound }] : []),
-    ...(canEditContent || userData?.canReviewTemplates ? [{ name: isAr ? 'القوالب' : 'Templates', href: '/admin/templates', icon: Layers }] : []),
-    ...(isSuperAdmin || userData?.canManageEmail || userData?.privileges?.includes('operations.update') ? [{ name: isAr ? 'البريد' : 'Mail', href: '/admin/mail', icon: Mail }] : []),
-    ...(hasAnyPrivilege(userData, 'operations') ? [{ name: isAr ? 'مركز المهام' : 'Operations', href: '/admin/operations', icon: Activity }] : []),
+    ...(hasAnyPrivilegeOf(userData, 'email_templates', 'certificate_templates') || userData?.canReviewTemplates ? [{ name: isAr ? 'القوالب' : 'Templates', href: '/admin/templates', icon: Layers }] : []),
+    ...(isSuperAdmin || userData?.canManageEmail || hasAnyPrivilege(userData, 'mail') ? [{ name: isAr ? 'البريد' : 'Mail', href: '/admin/mail', icon: Mail }] : []),
+    ...(hasAnyPrivilegeOf(userData, 'operations', 'projects', 'tasks', 'cross_team_requests', 'goals', 'ideas') ? [{ name: isAr ? 'مركز المهام' : 'Operations', href: '/admin/operations', icon: Activity }] : []),
   ];
 
   const footerItems: AdminNavItem[] = [
-    ...(isSuperAdmin || canEditContent || userData?.canManageEmail ? [{ name: isAr ? 'الإعدادات' : 'Settings', href: '/admin/settings', icon: Settings }] : []),
+    ...(isSuperAdmin || canEditContent || hasPrivilege(userData, 'academic_calendar.update') || userData?.canManageEmail ? [{ name: isAr ? 'الإعدادات' : 'Settings', href: '/admin/settings', icon: Settings }] : []),
   ];
 
   return { navItems, footerItems, isSuperAdmin, canEditContent, canViewMembers };

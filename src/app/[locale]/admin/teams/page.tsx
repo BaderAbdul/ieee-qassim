@@ -11,7 +11,7 @@ import { Link } from '@/i18n/routing';
 import PrivilegesBadgesPanel from '@/components/admin/PrivilegesBadgesPanel';
 import { useAdminTopbarActions } from '@/components/admin/AdminTopbarActions';
 import type { MemberSearchResult } from '@/lib/adminTypes';
-import { ArrowDown, ArrowUp, BadgeCheck, Briefcase, Crown, Edit2, KeyRound, Lock, Plus, ShieldCheck, Star, Trash2, UserMinus, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, BadgeCheck, Briefcase, Crown, Edit2, KeyRound, Plus, ShieldCheck, Star, Trash2, UserMinus, X } from 'lucide-react';
 
 type TeamRole = 'leader' | 'vice_leader' | 'member';
 type TeamKind = 'administrative' | 'specialized';
@@ -27,10 +27,8 @@ interface Team {
   id: string; nameAr: string; nameEn: string; descriptionAr: string | null; descriptionEn: string | null;
   icon: string | null; position: number; isPublic: boolean; kind: TeamKind; members: TeamMember[];
   // null = uncapped; otherwise the only privileges a leader/vice-leader of this team may grant.
-  maxPrivileges: string[] | null;
 }
 interface SearchResultUser { id: string; email?: string; displayName?: string; arabicFullName?: string; photoURL?: string; role?: string }
-interface Privilege { key: string; feature: string; action: string; labelAr: string; labelEn: string }
 
 export default function AdminTeamsPage() {
   const isAr = useLocale() === 'ar';
@@ -53,9 +51,6 @@ export default function AdminTeamsPage() {
   const [searching, setSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [privilegesUserId, setPrivilegesUserId] = useState<string | null>(null);
-  const [ceilingTeamId, setCeilingTeamId] = useState<string | null>(null);
-  const [ceilingSelection, setCeilingSelection] = useState<Set<string> | null>(null);
-  const [privilegeCatalog, setPrivilegeCatalog] = useState<Privilege[]>([]);
   const isSuperAdmin = userData?.isSuperAdmin === true;
 
   // `silent` skips the loading-spinner toggle -- used for reloads after a mutation so the whole
@@ -73,10 +68,9 @@ export default function AdminTeamsPage() {
     setSearching(true);
     try {
       const result = await httpsCallable<unknown, MemberSearchResult>(null, 'searchMembers')({ query });
-      // Teams are for club staff: only accounts that already hold an admin-tier role (Member,
-      // Leader/Vice-Leader, Super Admin) are offered here. A plain student must first be given
-      // one of those roles on the Users & Members page before they can be added to a team.
-      setSearchResults(result.data.users.filter(u => !!u.role && u.role !== 'student'));
+      // Any active account can be picked: a plain student is promoted to "member" by the server
+      // in the same step as joining the team, so there is no separate promote-then-add round trip.
+      setSearchResults(result.data.users.filter(u => !u.isRestricted));
     } catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to search members', 'error'); }
     finally { setSearching(false); setHasSearched(true); }
   };
@@ -212,41 +206,21 @@ export default function AdminTeamsPage() {
     if (!memberPicker) return;
     const team = teams.find(t => t.id === memberPicker.teamId);
     if (!team || team.members.some(m => m.userId === user.id)) return;
-    const sorted = [...team.members].sort((a, b) => a.position - b.position);
-    void saveMembers(team, [...sorted, { userId: user.id, teamRole: memberPicker.teamRole, position: sorted.length, displayName: '', role: '' }]);
+    const teamRole = memberPicker.teamRole;
     setMemberPicker(null); setSearchQuery(''); setSearchResults([]);
+    void (async () => {
+      setBusy(true);
+      try {
+        const result = await apiSend<{ promoted?: boolean }>('POST', `/api/admin/teams/${encodeURIComponent(team.id)}/members`, { userId: user.id, teamRole });
+        showToast(result?.promoted
+          ? (isAr ? 'تمت الإضافة وترقية الحساب إلى عضو.' : 'Added to the team and promoted to Member.')
+          : (isAr ? 'تمت إضافة العضو إلى الفريق.' : 'Added to the team.'), 'success');
+        await load({ silent: true });
+      } catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to add member', 'error'); }
+      finally { setBusy(false); }
+    })();
   };
 
-  const openCeiling = async (team: Team) => {
-    setCeilingTeamId(team.id);
-    setCeilingSelection(team.maxPrivileges === null ? null : new Set(team.maxPrivileges));
-    if (privilegeCatalog.length === 0) {
-      try { setPrivilegeCatalog(await apiGetArray<Privilege>('/api/admin/privileges')); }
-      catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to load privileges', 'error'); }
-    }
-  };
-
-  const togglePrivilege = (key: string) => {
-    setCeilingSelection(prev => {
-      const next = new Set(prev ?? []);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      return next;
-    });
-  };
-
-  const saveCeiling = async () => {
-    if (!ceilingTeamId) return;
-    setBusy(true);
-    try {
-      await apiSend('PUT', `/api/admin/teams/${encodeURIComponent(ceilingTeamId)}/ceiling`, {
-        privileges: ceilingSelection === null ? null : [...ceilingSelection],
-      });
-      setCeilingTeamId(null); setCeilingSelection(null);
-      await load({ silent: true });
-      showToast(isAr ? 'تم الحفظ.' : 'Saved.', 'success');
-    } catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to update the privilege ceiling', 'error'); }
-    finally { setBusy(false); }
-  };
 
   return (
     <div className="space-y-6">
@@ -254,8 +228,8 @@ export default function AdminTeamsPage() {
         <h1 className="text-2xl font-bold text-gray-900 font-cairo">{isAr ? 'الفرق' : 'Teams'}</h1>
         <p className="text-gray-500 text-sm">
           {isAr
-            ? 'قائد الفريق أو نائبه يمكنه إدارة صلاحيات وأوسمة أعضاء فريقه فقط، ضمن الحد الأقصى الذي يضعه المدير العام لكل فريق. الفرق العلنية تظهر على صفحة "الهيكلة" في الموقع، بالترتيب الظاهر هنا.'
-            : "A team's leader or vice-leader can manage privileges & badges only for their own team members, capped by the maximum a super admin sets per team. Public teams appear on the website's Structure page, in the order shown here."}
+            ? 'قائد الفريق أو نائبه يمكنه إدارة صلاحيات وأوسمة أعضاء فريقه فقط، وأقصى ما يمنحه هو صلاحياته هو نفسه — فضبط صلاحيات القائد/النائب يحدد تلقائيًا الحد الأقصى لأعضاء فريقه. الفرق العلنية تظهر على صفحة "الهيكلة" في الموقع، بالترتيب الظاهر هنا.'
+            : "A team's leader or vice-leader can manage privileges & badges only for their own team members, and the most they can grant is their own privileges — so setting the leader/vice-leader's privileges automatically sets the maximum for their team members. Public teams appear on the website's Structure page, in the order shown here."}
         </p>
       </div>
 
@@ -326,7 +300,6 @@ export default function AdminTeamsPage() {
               </div>
               {isSuperAdmin && (
                 <div className="flex items-center gap-2 shrink-0">
-                  <button type="button" onClick={() => void openCeiling(team)} title={isAr ? 'الحد الأقصى لصلاحيات الفريق' : "Team's privilege ceiling"} className="cursor-pointer rounded-lg bg-[var(--color-surface-2)] p-1.5 hover:opacity-80 text-[var(--color-text-secondary)]"><Lock size={14} /></button>
                   <button type="button" onClick={() => startEdit(team)} className="cursor-pointer rounded-lg bg-[var(--color-surface-2)] p-1.5 hover:opacity-80 text-[var(--color-text-secondary)]"><Edit2 size={14} /></button>
                   <button type="button" onClick={() => deleteTeam(team.id)} className="cursor-pointer rounded-lg p-1.5 text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)]"><Trash2 size={16} /></button>
                 </div>
@@ -467,8 +440,8 @@ export default function AdminTeamsPage() {
             </div>
             <p className="text-xs text-gray-500 mb-3">
               {isAr
-                ? 'ابحث بالاسم أو البريد أو الرقم الجامعي. تظهر فقط الحسابات التي لديها دور إداري بالفعل (عضو/قائد/مدير عام) — رقِّ الطالب من صفحة الأعضاء أولًا إذا لم يظهر.'
-                : "Search by name, email, or university id. Only accounts that already have an admin-tier role (Member/Leader/Super Admin) show up — promote a student from Users & Members first if they're missing."}
+                ? 'ابحث بالاسم أو البريد أو الرقم الجامعي واختر الحساب. إذا كان طالبًا يتحول حسابه إلى «عضو» تلقائيًا عند إضافته.'
+                : 'Search by name, email, or university id and pick the account. A student is automatically turned into a Member when added.'}
             </p>
             <div className="flex gap-2 mb-4">
               <div className="relative flex-1">
@@ -483,6 +456,11 @@ export default function AdminTeamsPage() {
                   <div>
                     <div className="font-bold text-gray-900 text-sm">{u.arabicFullName || u.displayName}</div>
                     <div className="text-xs text-gray-500">{u.email}</div>
+                    {u.role === 'student' && (
+                      <div className="mt-1 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                        {isAr ? 'طالب — سيصبح عضوًا' : 'Student — will become a Member'}
+                      </div>
+                    )}
                   </div>
                   <button type="button" onClick={() => addMember(u)} className="text-xs font-bold bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700">
                     {isAr ? 'إضافة' : 'Add'}
@@ -497,40 +475,6 @@ export default function AdminTeamsPage() {
         </div>
       )}
 
-      {ceilingTeamId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setCeilingTeamId(null)}>
-          <div className="bg-white rounded-2xl p-6 w-full max-w-lg flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-2">
-              <h2 className="text-lg font-bold font-cairo flex items-center gap-2"><Lock size={18} />{isAr ? 'الحد الأقصى لصلاحيات الفريق' : "Team's privilege ceiling"}</h2>
-              <button type="button" onClick={() => setCeilingTeamId(null)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
-            </div>
-            <p className="text-xs text-gray-500 mb-3">
-              {isAr
-                ? 'أقصى ما يمكن لقائد الفريق أو نائبه منحه لأعضاء هذا الفريق من صلاحيات أو أوسمة. سحب صلاحية لا يُقيَّد بهذا الحد أبدًا.'
-                : "The most a leader or vice-leader of this team can grant its members (privileges or badges). Revoking is never capped by this."}
-            </p>
-            <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3">
-              <input type="checkbox" checked={ceilingSelection === null} onChange={e => setCeilingSelection(e.target.checked ? null : new Set())} />
-              {isAr ? 'بلا حد (جميع الصلاحيات)' : 'Unrestricted (all privileges)'}
-            </label>
-            <div className="flex-1 overflow-y-auto space-y-1 border-t border-gray-100 pt-3">
-              {privilegeCatalog.map(privilege => (
-                <label key={privilege.key} className={`flex items-center gap-2 text-sm py-1 ${ceilingSelection === null ? 'opacity-40' : ''}`}>
-                  <input type="checkbox" disabled={ceilingSelection === null}
-                         checked={ceilingSelection?.has(privilege.key) ?? false}
-                         onChange={() => togglePrivilege(privilege.key)} />
-                  {isAr ? privilege.labelAr : privilege.labelEn}
-                </label>
-              ))}
-              {privilegeCatalog.length === 0 && <p className="text-xs text-gray-400">{isAr ? 'جارٍ التحميل…' : 'Loading…'}</p>}
-            </div>
-            <div className="flex gap-2 mt-4">
-              <button type="button" disabled={busy} onClick={saveCeiling} className="cursor-pointer rounded-xl bg-[var(--color-accent)] px-4 py-2 text-sm font-bold text-[var(--color-accent-contrast)] disabled:opacity-50">{isAr ? 'حفظ' : 'Save'}</button>
-              <button type="button" onClick={() => setCeilingTeamId(null)} className="cursor-pointer rounded-xl bg-[var(--color-surface-2)] px-4 py-2 text-sm font-bold text-[var(--color-text-secondary)]">{isAr ? 'إلغاء' : 'Cancel'}</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {privilegesUserId && <PrivilegesBadgesPanel userId={privilegesUserId} onClose={() => setPrivilegesUserId(null)} />}
     </div>
