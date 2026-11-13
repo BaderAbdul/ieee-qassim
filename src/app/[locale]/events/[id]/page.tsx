@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { apiGet, httpsCallable } from '@/lib/backend';
 import { PlatformEvent } from '@/lib/types';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { useLocale, useTranslations } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import { ar, enUS } from 'date-fns/locale';
@@ -39,6 +40,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
   const dateLocale = isAr ? ar : enUS;
   
   const { user, login, error: authError } = useAuth();
+  const { showToast } = useToast();
   
   // Instant load from memory cache if available, eliminating skeleton flicker on navigation
   const cached = typeof window !== 'undefined' ? eventCache.get(eventId) : null;
@@ -50,7 +52,6 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
   const [registrationStatus, setRegistrationStatus] = useState<string | null>(null);
   const [isRegistering, setIsRegistering] = useState(false);
   const [attendeeCount, setAttendeeCount] = useState(cached?.registeredCount ?? 0);
-  const [actionError, setActionError] = useState('');
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [isPosterOpen, setIsPosterOpen] = useState(false);
 
@@ -100,39 +101,39 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
         const current = await apiGet<{ registration: { status: string } | null }>(`/api/me/events/${eventId}`);
         if (alive) setRegistrationStatus(current.registration?.status ?? null);
       } catch {
-        if (alive) setActionError(isAr ? 'تعذر تحديث حالة التسجيل. حدّث الصفحة قبل إعادة المحاولة.' : 'Could not refresh registration status. Refresh before retrying.');
+        if (alive) showToast(isAr ? 'تعذر تحديث حالة التسجيل. حدّث الصفحة قبل إعادة المحاولة.' : 'Could not refresh registration status. Refresh before retrying.', 'error');
       }
     })();
     return () => { alive = false; };
-  }, [user, eventId, isAr]);
+  }, [user, eventId, isAr, showToast]);
 
   const handleRegister = async () => {
     if (!user) { await login(); return; }
     if (!event || isRegistering) return;
     setIsRegistering(true);
-    setActionError('');
     try {
       const register = httpsCallable<{ eventId: string }, { status: string; attendeeCount: number }>(null, 'registerForEvent');
       const { data } = await register({ eventId });
       setRegistrationStatus(data.status);
       setAttendeeCount(data.attendeeCount);
+      showToast(isAr ? 'تم التسجيل بنجاح.' : 'Registered successfully.', 'success');
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : (isAr ? 'تعذر التسجيل. حاول مرة أخرى.' : 'Registration failed. Please retry.'));
+      showToast(error instanceof Error ? error.message : (isAr ? 'تعذر التسجيل. حاول مرة أخرى.' : 'Registration failed. Please retry.'), 'error');
     } finally { setIsRegistering(false); }
   };
 
   const handleCancelRegistration = async () => {
     if (!user || !event || isRegistering) return;
     setIsRegistering(true);
-    setActionError('');
     try {
       const cancel = httpsCallable<{ eventId: string }, { status: string; attendeeCount: number }>(null, 'cancelRegistration');
       const { data } = await cancel({ eventId });
       setRegistrationStatus(data.status);
       setAttendeeCount(data.attendeeCount);
       setConfirmCancel(false);
+      showToast(isAr ? 'تم إلغاء التسجيل.' : 'Registration cancelled.', 'success');
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : (isAr ? 'تعذر إلغاء التسجيل.' : 'Cancellation failed.'));
+      showToast(error instanceof Error ? error.message : (isAr ? 'تعذر إلغاء التسجيل.' : 'Cancellation failed.'), 'error');
     } finally { setIsRegistering(false); }
   };
 
@@ -414,9 +415,9 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                                 {registrationStatus === 'rejected' ? (isAr ? 'تواصل مع المنظم إذا أردت الاستفسار عن القرار.' : 'Contact the organizer if you need to ask about this decision.') : registrationStatus === 'attended'
                                   ? (isAr ? 'تم احتساب نقاط الحضور وانطباعك بنجاح' : 'Attendance points & feedback recorded')
                                   : registrationStatus === 'approved' 
-                                    ? ((event.state === 'Completed' || event.state === 'Archived') ? (isAr ? 'شكراً لاهتمامك بهذه الفعالية' : 'Thank you for your interest in this event') : t('registeredNotice')) :
+                                    ? (event.state === 'Completed' ? (isAr ? 'شكراً لاهتمامك بهذه الفعالية' : 'Thank you for your interest in this event') : t('registeredNotice')) :
                                    registrationStatus === 'waitlisted' ? t('waitlistedNotice') :
-                                   ((event.state === 'Completed' || event.state === 'Archived') ? (isAr ? 'تم الانتهاء من الفعالية' : 'Event has concluded') : t('pendingNotice'))}
+                                   (event.state === 'Completed' ? (isAr ? 'تم الانتهاء من الفعالية' : 'Event has concluded') : t('pendingNotice'))}
                               </div>
                             </div>
                             
@@ -448,7 +449,6 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                     )}
                   </div>
                 </div>
-                {actionError && <p role="alert" className="mt-4 rounded-xl bg-red-950/40 p-3 text-sm text-red-100">{actionError}</p>}
              </div>
 
              {/* About Section */}
@@ -490,7 +490,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                    <span>{t('speakers')}</span>
                  </h2>
                  <div className="flex flex-wrap gap-3 sm:gap-4">
-                   {event.speakers.map((speaker, idx) => (
+                   {(!isAr && event.speakersEn?.length ? event.speakersEn : event.speakers).map((speaker, idx) => (
                      <span 
                        key={idx} 
                        className="bg-slate-50 text-slate-800 px-5 sm:px-6 py-2.5 sm:py-3 rounded-2xl font-bold text-sm sm:text-base border border-slate-200 shadow-xs flex items-center gap-2"

@@ -22,12 +22,14 @@ import SettingsStage from '@/components/admin/events/wizard/SettingsStage';
 import ReviewStage from '@/components/admin/events/wizard/ReviewStage';
 import ShareStage from '@/components/admin/events/wizard/ShareStage';
 import EventActivityTrail from '@/components/admin/events/wizard/EventActivityTrail';
+import ConfirmDialog from '@/components/admin/ConfirmDialog';
+import { useToast } from '@/context/ToastContext';
 import { STAGES, type DesignFields, type InterviewerFields, type MainDataFields, type ReviewFields, type SecurityFields, type SettingsFields, type ShareFields, type SponsorsFields, type StageId, type TimePlaceFields } from '@/components/admin/events/wizard/wizardTypes';
 
 const emptyMainData: MainDataFields = { title: '', titleEn: '', description: '', descriptionEn: '', type: 'Workshop', gains: '', gainsEn: '' };
 const emptyTimePlace: TimePlaceFields = { days: [], locationType: 'in_person', location: '', locationEn: '', capacity: 50, isUnlimitedCapacity: false, hideExactCapacity: false, gender: 'both' };
 const emptySecurity: SecurityFields = { securityFormAcknowledged: false };
-const emptyInterviewer: InterviewerFields = { interviewer: '', interviewerEn: '', speakers: '' };
+const emptyInterviewer: InterviewerFields = { interviewer: '', interviewerEn: '', speakers: '', speakersEn: '' };
 const emptyDesign: DesignFields = { coverUrl: '' };
 const emptySettings: SettingsFields = { requiresRegistration: true, registrationMode: 'Auto', vtoolsUuid: '', hasCertificate: false, certificateTemplateId: '', emailTemplateId: '' };
 const emptyReview: ReviewFields = { feedbackQuestions: [] };
@@ -38,6 +40,7 @@ export default function CreateEventPage() {
   const locale = useLocale();
   const isAr = locale === 'ar';
   const { userData } = useAuth();
+  const { showToast } = useToast();
   const searchParams = useSearchParams();
   const resumeParam = searchParams.get('eventId');
   const resumeId = resumeParam && /^\d+$/.test(resumeParam) ? Number(resumeParam) : null;
@@ -52,7 +55,6 @@ export default function CreateEventPage() {
   const [activeStage, setActiveStage] = useState<StageId>(stageParam || 'main');
   const [completedStages, setCompletedStages] = useState<Set<StageId>>(new Set());
   const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState('');
   const [activityRefreshKey, setActivityRefreshKey] = useState(0);
 
   const [mainData, setMainData] = useState<MainDataFields>(emptyMainData);
@@ -66,6 +68,7 @@ export default function CreateEventPage() {
   const [reviewData, setReviewData] = useState<ReviewFields>(emptyReview);
   const [shareData, setShareData] = useState<ShareFields>(emptyShare);
   const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   useEffect(() => {
     if (!resumeId) return;
@@ -83,7 +86,10 @@ export default function CreateEventPage() {
           gender: event.gender || 'both',
         });
         setSecurity({ securityFormAcknowledged: !!event.securityFormAcknowledged });
-        setInterviewerData({ interviewer: event.interviewer || '', interviewerEn: event.interviewerEn || '', speakers: (event.speakers || []).join('\n') });
+        setInterviewerData({
+          interviewer: event.interviewer || '', interviewerEn: event.interviewerEn || '',
+          speakers: (event.speakers || []).join('\n'), speakersEn: (event.speakersEn || []).join('\n'),
+        });
         setSponsorsData({ hasSponsors: event.hasSponsors ?? null, sponsors: event.sponsors || [] });
         setReport(event.report || null);
         setDesign({ coverUrl: event.coverUrl || '' });
@@ -97,7 +103,7 @@ export default function CreateEventPage() {
         const done = new Set<StageId>(['main']);
         if ((event.days || []).length) done.add('time');
         if (event.securityFormAcknowledged) done.add('security');
-        if (event.interviewer || event.interviewerEn) done.add('interviewer');
+        if (event.interviewer || event.interviewerEn || (event.speakers || []).length || (event.speakersEn || []).length) done.add('interviewer');
         if (typeof event.hasSponsors === 'boolean') done.add('sponsors');
         if (event.report) done.add('report');
         if (event.coverUrl) done.add('design');
@@ -116,16 +122,16 @@ export default function CreateEventPage() {
 
   const saveStage = async (stage: StageId, fields: Record<string, unknown>) => {
     setSaving(true);
-    setSaveError('');
     try {
       const payload = eventId ? { eventId, ...fields } : fields;
       const result = await httpsCallable<typeof payload, { eventId: number }>(null, 'saveEvent')(payload);
       if (!eventId) setEventId(result.data.eventId);
       setCompletedStages(prev => new Set(prev).add(stage));
       setActivityRefreshKey(k => k + 1);
+      showToast(isAr ? 'تم الحفظ.' : 'Saved.', 'success');
       return true;
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : (isAr ? 'حدث خطأ أثناء الحفظ.' : 'Something went wrong while saving.'));
+      showToast(error instanceof Error ? error.message : (isAr ? 'حدث خطأ أثناء الحفظ.' : 'Something went wrong while saving.'), 'error');
       // The page owns this request/error boundary. Click handlers must not receive an
       // unhandled rejection, and the wizard must remain on the stage that failed.
       return false;
@@ -159,8 +165,6 @@ export default function CreateEventPage() {
           locked={!eventId}
           onSelect={stage => setActiveStage(stage)}
         />
-
-        {saveError && <p role="alert" className="rounded-xl p-3 text-sm" style={{ backgroundColor: 'var(--color-danger-soft)', color: 'var(--color-danger)' }}>{saveError}</p>}
 
         {!eventId && (
           <p className="rounded-xl p-3 text-sm" style={{ backgroundColor: 'var(--color-accent-soft)', color: 'var(--color-accent)' }}>
@@ -207,12 +211,6 @@ export default function CreateEventPage() {
           <ShareStage isAr={isAr} value={shareData} onChange={setShareData} saving={saving}
             onSave={async fields => { await saveStage('share', fields); }} />
         )}
-        {activeStage === 'publish' && (
-          <div className="rounded-xl border border-dashed border-[var(--color-border)] p-10 text-center text-sm text-[var(--color-text-muted)]">
-            {isAr ? 'هذه المرحلة قيد التطوير وستتوفر في تحديث قادم.' : 'This stage is still being built and will land in an upcoming update.'}
-          </div>
-        )}
-
         {activeStage === 'report' && eventId && <ReportStage isAr={isAr} eventId={eventId} report={report} onSaved={saved => {
           setReport(saved); setCompletedStages(previous => new Set(previous).add('report')); setActivityRefreshKey(k => k + 1);
         }} />}
@@ -225,18 +223,8 @@ export default function CreateEventPage() {
               {isAr ? 'إنهاء لاحقًا والعودة إلى القائمة' : 'Finish later — back to the list'}
             </button>
             {userData?.isSuperAdmin && (
-              <button type="button" disabled={deleting} onClick={async () => {
-                if (!confirm(isAr ? 'حذف هذه الفعالية نهائيًا؟ سيُحذف التسجيل والحضور والشهادات المرتبطة بها ولا يمكن التراجع.'
-                                  : 'Permanently delete this event? Its registrations, attendance and certificates are deleted too. This cannot be undone.')) return;
-                setDeleting(true);
-                try {
-                  await httpsCallable(null, 'deleteEvent')({ eventId });
-                  router.push('/admin/events');
-                } catch (error) {
-                  setSaveError(error instanceof Error ? error.message : (isAr ? 'تعذر حذف الفعالية.' : 'Could not delete the event.'));
-                  setDeleting(false);
-                }
-              }} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold disabled:opacity-40"
+              <button type="button" disabled={deleting} onClick={() => setConfirmingDelete(true)}
+                className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold disabled:opacity-40"
                 style={{ color: 'var(--color-danger)', backgroundColor: 'var(--color-danger-soft)' }}>
                 <Trash2 size={15} />{deleting ? (isAr ? 'جارٍ الحذف...' : 'Deleting...') : (isAr ? 'حذف الفعالية نهائيًا' : 'Permanently delete event')}
               </button>
@@ -244,6 +232,33 @@ export default function CreateEventPage() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        icon={<Trash2 className="w-6 h-6" />}
+        tone="danger"
+        confirmWord="Delete"
+        title={isAr ? 'حذف هذه الفعالية نهائيًا؟' : 'Permanently delete this event?'}
+        message={isAr
+          ? 'سيُحذف التسجيل والحضور والشهادات المرتبطة بها ولا يمكن التراجع. اكتب Delete للتأكيد.'
+          : 'Its registrations, attendance and certificates are deleted too. This cannot be undone. Type Delete to confirm.'}
+        confirmLabel={isAr ? 'حذف نهائيًا' : 'Delete permanently'}
+        cancelLabel={isAr ? 'إلغاء' : 'Cancel'}
+        busy={deleting}
+        onCancel={() => setConfirmingDelete(false)}
+        onConfirm={async () => {
+          if (!eventId) return;
+          setDeleting(true);
+          try {
+            await httpsCallable(null, 'deleteEvent')({ eventId });
+            router.push('/admin/events');
+          } catch (error) {
+            showToast(error instanceof Error ? error.message : (isAr ? 'تعذر حذف الفعالية.' : 'Could not delete the event.'), 'error');
+            setDeleting(false);
+            setConfirmingDelete(false);
+          }
+        }}
+      />
     </div>
   );
 }

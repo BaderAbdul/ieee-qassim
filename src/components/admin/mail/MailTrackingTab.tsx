@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { CheckCircle2, Mail, Search, Send, TrendingUp } from 'lucide-react';
 import { apiGet } from '@/lib/backend';
+import { useToast } from '@/context/ToastContext';
 
 interface Stats { totalSent: number; sentToday: number; dailyLimit: number; remainingToday: number; totalStudents: number }
 interface Delivery { id: string; recipient: string; status: string; attempts: number; lastError?: string }
@@ -11,12 +12,12 @@ const panel = 'rounded-2xl border border-[var(--color-border)]/50 bg-[var(--colo
 
 export default function MailTrackingTab({ isAr }: { isAr: boolean }) {
   const t = (ar: string, en: string) => isAr ? ar : en;
+  const { showToast } = useToast();
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState('');
   const [messageId, setMessageId] = useState('');
   const [deliveries, setDeliveries] = useState<Delivery[] | null>(null);
   const [busy, setBusy] = useState(false);
-  const [lookupError, setLookupError] = useState('');
 
   const load = useCallback(async () => {
     setError('');
@@ -28,9 +29,9 @@ export default function MailTrackingTab({ isAr }: { isAr: boolean }) {
   const lookup = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!messageId.trim()) return;
-    setBusy(true); setLookupError(''); setDeliveries(null);
+    setBusy(true); setDeliveries(null);
     try { setDeliveries((await apiGet<{ deliveries: Delivery[] }>(`/api/admin/mail/messages/${messageId.trim()}`)).deliveries); }
-    catch (reason) { setLookupError(reason instanceof Error ? reason.message : t('تعذر العثور على الرسالة', 'Message not found')); }
+    catch (reason) { showToast(reason instanceof Error ? reason.message : t('تعذر العثور على الرسالة', 'Message not found'), 'error'); }
     finally { setBusy(false); }
   };
 
@@ -60,7 +61,6 @@ export default function MailTrackingTab({ isAr }: { isAr: boolean }) {
           {busy ? t('جارٍ البحث…', 'Looking up…') : t('بحث', 'Look up')}
         </button>
       </form>
-      {lookupError && <p role="alert" className="text-sm" style={{ color: 'var(--color-danger)' }}>{lookupError}</p>}
       {deliveries && (
         <div className="space-y-2">
           {deliveries.length ? deliveries.map(d => (

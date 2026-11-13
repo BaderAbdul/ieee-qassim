@@ -29,7 +29,7 @@ export default function EventCard({ event, priority = false }: EventCardProps) {
   const day = formatDateSafe(eventDate, 'dd', { locale: dateLocale });
   const month = formatDateSafe(eventDate, 'MMM', { locale: dateLocale }).toUpperCase();
   
-  const isCompleted = event.state === 'Completed' || event.state === 'Archived';
+  const isCompleted = event.state === 'Completed';
 
   // Badge setup
   let badgeColor = 'bg-slate-100 text-slate-800 border-slate-200';

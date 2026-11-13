@@ -5,6 +5,7 @@ import { useLocale } from 'next-intl';
 import { httpsCallable } from '@/lib/backend';
 import { apiGetArray } from '@/lib/backendResponse';
 import { AdminError, AdminLoading } from '@/components/admin/AdminData';
+import { useToast } from '@/context/ToastContext';
 import { STAGES, type StageId } from '@/components/admin/events/wizard/wizardTypes';
 import { Save, Users2 } from 'lucide-react';
 
@@ -13,12 +14,12 @@ type Assignment = Partial<Record<StageId, string | null>>;
 
 export default function AdminEventProcessTeamsPage() {
   const isAr = useLocale() === 'ar';
+  const { showToast } = useToast();
   const [teams, setTeams] = useState<Team[]>([]);
   const [assignment, setAssignment] = useState<Assignment>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -41,12 +42,12 @@ export default function AdminEventProcessTeamsPage() {
   }, [isAr]);
 
   const save = async () => {
-    setSaving(true); setSaved(false); setError(null);
+    setSaving(true);
     try {
       await httpsCallable(null, 'saveEventProcessTeams')(assignment);
-      setSaved(true);
+      showToast(isAr ? 'تم الحفظ بنجاح.' : 'Saved successfully.', 'success');
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : (isAr ? 'تعذر الحفظ.' : 'Unable to save.'));
+      showToast(reason instanceof Error ? reason.message : (isAr ? 'تعذر الحفظ.' : 'Unable to save.'), 'error');
     } finally {
       setSaving(false);
     }
@@ -69,11 +70,6 @@ export default function AdminEventProcessTeamsPage() {
       </header>
 
       {error && <AdminError message={error} />}
-      {saved && (
-        <p role="status" className="rounded-xl border border-[var(--color-success)]/30 bg-[var(--color-success-soft)] p-4 text-sm font-bold text-[var(--color-success)]">
-          {isAr ? 'تم الحفظ بنجاح.' : 'Saved successfully.'}
-        </p>
-      )}
 
       <div className="rounded-3xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/80 backdrop-blur-md p-6 space-y-4 max-w-lg">
         {STAGES.map(stage => (

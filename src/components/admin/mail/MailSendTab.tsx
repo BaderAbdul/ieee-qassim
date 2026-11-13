@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Mail, Paperclip, Send, Trash2, Users } from 'lucide-react';
 import { apiGet, apiSend } from '@/lib/backend';
 import { looksLikeEmail } from '@/lib/csv';
+import { useToast } from '@/context/ToastContext';
 import RecipientsFileUpload from './RecipientsFileUpload';
 
 interface Stats { totalSent: number; sentToday: number; dailyLimit: number; remainingToday: number; totalStudents: number }
@@ -26,6 +27,7 @@ function Toggle({ value, onChange, options }: { value: string; onChange: (v: str
 
 export default function MailSendTab({ isAr }: { isAr: boolean }) {
   const t = (ar: string, en: string) => isAr ? ar : en;
+  const { showToast } = useToast();
   const [stats, setStats] = useState<Stats | null>(null);
   const [mailTemplates, setMailTemplates] = useState<MailTemplate[]>([]);
   const [certTemplates, setCertTemplates] = useState<CertTemplate[]>([]);
@@ -47,8 +49,6 @@ export default function MailSendTab({ isAr }: { isAr: boolean }) {
   const [certificateTitle, setCertificateTitle] = useState('');
 
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [result, setResult] = useState<{ recipientCount: number; queuedCount: number } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -87,7 +87,7 @@ export default function MailSendTab({ isAr }: { isAr: boolean }) {
   const canSend = recipientCount > 0 && contentReady && !busy;
 
   const send = async () => {
-    setBusy(true); setError(''); setResult(null);
+    setBusy(true);
     try {
       const attachments = attachmentMode === 'fixed' && fixedFile ? [{ kind: 'fixed', ...fixedFile }]
         : attachmentMode === 'certificate' && certificateTemplateId ? [{ kind: 'certificate', certificateTemplateId, title: certificateTitle }]
@@ -101,21 +101,16 @@ export default function MailSendTab({ isAr }: { isAr: boolean }) {
         ...(contentMode === 'template' ? { templateId } : { subject: manualSubject, html: manualHtml }),
       };
       const res = await apiSend<{ recipientCount: number; queuedCount: number }>('POST', '/api/admin/mail/batch', payload);
-      setResult(res);
+      showToast(t(`تمت إضافة ${res.recipientCount} رسالة إلى قائمة الإرسال.`, `Queued ${res.recipientCount} emails for delivery.`), 'success');
       const refreshed = await apiGet<Stats>('/api/admin/mail/stats');
       setStats(refreshed);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : t('تعذر الإرسال', 'Unable to send')); } finally { setBusy(false); }
+    } catch (reason) { showToast(reason instanceof Error ? reason.message : t('تعذر الإرسال', 'Unable to send'), 'error'); } finally { setBusy(false); }
   };
 
   if (loadError) return <p role="alert" className="rounded-xl bg-red-500/10 p-4 text-red-600">{loadError}</p>;
   if (!stats) return <p>{t('جارٍ التحميل…', 'Loading…')}</p>;
 
   return <div className="space-y-6 pb-12">
-    {error && <p role="alert" className="rounded-xl bg-red-500/10 p-4 text-sm text-red-600">{error}</p>}
-    {result && <p role="status" className="rounded-xl bg-emerald-500/10 p-4 text-sm text-emerald-600">
-      {t(`تمت إضافة ${result.recipientCount} رسالة إلى قائمة الإرسال.`, `Queued ${result.recipientCount} emails for delivery.`)}
-    </p>}
-
     <section className={panel}>
       <h2 className="flex items-center gap-2 text-lg font-bold"><Users size={18} />{t('المستلمون', 'Recipients')}</h2>
       <Toggle value={recipientMode} onChange={v => setRecipientMode(v as 'all' | 'limited')}

@@ -8,17 +8,18 @@ import { Link } from '@/i18n/routing';
 import type { PlatformEvent } from '@/lib/types';
 import { AdminError, AdminLoading } from '@/components/admin/AdminData';
 import { httpsCallable } from '@/lib/backend';
+import { useToast } from '@/context/ToastContext';
 
 const DROPDOWN_STATES = new Set(['Published', 'Registration Open', 'Registration Closed', 'Ongoing']);
 
 export default function AdminContentPage() {
   const isAr = useLocale() === 'ar';
+  const { showToast } = useToast();
   const [heroStats, setHeroStats] = useState({ membersCount: '+500', eventsCount: '+25', tracksCount: '4', featuredEventId: '', showStructure: true, heroTitle: '', heroSubtitleAr: '', heroSubtitleEn: '' });
   const [allEvents, setAllEvents] = useState<PlatformEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingHeroStats, setSavingHeroStats] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
   const [revision, setRevision] = useState(0);
   useEffect(() => {
     let active = true;
@@ -38,16 +39,15 @@ export default function AdminContentPage() {
     void load(); return () => { active = false; };
   }, [revision]);
   const handleSaveHeroStats = async (event: React.FormEvent) => {
-    event.preventDefault(); setSavingHeroStats(true); setSaved(false); setError(null);
-    try { await httpsCallable(null, 'saveHomepage')(heroStats); setSaved(true); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to save content'); }
+    event.preventDefault(); setSavingHeroStats(true);
+    try { await httpsCallable(null, 'saveHomepage')(heroStats); showToast(isAr ? 'تم حفظ المحتوى بنجاح.' : 'Content saved successfully.', 'success'); }
+    catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to save content', 'error'); }
     finally { setSavingHeroStats(false); }
   };
   if (loading) return <AdminLoading />;
   return <div className="space-y-5">
     <header><h1 className="text-3xl font-black font-cairo">{isAr ? 'محتوى الموقع' : 'Site content'}</h1><p className="mt-2 text-sm text-slate-500">{isAr ? 'الأرقام هنا تسويقية يدوية وليست إحصاءات تشغيلية. راجع دقتها قبل النشر.' : 'These are manually managed marketing figures, not operational analytics. Check their accuracy before publishing.'}</p><Link href="/admin" className="mt-2 inline-block text-sm text-purple-600">{isAr ? 'العودة لمركز العمل' : 'Back to command center'}</Link></header>
     {error && <AdminError message={error} retry={() => setRevision(value => value + 1)} />}
-    {saved && <p role="status" className="rounded-xl border border-green-200 bg-green-50 p-4 text-green-800">{isAr ? 'تم حفظ المحتوى بنجاح.' : 'Content saved successfully.'}</p>}
       <form onSubmit={handleSaveHeroStats} className="space-y-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Column 1: Stats */}

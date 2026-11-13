@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Save, Sparkles } from 'lucide-react';
 import { apiGet, apiSend } from '@/lib/backend';
+import { useToast } from '@/context/ToastContext';
 
 interface AutomationSettings {
   defaultEmailTemplateId: string | null;
@@ -17,12 +18,12 @@ const input = 'w-full rounded-xl border border-[var(--color-border)] bg-[var(--c
 export default function EventAutomationSettings() {
   const isAr = useLocale() === 'ar';
   const t = (ar: string, en: string) => isAr ? ar : en;
+  const { showToast } = useToast();
   const [data, setData] = useState<AutomationSettings | null>(null);
   const [mailTemplates, setMailTemplates] = useState<MailTemplate[]>([]);
   const [certTemplates, setCertTemplates] = useState<CertTemplate[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
 
   const load = useCallback(async () => {
     setError('');
@@ -40,11 +41,11 @@ export default function EventAutomationSettings() {
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!data) return;
-    setBusy(true); setError(''); setNotice('');
+    setBusy(true);
     try {
       const result = await apiSend<AutomationSettings>('PUT', '/api/admin/settings/automation', data);
-      setData(result); setNotice(t('تم حفظ إعدادات الأتمتة.', 'Automation settings saved.'));
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to save'); } finally { setBusy(false); }
+      setData(result); showToast(t('تم حفظ إعدادات الأتمتة.', 'Automation settings saved.'), 'success');
+    } catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to save', 'error'); } finally { setBusy(false); }
   };
 
   return <section className="space-y-5 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 sm:p-7">
@@ -58,7 +59,6 @@ export default function EventAutomationSettings() {
       </div>
     </header>
     {error && <div role="alert" className="rounded-xl bg-red-500/10 p-4 text-red-600">{error}<button type="button" disabled={busy} onClick={() => void load()} className="ms-3 underline">{t('إعادة تحميل', 'Reload')}</button></div>}
-    {notice && <p role="status" className="rounded-xl bg-emerald-500/10 p-4 text-emerald-600">{notice}</p>}
     {!data ? <p>{t('جارٍ تحميل الإعدادات…', 'Loading settings…')}</p> : <form onSubmit={save} className="space-y-5">
       <fieldset disabled={busy} className="space-y-4">
         <label className="block space-y-2">

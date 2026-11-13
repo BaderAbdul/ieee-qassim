@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { apiSend } from '@/lib/backend';
 import { apiGetArray } from '@/lib/backendResponse';
 import { AdminError, AdminLoading } from '@/components/admin/AdminData';
+import { useToast } from '@/context/ToastContext';
 import { Plus, Shield, ShieldAlert, Trash2 } from 'lucide-react';
 
 interface Privilege { key: string; feature: string; action: string; labelAr: string; labelEn: string }
@@ -65,6 +66,7 @@ function PrivilegeGrid({ privileges, selected, onChange, disabled, isAr }: {
 export default function AdminRolesPage() {
   const isAr = useLocale() === 'ar';
   const { userData } = useAuth();
+  const { showToast } = useToast();
   const [privileges, setPrivileges] = useState<Privilege[]>([]);
   const [roles, setRoles] = useState<RoleRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,31 +98,33 @@ export default function AdminRolesPage() {
 
   const saveEdit = async () => {
     if (!editingKey) return;
-    setBusy(true); setError(null);
+    setBusy(true);
     try {
       await apiSend('PATCH', `/api/admin/roles/${encodeURIComponent(editingKey)}`, { privileges: [...editSelection] });
       setEditingKey(null);
       await load();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to save role'); }
+      showToast(isAr ? 'تم الحفظ.' : 'Saved.', 'success');
+    } catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to save role', 'error'); }
     finally { setBusy(false); }
   };
 
   const createRole = async () => {
     if (!newRole.key || !newRole.nameAr || !newRole.nameEn) return;
-    setBusy(true); setError(null);
+    setBusy(true);
     try {
       await apiSend('POST', '/api/admin/roles', { ...newRole, privileges: [...newSelection] });
       setCreating(false); setNewRole({ key: '', nameAr: '', nameEn: '', tier: 2 }); setNewSelection(new Set());
       await load();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to create role'); }
+      showToast(isAr ? 'تم إنشاء الدور.' : 'Role created.', 'success');
+    } catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to create role', 'error'); }
     finally { setBusy(false); }
   };
 
   const deleteRole = async (key: string) => {
     if (!window.confirm(isAr ? 'حذف هذا الدور؟' : 'Delete this role?')) return;
-    setBusy(true); setError(null);
-    try { await apiSend('DELETE', `/api/admin/roles/${encodeURIComponent(key)}`); await load(); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to delete role'); }
+    setBusy(true);
+    try { await apiSend('DELETE', `/api/admin/roles/${encodeURIComponent(key)}`); await load(); showToast(isAr ? 'تم الحذف.' : 'Deleted.', 'success'); }
+    catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to delete role', 'error'); }
     finally { setBusy(false); }
   };
 

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { LockKeyhole, Save, ShieldCheck } from 'lucide-react';
 import { apiGet, apiSend } from '@/lib/backend';
+import { useToast } from '@/context/ToastContext';
 
 interface SenderSettings {
   senderEmail: string; senderName: string; enabled: boolean; revision: number;
@@ -14,12 +15,12 @@ const input = 'w-full rounded-xl border border-[var(--color-border)] bg-[var(--c
 export default function EmailSettings() {
   const isAr = useLocale() === 'ar';
   const t = (ar: string, en: string) => isAr ? ar : en;
+  const { showToast } = useToast();
   const [data, setData] = useState<SenderSettings | null>(null);
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const load = useCallback(async () => {
     setError('');
     try { setData(await apiGet<SenderSettings>('/api/admin/mail/settings')); setPassword(''); setDirty(false); }
@@ -29,24 +30,23 @@ export default function EmailSettings() {
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!data) return;
-    setBusy(true); setError(''); setNotice('');
+    setBusy(true);
     try {
       const result = await apiSend<SenderSettings>('PUT', '/api/admin/mail/settings', {
         senderEmail: data.senderEmail, senderName: data.senderName, enabled: data.enabled,
         appPassword: password, revision: data.revision,
       });
-      setData(result); setPassword(''); setDirty(false); setNotice(t('تم حفظ إعدادات المرسل.', 'Sender settings saved.'));
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to save'); } finally { setBusy(false); }
+      setData(result); setPassword(''); setDirty(false); showToast(t('تم حفظ إعدادات المرسل.', 'Sender settings saved.'), 'success');
+    } catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to save', 'error'); } finally { setBusy(false); }
   };
   const verify = async () => {
-    setBusy(true); setError(''); setNotice('');
-    try { await apiSend('POST', '/api/admin/mail/settings/verify'); setNotice(t('نجح اتصال SMTP وتسجيل الدخول. لم يتم إرسال أي رسالة.', 'SMTP connection and authentication succeeded. No email was sent.')); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'Verification failed'); } finally { setBusy(false); }
+    setBusy(true);
+    try { await apiSend('POST', '/api/admin/mail/settings/verify'); showToast(t('نجح اتصال SMTP وتسجيل الدخول. لم يتم إرسال أي رسالة.', 'SMTP connection and authentication succeeded. No email was sent.'), 'success'); }
+    catch (reason) { showToast(reason instanceof Error ? reason.message : 'Verification failed', 'error'); } finally { setBusy(false); }
   };
   return <section className="space-y-5 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 sm:p-7">
     <header className="flex items-start gap-3"><LockKeyhole className="mt-1 shrink-0 text-[var(--color-accent)]" /><div><h2 className="text-xl font-bold">{t('إعدادات البريد المرسل', 'Email sender settings')}</h2><p className="mt-2 text-sm text-[var(--color-text-secondary)]">{t('متاحة للمدير العام وحاملي شارة Technician فقط. تستخدم جميع رسائل الموقع هذا الحساب.', 'Only super admins and Technician badge holders can view or edit these settings. All website emails use this account.')}</p></div></header>
     {error && <div role="alert" className="rounded-xl bg-red-500/10 p-4 text-red-600">{error}<button type="button" disabled={busy} onClick={() => void load()} className="ms-3 underline">{t('إعادة تحميل', 'Reload')}</button></div>}
-    {notice && <p role="status" className="rounded-xl bg-emerald-500/10 p-4 text-emerald-600">{notice}</p>}
     {!data ? <p>{t('جارٍ تحميل الإعدادات…', 'Loading settings…')}</p> : <form onSubmit={save} className="space-y-5">
       <fieldset disabled={busy} className="space-y-4">
         <label className="block space-y-2"><span>{t('بريد المرسل في Google Workspace', 'Google Workspace sender email')}</span><input dir="ltr" type="email" required maxLength={254} autoComplete="off" className={input} value={data.senderEmail} onChange={event => { setDirty(true); setData({ ...data, senderEmail: event.target.value }); }} /></label>

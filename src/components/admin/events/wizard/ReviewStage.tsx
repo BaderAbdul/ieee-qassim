@@ -3,6 +3,7 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { Languages, Loader2, Plus, Save, Trash2 } from 'lucide-react';
 import { apiGet, httpsCallable } from '@/lib/backend';
+import { useToast } from '@/context/ToastContext';
 import { feedbackQuestionError } from '@/lib/feedbackQuestionValidation';
 import type { CustomQuestion, QuestionType } from '@/lib/types';
 import { button, input, label, primaryButton, type ReviewFields } from './wizardTypes';
@@ -28,6 +29,7 @@ async function translate(text: string, target: 'ar' | 'en'): Promise<string> {
 }
 
 export default function ReviewStage({ isAr, value, onChange, onSave, saving }: ReviewStageProps) {
+  const { showToast } = useToast();
   const [error, setError] = useState('');
   const [translatingId, setTranslatingId] = useState<string | null>(null);
   const [translationState, setTranslationState] = useState<'loading' | 'ready' | 'unavailable'>('loading');
@@ -51,14 +53,13 @@ export default function ReviewStage({ isAr, value, onChange, onSave, saving }: R
   const translateQuestion = async (q: CustomQuestion) => {
     if (translationState !== 'ready' || translatingId || saving) return;
     setTranslatingId(q.id);
-    setError('');
     try {
       const titleEn = q.title.trim() ? await translate(q.title, 'en') : '';
       const optionsEn = q.type === 'choice' && q.options?.length
         ? await Promise.all(q.options.map(o => translate(o, 'en'))) : undefined;
       patch(q.id, { titleEn, ...(optionsEn ? { optionsEn } : {}) });
     } catch (err) {
-      setError(err instanceof Error ? err.message : (isAr ? 'تعذرت الترجمة الآلية.' : 'Automatic translation failed.'));
+      showToast(err instanceof Error ? err.message : (isAr ? 'تعذرت الترجمة الآلية.' : 'Automatic translation failed.'), 'error');
     } finally {
       setTranslatingId(null);
     }

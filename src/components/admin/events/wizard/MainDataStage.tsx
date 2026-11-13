@@ -33,8 +33,8 @@ export default function MainDataStage({ isAr, value, onChange, onSave, saving, h
   };
 
   const save = async () => {
-    if (!value.title.trim() || !value.titleEn.trim() || !value.description.trim() || !value.descriptionEn.trim()) {
-      setError(isAr ? 'أكمل العنوان والوصف بالعربية والإنجليزية.' : 'Complete the title and description in both languages.');
+    if (!value.title.trim() || !value.titleEn.trim()) {
+      setError(isAr ? 'أكمل العنوان بالعربية والإنجليزية.' : 'Complete the title in both languages.');
       return;
     }
     setError('');
@@ -55,9 +55,9 @@ export default function MainDataStage({ isAr, value, onChange, onSave, saving, h
           <input className={`${input} ${highlight === 'title' ? invalidClass : ''}`} dir="rtl" value={value.title} onChange={e => set('title', e.target.value)} /></label>
         <label className={label}><span>{isAr ? 'Event title (English)' : 'Event title (English)'}</span>
           <input className={input} dir="ltr" value={value.titleEn} onChange={e => set('titleEn', e.target.value)} /></label>
-        <label className={`${label} sm:col-span-2`}><span>{isAr ? 'الوصف (عربي)' : 'Description (Arabic)'}</span>
+        <label className={`${label} sm:col-span-2`}><span>{isAr ? 'الوصف (عربي -- اختياري)' : 'Description (Arabic — optional)'}</span>
           <textarea className={`${input} ${highlight === 'description' ? invalidClass : ''}`} dir="rtl" rows={3} value={value.description} onChange={e => set('description', e.target.value)} /></label>
-        <label className={`${label} sm:col-span-2`}><span>{isAr ? 'الوصف (إنجليزي)' : 'Description (English)'}</span>
+        <label className={`${label} sm:col-span-2`}><span>{isAr ? 'الوصف (إنجليزي -- اختياري)' : 'Description (English — optional)'}</span>
           <textarea className={input} dir="ltr" rows={3} value={value.descriptionEn} onChange={e => set('descriptionEn', e.target.value)} /></label>
         <label className={label}><span>{isAr ? 'نوع الفعالية' : 'Event type'}</span>
           <select className={input} value={value.type} onChange={e => set('type', e.target.value as EventType)}>

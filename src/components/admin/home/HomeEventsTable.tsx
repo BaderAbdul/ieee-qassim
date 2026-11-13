@@ -8,7 +8,7 @@ import { formatAdminDate } from '@/components/admin/AdminData';
 import { eventStateLabel } from '@/components/admin/EventWorkspace';
 import { stateBadgeColors } from '@/components/admin/events/EventCard';
 
-const OPEN_OR_PROCESSING: EventState[] = ['Draft', 'Published', 'Registration Open', 'Registration Closed', 'Ongoing'];
+const OPEN_OR_PROCESSING: EventState[] = ['Published', 'Registration Open', 'Registration Closed', 'Ongoing'];
 
 export default function HomeEventsTable({ events, locale, isAr }: { events: AdminEventSummary[]; locale: string; isAr: boolean }) {
   const rows = events

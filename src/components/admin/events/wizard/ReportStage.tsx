@@ -3,18 +3,19 @@
 import { useState } from 'react';
 import { Download, Upload } from 'lucide-react';
 import { downloadEventReport, uploadEventReport } from '@/lib/backend';
+import { useToast } from '@/context/ToastContext';
 import type { EventReport } from '@/lib/types';
 import { button, primaryButton } from './wizardTypes';
 
 export default function ReportStage({ isAr, eventId, report, onSaved }: {
   isAr: boolean; eventId: number; report: EventReport | null; onSaved: (report: EventReport) => void;
 }) {
+  const { showToast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
   const run = async (action: () => Promise<void>) => {
-    setBusy(true); setError('');
-    try { await action(); } catch (e) { setError(e instanceof Error ? e.message : (isAr ? 'تعذر إكمال الطلب.' : 'Request failed.')); }
+    setBusy(true);
+    try { await action(); } catch (e) { showToast(e instanceof Error ? e.message : (isAr ? 'تعذر إكمال الطلب.' : 'Request failed.'), 'error'); }
     finally { setBusy(false); }
   };
   return <div className="space-y-5">
@@ -26,12 +27,12 @@ export default function ReportStage({ isAr, eventId, report, onSaved }: {
     </div>}
     <label className="flex flex-col gap-3 rounded-xl border-2 border-dashed border-[var(--color-border)] p-6 text-sm">
       <span className="font-bold">{report ? (isAr ? 'استبدال التقرير' : 'Replace report') : (isAr ? 'ملف التقرير' : 'Report file')}</span>
-      <input disabled={busy} type="file" accept="application/pdf,.pdf" onChange={e => { setError(''); setFile(e.target.files?.[0] || null); }} />
+      <input disabled={busy} type="file" accept="application/pdf,.pdf" onChange={e => setFile(e.target.files?.[0] || null)} />
     </label>
-    {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
     <div className="flex justify-end"><button type="button" disabled={!file || busy} className={primaryButton} onClick={() => void run(async () => {
       if (!file) return;
       const saved = await uploadEventReport(eventId, file); onSaved(saved); setFile(null);
+      showToast(isAr ? 'تم رفع التقرير.' : 'Report uploaded.', 'success');
     })}><Upload size={16} />{busy ? (isAr ? 'جارٍ التنفيذ...' : 'Working...') : (isAr ? 'رفع التقرير' : 'Upload report')}</button></div>
   </div>;
 }

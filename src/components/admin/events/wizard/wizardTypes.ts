@@ -1,6 +1,6 @@
 import type { CustomQuestion, EventDay, EventGender, EventLocationType, EventSponsor, EventType, RegistrationMode, SocialLink } from '@/lib/types';
 
-export type StageId = 'main' | 'time' | 'security' | 'interviewer' | 'sponsors' | 'design' | 'settings' | 'review' | 'share' | 'publish' | 'report';
+export type StageId = 'main' | 'time' | 'security' | 'interviewer' | 'sponsors' | 'design' | 'settings' | 'review' | 'share' | 'report';
 
 export interface StageMeta {
   id: StageId;
@@ -19,8 +19,7 @@ export const STAGES: StageMeta[] = [
   { id: 'design', labelAr: 'التصميم', labelEn: 'Design', implemented: true },
   { id: 'settings', labelAr: 'الإعدادات', labelEn: 'Settings', implemented: true },
   { id: 'review', labelAr: 'نموذج التقييم', labelEn: 'Review form', implemented: true },
-  { id: 'share', labelAr: 'المشاركة', labelEn: 'Share', implemented: true },
-  { id: 'publish', labelAr: 'النشر', labelEn: 'Publication', implemented: false },
+  { id: 'share', labelAr: 'النشر', labelEn: 'Publication', implemented: true },
   { id: 'report', labelAr: 'تقرير الفعالية', labelEn: 'Event report', implemented: true },
 ];
 
@@ -57,6 +56,7 @@ export interface InterviewerFields {
   interviewer: string;
   interviewerEn: string;
   speakers: string;
+  speakersEn: string;
 }
 
 export interface DesignFields {

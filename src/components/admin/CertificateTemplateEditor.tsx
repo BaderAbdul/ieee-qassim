@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Download, Plus, Trash2, Upload, Check, ShieldCheck } from 'lucide-react';
 import { apiSend } from '@/lib/backend';
+import { useToast } from '@/context/ToastContext';
 import { arabicTemplateName, fieldGroups, newField, sources, testSources, type CertificateTemplate, type Source, type TemplateDefinition, type TemplateField } from '@/lib/certificateTemplates';
 import TemplateDialog from './TemplateDialog';
 import CertificateFieldPreview from './CertificateFieldPreview';
@@ -16,6 +17,7 @@ export default function CertificateTemplateEditor({ initial, isAr, canReview, ca
   initial?: CertificateTemplate; isAr: boolean; canReview: boolean; canEdit: boolean; onClose: () => void; onSaved: () => void;
 }) {
   const t = (ar: string, en: string) => isAr ? ar : en;
+  const { showToast } = useToast();
   const [step, setStep] = useState(initial ? 3 : 0);
   const [nameAr, setName] = useState(initial?.nameAr || '');
   const [definition, setDefinition] = useState<TemplateDefinition>(initial?.definition || { background: '', width: 0, height: 0, fields: [] });
@@ -58,23 +60,23 @@ export default function CertificateTemplateEditor({ initial, isAr, canReview, ca
   };
   const preview = async () => {
     if (!validateStage()) return;
-    setBusy(true); setError('');
+    setBusy(true);
     try {
       const result = await apiSend<{ pdf: string }>('POST', '/api/admin/templates/preview', { nameAr, definition, values: Object.fromEntries(usedSources.map(source => [source, values[source]])) });
       const bytes = Uint8Array.from(atob(result.pdf), character => character.charCodeAt(0));
       setPdfUrl(URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })));
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Preview failed'); } finally { setBusy(false); }
+    } catch (reason) { showToast(reason instanceof Error ? reason.message : 'Preview failed', 'error'); } finally { setBusy(false); }
   };
   const save = async () => {
     if (!validateStage()) return;
-    setBusy(true); setError('');
-    try { await apiSend(initial ? 'PUT' : 'POST', `/api/admin/templates${initial ? `/${initial.id}` : ''}`, { nameAr, definition, revision: initial?.revision }); onSaved(); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'Save failed'); } finally { setBusy(false); }
+    setBusy(true);
+    try { await apiSend(initial ? 'PUT' : 'POST', `/api/admin/templates${initial ? `/${initial.id}` : ''}`, { nameAr, definition, revision: initial?.revision }); showToast(t('تم الحفظ.', 'Saved.'), 'success'); onSaved(); }
+    catch (reason) { showToast(reason instanceof Error ? reason.message : 'Save failed', 'error'); } finally { setBusy(false); }
   };
   const approve = async () => {
-    setBusy(true); setError('');
-    try { await apiSend('POST', `/api/admin/templates/${initial!.id}/approve`, { revision: initial!.revision }); onSaved(); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'Approval failed'); } finally { setBusy(false); }
+    setBusy(true);
+    try { await apiSend('POST', `/api/admin/templates/${initial!.id}/approve`, { revision: initial!.revision }); showToast(t('تم الاعتماد.', 'Approved.'), 'success'); onSaved(); }
+    catch (reason) { showToast(reason instanceof Error ? reason.message : 'Approval failed', 'error'); } finally { setBusy(false); }
   };
   const move = (event: React.PointerEvent<SVGSVGElement>) => {
     if (!dragging.current || !canEdit || busy || !stage.current) return;

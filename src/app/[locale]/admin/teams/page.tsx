@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { apiSend, httpsCallable } from '@/lib/backend';
 import { apiGetArray } from '@/lib/backendResponse';
 import { AdminError, AdminLoading } from '@/components/admin/AdminData';
+import { useToast } from '@/context/ToastContext';
 import PrivilegesBadgesPanel from '@/components/admin/PrivilegesBadgesPanel';
 import { useAdminTopbarActions } from '@/components/admin/AdminTopbarActions';
 import type { MemberSearchResult } from '@/lib/adminTypes';
@@ -32,6 +33,7 @@ interface Privilege { key: string; feature: string; action: string; labelAr: str
 export default function AdminTeamsPage() {
   const isAr = useLocale() === 'ar';
   const { userData } = useAuth();
+  const { showToast } = useToast();
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,14 +65,14 @@ export default function AdminTeamsPage() {
   useEffect(() => { void load(); }, []);
 
   const searchUsers = async (query: string) => {
-    setSearching(true); setError(null);
+    setSearching(true);
     try {
       const result = await httpsCallable<unknown, MemberSearchResult>(null, 'searchMembers')({ query });
       // Teams are for club staff: only accounts that already hold an admin-tier role (Member,
       // Leader/Vice-Leader, Super Admin) are offered here. A plain student must first be given
       // one of those roles on the Users & Members page before they can be added to a team.
       setSearchResults(result.data.users.filter(u => !!u.role && u.role !== 'student'));
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to search members'); }
+    } catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to search members', 'error'); }
     finally { setSearching(false); setHasSearched(true); }
   };
 
@@ -111,7 +113,7 @@ export default function AdminTeamsPage() {
 
   const createTeam = async () => {
     if (!newTeam.id || !newTeam.nameAr || !newTeam.nameEn) return;
-    setBusy(true); setError(null);
+    setBusy(true);
     try {
       await apiSend('POST', '/api/admin/teams', {
         id: newTeam.id, nameAr: newTeam.nameAr, nameEn: newTeam.nameEn, isPublic: newTeam.isPublic,
@@ -120,7 +122,8 @@ export default function AdminTeamsPage() {
       setCreating(false);
       setNewTeam({ id: '', nameAr: '', nameEn: '', descriptionAr: '', descriptionEn: '', icon: '', isPublic: true });
       await load({ silent: true });
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to create team'); }
+      showToast(isAr ? 'تم إنشاء الفريق.' : 'Team created.', 'success');
+    } catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to create team', 'error'); }
     finally { setBusy(false); }
   };
 
@@ -131,7 +134,7 @@ export default function AdminTeamsPage() {
 
   const saveEdit = async () => {
     if (!editingId) return;
-    setBusy(true); setError(null);
+    setBusy(true);
     try {
       await apiSend('PATCH', `/api/admin/teams/${encodeURIComponent(editingId)}`, {
         nameAr: editTeam.nameAr, nameEn: editTeam.nameEn, isPublic: editTeam.isPublic,
@@ -139,26 +142,27 @@ export default function AdminTeamsPage() {
       });
       setEditingId(null);
       await load({ silent: true });
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to save team'); }
+      showToast(isAr ? 'تم الحفظ.' : 'Saved.', 'success');
+    } catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to save team', 'error'); }
     finally { setBusy(false); }
   };
 
   const deleteTeam = async (id: string) => {
     if (!window.confirm(isAr ? 'حذف هذا الفريق؟' : 'Delete this team?')) return;
-    setBusy(true); setError(null);
-    try { await apiSend('DELETE', `/api/admin/teams/${encodeURIComponent(id)}`); await load({ silent: true }); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to delete team'); }
+    setBusy(true);
+    try { await apiSend('DELETE', `/api/admin/teams/${encodeURIComponent(id)}`); await load({ silent: true }); showToast(isAr ? 'تم الحذف.' : 'Deleted.', 'success'); }
+    catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to delete team', 'error'); }
     finally { setBusy(false); }
   };
 
   const saveMembers = async (team: Team, members: TeamMember[]) => {
-    setBusy(true); setError(null);
+    setBusy(true);
     try {
       await apiSend('PUT', `/api/admin/teams/${encodeURIComponent(team.id)}/members`, {
         members: members.map(m => ({ userId: m.userId, teamRole: m.teamRole })),
       });
       await load({ silent: true });
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to update members'); }
+    } catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to update members', 'error'); }
     finally { setBusy(false); }
   };
 
@@ -198,7 +202,7 @@ export default function AdminTeamsPage() {
     setCeilingSelection(team.maxPrivileges === null ? null : new Set(team.maxPrivileges));
     if (privilegeCatalog.length === 0) {
       try { setPrivilegeCatalog(await apiGetArray<Privilege>('/api/admin/privileges')); }
-      catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to load privileges'); }
+      catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to load privileges', 'error'); }
     }
   };
 
@@ -212,14 +216,15 @@ export default function AdminTeamsPage() {
 
   const saveCeiling = async () => {
     if (!ceilingTeamId) return;
-    setBusy(true); setError(null);
+    setBusy(true);
     try {
       await apiSend('PUT', `/api/admin/teams/${encodeURIComponent(ceilingTeamId)}/ceiling`, {
         privileges: ceilingSelection === null ? null : [...ceilingSelection],
       });
       setCeilingTeamId(null); setCeilingSelection(null);
       await load({ silent: true });
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to update the privilege ceiling'); }
+      showToast(isAr ? 'تم الحفظ.' : 'Saved.', 'success');
+    } catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to update the privilege ceiling', 'error'); }
     finally { setBusy(false); }
   };
 

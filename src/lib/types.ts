@@ -1,6 +1,6 @@
 
 export type EventType = 'Workshop' | 'Camp' | 'Lecture' | 'Competition' | 'Meetup' | 'Challenge' | 'Booth' | 'Other';
-export type EventState = 'Draft' | 'Published' | 'Registration Open' | 'Registration Closed' | 'Ongoing' | 'Completed' | 'Archived';
+export type EventState = 'Published' | 'Registration Open' | 'Registration Closed' | 'Ongoing' | 'Completed';
 export type RegistrationMode = 'Auto' | 'Manual';
 export type EventGender = 'male' | 'female' | 'both';
 export type EventLocationType = 'online' | 'in_person';
@@ -49,11 +49,12 @@ export interface PlatformEvent {
   gains: string[]; // e.g. ["Networking", "React skills"]
   gainsEn: string[];
   speakers: string[];
+  speakersEn: string[];
   capacity: number;
   isUnlimitedCapacity?: boolean;
   hideExactCapacity?: boolean;
   requiresRegistration?: boolean; // false for walk-in booths / visits
-  isUnlisted?: boolean; // hidden from public event listings but accessible via direct link/QR
+  isUnlisted?: boolean; // hidden from the public site entirely (listing, search and direct link) until an admin shows it
   registeredCount?: number;
   attendanceCount?: number;
   points: number;

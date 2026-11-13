@@ -15,22 +15,23 @@ import {
   Search,
   CheckCircle2,
   QrCode,
-  BarChart3,
 } from 'lucide-react';
 import { AdminError, AdminLoading } from '@/components/admin/AdminData';
+import { useToast } from '@/context/ToastContext';
 import { eventStateLabel } from '@/components/admin/EventWorkspace';
 import EventTemplatesModal from '@/components/admin/EventTemplatesModal';
 import EventCard, { transitions } from '@/components/admin/events/EventCard';
 import { useAdminTopbarActions } from '@/components/admin/AdminTopbarActions';
 import { getCustomEventTemplates } from '@/lib/customEventTemplates';
 
-const DRAFT_STATES: EventState[] = ['Draft', 'Published'];
+const DRAFT_STATES: EventState[] = ['Published'];
 const OPEN_STATES: EventState[] = ['Registration Open', 'Registration Closed', 'Ongoing'];
-const CLOSED_STATES: EventState[] = ['Completed', 'Archived'];
+const CLOSED_STATES: EventState[] = ['Completed'];
 
 export default function AdminEventsPage() {
   const locale = useLocale();
   const isAr = locale === 'ar';
+  const { showToast } = useToast();
 
   const [events, setEvents] = useState<PlatformEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,27 +86,12 @@ export default function AdminEventsPage() {
   const changeState = async (event: PlatformEvent, state: EventState) => {
     if (busy || state === event.state) return;
     setBusy(event.id);
-    setError(null);
     try {
-      // Events saved before the backend learned about `locationType` and unlimited capacity can
-      // contain empty legacy fields. Repair only those compatibility fields before changing state.
-      // This makes already-completed online/open-registration drafts publishable without changing
-      // their public meaning.
-      const compatibilityPatch: Record<string, unknown> = {};
-      if (event.locationType === 'online' && !(event.location || '').trim()) {
-        compatibilityPatch.location = 'عن بُعد';
-        compatibilityPatch.locationEn = event.locationEn?.trim() || 'Online';
-      }
-      if (event.isUnlimitedCapacity && (!Number.isFinite(event.capacity) || event.capacity <= 0)) {
-        compatibilityPatch.capacity = 1;
-      }
-      if (Object.keys(compatibilityPatch).length) {
-        await httpsCallable(null, 'saveEvent')({ eventId: event.id, ...compatibilityPatch });
-      }
       await httpsCallable(null, 'changeEventState')({ eventId: event.id, state });
-      setEvents(prev => prev.map(item => item.id === event.id ? { ...item, ...compatibilityPatch, state } : item));
+      setEvents(prev => prev.map(item => item.id === event.id ? { ...item, state } : item));
+      showToast(isAr ? 'تم تغيير حالة الفعالية.' : 'Event state changed.', 'success');
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to change state');
+      showToast(reason instanceof Error ? reason.message : 'Unable to change state', 'error');
     } finally {
       setBusy(null);
     }
@@ -114,12 +100,12 @@ export default function AdminEventsPage() {
   const toggleVisibility = async (event: PlatformEvent, nextUnlisted: boolean) => {
     if (busy) return;
     setBusy(event.id);
-    setError(null);
     try {
       await httpsCallable(null, 'saveEvent')({ eventId: event.id, isUnlisted: nextUnlisted });
       setEvents(prev => prev.map(item => item.id === event.id ? { ...item, isUnlisted: nextUnlisted } : item));
+      showToast(nextUnlisted ? (isAr ? 'تم إخفاء الفعالية.' : 'Event hidden.') : (isAr ? 'تم إظهار الفعالية.' : 'Event shown.'), 'success');
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to update visibility');
+      showToast(reason instanceof Error ? reason.message : 'Unable to update visibility', 'error');
     } finally {
       setBusy(null);
     }
@@ -142,13 +128,6 @@ export default function AdminEventsPage() {
       >
         <QrCode className="w-4 h-4" />
         <span className="hidden lg:inline text-xs font-bold">{isAr ? 'مكتب التحضير' : 'Check-in desk'}</span>
-      </Link>
-      <Link
-        href="/admin/reports"
-        className="cursor-pointer flex items-center gap-2 rounded-xl bg-white/10 hover:bg-white/20 px-3 py-2 text-slate-300 hover:text-white transition-all"
-      >
-        <BarChart3 className="w-4 h-4" />
-        <span className="hidden lg:inline text-xs font-bold">{isAr ? 'تقرير تفصيلي' : 'Detailed report'}</span>
       </Link>
       <button
         type="button"
@@ -349,9 +328,9 @@ export default function AdminEventsPage() {
       ) : (
         <div className="flex flex-col gap-8">
           {([
-            { key: 'draft', label: isAr ? 'مسودة ومعالجة' : 'Draft & processing', states: DRAFT_STATES, accent: false },
+            { key: 'draft', label: isAr ? 'قادمة (لم يفتح التسجيل)' : 'Coming soon', states: DRAFT_STATES, accent: false },
             { key: 'open', label: isAr ? 'مفتوحة الآن' : 'Open now', states: OPEN_STATES, accent: true },
-            { key: 'closed', label: isAr ? 'مغلقة ومكتملة' : 'Closed & completed', states: CLOSED_STATES, accent: false },
+            { key: 'closed', label: isAr ? 'مكتملة' : 'Completed', states: CLOSED_STATES, accent: false },
           ] as const).map((group) => {
             const groupEvents = visible.filter((event) => group.states.includes(event.state));
             if (!groupEvents.length) return null;

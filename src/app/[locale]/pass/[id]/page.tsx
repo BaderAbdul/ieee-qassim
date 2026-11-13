@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import { apiGet, httpsCallable } from '@/lib/backend';
+import { useToast } from '@/context/ToastContext';
 import DigitalMemberCard from '@/components/ui/DigitalMemberCard';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { AlertCircle, CheckCircle, Sparkles, Award, LogIn } from 'lucide-react';
@@ -14,6 +15,7 @@ import { PlatformEvent } from '@/lib/types';
 export default function PublicPassPage({ params }: { params: Promise<{ id: string, locale: string }> }) {
   const [userId, setUserId] = useState<string | null>(null);
   const { user: currentUser, userData: currentUserData, login } = useAuth();
+  const { showToast } = useToast();
   
   useEffect(() => {
     params.then(p => setUserId(p.id));
@@ -36,7 +38,6 @@ export default function PublicPassPage({ params }: { params: Promise<{ id: strin
 
   const [checkinSuccess, setCheckinSuccess] = useState(false);
   const [awardedPoints, setAwardedPoints] = useState<number>(0);
-  const [checkinError, setCheckinError] = useState<string>('');
 
   const isOrganizer = ['event_organizer', 'super_admin'].includes(currentUserData?.role || '');
   const isSelf = currentUser?.uid === userId;
@@ -46,7 +47,6 @@ export default function PublicPassPage({ params }: { params: Promise<{ id: strin
   const handleSendToStudentPhone = async () => {
     if (!selectedEvent || !userId || initiatingLive) return;
     setInitiatingLive(true);
-    setCheckinError('');
     try {
       const initiateFn = httpsCallable<{ eventId: number; targetUserId: string }, { status: string; awardedPoints: number }>(null, 'initiatePendingCheckIn');
       const resp = await initiateFn({ eventId: selectedEvent.id, targetUserId: userId });
@@ -59,7 +59,7 @@ export default function PublicPassPage({ params }: { params: Promise<{ id: strin
       }
     } catch (err: unknown) {
       console.error(err);
-      setCheckinError(err instanceof Error ? err.message : (isAr ? 'تعذر تسجيل حضور الطالب.' : 'Could not record attendance.'));
+      showToast(err instanceof Error ? err.message : (isAr ? 'تعذر تسجيل حضور الطالب.' : 'Could not record attendance.'), 'error');
     } finally {
       setInitiatingLive(false);
     }
@@ -220,7 +220,7 @@ export default function PublicPassPage({ params }: { params: Promise<{ id: strin
                   <button
                     key={ev.id}
                     type="button"
-                    onClick={() => { setSelectedEvent(ev); setCheckinSuccess(false); setCheckinError(''); }}
+                    onClick={() => { setSelectedEvent(ev); setCheckinSuccess(false); }}
                     className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
                       selectedEvent.id === ev.id
                         ? 'bg-blue-600 text-white shadow-sm'
@@ -311,7 +311,6 @@ export default function PublicPassPage({ params }: { params: Promise<{ id: strin
                       ) : (
                         <p className="text-center text-sm text-slate-600">{isAr ? 'أبرز بطاقتك للمنظم أو امسح رمز الفعالية لتسجيل الحضور. سيظهر التقييم المطلوب بصورة مستقلة.' : 'Show your pass to an organizer or scan the event QR. Required feedback opens independently.'}</p>
                       )}
-                      {checkinError && <p role="alert" className="mt-3 text-sm text-red-700">{checkinError}</p>}
 
                   </div>
                 )}

@@ -5,6 +5,7 @@ import { useLocale } from 'next-intl';
 import Image from 'next/image';
 import { ImagePlus, Link2, Save } from 'lucide-react';
 import { uploadImage } from '@/lib/backend';
+import { useToast } from '@/context/ToastContext';
 import EventLinkQrModal from '../EventLinkQrModal';
 import { button, label, primaryButton, type DesignFields } from './wizardTypes';
 
@@ -17,32 +18,34 @@ interface DesignStageProps {
   saving: boolean;
 }
 
-// Not a hard requirement -- uploadImage() always re-encodes to WebP server-side -- just a nudge
-// toward converting the *source* file first for better quality/size than a re-encode would give.
+// The poster must be a genuine WebP file -- a non-WebP source is rejected with a toast pointing
+// at the matching CloudConvert conversion page, rather than silently re-encoded server-side.
 const WEBP_HINT_SLUG: Record<string, string> = { 'image/png': 'png-to-webp', 'image/jpeg': 'jpg-to-webp' };
 
 export default function DesignStage({ isAr, eventId, value, onChange, onSave, saving }: DesignStageProps) {
   const locale = useLocale();
+  const { showToast } = useToast();
   const fileInput = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState('');
-  const [webpHint, setWebpHint] = useState('');
   const [showQr, setShowQr] = useState(false);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const slug = WEBP_HINT_SLUG[file.type];
-    setWebpHint(slug ? (isAr
-      ? `الملف الأصلي ليس WebP -- لأفضل جودة/حجم يمكنك تحويله أولًا عبر cloudconvert.com/${slug} (اختياري، سيتم رفعه كما هو إن تجاوزت هذه الخطوة).`
-      : `Source file isn't WebP yet -- for the best quality/size you can convert it first at cloudconvert.com/${slug} (optional, it'll upload fine either way).`) : '');
+    if (file.type !== 'image/webp') {
+      const slug = WEBP_HINT_SLUG[file.type] || 'image-converter';
+      showToast(isAr
+        ? `صورة الإعلان يجب أن تكون بصيغة WebP. حوّلها أولًا عبر cloudconvert.com/${slug} ثم ارفعها.`
+        : `The poster image must be a WebP file. Convert it first at cloudconvert.com/${slug}, then upload it.`, 'error');
+      if (fileInput.current) fileInput.current.value = '';
+      return;
+    }
     setUploading(true);
-    setUploadError('');
     try {
       const url = await uploadImage(file, 'event', value.coverUrl || undefined);
       onChange({ coverUrl: url });
     } catch (error) {
-      setUploadError(error instanceof Error ? error.message : (isAr ? 'تعذر رفع الصورة.' : 'Could not upload the image.'));
+      showToast(error instanceof Error ? error.message : (isAr ? 'تعذر رفع الصورة.' : 'Could not upload the image.'), 'error');
     } finally {
       setUploading(false);
       if (fileInput.current) fileInput.current.value = '';
@@ -69,8 +72,6 @@ export default function DesignStage({ isAr, eventId, value, onChange, onSave, sa
               <ImagePlus size={16} />
               {uploading ? (isAr ? 'جارٍ الرفع...' : 'Uploading...') : value.coverUrl ? (isAr ? 'تغيير الصورة' : 'Change image') : (isAr ? 'رفع صورة' : 'Upload image')}
             </label>
-            {webpHint && <p className="max-w-sm text-xs text-[var(--color-text-muted)]">{webpHint}</p>}
-            {uploadError && <p role="alert" className="text-xs" style={{ color: 'var(--color-danger)' }}>{uploadError}</p>}
           </div>
         </div>
       </div>

@@ -81,7 +81,7 @@ export default function EventsList({ events: initialEvents, nextCursor = null, i
   // Client-side filtering by search query and type
   const filteredEvents = useMemo(() => {
     return events.filter((event) => {
-      const past = ['Completed', 'Archived'].includes(event.state) || (toJsDate(event.date)?.getTime() ?? 0) < now;
+      const past = event.state === 'Completed' || (toJsDate(event.date)?.getTime() ?? 0) < now;
       if (view === 'upcoming' && past) return false;
       if (view === 'past' && !past) return false;
       // Hide unlisted events (e.g. secret booth visits or internal events) from general list
@@ -114,7 +114,7 @@ export default function EventsList({ events: initialEvents, nextCursor = null, i
     const active: PlatformEvent[] = [];
     const completed: PlatformEvent[] = [];
     filteredEvents.forEach(ev => {
-      const isPast = ['Completed', 'Archived'].includes(ev.state) || (toJsDate(ev.date)?.getTime() ?? 0) < now;
+      const isPast = ev.state === 'Completed' || (toJsDate(ev.date)?.getTime() ?? 0) < now;
       if (isPast) completed.push(ev);
       else active.push(ev);
     });

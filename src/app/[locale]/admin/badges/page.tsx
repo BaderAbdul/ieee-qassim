@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { apiSend } from '@/lib/backend';
 import { apiGetArray } from '@/lib/backendResponse';
 import { AdminError, AdminLoading } from '@/components/admin/AdminData';
+import { useToast } from '@/context/ToastContext';
 import { Award, Plus, Trash2 } from 'lucide-react';
 
 interface Privilege { key: string; feature: string; action: string; labelAr: string; labelEn: string }
@@ -24,6 +25,7 @@ function groupByFeature(privileges: Privilege[]): Map<string, Privilege[]> {
 export default function AdminBadgesPage() {
   const isAr = useLocale() === 'ar';
   const { userData } = useAuth();
+  const { showToast } = useToast();
   const [privileges, setPrivileges] = useState<Privilege[]>([]);
   const [badges, setBadges] = useState<Badge[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,28 +83,29 @@ export default function AdminBadgesPage() {
 
   const createBadge = async () => {
     if (!newBadge.key || !newBadge.nameAr || !newBadge.nameEn) return;
-    setBusy(true); setError(null);
+    setBusy(true);
     try {
       await apiSend('POST', '/api/admin/badges', { ...newBadge, privileges: [...newSelection] });
       setCreating(false); setNewBadge({ key: '', nameAr: '', nameEn: '' }); setNewSelection(new Set());
       await load();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to create badge'); }
+      showToast(isAr ? 'تم إنشاء الوسام.' : 'Badge created.', 'success');
+    } catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to create badge', 'error'); }
     finally { setBusy(false); }
   };
 
   const saveEdit = async () => {
     if (!editingKey) return;
-    setBusy(true); setError(null);
-    try { await apiSend('PATCH', `/api/admin/badges/${encodeURIComponent(editingKey)}`, { privileges: [...editSelection] }); setEditingKey(null); await load(); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to save badge'); }
+    setBusy(true);
+    try { await apiSend('PATCH', `/api/admin/badges/${encodeURIComponent(editingKey)}`, { privileges: [...editSelection] }); setEditingKey(null); await load(); showToast(isAr ? 'تم الحفظ.' : 'Saved.', 'success'); }
+    catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to save badge', 'error'); }
     finally { setBusy(false); }
   };
 
   const deleteBadge = async (key: string) => {
     if (!window.confirm(isAr ? 'حذف هذا الوسام؟' : 'Delete this badge?')) return;
-    setBusy(true); setError(null);
-    try { await apiSend('DELETE', `/api/admin/badges/${encodeURIComponent(key)}`); await load(); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to delete badge'); }
+    setBusy(true);
+    try { await apiSend('DELETE', `/api/admin/badges/${encodeURIComponent(key)}`); await load(); showToast(isAr ? 'تم الحذف.' : 'Deleted.', 'success'); }
+    catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to delete badge', 'error'); }
     finally { setBusy(false); }
   };
 

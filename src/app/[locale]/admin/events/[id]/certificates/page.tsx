@@ -6,6 +6,7 @@ import { apiGetArray } from '@/lib/backendResponse';
 import { downloadCSV, parseCSV, secureCertificateURL } from '@/lib/csv';
 import { runOperations, type OperationResult } from '@/lib/admin-operations';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { useParams } from 'next/navigation';
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
 import { FileText, CheckCircle, Clock, XCircle, AlertCircle, RefreshCw, XOctagon, Download, Upload } from 'lucide-react';
@@ -21,6 +22,7 @@ interface Attendee {
 
 export default function CertificatesManagementPage() {
   const { userData, loading: authLoading } = useAuth();
+  const { showToast } = useToast();
   const params = useParams();
   const eventId = params.id as string;
   
@@ -29,7 +31,7 @@ export default function CertificatesManagementPage() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [uploadingCSV, setUploadingCSV] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [manualLinks, setManualLinks] = useState<Record<string, string>>({});
   const [importRows, setImportRows] = useState<{ id: string; name: string; email: string; userId?: string; url?: string; problem?: string }[]>([]);
@@ -49,13 +51,12 @@ export default function CertificatesManagementPage() {
     let active = true;
     apiGet<{ templates: { id: string; nameAr: string }[] }>('/api/admin/templates', { scope: 'approved' })
       .then(result => { if (active) setTemplates(result.templates); })
-      .catch(reason => { if (active) setError(reason instanceof Error ? reason.message : 'تعذر تحميل القوالب المعتمدة'); });
+      .catch(reason => { if (active) setLoadError(reason instanceof Error ? reason.message : 'تعذر تحميل القوالب المعتمدة'); });
     return () => { active = false; };
   }, [userData]);
 
   const handleCompleteEventAndEnableCertificates = async () => {
     setProcessing(true);
-    setError(null);
     try {
       if (event?.state !== 'Completed') {
         await httpsCallable(null, 'changeEventState')({ eventId, state: 'Completed' });
@@ -64,7 +65,7 @@ export default function CertificatesManagementPage() {
       setEvent(prev => prev ? { ...prev, state: 'Completed', hasCertificate: true } : null);
       setReloadKey(k => k + 1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'تعذر إنهاء الفعالية وتفعيل الشهادات');
+      showToast(err instanceof Error ? err.message : 'تعذر إنهاء الفعالية وتفعيل الشهادات', 'error');
     } finally {
       setProcessing(false);
     }
@@ -84,19 +85,19 @@ export default function CertificatesManagementPage() {
       try {
         await httpsCallable(null, 'renderCertificate')({ certificateId: pending.certificate!.id });
       } catch (reason) {
-        if (active) setError(reason instanceof Error ? reason.message : 'Certificate generation failed.');
+        if (active) showToast(reason instanceof Error ? reason.message : 'Certificate generation failed.', 'error');
       } finally {
         rendering.current = false;
         if (active) {
           try {
             const certificate = await apiGet<Certificate>(`/api/admin/certificates/${pending.certificate!.id}`);
             if (active) setAttendees(previous => previous.map(item => item.userId === pending.userId ? { ...item, certificate } : item));
-          } catch (reason) { if (active) setError(reason instanceof Error ? reason.message : 'تعذر تحديث الشهادة'); }
+          } catch (reason) { if (active) showToast(reason instanceof Error ? reason.message : 'تعذر تحديث الشهادة', 'error'); }
         }
       }
     }, 2000);
     return () => { active = false; window.clearTimeout(timer); };
-  }, [attendees, processing]);
+  }, [attendees, processing, showToast]);
 
   useEffect(() => {
     if (role !== 'super_admin' && role !== 'event_organizer') {
@@ -133,7 +134,7 @@ export default function CertificatesManagementPage() {
       } catch (err: unknown) {
         if (active) {
           const msg = err instanceof Error ? err.message : 'Error fetching data';
-          setError(msg);
+          setLoadError(msg);
         }
       } finally {
         if (active) {
@@ -151,21 +152,20 @@ export default function CertificatesManagementPage() {
 
   const handleIssueCertificates = async (retryIds?: string[]) => {
     if (!canIssue) {
-      setError('Certificates can only be issued for Completed events.');
+      showToast('Certificates can only be issued for Completed events.', 'error');
       return;
     }
-    
+
     const eligibleUserIds = attendees
       .filter(a => a.eligible && (!a.certificate || a.certificate.status === 'Failed') && (!retryIds || retryIds.includes(a.userId)))
       .map(a => a.userId);
 
     if (eligibleUserIds.length === 0) {
-      setError('No eligible attendees to issue certificates to.');
+      showToast('No eligible attendees to issue certificates to.', 'error');
       return;
     }
 
     setProcessing(true);
-    setError(null);
     try {
       const issueFn = httpsCallable<unknown, { results: { userId: string; status: 'queued' | 'skipped' | 'failed'; message?: string }[] }>(null, 'issueCertificates');
       const outcome: OperationResult[] = [];
@@ -185,8 +185,7 @@ export default function CertificatesManagementPage() {
       setIssueRetryIds(outcome.filter(row => !row.success).map(row => row.id));
       setReloadKey(k => k + 1);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error issuing certificates';
-      setError(msg);
+      showToast(err instanceof Error ? err.message : 'Error issuing certificates', 'error');
     } finally {
       setProcessing(false);
     }
@@ -199,8 +198,7 @@ export default function CertificatesManagementPage() {
       await retryFn({ certificateId });
       setReloadKey(k => k + 1);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error retrying certificate';
-      setError(msg);
+      showToast(err instanceof Error ? err.message : 'Error retrying certificate', 'error');
     } finally {
       setProcessing(false);
     }
@@ -213,8 +211,7 @@ export default function CertificatesManagementPage() {
       await revokeFn({ certificateId });
       setReloadKey(k => k + 1);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error revoking certificate';
-      setError(msg);
+      showToast(err instanceof Error ? err.message : 'Error revoking certificate', 'error');
     } finally {
       setProcessing(false);
     }
@@ -223,14 +220,14 @@ export default function CertificatesManagementPage() {
   const saveManualLink = async (attendee: Attendee) => {
     const url = manualLinks[attendee.userId];
     let safeURL: string;
-    try { safeURL = secureCertificateURL(url || ''); } catch { setError('يجب إدخال رابط HTTPS صحيح'); return; }
+    try { safeURL = secureCertificateURL(url || ''); } catch { showToast('يجب إدخال رابط HTTPS صحيح', 'error'); return; }
     setProcessing(true);
     try {
       await httpsCallable(null, 'saveExternalCertificate')({ eventId, userId: attendee.userId, url: safeURL });
       setResults([{ id: attendee.userId, name: attendee.name, success: true }]);
       setReloadKey(k => k + 1);
     } catch (err) {
-      setError('خطأ في حفظ الرابط: ' + (err instanceof Error ? err.message : 'أعد المحاولة'));
+      showToast('خطأ في حفظ الرابط: ' + (err instanceof Error ? err.message : 'أعد المحاولة'), 'error');
     } finally {
       setProcessing(false);
     }
@@ -250,7 +247,6 @@ export default function CertificatesManagementPage() {
     if (!file) return;
 
     setUploadingCSV(true);
-    setError(null);
       try {
         if (file.size > 2 * 1024 * 1024) throw new Error('الحد الأقصى للملف 2MB');
         const rows = parseCSV(await file.text());
@@ -276,7 +272,7 @@ export default function CertificatesManagementPage() {
         }));
         setResults([]); setRetryRows([]);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'خطأ في معالجة الملف');
+        showToast(err instanceof Error ? err.message : 'خطأ في معالجة الملف', 'error');
       } finally {
         setUploadingCSV(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
@@ -356,7 +352,7 @@ export default function CertificatesManagementPage() {
         {(templateId || event?.certificateTemplateId) && <details><summary className="cursor-pointer font-bold">بيانات المخاطبة للمستفيدين</summary><p className="my-3 text-sm text-slate-500">حدد البيانات عند الحاجة للشروط. غير المحدد يستخدم النص البديل في القالب؛ لا نستنتج الجنس من الاسم.</p><div className="max-h-64 space-y-2 overflow-y-auto">{attendees.map(attendee => <label key={attendee.userId} className="flex items-center justify-between gap-3"><span>{attendee.name}</span><select disabled={processing} className="rounded-lg border p-2" value={genders[attendee.userId] || ''} onChange={e => setGenders(previous => ({ ...previous, [attendee.userId]: e.target.value }))}><option value="">غير محدد</option><option value="male">ذكر</option><option value="female">أنثى</option></select></label>)}</div></details>}
         <p className="text-xs text-slate-500">المسودات غير متاحة للإصدار. تُحفظ نسخة من القالب المعتمد وبياناته مع الشهادة عند إضافتها لقائمة الإصدار.</p>
       </section>
-      {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">{error}</div>}
+      {loadError && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">{loadError}</div>}
       {issueRetryIds.length > 0 && <button disabled={processing || !canIssue} onClick={() => handleIssueCertificates(issueRetryIds)} className="rounded-xl bg-purple-600 hover:bg-purple-700 transition-colors px-4 py-3 text-white font-bold disabled:opacity-50">إعادة إرسال دفعات الإصدار المتعثرة فقط</button>}
       {results.length > 0 && <section className="rounded-2xl border border-slate-100 shadow-sm bg-white p-5" aria-live="polite"><p className="text-sm text-slate-700">نجح <span className="font-bold text-emerald-600">{results.filter(row => row.success).length}</span> / {results.length}.</p>{results.filter(row => !row.success).map(row => <p key={row.id} className="text-sm text-red-600 mt-1">{row.name}: {row.message}</p>)}<button className="mt-3 text-sm font-bold text-purple-600 hover:underline" onClick={() => downloadCSV('certificate-operation-results.csv', [['Name', 'Success', 'Message'], ...results.map(row => [row.name, row.success, row.message || ''])])}>تنزيل تقرير النتائج</button>{retryRows.length > 0 && <button disabled={uploadingCSV} className="ms-4 rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors px-4 py-2 text-sm font-bold text-white" onClick={() => applyImport(retryRows)}>إعادة محاولة الفاشل فقط ({retryRows.length})</button>}</section>}
       {importRows.length > 0 && <section className="rounded-2xl border border-slate-100 bg-slate-50 p-5"><h2 className="font-bold text-slate-900">معاينة قبل الحفظ — لم يُطبّق أي رابط بعد</h2><p className="text-sm text-slate-600 mt-1">صالح {importRows.filter(row => !row.problem).length}، يحتاج مراجعة {importRows.filter(row => row.problem).length}.</p><div className="max-h-64 overflow-auto mt-3 space-y-0.5">{importRows.map(row => <p key={row.id} className={`text-sm ${row.problem ? 'text-red-700' : 'text-emerald-700'}`}>صف {row.id}: {row.email} — {row.problem || 'جاهز للربط'}</p>)}</div><button disabled={uploadingCSV || !canAttachExternal || !importRows.some(row => !row.problem)} onClick={() => applyImport(importRows)} className="mt-3 rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors px-4 py-2 text-sm font-bold text-white disabled:opacity-50">تطبيق الصفوف الصالحة فقط</button><button disabled={uploadingCSV} onClick={() => setImportRows([])} className="ms-3 text-sm font-bold text-slate-600 hover:underline">إلغاء الاستيراد</button></section>}

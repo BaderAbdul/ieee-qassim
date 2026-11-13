@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { readSheet } from 'read-excel-file/browser';
 import { FileSpreadsheet, Upload } from 'lucide-react';
 import { looksLikeEmail, parseCSV } from '@/lib/csv';
+import { useToast } from '@/context/ToastContext';
 
 const input = 'w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2.5 text-sm';
 
@@ -11,14 +12,13 @@ export default function RecipientsFileUpload({ isAr, onExtracted }: {
   isAr: boolean; onExtracted: (emails: string[]) => void;
 }) {
   const t = (ar: string, en: string) => isAr ? ar : en;
+  const { showToast } = useToast();
   const [rows, setRows] = useState<string[][] | null>(null);
   const [fileName, setFileName] = useState('');
   const [columnIndex, setColumnIndex] = useState(0);
   const [hasHeader, setHasHeader] = useState(true);
-  const [error, setError] = useState('');
 
   const openFile = async (file: File) => {
-    setError('');
     try {
       const isXlsx = /\.xlsx$/i.test(file.name);
       const parsed = isXlsx
@@ -30,7 +30,7 @@ export default function RecipientsFileUpload({ isAr, onExtracted }: {
       setColumnIndex(0);
       setHasHeader(parsed[0].some(cell => !looksLikeEmail(cell)));
     } catch {
-      setError(t('تعذرت قراءة الملف. يجب أن يكون بصيغة Excel (.xlsx) أو CSV.', 'Could not read the file. It must be an Excel (.xlsx) or .csv file.'));
+      showToast(t('تعذرت قراءة الملف. يجب أن يكون بصيغة Excel (.xlsx) أو CSV.', 'Could not read the file. It must be an Excel (.xlsx) or .csv file.'), 'error');
     }
   };
 
@@ -48,7 +48,6 @@ export default function RecipientsFileUpload({ isAr, onExtracted }: {
     <p className="text-xs text-[var(--color-text-muted)]">
       {t('يدعم ملفات Excel بصيغة .xlsx وكذلك CSV.', 'Supports Excel (.xlsx) files as well as CSV.')}
     </p>
-    {error && <p role="alert" className="text-xs" style={{ color: 'var(--color-danger)' }}>{error}</p>}
     {rows && (
       <div className="space-y-2 rounded-lg bg-[var(--color-surface)] p-3">
         <p className="flex items-center gap-1.5 text-xs font-bold text-[var(--color-text-secondary)]"><FileSpreadsheet size={14} />{fileName}</p>

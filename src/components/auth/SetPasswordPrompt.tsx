@@ -4,11 +4,13 @@ import { useState, type FormEvent } from 'react';
 import { useLocale } from 'next-intl';
 import { useClerk, useUser, useReverification } from '@clerk/nextjs';
 import { Eye, EyeOff, KeyRound, Loader2 } from 'lucide-react';
+import { useToast } from '@/context/ToastContext';
 
 export default function SetPasswordPrompt() {
   const isAr = useLocale() === 'ar';
   const { user } = useUser();
   const clerk = useClerk();
+  const { showToast } = useToast();
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [visible, setVisible] = useState(false);
@@ -37,12 +39,12 @@ export default function SetPasswordPrompt() {
       // Cancelled reverification must never unlock the site. The parent gate
       // only releases when Clerk's user resource reports passwordEnabled.
       if (!updated?.passwordEnabled) {
-        setError(isAr ? 'لم يتم إنشاء كلمة المرور. أكمل التحقق ثم أعد المحاولة.' : 'Password was not created. Complete verification and try again.');
+        showToast(isAr ? 'لم يتم إنشاء كلمة المرور. أكمل التحقق ثم أعد المحاولة.' : 'Password was not created. Complete verification and try again.', 'error');
         return;
       }
       await user?.reload();
     } catch (err) {
-      setError(err instanceof Error ? err.message : (isAr ? 'تعذر إنشاء كلمة المرور. حاول مرة أخرى.' : 'Could not set password. Please try again.'));
+      showToast(err instanceof Error ? err.message : (isAr ? 'تعذر إنشاء كلمة المرور. حاول مرة أخرى.' : 'Could not set password. Please try again.'), 'error');
     } finally {
       setSubmitting(false);
     }
@@ -72,7 +74,7 @@ export default function SetPasswordPrompt() {
           {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
           {isAr ? 'إنشاء كلمة المرور والمتابعة' : 'Create password and continue'}
         </button>
-        <button type="button" disabled={submitting} onClick={() => { void clerk.signOut().catch(() => setError(isAr ? 'تعذر تسجيل الخروج. حاول مرة أخرى.' : 'Could not sign out. Please try again.')); }} className="w-full text-sm font-bold text-slate-500 disabled:opacity-50">{isAr ? 'تسجيل الخروج' : 'Sign out'}</button>
+        <button type="button" disabled={submitting} onClick={() => { void clerk.signOut().catch(() => showToast(isAr ? 'تعذر تسجيل الخروج. حاول مرة أخرى.' : 'Could not sign out. Please try again.', 'error')); }} className="w-full text-sm font-bold text-slate-500 disabled:opacity-50">{isAr ? 'تسجيل الخروج' : 'Sign out'}</button>
       </form>
     </section>
   );

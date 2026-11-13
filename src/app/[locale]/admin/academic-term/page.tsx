@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { httpsCallable } from '@/lib/backend';
 import { AdminError, AdminLoading } from '@/components/admin/AdminData';
+import { useToast } from '@/context/ToastContext';
 import { Save, CalendarRange, Plus, Trash2 } from 'lucide-react';
 
 interface AcademicTerm { startDate: string | null; endDate: string | null }
@@ -14,15 +15,13 @@ const emptyVacation: VacationSettings = { weeklyDays: [], ranges: [] };
 
 export default function AdminAcademicTermPage() {
   const isAr = useLocale() === 'ar';
+  const { showToast } = useToast();
   const [term, setTerm] = useState<AcademicTerm>({ startDate: null, endDate: null });
   const [vacation, setVacation] = useState<VacationSettings>(emptyVacation);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
   const [savingVacation, setSavingVacation] = useState(false);
-  const [vacationError, setVacationError] = useState<string | null>(null);
-  const [vacationSaved, setVacationSaved] = useState(false);
 
   const weekdayNames = isAr
     ? ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
@@ -46,12 +45,12 @@ export default function AdminAcademicTermPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true); setSaved(false); setError(null);
+    setSaving(true);
     try {
       await httpsCallable(null, 'saveAcademicTerm')(term);
-      setSaved(true);
+      showToast(isAr ? 'تم حفظ التواريخ بنجاح.' : 'Dates saved successfully.', 'success');
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to save');
+      showToast(reason instanceof Error ? reason.message : 'Unable to save', 'error');
     } finally {
       setSaving(false);
     }
@@ -66,12 +65,12 @@ export default function AdminAcademicTermPage() {
 
   const handleSaveVacation = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSavingVacation(true); setVacationSaved(false); setVacationError(null);
+    setSavingVacation(true);
     try {
       await httpsCallable(null, 'saveVacationDays')(vacation);
-      setVacationSaved(true);
+      showToast(isAr ? 'تم حفظ أيام العطلة بنجاح.' : 'Vacation days saved successfully.', 'success');
     } catch (reason) {
-      setVacationError(reason instanceof Error ? reason.message : 'Unable to save');
+      showToast(reason instanceof Error ? reason.message : 'Unable to save', 'error');
     } finally {
       setSavingVacation(false);
     }
@@ -94,11 +93,6 @@ export default function AdminAcademicTermPage() {
       </header>
 
       {error && <AdminError message={error} />}
-      {saved && (
-        <p role="status" className="rounded-xl border border-[var(--color-success)]/30 bg-[var(--color-success-soft)] p-4 text-sm font-bold text-[var(--color-success)]">
-          {isAr ? 'تم حفظ التواريخ بنجاح.' : 'Dates saved successfully.'}
-        </p>
-      )}
 
       <form onSubmit={handleSave} className="rounded-3xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/80 backdrop-blur-md p-6 shadow-xs space-y-5 max-w-lg">
         <div>
@@ -145,13 +139,6 @@ export default function AdminAcademicTermPage() {
             : 'Vacation days are highlighted on the home page calendar: a recurring weekly day off, plus specific date ranges (e.g. a semester break).'}
         </p>
       </header>
-
-      {vacationError && <AdminError message={vacationError} />}
-      {vacationSaved && (
-        <p role="status" className="rounded-xl border border-[var(--color-success)]/30 bg-[var(--color-success-soft)] p-4 text-sm font-bold text-[var(--color-success)]">
-          {isAr ? 'تم حفظ أيام العطلة بنجاح.' : 'Vacation days saved successfully.'}
-        </p>
-      )}
 
       <form onSubmit={handleSaveVacation} className="rounded-3xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/80 backdrop-blur-md p-6 shadow-xs space-y-5 max-w-lg">
         <div>

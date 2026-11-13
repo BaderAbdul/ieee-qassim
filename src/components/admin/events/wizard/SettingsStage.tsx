@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Paperclip, Save, Trash2 } from 'lucide-react';
 import { apiGet, apiSend } from '@/lib/backend';
+import { useToast } from '@/context/ToastContext';
 import { input, label, primaryButton, type SettingsFields } from './wizardTypes';
 
 interface CertTemplate { id: string; nameAr: string }
@@ -24,6 +25,7 @@ const invalidClass = 'border-2 border-[var(--color-danger)]';
 
 export default function SettingsStage({ isAr, value, onChange, onSave, saving, eventId, highlightField }: SettingsStageProps) {
   const t = (ar: string, en: string) => isAr ? ar : en;
+  const { showToast } = useToast();
   const [highlight, setHighlight] = useState(highlightField);
   const [templates, setTemplates] = useState<CertTemplate[]>([]);
   const [templatesError, setTemplatesError] = useState('');
@@ -31,7 +33,6 @@ export default function SettingsStage({ isAr, value, onChange, onSave, saving, e
   const [mailTemplatesError, setMailTemplatesError] = useState('');
   const [eventAttachments, setEventAttachments] = useState<EventAttachment[]>([]);
   const [attachBusy, setAttachBusy] = useState(false);
-  const [attachError, setAttachError] = useState('');
   const [attachTitle, setAttachTitle] = useState('');
 
   useEffect(() => {
@@ -62,7 +63,7 @@ export default function SettingsStage({ isAr, value, onChange, onSave, saving, e
 
   const addEventAttachment = async (file: File) => {
     if (!eventId) return;
-    setAttachBusy(true); setAttachError('');
+    setAttachBusy(true);
     try {
       const contentBase64 = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(',')[1]); reader.onerror = reject; reader.readAsDataURL(file); });
       await apiSend('POST', `/api/admin/events/${eventId}/email-attachments`, {
@@ -70,13 +71,13 @@ export default function SettingsStage({ isAr, value, onChange, onSave, saving, e
         contentType: file.type || 'application/octet-stream', contentBase64,
       });
       setAttachTitle(''); loadEventAttachments();
-    } catch (reason) { setAttachError(reason instanceof Error ? reason.message : t('تعذر إضافة المرفق', 'Unable to add attachment')); } finally { setAttachBusy(false); }
+    } catch (reason) { showToast(reason instanceof Error ? reason.message : t('تعذر إضافة المرفق', 'Unable to add attachment'), 'error'); } finally { setAttachBusy(false); }
   };
   const removeEventAttachment = async (id: string) => {
     if (!eventId) return;
-    setAttachBusy(true); setAttachError('');
+    setAttachBusy(true);
     try { await apiSend('DELETE', `/api/admin/events/${eventId}/email-attachments/${id}`); loadEventAttachments(); }
-    catch (reason) { setAttachError(reason instanceof Error ? reason.message : t('تعذر حذف المرفق', 'Unable to remove attachment')); } finally { setAttachBusy(false); }
+    catch (reason) { showToast(reason instanceof Error ? reason.message : t('تعذر حذف المرفق', 'Unable to remove attachment'), 'error'); } finally { setAttachBusy(false); }
   };
 
   const set = <K extends keyof SettingsFields>(key: K, val: SettingsFields[K]) => {
@@ -120,8 +121,8 @@ export default function SettingsStage({ isAr, value, onChange, onSave, saving, e
         </label>
         <p className="mt-1.5 text-xs text-[var(--color-text-muted)]">
           {isAr
-            ? 'اختياري الآن — سيصبح مطلوبًا قبل نشر الفعالية خارج المسودة.'
-            : 'Optional for now — will be required before this event leaves Draft.'}
+            ? 'اختياري الآن — سيصبح مطلوبًا قبل إظهار الفعالية للعامة.'
+            : 'Optional for now — will be required before this event is shown publicly.'}
         </p>
       </div>
 
@@ -164,7 +165,6 @@ export default function SettingsStage({ isAr, value, onChange, onSave, saving, e
               ))}</ul>}
               <input className={input} placeholder={isAr ? 'عنوان المرفق (اختياري)' : 'Attachment title (optional)'} value={attachTitle} onChange={e => setAttachTitle(e.target.value)} />
               <input type="file" disabled={attachBusy} onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void addEventAttachment(file); }} />
-              {attachError && <p role="alert" className="text-xs" style={{ color: 'var(--color-danger)' }}>{attachError}</p>}
             </>}
           </div>
         )}

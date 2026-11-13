@@ -12,26 +12,23 @@ import { formatAdminDate } from '@/components/admin/AdminData';
 import { eventStateLabel } from '@/components/admin/EventWorkspace';
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
 import EventLinkQrModal from '@/components/admin/events/EventLinkQrModal';
-import { eventReadiness } from '@/lib/eventReadiness';
+import MissingFieldModal from '@/components/admin/events/MissingFieldModal';
+import { eventReadiness, visibilityReadiness, completionReadiness, type EventReadiness } from '@/lib/eventReadiness';
 
 export const transitions: Record<EventState, EventState[]> = {
-  Draft: ['Published', 'Registration Open', 'Ongoing', 'Archived'],
-  Published: ['Draft', 'Registration Open', 'Ongoing', 'Archived'],
-  'Registration Open': ['Published', 'Registration Closed', 'Ongoing', 'Archived'],
-  'Registration Closed': ['Registration Open', 'Ongoing', 'Completed', 'Archived'],
-  Ongoing: ['Registration Open', 'Completed', 'Archived'],
-  Completed: ['Ongoing', 'Archived'],
-  Archived: ['Draft', 'Published', 'Registration Open', 'Ongoing', 'Completed'],
+  Published: ['Registration Open', 'Ongoing'],
+  'Registration Open': ['Published', 'Registration Closed', 'Ongoing'],
+  'Registration Closed': ['Registration Open', 'Ongoing', 'Completed'],
+  Ongoing: ['Registration Open', 'Completed'],
+  Completed: ['Ongoing'],
 };
 
 export const stateBadgeColors: Record<EventState, { bg: string; text: string; border: string }> = {
-  Draft: { bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-200' },
   Published: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
   'Registration Open': { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
   'Registration Closed': { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
   Ongoing: { bg: 'bg-[var(--color-accent-soft)]', text: 'text-[var(--color-accent)]', border: 'border-transparent' },
   Completed: { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200' },
-  Archived: { bg: 'bg-gray-100', text: 'text-gray-500', border: 'border-gray-200' },
 };
 
 interface EventCardProps {
@@ -49,17 +46,31 @@ export default function EventCard({
   const [pendingState, setPendingState] = useState<EventState | null>(null);
   const [pendingUnlisted, setPendingUnlisted] = useState<boolean | null>(null);
   const [showLinkModal, setShowLinkModal] = useState(false);
+  const [missing, setMissing] = useState<EventReadiness | null>(null);
 
   const date = toJsDate(event.date);
-  const badge = stateBadgeColors[event.state] || stateBadgeColors.Draft;
+  const badge = stateBadgeColors[event.state] || stateBadgeColors.Published;
   const isVisible = !event.isUnlisted;
   const readiness = eventReadiness(event);
   const readinessHref = readiness && !readiness.ready
     ? `/admin/events/create?eventId=${event.id}&stage=${readiness.missingStage}&field=${readiness.missingField}`
     : null;
-  const readinessLabel = readiness && (readiness.mode === 'open'
-    ? (readiness.ready ? (isAr ? 'جاهز للفتح' : 'Ready to open') : (isAr ? 'باقي بعض البيانات للفتح' : 'Some data left to open'))
-    : (readiness.ready ? (isAr ? 'جاهز للاغلاق' : 'Ready to close') : (isAr ? 'باقي بعض البيانات للاغلاق' : 'Some data left to close')));
+  const readinessLabel = readiness && (readiness.mode === 'visible'
+    ? (readiness.ready ? (isAr ? 'جاهز للإظهار' : 'Ready to show') : (isAr ? 'باقي بعض البيانات للإظهار' : 'Some data left to show it'))
+    : (readiness.ready ? (isAr ? 'جاهز للإنهاء' : 'Ready to complete') : (isAr ? 'باقي بعض البيانات للإنهاء' : 'Some data left to complete it')));
+
+  const requestStateChange = (state: EventState) => {
+    if (state === 'Completed') {
+      const check = completionReadiness(event);
+      if (!check.ready) { setMissing(check); return; }
+    }
+    setPendingState(state);
+  };
+  const requestShow = () => {
+    const check = visibilityReadiness(event);
+    if (!check.ready) { setMissing(check); return; }
+    setPendingUnlisted(false);
+  };
 
   return (
     <article className="group relative rounded-3xl border bg-[var(--color-surface)]/60 backdrop-blur-md p-5 sm:p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between border-[var(--color-border)]/50">
@@ -90,7 +101,7 @@ export default function EventCard({
                 aria-label={isAr ? `تغيير حالة ${event.title}` : `Change ${event.title} state`}
                 value={event.state}
                 disabled={busy}
-                onChange={(e) => setPendingState(e.target.value as EventState)}
+                onChange={(e) => requestStateChange(e.target.value as EventState)}
                 className="bg-transparent border-none px-0.5 py-0 text-[11px] font-bold disabled:opacity-50 transition-all focus:outline-none"
               >
                 <option value={event.state}>{eventStateLabel(event.state, isAr)}</option>
@@ -99,7 +110,7 @@ export default function EventCard({
                 ))}
               </select>
             ) : (
-              <span className="text-[11px] font-bold px-0.5">{isAr ? 'مؤرشفة' : 'Archived'}</span>
+              <span className="text-[11px] font-bold px-0.5">{eventStateLabel(event.state, isAr)}</span>
             )}
           </div>
 
@@ -209,7 +220,7 @@ export default function EventCard({
           <button
             type="button"
             disabled={busy}
-            onClick={() => setPendingUnlisted(isVisible)}
+            onClick={() => (isVisible ? setPendingUnlisted(true) : requestShow())}
             className="relative z-10 text-xs font-bold px-3 py-2 rounded-xl bg-[var(--color-surface-2)] hover:opacity-80 text-[var(--color-text-secondary)] disabled:opacity-50 transition-opacity ms-auto"
           >
             {isVisible ? (isAr ? 'إخفاء' : 'Hide') : (isAr ? 'إظهار' : 'Show')}
@@ -254,6 +265,19 @@ export default function EventCard({
         onConfirm={() => { if (pendingUnlisted !== null) onToggleVisibility(pendingUnlisted); setPendingUnlisted(null); }}
         onCancel={() => setPendingUnlisted(null)}
       />
+
+      {missing && missing.missingStage && missing.missingField && (
+        <MissingFieldModal
+          open
+          isAr={isAr}
+          eventId={event.id}
+          stage={missing.missingStage}
+          field={missing.missingField}
+          labelAr={missing.missingLabelAr || ''}
+          labelEn={missing.missingLabelEn || ''}
+          onClose={() => setMissing(null)}
+        />
+      )}
     </article>
   );
 }

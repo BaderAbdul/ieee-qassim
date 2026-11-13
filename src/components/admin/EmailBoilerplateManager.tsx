@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Image as ImageIcon, Layers, Plus, Save, Trash2 } from 'lucide-react';
 import { apiGet, apiSend, uploadImage } from '@/lib/backend';
+import { useToast } from '@/context/ToastContext';
 import { imageDimensions, type EmailBoilerplate, type EmailBoilerplateSummary } from '@/lib/emailTemplates';
 import TemplateDialog from './TemplateDialog';
 
@@ -12,6 +13,7 @@ const primary = `${button} bg-[var(--color-accent)] text-[var(--color-accent-con
 
 export default function EmailBoilerplateManager({ isAr, onClose }: { isAr: boolean; onClose: () => void }) {
   const t = (ar: string, en: string) => isAr ? ar : en;
+  const { showToast } = useToast();
   const [list, setList] = useState<EmailBoilerplateSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -30,28 +32,29 @@ export default function EmailBoilerplateManager({ isAr, onClose }: { isAr: boole
   useEffect(() => { void load(); }, [load]);
   const open = async (id?: string) => {
     if (!id) { setEditing({ id: '', name: '', html: '', revision: 0 }); return; }
-    setBusy(true); setError('');
+    setBusy(true);
     try { setEditing(await apiGet<EmailBoilerplate>(`/api/admin/mail/boilerplates/${id}`)); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to open boilerplate'); } finally { setBusy(false); }
+    catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to open boilerplate', 'error'); } finally { setBusy(false); }
   };
   const save = async () => {
     if (!editing) return;
-    setBusy(true); setError('');
+    setBusy(true);
     try {
       await apiSend(editing.id ? 'PUT' : 'POST', editing.id ? `/api/admin/mail/boilerplates/${editing.id}` : '/api/admin/mail/boilerplates',
         { name: editing.name, html: editing.html, revision: editing.revision });
       setEditing(null); await load();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to save boilerplate'); } finally { setBusy(false); }
+      showToast(t('تم الحفظ.', 'Saved.'), 'success');
+    } catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to save boilerplate', 'error'); } finally { setBusy(false); }
   };
   const remove = async (id: string) => {
     if (!window.confirm(t('حذف هذا القالب الأساسي؟', 'Delete this boilerplate?'))) return;
-    setBusy(true); setError('');
+    setBusy(true);
     try { await apiSend('DELETE', `/api/admin/mail/boilerplates/${id}`); await load(); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to delete boilerplate'); } finally { setBusy(false); }
+    catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to delete boilerplate', 'error'); } finally { setBusy(false); }
   };
   const insertImage = async (file: File) => {
     if (!editing) return;
-    setImageBusy(true); setError('');
+    setImageBusy(true);
     try {
       const [url, natural] = await Promise.all([uploadImage(file, 'email'), imageDimensions(file)]);
       // The width/height HTML attributes (not just CSS) are what keep some mail clients from
@@ -67,11 +70,10 @@ export default function EmailBoilerplateManager({ isAr, onClose }: { isAr: boole
       setEditing({ ...editing, html: next });
       setImageForm(false);
       requestAnimationFrame(() => { field?.focus(); field?.setSelectionRange(start + tag.length, start + tag.length); });
-    } catch (reason) { setError(reason instanceof Error ? reason.message : t('تعذر رفع الصورة', 'Unable to upload the image')); } finally { setImageBusy(false); }
+    } catch (reason) { showToast(reason instanceof Error ? reason.message : t('تعذر رفع الصورة', 'Unable to upload the image'), 'error'); } finally { setImageBusy(false); }
   };
   if (editing) return <TemplateDialog title={editing.id ? t('تعديل القالب الأساسي', 'Edit boilerplate') : t('قالب أساسي جديد', 'New boilerplate')} onClose={() => setEditing(null)}>
     <div dir={isAr ? 'rtl' : 'ltr'} className="space-y-4">
-      {error && <p role="alert" className="rounded-xl bg-red-500/10 p-4 text-red-600">{error}</p>}
       <p className="text-xs text-[var(--color-text-muted)]">{t('القوالب الأساسية تحتوي على تنسيق HTML/CSS فقط، بلا متغيرات.', 'Boilerplates hold pure HTML/CSS styling only -- no variables.')}</p>
       <label className="block space-y-2"><span>{t('الاسم', 'Name')}</span><input className={input} maxLength={120} value={editing.name} onChange={event => setEditing({ ...editing, name: event.target.value })} /></label>
       <div className="flex items-center justify-between"><span dir="ltr" className="text-sm font-bold">HTML / CSS</span><button type="button" className={button} onClick={() => setImageForm(previous => !previous)}><ImageIcon size={16} />{t('إدراج صورة', 'Insert image')}</button></div>

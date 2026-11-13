@@ -101,7 +101,6 @@ export default async function HomePage({ params }: PageProps) {
         {eventsList.length > 0 ? (
           <div className="flex overflow-x-auto pb-8 -mx-4 px-4 sm:mx-0 sm:px-0 snap-x snap-mandatory hide-scrollbar gap-4 sm:gap-6">
             {eventsList.map((event) => {
-              const isCompleted = event.state === 'Completed' || event.state === 'Archived';
               return (
                 <div 
                   key={event.id}

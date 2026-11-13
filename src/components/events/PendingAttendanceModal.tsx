@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useFeedbackDraft } from '@/lib/useFeedbackDraft';
 import { useAuth } from '@/context/AuthContext';
 import { apiGet, httpsCallable } from '@/lib/backend';
+import { useToast } from '@/context/ToastContext';
 import { useLocale } from 'next-intl';
 import { usePathname } from 'next/navigation';
 import { RequiredFeedbackDialog, useFeedbackSurface } from './RequiredFeedbackDialog';
@@ -33,6 +34,7 @@ export default function PendingAttendanceModal() {
   const pathname = usePathname();
   const locale = useLocale();
   const surface = useFeedbackSurface();
+  const { showToast } = useToast();
   const isAr = locale === 'ar';
 
   const [pendingDoc, setPendingDoc] = useState<PendingCheckinDoc | null>(null);
@@ -157,7 +159,7 @@ export default function PendingAttendanceModal() {
 
     } catch (err: unknown) {
       console.error('Failed to submit check-in with survey:', err);
-      setErrorMessage(isAr ? 'تعذر حفظ التقييم. إجاباتك محفوظة على هذا الجهاز، أعد المحاولة.' : 'Could not save feedback. Your answers are kept on this device; please retry.');
+      showToast(isAr ? 'تعذر حفظ التقييم. إجاباتك محفوظة على هذا الجهاز، أعد المحاولة.' : 'Could not save feedback. Your answers are kept on this device; please retry.', 'error');
 
     } finally {
       setIsSubmitting(false);

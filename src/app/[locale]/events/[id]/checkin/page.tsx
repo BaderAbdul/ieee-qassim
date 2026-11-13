@@ -3,6 +3,7 @@
 import { useEffect, useState, use, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { apiGet, httpsCallable } from '@/lib/backend';
+import { useToast } from '@/context/ToastContext';
 import { useSearchParams } from 'next/navigation';
 import { Link } from '@/i18n/routing';
 import { CheckCircle, XCircle, Loader2, Star, Sparkles, Award, Send } from 'lucide-react';
@@ -17,6 +18,7 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
   const token = searchParams.get('token');
   const [feedbackMode, setFeedbackMode] = useState(searchParams.get('feedback') === '1');
   const { user, login, loading: authLoading } = useAuth();
+  const { showToast } = useToast();
   const isAr = locale === 'ar';
 
   const [event, setEvent] = useState<PlatformEvent | null>(() => eventCache.get(eventId) || null);
@@ -162,7 +164,7 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
     } catch (error) {
       console.error('Check-in failed', error);
       setStatus('idle_form');
-      setFormError(isAr ? 'تعذر حفظ التقييم. إجاباتك محفوظة؛ أعد الإرسال.' : 'Could not save feedback. Your answers are kept; submit again.');
+      showToast(isAr ? 'تعذر حفظ التقييم. إجاباتك محفوظة؛ أعد الإرسال.' : 'Could not save feedback. Your answers are kept; submit again.', 'error');
     } finally {
       setIsSubmitting(false);
     }

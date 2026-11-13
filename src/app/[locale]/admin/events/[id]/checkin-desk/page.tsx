@@ -351,12 +351,17 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
 
                 <button
                   onClick={() => handleGenerateToken()}
-                  disabled={isGeneratingToken || event.state !== 'Ongoing'}
+                  disabled={isGeneratingToken}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold text-sm transition-colors shadow-md shadow-blue-600/20 flex items-center mx-auto disabled:opacity-50"
                 >
                   <RefreshCw className={`w-4 h-4 me-2 ${isGeneratingToken ? 'animate-spin' : ''}`} />
-                  {event.state !== 'Ongoing' ? 'ابدأ الفعالية لتوليد الرمز' : isGeneratingToken ? 'جاري توليد الرمز...' : 'توليد رمز التحضير الآن'}
+                  {isGeneratingToken ? 'جاري توليد الرمز...' : 'توليد رمز التحضير الآن'}
                 </button>
+                {event.state !== 'Registration Open' && event.state !== 'Ongoing' && (
+                  <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 max-w-sm mx-auto">
+                    يمكنك توليد الرمز الآن لتجهيزه مسبقًا، لكن المسح الفعلي للحضور يعمل فقط عندما تكون الفعالية &quot;التسجيل مفتوح&quot; أو &quot;جارية&quot;.
+                  </p>
+                )}
               </div>
             )}
           </div>

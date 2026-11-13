@@ -6,6 +6,7 @@ import { useRouter } from '@/i18n/routing';
 import { useAuth } from '@/context/AuthContext';
 
 import { httpsCallable } from '@/lib/backend';
+import { useToast } from '@/context/ToastContext';
 import { normalizeStudentId, safeReturnTo } from '@/lib/studentExperience';
 
 export default function CompleteProfilePage() {
@@ -14,7 +15,8 @@ export default function CompleteProfilePage() {
   const isAr = locale === 'ar';
   const router = useRouter();
   const { user } = useAuth();
-  
+  const { showToast } = useToast();
+
   const [isStudent, setIsStudent] = useState<boolean | null>(null);
   
   // Form State
@@ -123,7 +125,7 @@ export default function CompleteProfilePage() {
       
     } catch (error) {
       console.error("Error updating profile:", error);
-      setErrors({ general: t('errors.general') });
+      showToast(t('errors.general'), 'error');
       setLoading(false);
     }
   };
@@ -152,11 +154,6 @@ export default function CompleteProfilePage() {
 
         <form onSubmit={handleSubmit} className="p-8 space-y-6">
           
-          {errors.general && (
-            <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm font-medium">
-              {errors.general}
-            </div>
-          )}
 
           {/* Step 1: Is Student? */}
           <div className="space-y-4">

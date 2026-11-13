@@ -18,13 +18,11 @@ export function normalizeStudentId(value: string): string {
 }
 
 const eventStates: Record<string, [string, string]> = {
-  Draft: ['مسودة', 'Draft'],
   Published: ['قريبًا (لم يفتح التسجيل بعد)', 'Coming soon (Registration not open)'],
   'Registration Open': ['التسجيل مفتوح', 'Registration open'],
   'Registration Closed': ['التسجيل مغلق', 'Registration closed'],
   Ongoing: ['جارية', 'Ongoing'],
   Completed: ['مكتملة', 'Completed'],
-  Archived: ['مؤرشفة', 'Archived'],
 };
 const eventTypes: Record<string, [string, string]> = {
   Workshop: ['ورشة عمل', 'Workshop'], Camp: ['معسكر', 'Camp'], Lecture: ['محاضرة', 'Lecture'],
@@ -52,7 +50,7 @@ export function competitionRanks(points: number[]): number[] {
 }
 
 export function eventCapacityLabel(event: { state: string; attendanceCount?: number; registeredCount?: number; capacity: number; hideExactCapacity?: boolean; isUnlimitedCapacity?: boolean }, isAr: boolean): string {
-  if (['Completed', 'Archived'].includes(event.state)) return `${isAr ? 'الحضور' : 'Attendance'}: ${event.attendanceCount ?? 0}`;
+  if (event.state === 'Completed') return `${isAr ? 'الحضور' : 'Attendance'}: ${event.attendanceCount ?? 0}`;
   if (event.isUnlimitedCapacity) return isAr ? 'سعة غير محدودة' : 'Unlimited capacity';
   if (event.hideExactCapacity) return isAr ? 'مقاعد محدودة' : 'Limited seats';
   return `${event.registeredCount ?? 0} / ${event.capacity} ${isAr ? 'مسجل' : 'registered'}`;

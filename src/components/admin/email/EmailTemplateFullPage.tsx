@@ -6,6 +6,7 @@ import { ArrowRight, Check, Code2, Eye, Image as ImageIcon, Paperclip, Send, Shi
 import { Link, useRouter } from '@/i18n/routing';
 import { useAuth } from '@/context/AuthContext';
 import { apiGet, apiSend, uploadImage } from '@/lib/backend';
+import { useToast } from '@/context/ToastContext';
 import {
   EMAIL_VARIABLE_GROUPS, MAX_TEMPLATE_ATTACHMENTS, MAX_TEST_RECIPIENTS, imageDimensions, insertAtCursor,
   variableToken, type EmailBoilerplateSummary, type EmailTemplate, type EmailTemplateAttachment,
@@ -46,6 +47,7 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
   const t = (ar: string, en: string) => isAr ? ar : en;
   const router = useRouter();
   const { userData } = useAuth();
+  const { showToast } = useToast();
 
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [attachments, setAttachments] = useState<EmailTemplateAttachment[]>([]);
@@ -56,7 +58,6 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
   const [certOptions, setCertOptions] = useState<{ id: string; nameAr: string }[] | null>(null);
   const [boilerplates, setBoilerplates] = useState<EmailBoilerplateSummary[]>([]);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [error, setError] = useState('');
   const [tab, setTab] = useState<'preview' | 'code'>('preview');
   const [mobile, setMobile] = useState(false);
   const [attachBusy, setAttachBusy] = useState(false);
@@ -66,8 +67,6 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
   const [linkedEvents, setLinkedEvents] = useState<{ id: number; title: string }[]>([]);
   const [testEventId, setTestEventId] = useState<number | ''>('');
   const [testBusy, setTestBusy] = useState(false);
-  const [testError, setTestError] = useState('');
-  const [testOk, setTestOk] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [approveBusy, setApproveBusy] = useState(false);
 
@@ -119,7 +118,7 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
   }, [draft.id]);
 
   const save = useCallback(async (payload: Draft) => {
-    setSaveState('saving'); setError('');
+    setSaveState('saving');
     try {
       const body = { name: payload.name, subject: payload.subject, html: payload.html, allowAttachments: payload.allowAttachments, boilerplateId: payload.boilerplateId, revision: payload.revision };
       const result = await apiSend<{ id: string; revision: number; status: 'draft' | 'approved' }>(payload.id ? 'PUT' : 'POST', payload.id ? `/api/admin/mail/templates/${payload.id}` : '/api/admin/mail/templates', body);
@@ -128,7 +127,7 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
       if (!payload.id) router.replace(`/admin/mail/templates/${result.id}`);
       setSaveState('saved');
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t('تعذر الحفظ التلقائي', 'Autosave failed'));
+      showToast(reason instanceof Error ? reason.message : t('تعذر الحفظ التلقائي', 'Autosave failed'), 'error');
       setSaveState('error');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -188,16 +187,15 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
 
   const startFromBoilerplate = async (boilerplateId: string) => {
     if (draft.html.trim() && !window.confirm(t('سيستبدل هذا المحتوى الحالي بالقالب الأساسي. متابعة؟', 'This replaces the current content with the boilerplate. Continue?'))) return;
-    setError('');
     try {
       const boilerplate = await apiGet<{ html: string }>(`/api/admin/mail/boilerplates/${boilerplateId}`);
       setDraft(previous => ({ ...previous, html: boilerplate.html, boilerplateId }));
       if (previewRef.current && tab === 'preview') previewRef.current.innerHTML = boilerplate.html;
-    } catch (reason) { setError(reason instanceof Error ? reason.message : t('تعذر تحميل القالب الأساسي', 'Unable to load the boilerplate')); }
+    } catch (reason) { showToast(reason instanceof Error ? reason.message : t('تعذر تحميل القالب الأساسي', 'Unable to load the boilerplate'), 'error'); }
   };
 
   const insertImage = async (file: File) => {
-    setImageBusy(true); setError('');
+    setImageBusy(true);
     try {
       const [url, natural] = await Promise.all([uploadImage(file, 'email'), imageDimensions(file)]);
       const width = 320;
@@ -212,61 +210,61 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
         img.width = width; if (height2) img.height = height2;
         insertNodeInPreview(img);
       }
-    } catch (reason) { setError(reason instanceof Error ? reason.message : t('تعذر رفع الصورة', 'Unable to upload the image')); }
+    } catch (reason) { showToast(reason instanceof Error ? reason.message : t('تعذر رفع الصورة', 'Unable to upload the image'), 'error'); }
     finally { setImageBusy(false); }
   };
 
   const addFixedAttachment = async (file: File, title: string) => {
     if (!draft.id) return;
-    if (file.size > 10 * 1024 * 1024) { setError(t('الملف أكبر من ١٠ ميجابايت.', 'File exceeds 10 MB.')); return; }
-    setAttachBusy(true); setError('');
+    if (file.size > 10 * 1024 * 1024) { showToast(t('الملف أكبر من ١٠ ميجابايت.', 'File exceeds 10 MB.'), 'error'); return; }
+    setAttachBusy(true);
     try {
       const contentBase64 = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(',')[1]); reader.onerror = reject; reader.readAsDataURL(file); });
       const row = await apiSend<EmailTemplateAttachment>('POST', `/api/admin/mail/templates/${draft.id}/attachments`, { kind: 'fixed', title, filename: file.name, contentType: file.type || 'application/octet-stream', contentBase64 });
       setAttachments(previous => [...previous, row]);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : t('تعذر إضافة المرفق', 'Unable to add attachment')); } finally { setAttachBusy(false); }
+    } catch (reason) { showToast(reason instanceof Error ? reason.message : t('تعذر إضافة المرفق', 'Unable to add attachment'), 'error'); } finally { setAttachBusy(false); }
   };
   const addCertificateAttachment = async (certificateTemplateId: string, title: string) => {
     if (!draft.id) return;
-    setAttachBusy(true); setError('');
+    setAttachBusy(true);
     try {
       const row = await apiSend<EmailTemplateAttachment>('POST', `/api/admin/mail/templates/${draft.id}/attachments`, { kind: 'certificate', title, certificateTemplateId });
       setAttachments(previous => [...previous, row]);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : t('تعذر إضافة المرفق', 'Unable to add attachment')); } finally { setAttachBusy(false); }
+    } catch (reason) { showToast(reason instanceof Error ? reason.message : t('تعذر إضافة المرفق', 'Unable to add attachment'), 'error'); } finally { setAttachBusy(false); }
   };
   const removeAttachment = async (id: string) => {
     if (!draft.id) return;
-    setAttachBusy(true); setError('');
+    setAttachBusy(true);
     try { await apiSend('DELETE', `/api/admin/mail/templates/${draft.id}/attachments/${id}`); setAttachments(previous => previous.filter(item => item.id !== id)); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : t('تعذر حذف المرفق', 'Unable to remove attachment')); } finally { setAttachBusy(false); }
+    catch (reason) { showToast(reason instanceof Error ? reason.message : t('تعذر حذف المرفق', 'Unable to remove attachment'), 'error'); } finally { setAttachBusy(false); }
   };
 
   const sendTest = async () => {
     const list = recipients.split(/[,;\s]+/).filter(Boolean);
-    if (list.length === 0 || list.length > MAX_TEST_RECIPIENTS) { setTestError(t(`أدخل بين ١ و٥ عناوين.`, `Enter between 1 and ${MAX_TEST_RECIPIENTS} addresses.`)); return; }
-    if (!draft.id) { setTestError(t('احفظ القالب أولًا.', 'Save the template first.')); return; }
-    setTestBusy(true); setTestError(''); setTestOk(false);
-    try { await apiSend('POST', `/api/admin/mail/templates/${draft.id}/test-send`, { recipients: list, eventId: testEventId || undefined }); setTestOk(true); }
+    if (list.length === 0 || list.length > MAX_TEST_RECIPIENTS) { showToast(t(`أدخل بين ١ و٥ عناوين.`, `Enter between 1 and ${MAX_TEST_RECIPIENTS} addresses.`), 'error'); return; }
+    if (!draft.id) { showToast(t('احفظ القالب أولًا.', 'Save the template first.'), 'error'); return; }
+    setTestBusy(true);
+    try { await apiSend('POST', `/api/admin/mail/templates/${draft.id}/test-send`, { recipients: list, eventId: testEventId || undefined }); showToast(t('تم إضافة الرسالة الاختبارية لقائمة الإرسال.', 'Test message queued for delivery.'), 'success'); }
     catch (reason) {
       const apiError = reason as ApiErrorLike;
       if (apiError?.code === 'sender-not-configured') {
         if (window.confirm(t('لم يُضبط بريد المرسل بعد. الانتقال لإعدادات البريد الآن؟', 'The sender email isn’t configured yet. Go to email settings now?'))) { router.push('/admin/mail'); return; }
-        setTestError(t('لم يُضبط بريد المرسل بعد.', 'Sender email isn’t configured yet.'));
-      } else setTestError(apiError?.message || t('تعذر إرسال الاختبار', 'Unable to send the test'));
+        showToast(t('لم يُضبط بريد المرسل بعد.', 'Sender email isn’t configured yet.'), 'error');
+      } else showToast(apiError?.message || t('تعذر إرسال الاختبار', 'Unable to send the test'), 'error');
     } finally { setTestBusy(false); }
   };
 
   const deleteTemplate = async () => {
     if (!draft.id || !window.confirm(t('حذف هذا القالب نهائيًا؟ لا يمكن التراجع عن هذا الإجراء.', 'Permanently delete this template? This cannot be undone.'))) return;
-    setDeleteBusy(true); setError('');
+    setDeleteBusy(true);
     try { await apiSend('DELETE', `/api/admin/mail/templates/${draft.id}`); router.push('/admin/templates'); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : t('تعذر حذف القالب', 'Unable to delete the template')); setDeleteBusy(false); }
+    catch (reason) { showToast(reason instanceof Error ? reason.message : t('تعذر حذف القالب', 'Unable to delete the template'), 'error'); setDeleteBusy(false); }
   };
   const approveTemplate = async () => {
     if (!draft.id) return;
-    setApproveBusy(true); setError('');
-    try { await apiSend('POST', `/api/admin/mail/templates/${draft.id}/approve`, { revision: draft.revision }); setDraft(previous => ({ ...previous, status: 'approved' })); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : t('تعذر الاعتماد', 'Unable to approve')); } finally { setApproveBusy(false); }
+    setApproveBusy(true);
+    try { await apiSend('POST', `/api/admin/mail/templates/${draft.id}/approve`, { revision: draft.revision }); setDraft(previous => ({ ...previous, status: 'approved' })); showToast(t('تم الاعتماد.', 'Approved.'), 'success'); }
+    catch (reason) { showToast(reason instanceof Error ? reason.message : t('تعذر الاعتماد', 'Unable to approve'), 'error'); } finally { setApproveBusy(false); }
   };
 
   if (loading) return <p role="status" className="p-10 text-center">{t('جارٍ التحميل…', 'Loading…')}</p>;
@@ -283,7 +281,6 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
       </div>
     </div>
     {!canEdit && <p className="mb-3 rounded-xl bg-amber-500/10 p-3 text-sm text-amber-700">{t('هذا القالب لمنشئ آخر — للعرض فقط.', 'This template belongs to another author -- read only.')}</p>}
-    {error && <p role="alert" className="mb-3 rounded-xl bg-red-500/10 p-4 text-red-600">{error}</p>}
 
     {/* dir="ltr" here only fixes the grid's own track order so the editor is always physically on
         the left, as asked -- it does not affect the RTL/LTR direction of anything inside the columns. */}
@@ -348,7 +345,7 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
         </section>}
 
         <section className="space-y-3 border-t border-[var(--color-border)] pt-4">
-          <button type="button" className={primary} disabled={!draft.id || testBusy} onClick={() => { setTestOpen(previous => !previous); setTestOk(false); setTestError(''); }}><Send size={16} />{t('إرسال اختباري', 'Send test')}</button>
+          <button type="button" className={primary} disabled={!draft.id || testBusy} onClick={() => setTestOpen(previous => !previous)}><Send size={16} />{t('إرسال اختباري', 'Send test')}</button>
           {testOpen && <div className="space-y-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3">
             <label className="block space-y-2"><span className="text-xs">{t(`عناوين الاختبار (حتى ${MAX_TEST_RECIPIENTS})`, `Test recipients (up to ${MAX_TEST_RECIPIENTS})`)}</span><input dir="ltr" className={input} value={recipients} onChange={event => setRecipients(event.target.value)} placeholder="person@example.com, another@example.com" /></label>
             {linkedEvents.length > 0 && <label className="block space-y-2"><span className="text-xs">{t('معاينة كفعالية (لإضافة مرفقاتها)', 'Preview as event (adds its attachments)')}</span>
@@ -357,8 +354,6 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
                 {linkedEvents.map(ev => <option key={ev.id} value={ev.id}>{ev.title}</option>)}
               </select>
             </label>}
-            {testError && <p role="alert" className="text-sm text-red-600">{testError}</p>}
-            {testOk && <p role="status" className="text-sm text-emerald-600">{t('تم إضافة الرسالة الاختبارية لقائمة الإرسال.', 'Test message queued for delivery.')}</p>}
             <button type="button" className={primary} disabled={testBusy} onClick={() => void sendTest()}><Check size={16} />{testBusy ? t('جارٍ الإرسال…', 'Sending…') : t('إرسال', 'Send')}</button>
           </div>}
           {canManage && draft.id && draft.status === 'draft' && <button type="button" className={button} disabled={approveBusy} onClick={() => void approveTemplate()}><ShieldCheck size={16} />{approveBusy ? t('جارٍ الاعتماد…', 'Approving…') : t('اعتماد القالب', 'Approve template')}</button>}
