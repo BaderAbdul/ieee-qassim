@@ -1,6 +1,8 @@
 'use client';
 
 import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { toAdminPath, useOnAdminHost } from '@/lib/adminPath';
 import { CheckCircle2, AlertTriangle, Info, X } from 'lucide-react';
 
 export type ToastType = 'success' | 'error' | 'info';
@@ -25,19 +27,31 @@ const STYLES: Record<ToastType, { box: string; icon: React.ReactNode }> = {
   info: { box: 'border-blue-200 bg-blue-50 text-blue-900', icon: <Info className="h-5 w-5 text-blue-600 shrink-0" /> },
 };
 
+/**
+ * Toast notifications belong to the admin panel only. In the student part of the site the page itself shows
+ * the outcome (a changed button, a status line), so success/info messages are dropped and a failure
+ * is reported with the browser's plain alert so it is never silent.
+ */
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const nextId = useRef(0);
+  const pathname = usePathname() || '';
+  const onAdminHost = useOnAdminHost();
+  const inAdmin = /^\/(?:ar|en)\/admin(?:\/|$)/.test(toAdminPath(pathname, onAdminHost));
 
   const dismiss = useCallback((id: number) => {
     setToasts(current => current.filter(toast => toast.id !== id));
   }, []);
 
   const showToast = useCallback((message: string, type: ToastType = 'info') => {
+    if (!inAdmin) {
+      if (type === 'error' && typeof window !== 'undefined') window.alert(message);
+      return;
+    }
     const id = ++nextId.current;
     setToasts(current => [...current, { id, type, message }]);
     setTimeout(() => dismiss(id), 5000);
-  }, [dismiss]);
+  }, [dismiss, inAdmin]);
 
   return (
     <ToastContext.Provider value={{ showToast }}>

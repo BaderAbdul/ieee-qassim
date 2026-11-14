@@ -6,9 +6,9 @@ import { apiGet, httpsCallable } from '@/lib/backend';
 import { useToast } from '@/context/ToastContext';
 import { feedbackQuestionError } from '@/lib/feedbackQuestionValidation';
 import type { CustomQuestion, QuestionType } from '@/lib/types';
-import { button, input, label, primaryButton, type ReviewFields } from './wizardTypes';
+import { button, input, label, primaryButton, type ReviewFields, type StageEmbedProps } from './wizardTypes';
 
-interface ReviewStageProps {
+interface ReviewStageProps extends StageEmbedProps {
   isAr: boolean;
   value: ReviewFields;
   onChange: Dispatch<SetStateAction<ReviewFields>>;
@@ -28,7 +28,7 @@ async function translate(text: string, target: 'ar' | 'en'): Promise<string> {
   return data.translatedText;
 }
 
-export default function ReviewStage({ isAr, value, onChange, onSave, saving }: ReviewStageProps) {
+export default function ReviewStage({ isAr, value, onChange, onSave, saving, hideSave, registerCollect }: ReviewStageProps) {
   const { showToast } = useToast();
   const [error, setError] = useState('');
   const [translatingId, setTranslatingId] = useState<string | null>(null);
@@ -55,8 +55,10 @@ export default function ReviewStage({ isAr, value, onChange, onSave, saving }: R
     setTranslatingId(q.id);
     try {
       const titleEn = q.title.trim() ? await translate(q.title, 'en') : '';
-      const optionsEn = q.type === 'choice' && q.options?.length
-        ? await Promise.all(q.options.map(o => translate(o, 'en'))) : undefined;
+      const arabicLines = (q.options || []).map(o => o.trim()).filter(Boolean);
+      // one request per line, so the English list always has exactly the same lines in the same order
+      const optionsEn = q.type === 'choice' && arabicLines.length
+        ? await Promise.all(arabicLines.map(o => translate(o, 'en'))) : undefined;
       patch(q.id, { titleEn, ...(optionsEn ? { optionsEn } : {}) });
     } catch (err) {
       showToast(err instanceof Error ? err.message : (isAr ? 'تعذرت الترجمة الآلية.' : 'Automatic translation failed.'), 'error');
@@ -65,12 +67,18 @@ export default function ReviewStage({ isAr, value, onChange, onSave, saving }: R
     }
   };
 
-  const save = async () => {
-    const validationError = feedbackQuestionError(questions, isAr);
-    if (validationError) { setError(validationError); return; }
+  // Option lists are typed one per line (empty lines are kept while typing, dropped when saving).
+  const cleanLines = (lines?: string[]) => (lines ? lines.map(line => line.trim()).filter(Boolean) : lines);
+  const collect = (): Record<string, unknown> | null => {
+    const cleaned = questions.map(q => ({ ...q, options: cleanLines(q.options), optionsEn: cleanLines(q.optionsEn), quickChips: cleanLines(q.quickChips), quickChipsEn: cleanLines(q.quickChipsEn) }));
+    const validationError = feedbackQuestionError(cleaned, isAr);
+    if (validationError) { setError(validationError); return null; }
     setError('');
-    await onSave({ feedbackQuestions: questions });
+    return { feedbackQuestions: cleaned };
   };
+  const save = async () => { const fields = collect(); if (fields) await onSave(fields); };
+  useEffect(() => { registerCollect?.(collect); });
+  const lines = (text: string) => text.split('\n');
 
   return (
     <div className="space-y-5">
@@ -119,23 +127,23 @@ export default function ReviewStage({ isAr, value, onChange, onSave, saving }: R
 
             {q.type === 'choice' && (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className={label}><span>{isAr ? 'الخيارات (عربي، مفصولة بفاصلة)' : 'Options (Arabic, comma-separated)'}</span>
-                  <input className={input} dir="rtl" value={(q.options || []).join(', ')}
-                    onChange={e => patch(q.id, { options: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} /></label>
-                <label className={label}><span>{isAr ? 'Options (English)' : 'Options (English)'}</span>
-                  <input className={input} dir="ltr" value={(q.optionsEn || []).join(', ')}
-                    onChange={e => patch(q.id, { optionsEn: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} /></label>
+                <label className={label}><span>{isAr ? 'الخيارات (عربي، سطر لكل خيار)' : 'Options (Arabic, one per line)'}</span>
+                  <textarea className={input} dir="rtl" rows={4} value={(q.options || []).join('\n')}
+                    onChange={e => patch(q.id, { options: lines(e.target.value) })} /></label>
+                <label className={label}><span>{isAr ? 'Options (English, one per line — same order)' : 'Options (English, one per line — same order)'}</span>
+                  <textarea className={input} dir="ltr" rows={4} value={(q.optionsEn || []).join('\n')}
+                    onChange={e => patch(q.id, { optionsEn: lines(e.target.value) })} /></label>
               </div>
             )}
 
             {q.type === 'text' && (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className={label}><span>{isAr ? 'اقتراحات سريعة (عربي)' : 'Quick suggestions (Arabic)'}</span>
-                  <input className={input} dir="rtl" value={(q.quickChips || []).join(', ')}
-                    onChange={e => patch(q.id, { quickChips: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} /></label>
-                <label className={label}><span>{isAr ? 'Quick suggestions (English)' : 'Quick suggestions (English)'}</span>
-                  <input className={input} dir="ltr" value={(q.quickChipsEn || []).join(', ')}
-                    onChange={e => patch(q.id, { quickChipsEn: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} /></label>
+                <label className={label}><span>{isAr ? 'اقتراحات سريعة (عربي، سطر لكل اقتراح)' : 'Quick suggestions (Arabic, one per line)'}</span>
+                  <textarea className={input} dir="rtl" rows={3} value={(q.quickChips || []).join('\n')}
+                    onChange={e => patch(q.id, { quickChips: lines(e.target.value) })} /></label>
+                <label className={label}><span>{isAr ? 'Quick suggestions (English, one per line)' : 'Quick suggestions (English, one per line)'}</span>
+                  <textarea className={input} dir="ltr" rows={3} value={(q.quickChipsEn || []).join('\n')}
+                    onChange={e => patch(q.id, { quickChipsEn: lines(e.target.value) })} /></label>
               </div>
             )}
 
@@ -150,9 +158,9 @@ export default function ReviewStage({ isAr, value, onChange, onSave, saving }: R
 
       <div className="flex items-center justify-between">
         <button type="button" disabled={saving || translatingId !== null || questions.length >= 25} onClick={addQuestion} className={button}><Plus size={15} />{isAr ? 'إضافة سؤال' : 'Add question'}</button>
-        <button type="button" disabled={saving || translatingId !== null} onClick={() => void save()} className={primaryButton}>
+        {!hideSave && <button type="button" disabled={saving || translatingId !== null} onClick={() => void save()} className={primaryButton}>
           <Save size={16} />{saving ? (isAr ? 'جارٍ الحفظ...' : 'Saving...') : (isAr ? 'حفظ' : 'Save')}
-        </button>
+        </button>}
       </div>
     </div>
   );

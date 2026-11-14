@@ -4,13 +4,14 @@ import { useEffect, useState } from 'react';
 import { Paperclip, Save, Trash2 } from 'lucide-react';
 import { apiGet, apiSend } from '@/lib/backend';
 import { useToast } from '@/context/ToastContext';
-import { input, label, primaryButton, type SettingsFields } from './wizardTypes';
+import TemplatePreview from './TemplatePreview';
+import { input, label, primaryButton, type SettingsFields, type StageEmbedProps } from './wizardTypes';
 
 interface CertTemplate { id: string; nameAr: string }
 interface MailTemplate { id: string; name: string; subject: string }
 interface EventAttachment { id: string; title: string; filename: string; contentType: string }
 
-interface SettingsStageProps {
+interface SettingsStageProps extends StageEmbedProps {
   isAr: boolean;
   value: SettingsFields;
   onChange: (next: SettingsFields) => void;
@@ -23,7 +24,7 @@ interface SettingsStageProps {
 
 const invalidClass = 'border-2 border-[var(--color-danger)]';
 
-export default function SettingsStage({ isAr, value, onChange, onSave, saving, eventId, highlightField }: SettingsStageProps) {
+export default function SettingsStage({ isAr, value, onChange, onSave, saving, eventId, highlightField, hideSave, registerCollect }: SettingsStageProps) {
   const t = (ar: string, en: string) => isAr ? ar : en;
   const { showToast } = useToast();
   const [highlight, setHighlight] = useState(highlightField);
@@ -85,23 +86,25 @@ export default function SettingsStage({ isAr, value, onChange, onSave, saving, e
     onChange({ ...value, [key]: val });
   };
 
-  const save = async () => onSave({
-    requiresRegistration: value.requiresRegistration,
+  // "requires registration" now lives in the first stage (main data, time & place); this stage only saves what it shows.
+  const collect = () => ({
     registrationMode: value.registrationMode,
     vtoolsUuid: value.vtoolsUuid.trim(),
     hasCertificate: value.hasCertificate,
     certificateTemplateId: value.hasCertificate && value.certificateTemplateId ? value.certificateTemplateId : null,
     emailTemplateId: value.emailTemplateId || null,
   });
+  const save = async () => onSave(collect());
+  useEffect(() => { registerCollect?.(collect); });
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <label className="flex items-start gap-2 text-sm font-bold text-[var(--color-text-secondary)]">
-          <input type="checkbox" className="mt-0.5" checked={value.requiresRegistration}
-                 onChange={e => set('requiresRegistration', e.target.checked)} />
-          {isAr ? 'تتطلب الفعالية تسجيلًا مسبقًا' : 'This event requires registration'}
-        </label>
+        {!value.requiresRegistration && (
+          <p className="rounded-xl bg-[var(--color-surface-2)] p-3 text-xs text-[var(--color-text-muted)] sm:col-span-2">
+            {isAr ? 'هذه الفعالية لا تتطلب تسجيلًا مسبقًا (يُغيَّر ذلك من مرحلة «البيانات الأساسية والزمان والمكان»).' : 'This event does not require registration (change it in the “Main data, time & place” stage).'}
+          </p>
+        )}
         {value.requiresRegistration && (
           <label className={label}><span>{isAr ? 'نمط قبول التسجيل' : 'Registration acceptance mode'}</span>
             <select className={input} value={value.registrationMode}
@@ -140,6 +143,7 @@ export default function SettingsStage({ isAr, value, onChange, onSave, saving, e
             </select>
           </label>
         )}
+        {value.hasCertificate && <TemplatePreview isAr={isAr} kind="certificate" templateId={value.certificateTemplateId} eventId={eventId} />}
         {templatesError && <p role="alert" className="text-xs" style={{ color: 'var(--color-danger)' }}>{templatesError}</p>}
       </div>
 
@@ -150,6 +154,10 @@ export default function SettingsStage({ isAr, value, onChange, onSave, saving, e
             {mailTemplates.map(m => <option key={m.id} value={m.id}>{m.name || m.subject || m.id}</option>)}
           </select>
         </label>
+        {!value.emailTemplateId && (
+          <p className="text-xs text-[var(--color-text-muted)]">{isAr ? 'اختياري: يمكن أن تكون الفعالية بلا بريد إلكتروني.' : 'Optional: an event can go without any email.'}</p>
+        )}
+        {value.emailTemplateId && <TemplatePreview isAr={isAr} kind="email" templateId={value.emailTemplateId} eventId={eventId} />}
         {mailTemplatesError && <p role="alert" className="text-xs" style={{ color: 'var(--color-danger)' }}>{mailTemplatesError}</p>}
         {value.emailTemplateId && (
           <div className="space-y-2 border-t border-[var(--color-border)] pt-3">
@@ -170,11 +178,11 @@ export default function SettingsStage({ isAr, value, onChange, onSave, saving, e
         )}
       </div>
 
-      <div className="flex justify-end">
+      {!hideSave && <div className="flex justify-end">
         <button type="button" disabled={saving} onClick={save} className={primaryButton}>
           <Save size={16} />{saving ? (isAr ? 'جارٍ الحفظ...' : 'Saving...') : (isAr ? 'حفظ' : 'Save')}
         </button>
-      </div>
+      </div>}
     </div>
   );
 }

@@ -1,6 +1,13 @@
 import type { CustomQuestion, EventDay, EventGender, EventLocationType, EventSponsor, EventType, RegistrationMode, SocialLink } from '@/lib/types';
 
-export type StageId = 'main' | 'time' | 'security' | 'interviewer' | 'sponsors' | 'design' | 'settings' | 'review' | 'share' | 'report';
+export type StageId = 'main' | 'interviewer' | 'sponsors' | 'design' | 'settings';
+
+/** Stage ids from before the stages were merged (old links, saved audit entries, team settings). */
+export const LEGACY_STAGE: Record<string, StageId> = { time: 'main', security: 'interviewer', share: 'design', review: 'settings', report: 'settings' };
+
+/** A stage hands its (validated) fields to a merged stage; null means validation failed and nothing may be saved. */
+export type Collect = () => Record<string, unknown> | null;
+export interface StageEmbedProps { hideSave?: boolean; registerCollect?: (collect: Collect) => void }
 
 export interface StageMeta {
   id: StageId;
@@ -11,16 +18,11 @@ export interface StageMeta {
 
 // Shared with stage ownership settings and the activity trail.
 export const STAGES: StageMeta[] = [
-  { id: 'main', labelAr: 'البيانات الأساسية', labelEn: 'Main data', implemented: true },
-  { id: 'time', labelAr: 'الزمان والمكان', labelEn: 'Time & place', implemented: true },
-  { id: 'security', labelAr: 'التصريح الأمني', labelEn: 'Security screening', implemented: true },
-  { id: 'interviewer', labelAr: 'المحاور والمنظمون', labelEn: 'Interviewer & organizers', implemented: true },
+  { id: 'main', labelAr: 'البيانات الأساسية والزمان والمكان', labelEn: 'Main data, time & place', implemented: true },
+  { id: 'interviewer', labelAr: 'المحاور والتصريح الأمني', labelEn: 'Interviewer & security screening', implemented: true },
   { id: 'sponsors', labelAr: 'الرعاة', labelEn: 'Sponsors', implemented: true },
-  { id: 'design', labelAr: 'التصميم', labelEn: 'Design', implemented: true },
-  { id: 'settings', labelAr: 'الإعدادات', labelEn: 'Settings', implemented: true },
-  { id: 'review', labelAr: 'نموذج التقييم', labelEn: 'Review form', implemented: true },
-  { id: 'share', labelAr: 'النشر', labelEn: 'Publication', implemented: true },
-  { id: 'report', labelAr: 'تقرير الفعالية', labelEn: 'Event report', implemented: true },
+  { id: 'design', labelAr: 'التصميم والنشر', labelEn: 'Design & publication', implemented: true },
+  { id: 'settings', labelAr: 'الإعدادات والتقييم وتقرير الفعالية', labelEn: 'Settings, feedback form & event report', implemented: true },
 ];
 
 export interface MainDataFields {
@@ -54,12 +56,15 @@ export interface SecurityFields {
 
 export interface OrganizerAccount { id: string; name: string; nameEn?: string | null; role?: string; photoURL?: string | null }
 
+/** A speaker: Arabic and English name and the e-mail the event's mail and certificate are sent to. */
+export interface SpeakerRow { name: string; nameEn: string; email: string }
+
 export interface InterviewerFields {
   organizers: OrganizerAccount[];
   interviewer: string;
   interviewerEn: string;
-  speakers: string;
-  speakersEn: string;
+  interviewerEmail: string;
+  speakers: SpeakerRow[];
 }
 
 export interface DesignFields {

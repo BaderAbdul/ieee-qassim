@@ -1,14 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Save, Trash2 } from 'lucide-react';
 import { parseRiyadhInput } from '@/lib/dateUtils';
 import type { EventDay, EventGender, EventLocationType } from '@/lib/types';
-import { input, label, primaryButton, button, type TimePlaceFields } from './wizardTypes';
+import { input, label, primaryButton, button, type StageEmbedProps, type TimePlaceFields } from './wizardTypes';
 
 const minutes = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
 
-interface TimePlaceStageProps {
+interface TimePlaceStageProps extends StageEmbedProps {
   isAr: boolean;
   value: TimePlaceFields;
   onChange: (next: TimePlaceFields) => void;
@@ -20,7 +20,7 @@ interface TimePlaceStageProps {
 
 const invalidClass = 'border-2 border-[var(--color-danger)]';
 
-export default function TimePlaceStage({ isAr, value, onChange, onSave, saving, highlightField }: TimePlaceStageProps) {
+export default function TimePlaceStage({ isAr, value, onChange, onSave, saving, highlightField, hideSave, registerCollect }: TimePlaceStageProps) {
   const [error, setError] = useState('');
   const [highlight, setHighlight] = useState(highlightField);
   const set = <K extends keyof TimePlaceFields>(key: K, val: TimePlaceFields[K]) => {
@@ -36,34 +36,34 @@ export default function TimePlaceStage({ isAr, value, onChange, onSave, saving, 
   const patchDay = (index: number, patch: Partial<EventDay>) =>
     onChange({ ...value, days: value.days.map((d, i) => i === index ? { ...d, ...patch } : d) });
 
-  const save = async () => {
+  const collect = (): Record<string, unknown> | null => {
     if (!value.days.length) {
       setError(isAr ? 'أضف يومًا واحدًا على الأقل.' : 'Add at least one day.');
-      return;
+      return null;
     }
     if (value.locationType === 'in_person' && (!value.location.trim() || !value.locationEn.trim())) {
       setError(isAr ? 'أكمل المكان بالعربية والإنجليزية.' : 'Complete the location in both languages.');
-      return;
+      return null;
     }
     let earliest: Date | null = null;
     let totalHours = 0;
     for (const day of value.days) {
       if (!day.date || !day.startTime || !day.endTime || day.endTime <= day.startTime) {
         setError(isAr ? 'تأكد من صحة تواريخ وأوقات الأيام (وقت النهاية بعد البداية).' : 'Check every day’s date and times (end must be after start).');
-        return;
+        return null;
       }
       let start: Date;
-      try { start = parseRiyadhInput(day.date, day.startTime); } catch { setError(isAr ? 'تاريخ غير صالح.' : 'Invalid date.'); return; }
+      try { start = parseRiyadhInput(day.date, day.startTime); } catch { setError(isAr ? 'تاريخ غير صالح.' : 'Invalid date.'); return null; }
       if (!earliest || start < earliest) earliest = start;
       totalHours += (minutes(day.endTime) - minutes(day.startTime)) / 60;
     }
     if (!(totalHours > 0 && totalHours <= 500)) {
       setError(isAr ? 'إجمالي ساعات غير صالح.' : 'Invalid total hours.');
-      return;
+      return null;
     }
     if (!value.isUnlimitedCapacity && (!Number.isFinite(value.capacity) || value.capacity <= 0)) {
       setError(isAr ? 'عدد مقاعد غير صالح.' : 'Invalid seat count.');
-      return;
+      return null;
     }
     setError('');
     const online = value.locationType === 'online';
@@ -71,15 +71,17 @@ export default function TimePlaceStage({ isAr, value, onChange, onSave, saving, 
     // locationType or isUnlimitedCapacity. Keep those compatibility fields valid so an online
     // or open-registration event can leave Draft; public UI continues to use the explicit flags.
     const capacity = value.isUnlimitedCapacity ? Math.max(1, value.capacity || 1) : value.capacity;
-    await onSave({
+    return {
       days: value.days, date: earliest!.toISOString(), durationHours: Math.round(totalHours * 100) / 100,
       locationType: value.locationType,
       location: online ? 'عن بُعد' : value.location.trim(), locationEn: online ? 'Online' : value.locationEn.trim(),
       capacity,
       isUnlimitedCapacity: value.isUnlimitedCapacity, hideExactCapacity: value.hideExactCapacity,
       gender: value.gender,
-    });
+    };
   };
+  const save = async () => { const fields = collect(); if (fields) await onSave(fields); };
+  useEffect(() => { registerCollect?.(collect); });
 
   return (
     <div className="space-y-5">
@@ -136,7 +138,9 @@ export default function TimePlaceStage({ isAr, value, onChange, onSave, saving, 
 
         <label className={label}>
           <span>{value.locationType === 'online' ? (isAr ? 'المستهدف من الحضور' : 'Attendance goal') : (isAr ? 'عدد المقاعد' : 'Seat count')}</span>
-          <input type="number" min={1} disabled={value.isUnlimitedCapacity} className={`${input} ${highlight === 'capacity' ? invalidClass : ''}`} value={value.capacity}
+          <input type="number" min={1} disabled={value.isUnlimitedCapacity} placeholder={value.isUnlimitedCapacity ? (isAr ? 'بلا حد أقصى' : 'No limit') : undefined}
+            className={`${input} disabled:cursor-not-allowed disabled:opacity-50 ${highlight === 'capacity' ? invalidClass : ''}`}
+            value={value.isUnlimitedCapacity ? '' : value.capacity}
             onChange={e => set('capacity', Number(e.target.value))} /></label>
         <label className={label}><span>{isAr ? 'الفئة المستهدفة' : 'Gender'}</span>
           <select className={input} value={value.gender} onChange={e => set('gender', e.target.value as EventGender)}>
@@ -159,11 +163,11 @@ export default function TimePlaceStage({ isAr, value, onChange, onSave, saving, 
         </div>
       </div>
 
-      <div className="flex justify-end">
+      {!hideSave && <div className="flex justify-end">
         <button type="button" disabled={saving} onClick={save} className={primaryButton}>
           <Save size={16} />{saving ? (isAr ? 'جارٍ الحفظ...' : 'Saving...') : (isAr ? 'حفظ والمتابعة' : 'Save & continue')}
         </button>
-      </div>
+      </div>}
     </div>
   );
 }

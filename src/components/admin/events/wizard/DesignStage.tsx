@@ -1,16 +1,16 @@
 'use client';
 
 import { publicOrigin } from '@/lib/siteUrls';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocale } from 'next-intl';
 import Image from 'next/image';
 import { ImagePlus, Link2, Save } from 'lucide-react';
 import { uploadImage } from '@/lib/backend';
 import { useToast } from '@/context/ToastContext';
 import EventLinkQrModal from '../EventLinkQrModal';
-import { button, label, primaryButton, type DesignFields } from './wizardTypes';
+import { button, label, primaryButton, type DesignFields, type StageEmbedProps } from './wizardTypes';
 
-interface DesignStageProps {
+interface DesignStageProps extends StageEmbedProps {
   isAr: boolean;
   eventId: number;
   value: DesignFields;
@@ -23,7 +23,7 @@ interface DesignStageProps {
 // at the matching CloudConvert conversion page, rather than silently re-encoded server-side.
 const WEBP_HINT_SLUG: Record<string, string> = { 'image/png': 'png-to-webp', 'image/jpeg': 'jpg-to-webp' };
 
-export default function DesignStage({ isAr, eventId, value, onChange, onSave, saving }: DesignStageProps) {
+export default function DesignStage({ isAr, eventId, value, onChange, onSave, saving, hideSave, registerCollect }: DesignStageProps) {
   const locale = useLocale();
   const { showToast } = useToast();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -53,7 +53,9 @@ export default function DesignStage({ isAr, eventId, value, onChange, onSave, sa
     }
   };
 
-  const save = async () => onSave({ coverUrl: value.coverUrl });
+  const collect = () => ({ coverUrl: value.coverUrl });
+  const save = async () => onSave(collect());
+  useEffect(() => { registerCollect?.(collect); });
   const eventUrl = typeof window !== 'undefined' ? `${publicOrigin()}/${locale}/events/${eventId}` : '';
 
   return (
@@ -86,11 +88,11 @@ export default function DesignStage({ isAr, eventId, value, onChange, onSave, sa
         </button>
       </div>
 
-      <div className="flex justify-end">
+      {!hideSave && <div className="flex justify-end">
         <button type="button" disabled={saving} onClick={save} className={primaryButton}>
           <Save size={16} />{saving ? (isAr ? 'جارٍ الحفظ...' : 'Saving...') : (isAr ? 'حفظ' : 'Save')}
         </button>
-      </div>
+      </div>}
 
       {showQr && <EventLinkQrModal url={eventUrl} isAr={isAr} onClose={() => setShowQr(false)} />}
     </div>

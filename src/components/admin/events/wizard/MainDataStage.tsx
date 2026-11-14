@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Save } from 'lucide-react';
 import type { EventType } from '@/lib/types';
-import { input, label, primaryButton, type MainDataFields } from './wizardTypes';
+import { input, label, primaryButton, type MainDataFields, type StageEmbedProps } from './wizardTypes';
 
 const TYPES: EventType[] = ['Workshop', 'Camp', 'Lecture', 'Competition', 'Meetup', 'Challenge', 'Booth', 'Other'];
 const TYPE_LABELS: Record<EventType, [string, string]> = {
@@ -12,7 +12,7 @@ const TYPE_LABELS: Record<EventType, [string, string]> = {
   Booth: ['بوث / زيارة جناح', 'Booth / Visit'], Other: ['أخرى', 'Other'],
 };
 
-interface MainDataStageProps {
+interface MainDataStageProps extends StageEmbedProps {
   isAr: boolean;
   value: MainDataFields;
   onChange: (next: MainDataFields) => void;
@@ -24,7 +24,7 @@ interface MainDataStageProps {
 
 const invalidClass = 'border-2 border-[var(--color-danger)]';
 
-export default function MainDataStage({ isAr, value, onChange, onSave, saving, highlightField }: MainDataStageProps) {
+export default function MainDataStage({ isAr, value, onChange, onSave, saving, highlightField, hideSave, registerCollect }: MainDataStageProps) {
   const [error, setError] = useState('');
   const [highlight, setHighlight] = useState(highlightField);
   const set = <K extends keyof MainDataFields>(key: K, val: MainDataFields[K]) => {
@@ -32,20 +32,22 @@ export default function MainDataStage({ isAr, value, onChange, onSave, saving, h
     onChange({ ...value, [key]: val });
   };
 
-  const save = async () => {
+  const collect = (): Record<string, unknown> | null => {
     if (!value.title.trim() || !value.titleEn.trim()) {
       setError(isAr ? 'أكمل العنوان بالعربية والإنجليزية.' : 'Complete the title in both languages.');
-      return;
+      return null;
     }
     setError('');
-    await onSave({
+    return {
       title: value.title.trim(), titleEn: value.titleEn.trim(),
       description: value.description.trim(), descriptionEn: value.descriptionEn.trim(),
       type: value.type,
       gains: value.gains.split('\n').map(g => g.trim()).filter(Boolean),
       gainsEn: value.gainsEn.split('\n').map(g => g.trim()).filter(Boolean),
-    });
+    };
   };
+  const save = async () => { const fields = collect(); if (fields) await onSave(fields); };
+  useEffect(() => { registerCollect?.(collect); });
 
   return (
     <div className="space-y-5">
@@ -68,11 +70,11 @@ export default function MainDataStage({ isAr, value, onChange, onSave, saving, h
         <label className={label}><span>{isAr ? 'Gains (English, one per line)' : 'Gains (English, one per line)'}</span>
           <textarea className={input} dir="ltr" rows={3} value={value.gainsEn} onChange={e => set('gainsEn', e.target.value)} /></label>
       </div>
-      <div className="flex justify-end">
+      {!hideSave && <div className="flex justify-end">
         <button type="button" disabled={saving} onClick={save} className={primaryButton}>
           <Save size={16} />{saving ? (isAr ? 'جارٍ الحفظ...' : 'Saving...') : (isAr ? 'حفظ والمتابعة' : 'Save & continue')}
         </button>
-      </div>
+      </div>}
     </div>
   );
 }

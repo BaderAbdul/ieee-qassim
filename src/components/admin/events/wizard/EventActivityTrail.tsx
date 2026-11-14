@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { History } from 'lucide-react';
 import { apiGetArray } from '@/lib/backendResponse';
-import { STAGES, type StageId } from './wizardTypes';
+import { LEGACY_STAGE, STAGES, type StageId } from './wizardTypes';
 
 interface ActivityEntry {
   id: number;
@@ -37,7 +37,7 @@ export default function EventActivityTrail({ isAr, eventId, stage, refreshKey }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId, refreshKey]);
 
-  const stageEntries = entries.filter(entry => entry.stage === stage);
+  const stageEntries = entries.filter(entry => ((entry.stage && LEGACY_STAGE[entry.stage]) || entry.stage) === stage);
   if (error) return <p className="text-xs text-[var(--color-text-muted)]">{error}</p>;
   if (!stageEntries.length) return null;
 

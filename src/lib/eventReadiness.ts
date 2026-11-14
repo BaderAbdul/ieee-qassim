@@ -23,11 +23,11 @@ interface Check {
 // visible: isUnlisted -> false) and app/services/operations.py's change_event_state Completed
 // gate -- so the admin gets a precise "X is missing" modal before the API call even happens.
 const VISIBLE_CHECKS: Check[] = [
-  { field: 'days', stage: 'time', labelAr: 'أيام الفعالية', labelEn: 'Event days',
+  { field: 'days', stage: 'main', labelAr: 'أيام الفعالية', labelEn: 'Event days',
     missing: e => !(e.days && e.days.length) },
-  { field: 'location', stage: 'time', labelAr: 'المكان (عربي وإنجليزي)', labelEn: 'Location (Arabic and English)',
+  { field: 'location', stage: 'main', labelAr: 'المكان (عربي وإنجليزي)', labelEn: 'Location (Arabic and English)',
     missing: e => e.locationType === 'in_person' && !(e.location?.trim() && e.locationEn?.trim()) },
-  { field: 'capacity', stage: 'time', labelAr: 'عدد المقاعد', labelEn: 'Seat count',
+  { field: 'capacity', stage: 'main', labelAr: 'عدد المقاعد', labelEn: 'Seat count',
     missing: e => e.locationType === 'in_person' && !e.isUnlimitedCapacity && !(e.capacity > 0) },
   { field: 'interviewer', stage: 'interviewer', labelAr: 'محاور أو متحدث', labelEn: 'An interviewer or speaker',
     missing: e => !(e.interviewer?.trim() || e.interviewerEn?.trim() || e.speakers?.length || e.speakersEn?.length) },

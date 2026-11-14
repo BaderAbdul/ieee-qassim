@@ -1,9 +1,10 @@
 'use client';
 
+import { useEffect } from 'react';
 import { Download, Save } from 'lucide-react';
-import { primaryButton, button, type SecurityFields } from './wizardTypes';
+import { primaryButton, button, type SecurityFields, type StageEmbedProps } from './wizardTypes';
 
-interface SecurityScreeningStageProps {
+interface SecurityScreeningStageProps extends StageEmbedProps {
   isAr: boolean;
   value: SecurityFields;
   onChange: (next: SecurityFields) => void;
@@ -11,8 +12,10 @@ interface SecurityScreeningStageProps {
   saving: boolean;
 }
 
-export default function SecurityScreeningStage({ isAr, value, onChange, onSave, saving }: SecurityScreeningStageProps) {
-  const save = async () => onSave({ securityFormAcknowledged: value.securityFormAcknowledged });
+export default function SecurityScreeningStage({ isAr, value, onChange, onSave, saving, hideSave, registerCollect }: SecurityScreeningStageProps) {
+  const collect = () => ({ securityFormAcknowledged: value.securityFormAcknowledged });
+  const save = async () => onSave(collect());
+  useEffect(() => { registerCollect?.(collect); });
 
   return (
     <div className="space-y-5">
@@ -37,11 +40,11 @@ export default function SecurityScreeningStage({ isAr, value, onChange, onSave, 
         {isAr ? 'تم استلام موافقة الجهة الأمنية على هذه الفعالية.' : 'Security approval for this event has been received.'}
       </label>
 
-      <div className="flex justify-end">
+      {!hideSave && <div className="flex justify-end">
         <button type="button" disabled={saving} onClick={save} className={primaryButton}>
           <Save size={16} />{saving ? (isAr ? 'جارٍ الحفظ...' : 'Saving...') : (isAr ? 'حفظ والمتابعة' : 'Save & continue')}
         </button>
-      </div>
+      </div>}
     </div>
   );
 }

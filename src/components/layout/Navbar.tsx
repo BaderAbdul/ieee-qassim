@@ -50,9 +50,7 @@ export default function Navbar() {
   const navLinks = [
     { href: '/', label: t('home'), icon: Sparkles },
     { href: '/events', label: t('events'), icon: Calendar },
-    // Leaderboard ranks student participation points; admin-tier accounts manage that data
-    // rather than compete on it, so the link (and the page itself) is hidden from them.
-    ...(isAdminRole(userData) ? [] : [{ href: '/leaderboard', label: t('leaderboard'), icon: Trophy }]),
+    { href: '/leaderboard', label: t('leaderboard'), icon: Trophy },
     { href: '/structure', label: t('structure'), icon: Users },
     ...(user ? [
       { href: '/profile', label: t('profile'), icon: UserCircle },

@@ -22,18 +22,37 @@ import SettingsStage from '@/components/admin/events/wizard/SettingsStage';
 import ReviewStage from '@/components/admin/events/wizard/ReviewStage';
 import ShareStage from '@/components/admin/events/wizard/ShareStage';
 import EventActivityTrail from '@/components/admin/events/wizard/EventActivityTrail';
+import MergedStage from '@/components/admin/events/wizard/MergedStage';
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
 import { useToast } from '@/context/ToastContext';
-import { STAGES, type DesignFields, type InterviewerFields, type MainDataFields, type ReviewFields, type SecurityFields, type SettingsFields, type ShareFields, type SponsorsFields, type StageId, type TimePlaceFields } from '@/components/admin/events/wizard/wizardTypes';
+import { LEGACY_STAGE, STAGES, type Collect, type DesignFields, type InterviewerFields, type MainDataFields, type ReviewFields, type SecurityFields, type SettingsFields, type ShareFields, type SponsorsFields, type StageId, type TimePlaceFields } from '@/components/admin/events/wizard/wizardTypes';
 
 const emptyMainData: MainDataFields = { title: '', titleEn: '', description: '', descriptionEn: '', type: 'Workshop', gains: '', gainsEn: '' };
 const emptyTimePlace: TimePlaceFields = { days: [], locationType: 'in_person', location: '', locationEn: '', capacity: 50, isUnlimitedCapacity: false, hideExactCapacity: false, gender: 'both' };
 const emptySecurity: SecurityFields = { securityFormAcknowledged: false };
-const emptyInterviewer: InterviewerFields = { organizers: [], interviewer: '', interviewerEn: '', speakers: '', speakersEn: '' };
+const emptyInterviewer: InterviewerFields = { organizers: [], interviewer: '', interviewerEn: '', interviewerEmail: '', speakers: [] };
 const emptyDesign: DesignFields = { coverUrl: '' };
 const emptySettings: SettingsFields = { requiresRegistration: true, registrationMode: 'Auto', vtoolsUuid: '', hasCertificate: false, certificateTemplateId: '', emailTemplateId: '' };
 const emptyReview: ReviewFields = { feedbackQuestions: [] };
 const emptyShare: ShareFields = { socialLinks: [] };
+
+/** "This event requires registration": moved here from the settings stage, next to the seat count it affects. */
+function RegistrationToggle({ isAr, value, onChange, registerCollect }: {
+  isAr: boolean; value: boolean; onChange: (next: boolean) => void; registerCollect: (collect: Collect) => void;
+}) {
+  useEffect(() => { registerCollect(() => ({ requiresRegistration: value })); });
+  return (
+    <label className="flex items-start gap-2 text-sm font-bold text-[var(--color-text-secondary)]">
+      <input type="checkbox" className="mt-0.5" checked={value} onChange={e => onChange(e.target.checked)} />
+      <span>
+        {isAr ? 'تتطلب الفعالية تسجيلًا مسبقًا' : 'This event requires registration'}
+        <small className="block text-xs font-normal text-[var(--color-text-muted)]">
+          {isAr ? 'عند الإيقاف يحضر الجميع بمسح رمز التحضير دون تسجيل مسبق.' : 'When off, everyone attends by scanning the check-in code, without registering first.'}
+        </small>
+      </span>
+    </label>
+  );
+}
 
 export default function CreateEventPage() {
   const router = useRouter();
@@ -45,7 +64,9 @@ export default function CreateEventPage() {
   const resumeParam = searchParams.get('eventId');
   const resumeId = resumeParam && /^\d+$/.test(resumeParam) ? Number(resumeParam) : null;
   const rawStageParam = searchParams.get('stage');
-  const stageParam = STAGES.some(stage => stage.id === rawStageParam) ? (rawStageParam as StageId) : null;
+  // Old links still say time / security / share / review / report: those stages are now sections of the merged ones.
+  const normalizedStageParam = rawStageParam && LEGACY_STAGE[rawStageParam] ? LEGACY_STAGE[rawStageParam] : rawStageParam;
+  const stageParam = STAGES.some(stage => stage.id === normalizedStageParam) ? (normalizedStageParam as StageId) : null;
   const highlightField = searchParams.get('field') || undefined;
 
   const [eventId, setEventId] = useState<number | null>(null);
@@ -66,6 +87,7 @@ export default function CreateEventPage() {
   const [design, setDesign] = useState<DesignFields>(emptyDesign);
   const [settingsData, setSettingsData] = useState<SettingsFields>(emptySettings);
   const [reviewData, setReviewData] = useState<ReviewFields>(emptyReview);
+  const [attendance, setAttendance] = useState('');
   const [shareData, setShareData] = useState<ShareFields>(emptyShare);
   const [deleting, setDeleting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -89,7 +111,10 @@ export default function CreateEventPage() {
         setInterviewerData({
           organizers: event.organizers || [],
           interviewer: event.interviewer || '', interviewerEn: event.interviewerEn || '',
-          speakers: (event.speakers || []).join('\n'), speakersEn: (event.speakersEn || []).join('\n'),
+          interviewerEmail: event.interviewerEmail || '',
+          speakers: Array.from({ length: Math.max((event.speakers || []).length, (event.speakersEn || []).length, (event.speakerEmails || []).length) }, (_, index) => ({
+            name: event.speakers?.[index] || '', nameEn: event.speakersEn?.[index] || '', email: event.speakerEmails?.[index] || '',
+          })),
         });
         setSponsorsData({ hasSponsors: event.hasSponsors ?? null, sponsors: event.sponsors || [] });
         setReport(event.report || null);
@@ -100,17 +125,15 @@ export default function CreateEventPage() {
           certificateTemplateId: event.certificateTemplateId || '', emailTemplateId: event.emailTemplateId || '',
         });
         setReviewData({ feedbackQuestions: normalizeFeedbackQuestions(event.feedbackQuestions || []) });
+        setAttendance(event.manualAttendanceCount === null || event.manualAttendanceCount === undefined ? '' : String(event.manualAttendanceCount));
         setShareData({ socialLinks: event.socialLinks || [] });
-        const done = new Set<StageId>(['main']);
-        if ((event.days || []).length) done.add('time');
-        if (event.securityFormAcknowledged) done.add('security');
-        if (event.interviewer || event.interviewerEn || (event.speakers || []).length || (event.speakersEn || []).length) done.add('interviewer');
+        const done = new Set<StageId>();
+        if ((event.days || []).length) done.add('main');
+        if (event.securityFormAcknowledged || event.interviewer || event.interviewerEn || (event.speakers || []).length || (event.speakersEn || []).length) done.add('interviewer');
         if (typeof event.hasSponsors === 'boolean') done.add('sponsors');
-        if (event.report) done.add('report');
-        if (event.coverUrl) done.add('design');
-        if (event.vtoolsUuid || event.hasCertificate || event.registrationMode === 'Manual' || event.requiresRegistration === false) done.add('settings');
-        if ((event.feedbackQuestions || []).length) done.add('review');
-        if ((event.socialLinks || []).length) done.add('share');
+        if (event.coverUrl || (event.socialLinks || []).length) done.add('design');
+        if (event.vtoolsUuid || event.hasCertificate || event.registrationMode === 'Manual' || event.requiresRegistration === false
+            || (event.feedbackQuestions || []).length || event.report) done.add('settings');
         setCompletedStages(done);
       } catch (error) {
         setLoadError(error instanceof Error ? error.message : (isAr ? 'تعذر تحميل مسودة الفعالية.' : 'Could not load the event draft.'));
@@ -174,21 +197,29 @@ export default function CreateEventPage() {
         )}
 
         {activeStage === 'main' && (
-          <MainDataStage isAr={isAr} value={mainData} onChange={setMainData} saving={saving}
-            highlightField={highlightField}
-            onSave={async fields => { if (await saveStage('main', fields) && !completedStages.has('time')) setActiveStage('time'); }} />
-        )}
-        {activeStage === 'time' && eventId && (
-          <TimePlaceStage isAr={isAr} value={timePlace} onChange={setTimePlace} saving={saving}
-            highlightField={highlightField}
-            onSave={async fields => { if (await saveStage('time', fields)) setActiveStage('security'); }} />
-        )}
-        {activeStage === 'security' && eventId && (
-          <SecurityScreeningStage isAr={isAr} value={security} onChange={setSecurity} saving={saving}
-            onSave={async fields => { if (await saveStage('security', fields)) setActiveStage('interviewer'); }} />
+          <MergedStage isAr={isAr} saving={saving}
+            parts={[
+              { id: 'main', title: isAr ? 'البيانات الأساسية' : 'Main data', render: register => (
+                <MainDataStage isAr={isAr} value={mainData} onChange={setMainData} saving={saving} highlightField={highlightField} hideSave registerCollect={register}
+                  onSave={async () => {}} />) },
+              { id: 'time', title: isAr ? 'الزمان والمكان' : 'Time & place', render: register => (
+                <TimePlaceStage isAr={isAr} value={timePlace} onChange={setTimePlace} saving={saving} highlightField={highlightField} hideSave registerCollect={register}
+                  onSave={async () => {}} />) },
+              { id: 'registration', title: isAr ? 'التسجيل' : 'Registration', render: register => (
+                <RegistrationToggle isAr={isAr} value={settingsData.requiresRegistration} onChange={requiresRegistration => setSettingsData({ ...settingsData, requiresRegistration })} registerCollect={register} />) },
+            ]}
+            onSave={async fields => { if (await saveStage('main', fields) && !completedStages.has('interviewer')) setActiveStage('interviewer'); }} />
         )}
         {activeStage === 'interviewer' && eventId && (
-          <InterviewerStage isAr={isAr} value={interviewerData} onChange={setInterviewerData} saving={saving}
+          <MergedStage isAr={isAr} saving={saving}
+            parts={[
+              { id: 'interviewer', title: isAr ? 'المحاور والمتحدثون والمنظمون' : 'Interviewer, speakers & organizers', render: register => (
+                <InterviewerStage isAr={isAr} eventId={eventId} value={interviewerData} onChange={setInterviewerData} saving={saving} hideSave registerCollect={register}
+                  onSave={async () => {}} />) },
+              { id: 'security', title: isAr ? 'التصريح الأمني' : 'Security screening', render: register => (
+                <SecurityScreeningStage isAr={isAr} value={security} onChange={setSecurity} saving={saving} hideSave registerCollect={register}
+                  onSave={async () => {}} />) },
+            ]}
             onSave={async fields => { if (await saveStage('interviewer', fields)) setActiveStage('sponsors'); }} />
         )}
         {activeStage === 'sponsors' && eventId && (
@@ -196,25 +227,32 @@ export default function CreateEventPage() {
             onSave={async fields => { if (await saveStage('sponsors', fields)) setActiveStage('design'); }} />
         )}
         {activeStage === 'design' && eventId && (
-          <DesignStage isAr={isAr} eventId={eventId} value={design} onChange={setDesign} saving={saving}
+          <MergedStage isAr={isAr} saving={saving}
+            parts={[
+              { id: 'design', title: isAr ? 'التصميم' : 'Design', render: register => (
+                <DesignStage isAr={isAr} eventId={eventId} value={design} onChange={setDesign} saving={saving} hideSave registerCollect={register}
+                  onSave={async () => {}} />) },
+              { id: 'share', title: isAr ? 'النشر' : 'Publication', render: register => (
+                <ShareStage isAr={isAr} value={shareData} onChange={setShareData} saving={saving} hideSave registerCollect={register}
+                  onSave={async () => {}} />) },
+            ]}
             onSave={async fields => { if (await saveStage('design', fields)) setActiveStage('settings'); }} />
         )}
         {activeStage === 'settings' && eventId && (
-          <SettingsStage isAr={isAr} value={settingsData} onChange={setSettingsData} saving={saving} eventId={eventId}
-            highlightField={highlightField}
+          <MergedStage isAr={isAr} saving={saving} saveLabel={isAr ? 'حفظ' : 'Save'}
+            parts={[
+              { id: 'settings', title: isAr ? 'الإعدادات' : 'Settings', render: register => (
+                <SettingsStage isAr={isAr} value={settingsData} onChange={setSettingsData} saving={saving} eventId={eventId} highlightField={highlightField} hideSave registerCollect={register}
+                  onSave={async () => {}} />) },
+              { id: 'review', title: isAr ? 'نموذج التقييم' : 'Feedback form', render: register => (
+                <ReviewStage isAr={isAr} value={reviewData} onChange={setReviewData} saving={saving} hideSave registerCollect={register}
+                  onSave={async () => {}} />) },
+              { id: 'report', title: isAr ? 'تقرير الفعالية' : 'Event report', render: register => (
+                <ReportStage isAr={isAr} eventId={eventId} report={report} attendance={attendance} onAttendanceChange={setAttendance} registerCollect={register}
+                  onSaved={saved => { setReport(saved); setCompletedStages(previous => new Set(previous).add('settings')); setActivityRefreshKey(k => k + 1); }} />) },
+            ]}
             onSave={async fields => { await saveStage('settings', fields); }} />
         )}
-        {activeStage === 'review' && eventId && (
-          <ReviewStage isAr={isAr} value={reviewData} onChange={setReviewData} saving={saving}
-            onSave={async fields => { await saveStage('review', fields); }} />
-        )}
-        {activeStage === 'share' && eventId && (
-          <ShareStage isAr={isAr} value={shareData} onChange={setShareData} saving={saving}
-            onSave={async fields => { await saveStage('share', fields); }} />
-        )}
-        {activeStage === 'report' && eventId && <ReportStage isAr={isAr} eventId={eventId} report={report} onSaved={saved => {
-          setReport(saved); setCompletedStages(previous => new Set(previous).add('report')); setActivityRefreshKey(k => k + 1);
-        }} />}
 
         {eventId && <EventActivityTrail isAr={isAr} eventId={eventId} stage={activeStage} refreshKey={activityRefreshKey} />}
 

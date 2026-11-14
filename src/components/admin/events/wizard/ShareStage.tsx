@@ -1,10 +1,11 @@
 'use client';
 
+import { useEffect } from 'react';
 import { Plus, Save, Trash2 } from 'lucide-react';
 import type { SocialLink } from '@/lib/types';
-import { button, input, label, primaryButton, SOCIAL_PLATFORMS, type ShareFields } from './wizardTypes';
+import { button, input, label, primaryButton, SOCIAL_PLATFORMS, type ShareFields, type StageEmbedProps } from './wizardTypes';
 
-export default function ShareStage({ isAr, value, onChange, onSave, saving }: {
+export default function ShareStage({ isAr, value, onChange, onSave, saving, hideSave, registerCollect }: StageEmbedProps & {
   isAr: boolean; value: ShareFields; onChange: (value: ShareFields) => void;
   onSave: (fields: Record<string, unknown>) => Promise<void>; saving: boolean;
 }) {
@@ -13,12 +14,9 @@ export default function ShareStage({ isAr, value, onChange, onSave, saving }: {
   const update = (index: number, patch: Partial<SocialLink>) =>
     onChange({ socialLinks: value.socialLinks.map((link, i) => i === index ? { ...link, ...patch } : link) });
 
-  return <form className="space-y-5" onSubmit={event => {
-    event.preventDefault();
-    if (saving) return;
-    const links = value.socialLinks.filter(l => l.url.trim());
-    void onSave({ socialLinks: links.map(l => ({ ...l, url: l.url.trim() })) });
-  }}>
+  const collect = () => ({ socialLinks: value.socialLinks.filter(l => l.url.trim()).map(l => ({ ...l, url: l.url.trim() })) });
+  useEffect(() => { registerCollect?.(collect); });
+  return <div className="space-y-5">
     <fieldset disabled={saving} className="space-y-4">
       <p className="text-sm text-[var(--color-text-secondary)]">
         {isAr ? 'اختياري بالكامل — أضف روابط منشورات الفعالية على منصات التواصل الاجتماعي إن وُجدت.'
@@ -54,7 +52,7 @@ export default function ShareStage({ isAr, value, onChange, onSave, saving }: {
               onClick={() => onChange({ socialLinks: [...value.socialLinks, { platform: nextPlatform, url: '' }] })}>
         <Plus size={16} />{isAr ? 'إضافة رابط' : 'Add link'}
       </button>
-      <div className="flex justify-end"><button type="submit" className={primaryButton}><Save size={16} />{isAr ? 'حفظ' : 'Save'}</button></div>
+      {!hideSave && <div className="flex justify-end"><button type="button" disabled={saving} onClick={() => void onSave(collect())} className={primaryButton}><Save size={16} />{isAr ? 'حفظ' : 'Save'}</button></div>}
     </fieldset>
-  </form>;
+  </div>;
 }

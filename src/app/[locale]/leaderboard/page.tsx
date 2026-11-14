@@ -3,7 +3,6 @@ import { Trophy } from 'lucide-react';
 import { setRequestLocale } from 'next-intl/server';
 import { API_BASE_URL } from '@/lib/apiBase';
 import LeaderboardList, { type LeaderboardUser } from './LeaderboardList';
-import LeaderboardGuard from './LeaderboardGuard';
 
 export const revalidate = 30;
 
@@ -28,7 +27,7 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ lo
   }));
 
   return (
-    <LeaderboardGuard>
+    <>
       <div className="min-h-screen bg-slate-50 pt-24 pb-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto space-y-8">
 
@@ -52,7 +51,7 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ lo
 
         </div>
       </div>
-    </LeaderboardGuard>
+    </>
   );
 }
 

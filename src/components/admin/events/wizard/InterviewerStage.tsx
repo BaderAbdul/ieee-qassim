@@ -1,26 +1,46 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowDown, ArrowUp, Loader2, Save, Search, UserPlus, X } from 'lucide-react';
-import { apiGet } from '@/lib/backend';
-import { input, label, primaryButton, type InterviewerFields, type OrganizerAccount } from './wizardTypes';
+import { ArrowDown, ArrowUp, Loader2, Mail, Plus, Save, Search, UserPlus, X } from 'lucide-react';
+import { apiGet, httpsCallable } from '@/lib/backend';
+import { useToast } from '@/context/ToastContext';
+import { input, label, primaryButton, type InterviewerFields, type OrganizerAccount, type SpeakerRow, type StageEmbedProps } from './wizardTypes';
 
-interface InterviewerStageProps {
+const EMAIL = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
+
+interface InterviewerStageProps extends StageEmbedProps {
   isAr: boolean;
   value: InterviewerFields;
+  /** The saved event: guests can be mailed only once their data is stored. */
+  eventId?: number | null;
   onChange: (next: InterviewerFields) => void;
   onSave: (fields: Record<string, unknown>) => Promise<void>;
   saving: boolean;
 }
 
-export default function InterviewerStage({ isAr, value, onChange, onSave, saving }: InterviewerStageProps) {
+export default function InterviewerStage({ isAr, value, eventId, onChange, onSave, saving, hideSave, registerCollect }: InterviewerStageProps) {
+  const { showToast } = useToast();
+  const [emailError, setEmailError] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState('');
   const set = <K extends keyof InterviewerFields>(key: K, val: InterviewerFields[K]) => onChange({ ...value, [key]: val });
-  const save = async () => onSave({
-    interviewer: value.interviewer.trim(), interviewerEn: value.interviewerEn.trim(),
-    speakers: value.speakers.split('\n').map(s => s.trim()).filter(Boolean),
-    speakersEn: value.speakersEn.split('\n').map(s => s.trim()).filter(Boolean),
-    organizerIds: value.organizers.map(account => account.id),
-  });
+  const collect = (): Record<string, unknown> | null => {
+    const rows = value.speakers.filter(row => row.name.trim() || row.nameEn.trim() || row.email.trim());
+    const addresses = [value.interviewerEmail, ...rows.map(row => row.email)].map(address => address.trim()).filter(Boolean);
+    if (addresses.some(address => !EMAIL.test(address))) {
+      setEmailError(isAr ? 'أدخل بريدًا إلكترونيًا صحيحًا للمحاور والمتحدثين (أو اتركه فارغًا).' : 'Enter a valid e-mail for the interviewer and speakers (or leave it empty).');
+      return null;
+    }
+    setEmailError('');
+    return {
+      interviewer: value.interviewer.trim(), interviewerEn: value.interviewerEn.trim(), interviewerEmail: value.interviewerEmail.trim(),
+      speakers: rows.map(row => row.name.trim()), speakersEn: rows.map(row => row.nameEn.trim()),
+      speakerEmails: rows.map(row => row.email.trim()),
+      organizerIds: value.organizers.map(account => account.id),
+    };
+  };
+  const save = async () => { const fields = collect(); if (fields) await onSave(fields); };
+  useEffect(() => { registerCollect?.(collect); });
 
   // Organizers are picked from the platform's accounts by searching for any part of the name.
   const [query, setQuery] = useState('');
@@ -42,6 +62,23 @@ export default function InterviewerStage({ isAr, value, onChange, onSave, saving
   const chosen = new Set(value.organizers.map(account => account.id));
   const add = (account: OrganizerAccount) => { if (!chosen.has(account.id)) onChange({ ...value, organizers: [...value.organizers, account] }); setQuery(''); setResults([]); };
   const remove = (id: string) => onChange({ ...value, organizers: value.organizers.filter(account => account.id !== id) });
+  const setSpeaker = (index: number, patch: Partial<SpeakerRow>) =>
+    onChange({ ...value, speakers: value.speakers.map((row, at) => at === index ? { ...row, ...patch } : row) });
+  const addSpeaker = () => onChange({ ...value, speakers: [...value.speakers, { name: '', nameEn: '', email: '' }] });
+  const removeSpeaker = (index: number) => onChange({ ...value, speakers: value.speakers.filter((_, at) => at !== index) });
+
+  /** Mails the event's e-mail and certificate to every guest with an address, once each. Works on the saved data. */
+  const sendNow = async () => {
+    if (!eventId || sending) return;
+    if (!window.confirm(isAr ? 'سيُرسل بريد الفعالية وشهادتها الآن إلى المحاور والمتحدثين الذين أُدخلت بريداتهم (ولن يُكرَّر الإرسال لمن أُرسل له). المتابعة؟' : 'This sends the event’s e-mail and certificate now to every interviewer/speaker with an address (nobody is mailed twice). Continue?')) return;
+    setSending(true); setSendResult('');
+    try {
+      const { data } = await httpsCallable<{ eventId: number }, { queuedCount: number; alreadySentCount: number }>(null, 'sendEventGuestEmails')({ eventId });
+      setSendResult(isAr ? `أُضيف ${data.queuedCount} بريدًا إلى قائمة الإرسال (${data.alreadySentCount} أُرسل سابقًا).` : `${data.queuedCount} e-mail(s) queued (${data.alreadySentCount} already sent before).`);
+    } catch (reason) {
+      showToast(reason instanceof Error ? reason.message : (isAr ? 'تعذر الإرسال.' : 'Could not send.'), 'error');
+    } finally { setSending(false); }
+  };
   const move = (index: number, delta: number) => {
     const next = [...value.organizers]; const target = index + delta;
     if (target < 0 || target >= next.length) return;
@@ -53,17 +90,51 @@ export default function InterviewerStage({ isAr, value, onChange, onSave, saving
       <p className="text-sm text-[var(--color-text-muted)]">
         {isAr ? 'لإظهار الفعالية للعامة لا بد من محاور أو متحدث واحد على الأقل.' : 'At least one interviewer or speaker is required before the event can be shown publicly.'}
       </p>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <label className={label}><span>{isAr ? 'اسم المحاور (عربي)' : 'Interviewer name (Arabic)'}</span>
-          <input className={input} dir="rtl" value={value.interviewer} onChange={e => set('interviewer', e.target.value)} /></label>
-        <label className={label}><span>{isAr ? 'Interviewer name (English)' : 'Interviewer name (English)'}</span>
-          <input className={input} dir="ltr" value={value.interviewerEn} onChange={e => set('interviewerEn', e.target.value)} /></label>
+      <div className="space-y-3 rounded-2xl border border-[var(--color-border)] p-4">
+        <h3 className="font-bold">{isAr ? 'المحاور' : 'Interviewer'}</h3>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <label className={label}><span>{isAr ? 'الاسم (عربي)' : 'Name (Arabic)'}</span>
+            <input className={input} dir="rtl" value={value.interviewer} onChange={e => set('interviewer', e.target.value)} /></label>
+          <label className={label}><span>Name (English)</span>
+            <input className={input} dir="ltr" value={value.interviewerEn} onChange={e => set('interviewerEn', e.target.value)} /></label>
+          <label className={label}><span>{isAr ? 'البريد الإلكتروني' : 'E-mail'}</span>
+            <input className={input} dir="ltr" type="email" inputMode="email" value={value.interviewerEmail} onChange={e => set('interviewerEmail', e.target.value)} placeholder="name@example.com" /></label>
+        </div>
       </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <label className={label}><span>{isAr ? 'المتحدثون (عربي -- سطر لكل متحدث)' : 'Speakers (Arabic, one per line)'}</span>
-          <textarea className={input} dir="rtl" rows={3} value={value.speakers} onChange={e => set('speakers', e.target.value)} /></label>
-        <label className={label}><span>{isAr ? 'Speakers (English, one per line)' : 'Speakers (English, one per line)'}</span>
-          <textarea className={input} dir="ltr" rows={3} value={value.speakersEn} onChange={e => set('speakersEn', e.target.value)} /></label>
+
+      <div className="space-y-3 rounded-2xl border border-[var(--color-border)] p-4">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="font-bold">{isAr ? 'المتحدثون' : 'Speakers'}</h3>
+          <button type="button" onClick={addSpeaker} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-xs font-bold hover:bg-[var(--color-surface-2)]">
+            <Plus size={14} />{isAr ? 'إضافة متحدث' : 'Add speaker'}
+          </button>
+        </div>
+        {value.speakers.length === 0 && <p className="text-xs text-[var(--color-text-muted)]">{isAr ? 'لم يُضف متحدثون بعد.' : 'No speakers yet.'}</p>}
+        {value.speakers.map((row, index) => (
+          <div key={index} className="grid grid-cols-1 gap-2 rounded-xl bg-[var(--color-surface-2)] p-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
+            <label className={label}><span>{isAr ? 'الاسم (عربي)' : 'Name (Arabic)'}</span>
+              <input className={input} dir="rtl" value={row.name} onChange={e => setSpeaker(index, { name: e.target.value })} /></label>
+            <label className={label}><span>Name (English)</span>
+              <input className={input} dir="ltr" value={row.nameEn} onChange={e => setSpeaker(index, { nameEn: e.target.value })} /></label>
+            <label className={label}><span>{isAr ? 'البريد الإلكتروني' : 'E-mail'}</span>
+              <input className={input} dir="ltr" type="email" inputMode="email" value={row.email} onChange={e => setSpeaker(index, { email: e.target.value })} placeholder="name@example.com" /></label>
+            <button type="button" aria-label={isAr ? 'إزالة المتحدث' : 'Remove speaker'} onClick={() => removeSpeaker(index)} className="rounded-lg p-2 text-red-500 hover:bg-red-50"><X size={16} /></button>
+          </div>
+        ))}
+        {emailError && <p role="alert" className="text-xs" style={{ color: 'var(--color-danger)' }}>{emailError}</p>}
+        <div className="space-y-2 border-t border-[var(--color-border)] pt-3">
+          <p className="text-xs text-[var(--color-text-muted)]">
+            {isAr ? 'بريد المحاور والمتحدثين خاص بالإدارة ولا يظهر للعامة. يُستخدم لإرسال بريد الفعالية وشهادتهم فورًا.' : 'Interviewer and speaker e-mails are private to the admins. They receive the event’s e-mail and their certificate immediately.'}
+          </p>
+          {eventId ? (
+            <button type="button" disabled={sending} onClick={() => void sendNow()} className="inline-flex items-center gap-2 rounded-xl border border-[var(--color-accent)] px-4 py-2 text-sm font-bold text-[var(--color-accent)] hover:bg-[var(--color-surface-2)] disabled:opacity-50">
+              {sending ? <Loader2 size={15} className="animate-spin" /> : <Mail size={15} />}
+              {isAr ? 'إرسال البريد والشهادة الآن' : 'Send e-mail & certificate now'}
+            </button>
+          ) : <p className="text-xs text-[var(--color-text-muted)]">{isAr ? 'احفظ الفعالية أولًا لتتمكن من الإرسال.' : 'Save the event first to be able to send.'}</p>}
+          {eventId ? <p className="text-[11px] text-[var(--color-text-muted)]">{isAr ? 'يعمل الإرسال على البيانات المحفوظة؛ احفظ التعديلات قبل الضغط. يتطلب قالب بريد أو شهادة من «الإعدادات».' : 'Sending uses the saved data — save your edits first. Needs an e-mail or certificate template chosen in “Settings”.'}</p> : null}
+          {sendResult && <p role="status" className="text-xs font-bold text-emerald-600">{sendResult}</p>}
+        </div>
       </div>
       <div className="space-y-3 rounded-2xl border border-[var(--color-border)] p-4">
         <div>
@@ -103,11 +174,11 @@ export default function InterviewerStage({ isAr, value, onChange, onSave, saving
           </ul>
         )}
       </div>
-      <div className="flex justify-end">
+      {!hideSave && <div className="flex justify-end">
         <button type="button" disabled={saving} onClick={save} className={primaryButton}>
           <Save size={16} />{saving ? (isAr ? 'جارٍ الحفظ...' : 'Saving...') : (isAr ? 'حفظ' : 'Save')}
         </button>
-      </div>
+      </div>}
     </div>
   );
 }

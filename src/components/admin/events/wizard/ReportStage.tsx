@@ -1,24 +1,54 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Download, Upload } from 'lucide-react';
 import { downloadEventReport, uploadEventReport } from '@/lib/backend';
 import { useToast } from '@/context/ToastContext';
 import type { EventReport } from '@/lib/types';
-import { button, primaryButton } from './wizardTypes';
+import ReportBuilder from './ReportBuilder';
+import { button, input, label, primaryButton, type StageEmbedProps } from './wizardTypes';
 
-export default function ReportStage({ isAr, eventId, report, onSaved }: {
+export default function ReportStage({ isAr, eventId, report, onSaved, attendance, onAttendanceChange, registerCollect }: StageEmbedProps & {
   isAr: boolean; eventId: number; report: EventReport | null; onSaved: (report: EventReport) => void;
+  /** The real attendance number the organizers counted, as typed ('' = not entered). */
+  attendance: string; onAttendanceChange: (value: string) => void;
 }) {
   const { showToast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
     try { await action(); } catch (e) { showToast(e instanceof Error ? e.message : (isAr ? 'تعذر إكمال الطلب.' : 'Request failed.'), 'error'); }
     finally { setBusy(false); }
   };
+
+  const collect = (): Record<string, unknown> | null => {
+    const text = attendance.trim();
+    if (text === '') { setError(''); return { manualAttendanceCount: null }; }
+    const count = Number(text);
+    if (!Number.isInteger(count) || count < 0 || count > 1_000_000) {
+      setError(isAr ? 'أدخل عدد الحضور الفعلي كرقم صحيح (٠ أو أكثر).' : 'Enter the real attendance as a whole number (0 or more).');
+      return null;
+    }
+    setError('');
+    return { manualAttendanceCount: count };
+  };
+  useEffect(() => { registerCollect?.(collect); });
+
   return <div className="space-y-5">
+    <ReportBuilder isAr={isAr} eventId={eventId} onAdopted={onSaved} />
+    <label className={label}>
+      <span>{isAr ? 'عدد الحضور الفعلي' : 'Real attendance number'}</span>
+      <input type="number" min={0} inputMode="numeric" className={`${input} max-w-xs`} value={attendance}
+             placeholder={isAr ? 'اتركه فارغًا لاستخدام العدّ الآلي' : 'Leave empty to use the automatic count'}
+             onChange={e => onAttendanceChange(e.target.value)} />
+    </label>
+    {error && <p role="alert" className="text-xs" style={{ color: 'var(--color-danger)' }}>{error}</p>}
+    <p className="text-xs text-[var(--color-text-muted)]">
+      {isAr ? 'يظهر هذا الرقم للطلاب فقط في بطاقة الفعالية بالموقع، ولا يغيّر أرقام الحضور الفعلية في لوحة الإدارة.' : 'Students see this number on the event card of the website only; the admin dashboard keeps showing the counted attendance.'}
+    </p>
+
     <p className="text-sm text-[var(--color-text-muted)]">{isAr ? 'ارفع تقرير الفعالية بصيغة PDF فقط، حتى ١٠ ميجابايت.' : 'Upload the event report as a PDF only, up to 10 MB.'}</p>
     {report && <div className="rounded-xl border border-[var(--color-border)] p-4 space-y-2">
       <p className="font-bold break-all">{report.fileName}</p>

@@ -22,7 +22,9 @@ import {
   X,
   Maximize2,
   Download,
-  Sparkles
+  Sparkles,
+  Bell,
+  BellOff
 } from 'lucide-react';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import EventDetailsSkeleton from '@/components/skeletons/EventDetailsSkeleton';
@@ -54,6 +56,8 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
   const [attendeeCount, setAttendeeCount] = useState(cached?.registeredCount ?? 0);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [isPosterOpen, setIsPosterOpen] = useState(false);
+  const [reminder, setReminder] = useState(false);
+  const [reminderBusy, setReminderBusy] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -98,8 +102,8 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
     let alive = true;
     (async () => {
       try {
-        const current = await apiGet<{ registration: { status: string } | null }>(`/api/me/events/${eventId}`);
-        if (alive) setRegistrationStatus(current.registration?.status ?? null);
+        const current = await apiGet<{ registration: { status: string } | null; reminder?: boolean }>(`/api/me/events/${eventId}`);
+        if (alive) { setRegistrationStatus(current.registration?.status ?? null); setReminder(current.reminder === true); }
       } catch {
         if (alive) showToast(isAr ? 'تعذر تحديث حالة التسجيل. حدّث الصفحة قبل إعادة المحاولة.' : 'Could not refresh registration status. Refresh before retrying.', 'error');
       }
@@ -135,6 +139,19 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
     } catch (error) {
       showToast(error instanceof Error ? error.message : (isAr ? 'تعذر إلغاء التسجيل.' : 'Cancellation failed.'), 'error');
     } finally { setIsRegistering(false); }
+  };
+
+  /** "Remind me": for events without registration; the student's account data is what the reminder email uses. */
+  const toggleReminder = async () => {
+    if (!user || reminderBusy) return;
+    setReminderBusy(true);
+    try {
+      const next = !reminder;
+      await httpsCallable<{ eventId: string; reminder: boolean }, { reminder: boolean }>(null, 'remindMeAboutEvent')({ eventId, reminder: next });
+      setReminder(next);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : (isAr ? 'تعذر حفظ التذكير.' : 'Could not save the reminder.'), 'error');
+    } finally { setReminderBusy(false); }
   };
 
   if (loadError) throw loadError;
@@ -359,10 +376,14 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                           <div className="space-y-3">
                             <div className="p-4 rounded-2xl text-center bg-blue-500/20 border border-blue-400/30 text-blue-50">
                               <div className="font-bold text-sm mb-1">
-                                {isAr ? 'زيارة مباشرة بدون تسجيل مسبق' : 'Walk-in visit (No registration required)'}
+                                {event.type === 'Booth'
+                                  ? (isAr ? 'زيارة مباشرة بدون تسجيل مسبق' : 'Walk-in visit (No registration required)')
+                                  : (isAr ? 'لا تتطلب تسجيلًا مسبقًا' : 'No registration required')}
                               </div>
                               <div className="text-xs opacity-90 leading-relaxed">
-                                {isAr ? 'حضورك يُسجّل مباشرة عند مسح رمز QR في البوث.' : 'Check-in is recorded on-site by scanning the booth QR code.'}
+                                {event.type === 'Booth'
+                                  ? (isAr ? 'حضورك يُسجّل مباشرة عند مسح رمز QR في البوث.' : 'Check-in is recorded on-site by scanning the booth QR code.')
+                                  : (isAr ? 'يمكنك الحضور مباشرة، ويُسجَّل حضورك عند مسح رمز التحضير في الفعالية.' : 'Just show up: your attendance is recorded when you scan the check-in code at the event.')}
                               </div>
                             </div>
                             <Link
@@ -370,8 +391,20 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                               className="w-full inline-flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-3.5 px-6 rounded-2xl font-bold shadow-lg transition-transform transform hover:-translate-y-1"
                             >
                               <QrCode className="h-4 w-4 text-white" />
-                              <span>{isAr ? 'صفحة التحضير للبوث' : 'Booth check-in page'}</span>
+                              <span>{event.type === 'Booth' ? (isAr ? 'صفحة التحضير للبوث' : 'Booth check-in page') : (isAr ? 'صفحة التحضير' : 'Check-in page')}</span>
                             </Link>
+                            {event.requiresRegistration === false && event.state !== 'Completed' && (
+                              <button
+                                type="button"
+                                onClick={toggleReminder}
+                                disabled={reminderBusy}
+                                aria-pressed={reminder}
+                                className={`w-full inline-flex items-center justify-center gap-2 py-3 px-6 rounded-2xl font-bold border transition-colors disabled:opacity-60 ${reminder ? 'bg-white/20 border-white/40 text-white' : 'bg-white/10 hover:bg-white/20 border-white/25 text-white'}`}
+                              >
+                                {reminder ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
+                                <span>{reminder ? (isAr ? 'سنذكّرك قبل الفعالية — إلغاء التذكير' : 'We will remind you — cancel') : (isAr ? 'ذكّرني' : 'Remind me')}</span>
+                              </button>
+                            )}
                           </div>
                         ) : !registrationStatus || registrationStatus === 'cancelled' ? (
                           <button 

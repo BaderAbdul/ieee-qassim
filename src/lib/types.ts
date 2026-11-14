@@ -51,6 +51,7 @@ export interface PlatformEvent {
   speakers: string[];
   speakersEn: string[];
   organizerIds?: string[];
+  manualAttendanceCount?: number | null;
   organizers?: { id: string; name: string; nameEn?: string | null; role?: string; photoURL?: string | null }[];
   capacity: number;
   isUnlimitedCapacity?: boolean;
@@ -70,6 +71,9 @@ export interface PlatformEvent {
   gender?: EventGender;
   interviewer?: string;
   interviewerEn?: string;
+  /** Admin-only: the interviewer's address and one per speaker (same order as `speakers`). */
+  interviewerEmail?: string;
+  speakerEmails?: string[];
   hasSponsors?: boolean | null;
   sponsors?: EventSponsor[];
   report?: EventReport | null;
