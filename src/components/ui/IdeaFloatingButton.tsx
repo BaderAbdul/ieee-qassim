@@ -8,6 +8,7 @@ import { API_BASE_URL } from '@/lib/backend';
 import { readBackendResponse } from '@/lib/backendResponse';
 import { useLocale } from 'next-intl';
 import { usePathname } from '@/i18n/routing';
+import { inAdminArea, useOnAdminHost } from '@/lib/adminPath';
 
 async function postIdea(data: Record<string, unknown>) {
   const token = await window.Clerk?.session?.getToken();
@@ -32,9 +33,10 @@ export default function IdeaFloatingButton() {
   const locale = useLocale();
   const isAr = locale === 'ar';
   const pathname = usePathname();
+  const onAdminHost = useOnAdminHost();
 
   // Admin dashboard has its own tools; this public widget only makes sense on the main site.
-  if (pathname.startsWith('/admin')) return null;
+  if (inAdminArea(pathname, onAdminHost)) return null;
   // Only show to logged in users
   if (!user) return null;
 

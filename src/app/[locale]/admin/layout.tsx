@@ -15,6 +15,9 @@ import {
 import { usePathname } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import ConfigurationNotice from '@/components/admin/ConfigurationNotice';
+import { ADMIN_HOST } from '@/lib/siteUrls';
+import { toAdminPath, useOnAdminHost } from '@/lib/adminPath';
+import { mainHostFor } from '@/lib/adminHost';
 import AdminTopbar from '@/components/admin/AdminTopbar';
 import { AdminTopbarActionsProvider } from '@/components/admin/AdminTopbarActions';
 import { StaffMessagesProvider } from '@/components/admin/messages/StaffMessagesContext';
@@ -49,7 +52,9 @@ const getThemeSnapshot = () => {
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, userData, loading } = useAuth();
   const router = useRouter();
-  const pathname = usePathname();
+  const rawPathname = usePathname();
+  const onAdminHost = useOnAdminHost();
+  const pathname = toAdminPath(rawPathname, onAdminHost);
   const locale = useLocale();
   const isAr = locale === 'ar';
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -121,6 +126,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </p>
         <Link
           href="/"
+          onClick={event => { if (ADMIN_HOST && window.location.hostname === ADMIN_HOST) { event.preventDefault(); window.location.assign(`https://${mainHostFor(ADMIN_HOST)}/${isAr ? 'ar' : 'en'}`); } }}
           className="inline-flex items-center gap-2 bg-[var(--color-accent)] hover:opacity-90 text-[var(--color-accent-contrast)] px-5 py-2.5 rounded-xl font-bold text-sm transition-all"
         >
           <Home className="w-4 h-4" />

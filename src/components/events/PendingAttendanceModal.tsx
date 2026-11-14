@@ -7,6 +7,7 @@ import { apiGet, httpsCallable } from '@/lib/backend';
 import { useToast } from '@/context/ToastContext';
 import { useLocale } from 'next-intl';
 import { usePathname } from 'next/navigation';
+import { useOnAdminHost } from '@/lib/adminPath';
 import { RequiredFeedbackDialog, useFeedbackSurface } from './RequiredFeedbackDialog';
 import { Star, Sparkles, Award, Send, AlertCircle, Loader2 } from 'lucide-react';
 
@@ -32,6 +33,8 @@ interface PendingCheckinDoc {
 export default function PendingAttendanceModal() {
   const { user, userData } = useAuth();
   const pathname = usePathname();
+  const onAdminHost = useOnAdminHost();
+  const inAdmin = pathname.includes('/admin') || onAdminHost;
   const locale = useLocale();
   const surface = useFeedbackSurface();
   const { showToast } = useToast();
@@ -51,7 +54,7 @@ export default function PendingAttendanceModal() {
   // just had their badge scanned at a physical event, so: skip it entirely on admin pages (same
   // condition the render-gate below already uses), pause it while the tab is in the background,
   // and poll far less often -- a human at a check-in desk won't notice 12s instead of 4s.
-  const skipPolling = !!user && !!userData && userData.role !== 'student' && pathname.includes('/admin');
+  const skipPolling = !!user && !!userData && userData.role !== 'student' && inAdmin;
   useEffect(() => {
     if (!user || skipPolling) return;
     let active = true;
@@ -103,7 +106,7 @@ export default function PendingAttendanceModal() {
 
   if (!user) return null;
   // Organizer controls remain independent even if an organizer attended an event too.
-  if (userData && userData.role !== 'student' && pathname.includes('/admin')) return null;
+  if (userData && userData.role !== 'student' && inAdmin) return null;
   if (surface.eventId) return null; // The dedicated rating page already makes the site inert.
   if (!pendingDoc) return null;
 

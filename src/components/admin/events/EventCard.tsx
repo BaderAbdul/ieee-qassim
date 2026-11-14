@@ -1,5 +1,6 @@
 'use client';
 
+import { publicOrigin } from '@/lib/siteUrls';
 import { useState } from 'react';
 import Image from 'next/image';
 import { Link } from '@/i18n/routing';
@@ -244,7 +245,7 @@ export default function EventCard({
 
       {showLinkModal && (
         <EventLinkQrModal
-          url={`${typeof window !== 'undefined' ? window.location.origin : ''}/${locale}/events/${event.id}`}
+          url={`${publicOrigin()}/${locale}/events/${event.id}`}
           isAr={isAr}
           onClose={() => setShowLinkModal(false)}
         />

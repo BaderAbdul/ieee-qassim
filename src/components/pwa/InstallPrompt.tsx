@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Download, Share, X } from 'lucide-react';
 import { usePathname } from '@/i18n/routing';
+import { inAdminArea, useOnAdminHost } from '@/lib/adminPath';
 import { isAdminRole, useAuth } from '@/context/AuthContext';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -32,6 +33,7 @@ function recentlyDismissed() {
 export default function InstallPrompt() {
   const isAr = useLocale() === 'ar';
   const pathname = usePathname();
+  const onAdminHost = useOnAdminHost();
   const { userData } = useAuth();
   const staff = isAdminRole(userData);
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
@@ -81,7 +83,7 @@ export default function InstallPrompt() {
     if (outcome === 'dismissed') dismiss(); else setVisible(false);
   };
 
-  if (!staff || !pathname.startsWith('/admin') || !visible || (!deferred && !ios)) return null;
+  if (!staff || !inAdminArea(pathname, onAdminHost) || !visible || (!deferred && !ios)) return null;
 
   return (
     <div

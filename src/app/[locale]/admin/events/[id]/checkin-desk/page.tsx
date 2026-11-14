@@ -4,6 +4,7 @@ import React, { useEffect, useState, use, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { apiGet, httpsCallable } from '@/lib/backend';
 import { QRCodeSVG } from 'qrcode.react';
+import { publicOrigin } from '@/lib/siteUrls';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
 import { Loader2, ArrowRight, QrCode, Link as LinkIcon, UserCheck, ShieldCheck, CheckCircle2, XCircle, Camera, RefreshCw, X, Search } from 'lucide-react';
@@ -59,7 +60,7 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
   const [isSearching, setIsSearching] = useState(false);
 
   // Self Check-in Link
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+  const baseUrl = publicOrigin();   // student-facing link: never the admin subdomain
   const secondsLeft = tokenExpiry ? Math.max(0, Math.ceil((tokenExpiry - now) / 1000)) : 0;
   const selfCheckinUrl = event?.checkinToken && secondsLeft > 0 ? `${baseUrl}/${locale}/events/${eventId}/checkin?token=${event.checkinToken}` : '';
   useEffect(() => {

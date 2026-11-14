@@ -1,5 +1,6 @@
 'use client';
 
+import { publicOrigin } from '@/lib/siteUrls';
 import { useRef, useState } from 'react';
 import { useLocale } from 'next-intl';
 import Image from 'next/image';
@@ -53,7 +54,7 @@ export default function DesignStage({ isAr, eventId, value, onChange, onSave, sa
   };
 
   const save = async () => onSave({ coverUrl: value.coverUrl });
-  const eventUrl = typeof window !== 'undefined' ? `${window.location.origin}/${locale}/events/${eventId}` : '';
+  const eventUrl = typeof window !== 'undefined' ? `${publicOrigin()}/${locale}/events/${eventId}` : '';
 
   return (
     <div className="space-y-5">

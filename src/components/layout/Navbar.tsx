@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Link, usePathname } from '@/i18n/routing';
 import { useAuth, isAdminRole } from '@/context/AuthContext';
+import { adminHomeUrl } from '@/lib/siteUrls';
+import { inAdminArea, useOnAdminHost } from '@/lib/adminPath';
 import Image from 'next/image';
 import { 
   Calendar, 
@@ -21,6 +23,7 @@ export default function Navbar() {
   const locale = useLocale();
   const isAr = locale === 'ar';
   const pathname = usePathname();
+  const onAdminHost = useOnAdminHost();
   const { user, userData, login } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -33,7 +36,7 @@ export default function Navbar() {
   }, []);
 
   // If in admin dashboard, let admin layout manage its own sidebar & navigation
-  if (pathname.startsWith('/admin')) {
+  if (inAdminArea(pathname, onAdminHost)) {
     return null;
   }
 
@@ -113,6 +116,7 @@ export default function Navbar() {
                   href={item.href}
                   aria-label={item.label}
                   aria-current={active ? 'page' : undefined}
+                  onClick={event => { const url = item.isAdmin ? adminHomeUrl(locale) : null; if (url) { event.preventDefault(); window.location.assign(url); } }}
                   className={`inline-flex shrink-0 items-center gap-2 px-2.5 sm:px-3.5 py-2 rounded-xl text-sm font-semibold transition-all ${
                     active 
                       ? 'bg-blue-50 text-blue-700 shadow-xs' 
