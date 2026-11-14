@@ -17,7 +17,7 @@ export default function MemberDetail({ id }: { id: string }) {
   const locale = useLocale(); const lang = locale === 'ar' ? 0 : 1;
   const { userData, loading: authLoading } = useAuth(); const role = userData?.role;
   const { showToast } = useToast();
-  const authorized = role === 'super_admin' || role === 'event_organizer';
+  const authorized = role === 'super_admin' || role === 'event_organizer' || role === 'member';
   const [summary, setSummary] = useState<MemberOverview | null>(null);
   const [section, setSection] = useState<MemberActivitySection>('registrations');
   const [entries, setEntries] = useState<MemberActivityEntry[]>([]);

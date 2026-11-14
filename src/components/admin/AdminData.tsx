@@ -1,21 +1,27 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { isAdminRole, useAuth } from '@/context/AuthContext';
 import { httpsCallable } from '@/lib/backend';
 import { RefreshCw } from 'lucide-react';
 import { useLocale } from 'next-intl';
 
 export function useAdminQuery<T>(action: string, eventId?: number) {
-  const role = useAuth().userData?.role;
+  const { userData } = useAuth();
+  const role = userData?.role;
+  const admin = isAdminRole(userData);
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [revision, setRevision] = useState(0);
   const refresh = useCallback(() => setRevision(value => value + 1), []);
   useEffect(() => {
-    if (!['super_admin', 'event_organizer'].includes(role || '')) return;
-    if (action === 'getAuditLog' && role !== 'super_admin') return;
+    // Any admin-tier account (members too) may ask; the server answers according to its privileges. Never leave the page "loading".
+    if (!admin || (action === 'getAuditLog' && role !== 'super_admin')) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (userData) setLoading(false);
+      return;
+    }
     let active = true;
     const load = async () => {
       setLoading(true); setError(null);
@@ -24,7 +30,7 @@ export function useAdminQuery<T>(action: string, eventId?: number) {
       finally { if (active) setLoading(false); }
     };
     void load(); return () => { active = false; };
-  }, [action, eventId, role, revision]);
+  }, [action, eventId, role, admin, userData, revision]);
   return { data, error, loading, refresh };
 }
 

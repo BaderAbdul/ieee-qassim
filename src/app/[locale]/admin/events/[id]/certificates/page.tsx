@@ -290,7 +290,7 @@ export default function CertificatesManagementPage() {
     } finally { setUploadingCSV(false); }
   };
 
-  const isAuthorized = userData && (userData.role === 'super_admin' || userData.role === 'event_organizer');
+  const isAuthorized = userData && (userData.role === 'super_admin' || userData.role === 'event_organizer' || userData.role === 'member');
 
   if (authLoading || (isAuthorized && loading)) return <div className="p-8 text-center">Loading...</div>;
 
