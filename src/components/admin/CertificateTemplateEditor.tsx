@@ -70,7 +70,11 @@ export default function CertificateTemplateEditor({ initial, isAr, canReview, ca
   const save = async () => {
     if (!validateStage()) return;
     setBusy(true);
-    try { await apiSend(initial ? 'PUT' : 'POST', `/api/admin/templates${initial ? `/${initial.id}` : ''}`, { nameAr, definition, revision: initial?.revision }); showToast(t('تم الحفظ.', 'Saved.'), 'success'); onSaved(); }
+    try {
+      const result = await apiSend<{ status?: string }>(initial ? 'PUT' : 'POST', `/api/admin/templates${initial ? `/${initial.id}` : ''}`, { nameAr, definition, revision: initial?.revision });
+      showToast(result.status === 'approved' ? t('تم الحفظ والاعتماد للاستخدام العام.', 'Saved and approved for use.') : t('تم الحفظ كمسودة بانتظار الاعتماد.', 'Saved as a draft awaiting approval.'), 'success');
+      onSaved();
+    }
     catch (reason) { showToast(reason instanceof Error ? reason.message : 'Save failed', 'error'); } finally { setBusy(false); }
   };
   const approve = async () => {
@@ -155,8 +159,9 @@ export default function CertificateTemplateEditor({ initial, isAr, canReview, ca
         <button type="button" className={button} disabled={busy || step === 0} onClick={() => setStep(step - 1)}>{t('السابق', 'Back')}</button>
         <div className="flex flex-wrap gap-2">
           {step < 3 ? <button type="button" className={primary} disabled={busy} onClick={() => { if (validateStage()) { if (step === 1 && !selected) setSelected(definition.fields[0]?.id || ''); setStep(step + 1); } }}>{t('التالي', 'Continue')}</button> : <>
-            {canEdit && <button type="button" className={primary} disabled={busy} onClick={() => void save()}><Check size={16} />{busy ? t('جارٍ التنفيذ…', 'Working…') : t('حفظ كمسودة للمراجعة', 'Submit draft for review')}</button>}
+            {canEdit && <button type="button" className={primary} disabled={busy} onClick={() => void save()}><Check size={16} />{busy ? t('جارٍ التنفيذ…', 'Working…') : canReview ? t('حفظ', 'Save') : t('حفظ كمسودة للمراجعة', 'Submit draft for review')}</button>}
             {canReview && initial?.status === 'draft' && <button type="button" className={button} disabled={busy || dirty || !pdfUrl} title={t('اختبر النسخة المحفوظة قبل اعتمادها', 'Test the saved revision before approval')} onClick={() => void approve()}><ShieldCheck size={16} />{t('اعتماد للاستخدام العام', 'Approve for global use')}</button>}
+            {canReview && initial?.status === 'draft' && (dirty || !pdfUrl) && <span className="basis-full text-xs text-[var(--color-text-muted)]">{dirty ? t('احفظ التعديلات أولًا ثم اختبر النسخة المحفوظة.', 'Save your changes first, then test the saved revision.') : t('لتفعيل الاعتماد: أنشئ نسخة PDF تجريبية من الخطوة السابقة.', 'To enable approval: generate a test PDF in the previous step.')}</span>}
           </>}
         </div>
       </footer>

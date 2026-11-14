@@ -5,11 +5,13 @@ import { useLocale } from 'next-intl';
 import { Save, Sparkles } from 'lucide-react';
 import { apiGet, apiSend } from '@/lib/backend';
 import { useToast } from '@/context/ToastContext';
+import { useAuth } from '@/context/AuthContext';
 
 interface AutomationSettings {
   defaultEmailTemplateId: string | null;
   defaultCertificateTemplateId: string | null;
   dailyEmailLimit: number;
+  autoApproveTemplates: boolean;
 }
 interface MailTemplate { id: string; name: string; subject: string }
 interface CertTemplate { id: string; nameAr: string }
@@ -19,6 +21,8 @@ export default function EventAutomationSettings() {
   const isAr = useLocale() === 'ar';
   const t = (ar: string, en: string) => isAr ? ar : en;
   const { showToast } = useToast();
+  const { userData } = useAuth();
+  const isSuperAdmin = userData?.isSuperAdmin === true || userData?.role === 'super_admin';
   const [data, setData] = useState<AutomationSettings | null>(null);
   const [mailTemplates, setMailTemplates] = useState<MailTemplate[]>([]);
   const [certTemplates, setCertTemplates] = useState<CertTemplate[]>([]);
@@ -43,7 +47,9 @@ export default function EventAutomationSettings() {
     if (!data) return;
     setBusy(true);
     try {
-      const result = await apiSend<AutomationSettings>('PUT', '/api/admin/settings/automation', data);
+      // Only a super admin may change the approval switch; everyone else saves the rest without it.
+      const { autoApproveTemplates, ...others } = data;
+      const result = await apiSend<AutomationSettings>('PUT', '/api/admin/settings/automation', isSuperAdmin ? { ...others, autoApproveTemplates } : others);
       setData(result); showToast(t('تم حفظ إعدادات الأتمتة.', 'Automation settings saved.'), 'success');
     } catch (reason) { showToast(reason instanceof Error ? reason.message : 'Unable to save', 'error'); } finally { setBusy(false); }
   };
@@ -74,6 +80,18 @@ export default function EventAutomationSettings() {
             <option value="">{t('بلا قالب افتراضي', 'No default')}</option>
             {certTemplates.map(c => <option key={c.id} value={c.id}>{c.nameAr}</option>)}
           </select>
+        </label>
+        <label className="flex items-start gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] p-4">
+          <input type="checkbox" className="mt-1 h-4 w-4" checked={data.autoApproveTemplates} disabled={!isSuperAdmin}
+                 onChange={e => setData({ ...data, autoApproveTemplates: e.target.checked })} />
+          <span>
+            <b className="block">{t('اعتماد القوالب تلقائيًا عند الحفظ', 'Approve templates automatically on save')}</b>
+            <small className="text-xs leading-6 text-[var(--color-text-secondary)]">
+              {t('عند التفعيل: أي قالب شهادة أو بريد يحفظه مدير عام أو صاحب وسام تقني يُعتمد فورًا للاستخدام العام. عند الإيقاف: يُحفظ كمسودة ويحتاج اعتمادًا يدويًا (مع اختبار النسخة المحفوظة للشهادات). حفظ بقية المستخدمين يبقى مسودة دائمًا.',
+                'On: any certificate or email template saved by a super admin or Technician-badge holder is approved for public use immediately. Off: it is saved as a draft and needs a manual approval (certificates must also be tested first). Everyone else’s saves are always drafts.')}
+              {!isSuperAdmin && <em className="block not-italic text-amber-600">{t('يغيّر هذا الخيار المدير العام فقط.', 'Only a super admin can change this option.')}</em>}
+            </small>
+          </span>
         </label>
         <label className="block space-y-2">
           <span>{t('الحد الأقصى اليومي لرسائل البريد', 'Daily email sending limit')}</span>
