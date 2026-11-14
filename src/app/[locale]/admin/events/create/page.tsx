@@ -32,7 +32,7 @@ const emptyTimePlace: TimePlaceFields = { days: [], locationType: 'in_person', l
 const emptySecurity: SecurityFields = { securityFormAcknowledged: false };
 const emptyInterviewer: InterviewerFields = { organizers: [], interviewer: '', interviewerEn: '', interviewerEmail: '', speakers: [] };
 const emptyDesign: DesignFields = { coverUrl: '' };
-const emptySettings: SettingsFields = { requiresRegistration: true, registrationMode: 'Auto', vtoolsUuid: '', hasCertificate: false, certificateTemplateId: '', emailTemplateId: '' };
+const emptySettings: SettingsFields = { requiresRegistration: true, registrationMode: 'Auto', vtoolsUuid: '', hasCertificate: false, certificateTemplateId: '', emailTemplateId: '', points: '0' };
 const emptyReview: ReviewFields = { feedbackQuestions: [] };
 const emptyShare: ShareFields = { socialLinks: [] };
 
@@ -123,6 +123,7 @@ export default function CreateEventPage() {
           requiresRegistration: event.requiresRegistration !== false, registrationMode: event.registrationMode || 'Auto',
           vtoolsUuid: event.vtoolsUuid || '', hasCertificate: !!event.hasCertificate,
           certificateTemplateId: event.certificateTemplateId || '', emailTemplateId: event.emailTemplateId || '',
+          points: String(event.points ?? 0),
         });
         setReviewData({ feedbackQuestions: normalizeFeedbackQuestions(event.feedbackQuestions || []) });
         setAttendance(event.manualAttendanceCount === null || event.manualAttendanceCount === undefined ? '' : String(event.manualAttendanceCount));

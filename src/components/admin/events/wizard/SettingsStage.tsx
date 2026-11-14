@@ -87,14 +87,24 @@ export default function SettingsStage({ isAr, value, onChange, onSave, saving, e
   };
 
   // "requires registration" now lives in the first stage (main data, time & place); this stage only saves what it shows.
-  const collect = () => ({
+  const [pointsError, setPointsError] = useState('');
+  const collect = (): Record<string, unknown> | null => {
+    const points = Number(value.points.trim() === '' ? '0' : value.points);
+    if (!Number.isInteger(points) || points < 0 || points > 100000) {
+      setPointsError(isAr ? 'أدخل عدد النقاط كرقم صحيح (٠ أو أكثر).' : 'Enter the points as a whole number (0 or more).');
+      return null;
+    }
+    setPointsError('');
+    return {
+    points,
     registrationMode: value.registrationMode,
     vtoolsUuid: value.vtoolsUuid.trim(),
     hasCertificate: value.hasCertificate,
     certificateTemplateId: value.hasCertificate && value.certificateTemplateId ? value.certificateTemplateId : null,
     emailTemplateId: value.emailTemplateId || null,
-  });
-  const save = async () => onSave(collect());
+    };
+  };
+  const save = async () => { const fields = collect(); if (fields) await onSave(fields); };
   useEffect(() => { registerCollect?.(collect); });
 
   return (
@@ -114,6 +124,18 @@ export default function SettingsStage({ isAr, value, onChange, onSave, saving, e
             </select>
           </label>
         )}
+      </div>
+
+      <div>
+        <label className={label}>
+          <span>{isAr ? 'نقاط الفعالية' : 'Event points'}</span>
+          <input className={`${input} max-w-xs`} type="number" min={0} step={1} inputMode="numeric" value={value.points}
+                 onChange={e => set('points', e.target.value)} />
+        </label>
+        <p className="mt-1.5 text-xs text-[var(--color-text-muted)]">
+          {isAr ? 'عدد النقاط التي تُضاف إلى رصيد كل طالب يُسجَّل حضوره في هذه الفعالية. اكتب ٠ إن لم تكن للفعالية نقاط.' : 'Points added to each student whose attendance is recorded at this event. Enter 0 for none.'}
+        </p>
+        {pointsError && <p role="alert" className="mt-1 text-xs" style={{ color: 'var(--color-danger)' }}>{pointsError}</p>}
       </div>
 
       <div>
