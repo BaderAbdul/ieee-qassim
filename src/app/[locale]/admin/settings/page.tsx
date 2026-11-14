@@ -12,6 +12,7 @@ import AdminAuditPage from '../audit/page';
 import AdminAcademicTermPage from '../academic-term/page';
 import AdminEventProcessTeamsPage from '../event-process-teams/page';
 import EmailSettings from '@/components/admin/EmailSettings';
+import OnboardingSettings from '@/components/admin/onboarding/OnboardingSettings';
 import EventAutomationSettings from '@/components/admin/EventAutomationSettings';
 import MessagesComposer from '@/components/admin/messages/MessagesComposer';
 
@@ -26,7 +27,8 @@ export default function AdminSettingsPage() {
     ...(isSuperAdmin || userData?.canManageEmail ? [{ key: 'email-sender', label: isAr ? 'البريد المرسل' : 'Email sender', content: <EmailSettings /> }] : []),
     ...(isSuperAdmin || canEditContent ? [{ key: 'event-automation', label: isAr ? 'أتمتة الفعاليات' : 'Event automation', content: <EventAutomationSettings /> }] : []),
     ...(isSuperAdmin ? [{ key: 'messages', label: isAr ? 'رسائل الإدارة' : 'Staff messages', content: <MessagesComposer /> }] : []),
-    ...(isSuperAdmin ? [{ key: 'roles', label: isAr ? 'الأدوار والصلاحيات' : 'Roles & Privileges', content: <AdminRolesPage /> }] : []),
+    ...(isSuperAdmin ? [{ key: 'onboarding', label: isAr ? 'الدخول الأول والتطبيق' : 'First sign-in & app', content: <OnboardingSettings /> }] : []),
+    ...(isSuperAdmin ? [{ key: 'roles', label: isAr ? 'الأدوار والحد الأدنى للصلاحيات' : 'Roles & minimum privileges', content: <AdminRolesPage /> }] : []),
     ...(canEditContent ? [{ key: 'content', label: isAr ? 'محتوى الموقع' : 'Site content', content: <AdminContentPage /> }] : []),
     ...(canEditAcademicCalendar ? [{ key: 'academic-term', label: isAr ? 'الفصل الدراسي' : 'Academic term', content: <AdminAcademicTermPage /> }] : []),
     ...(isSuperAdmin ? [{ key: 'event-process-teams', label: isAr ? 'فرق مراحل الفعاليات' : 'Event process teams', content: <AdminEventProcessTeamsPage /> }] : []),

@@ -1,67 +1,16 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { useAuth } from '@/context/AuthContext';
 import { apiSend } from '@/lib/backend';
 import { apiGetArray } from '@/lib/backendResponse';
 import { AdminError, AdminLoading } from '@/components/admin/AdminData';
+import { PrivilegeGrid, type Privilege } from '@/components/admin/PrivilegeGrid';
 import { useToast } from '@/context/ToastContext';
 import { Plus, Shield, ShieldAlert, Trash2 } from 'lucide-react';
 
-interface Privilege { key: string; feature: string; action: string; labelAr: string; labelEn: string }
 interface RoleRow { key: string; nameAr: string; nameEn: string; tier: number; isSystem: boolean; isAdminRole: boolean; privileges: string[] }
-
-function groupByFeature(privileges: Privilege[]): Map<string, Privilege[]> {
-  const groups = new Map<string, Privilege[]>();
-  for (const privilege of privileges) {
-    const list = groups.get(privilege.feature) ?? [];
-    list.push(privilege);
-    groups.set(privilege.feature, list);
-  }
-  return groups;
-}
-
-function PrivilegeGrid({ privileges, selected, onChange, disabled, isAr }: {
-  privileges: Privilege[]; selected: Set<string>; onChange: (next: Set<string>) => void; disabled?: boolean; isAr: boolean;
-}) {
-  const groups = useMemo(() => groupByFeature(privileges), [privileges]);
-  const toggle = (key: string) => {
-    const next = new Set(selected);
-    if (next.has(key)) next.delete(key); else next.add(key);
-    onChange(next);
-  };
-  const toggleFeature = (keys: string[], allSelected: boolean) => {
-    const next = new Set(selected);
-    for (const key of keys) { if (allSelected) next.delete(key); else next.add(key); }
-    onChange(next);
-  };
-  return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      {[...groups.entries()].map(([feature, items]) => {
-        const keys = items.map(item => item.key);
-        const allSelected = keys.every(key => selected.has(key));
-        return (
-          <div key={feature} className="rounded-xl border border-gray-200 p-3">
-            <label className="flex items-center gap-2 font-bold text-sm text-gray-800 mb-2">
-              <input type="checkbox" checked={allSelected} disabled={disabled}
-                     onChange={() => toggleFeature(keys, allSelected)} />
-              {feature}
-            </label>
-            <div className="space-y-1 ps-1">
-              {items.map(item => (
-                <label key={item.key} className="flex items-center gap-2 text-xs text-gray-600">
-                  <input type="checkbox" checked={selected.has(item.key)} disabled={disabled} onChange={() => toggle(item.key)} />
-                  {isAr ? item.labelAr : item.labelEn} <span className="text-gray-400">({item.action})</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 export default function AdminRolesPage() {
   const isAr = useLocale() === 'ar';
@@ -132,8 +81,8 @@ export default function AdminRolesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 font-cairo">{isAr ? 'الأدوار والصلاحيات' : 'Roles & Privileges'}</h1>
-          <p className="text-gray-500 text-sm">{isAr ? 'لكل دور قائمة صلاحيات قابلة للتعديل، لكل ميزة.' : 'Each role has an editable, per-feature privilege list.'}</p>
+          <h1 className="text-2xl font-bold text-gray-900 font-cairo">{isAr ? 'الأدوار والحد الأدنى للصلاحيات' : 'Roles & minimum privileges'}</h1>
+          <p className="text-gray-500 text-sm">{isAr ? 'هذه هي الصلاحيات الدنيا لكل دور: يبدأ بها كل عضو. ويحصل قائد الفريق ونائبه تلقائيًا على الحد الأقصى لفريقهما (يُضبط من صفحة الهيكلة ← الفرق).' : 'These are the minimum privileges of each role: every member starts with them. A team leader and vice-leader automatically get their team’s maximum (set on People → Teams).'}</p>
         </div>
         <button type="button" onClick={() => setCreating(value => !value)}
                 className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2 text-sm font-bold text-white hover:bg-purple-700">

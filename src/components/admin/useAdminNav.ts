@@ -60,3 +60,24 @@ export function operationsShortcuts(isAr: boolean) {
     { name: isAr ? 'سجل الإجراءات' : 'Audit log', href: '/admin/settings' },
   ];
 }
+
+/**
+ * Direct links must follow the same rule as the sidebar: when a whole feature group is disabled for someone (none of its
+ * privileges), its page is closed to them just as its tab is hidden. `pathname` is the internal /<locale>/admin/... form.
+ */
+export function canOpenAdminPath(pathname: string, userData: UserData | null): boolean {
+  if (!userData) return false;
+  const section = /^\/(?:ar|en)\/admin(?:\/([^/?#]+))?/.exec(pathname)?.[1] ?? '';
+  const isSuperAdmin = userData.isSuperAdmin === true || userData.role === 'super_admin';
+  if (isSuperAdmin) return true;
+  switch (section) {
+    case 'events': return hasAnyPrivilege(userData, 'events');
+    case 'people': case 'users': case 'teams': return hasAnyPrivilege(userData, 'members');
+    case 'templates': return hasAnyPrivilegeOf(userData, 'email_templates', 'certificate_templates') || userData.canReviewTemplates === true;
+    case 'mail': return userData.canManageEmail === true || hasAnyPrivilege(userData, 'mail');
+    case 'operations': return hasAnyPrivilegeOf(userData, 'operations', 'projects', 'tasks', 'cross_team_requests', 'goals', 'ideas');
+    case 'settings': return hasPrivilege(userData, 'content.update') || hasPrivilege(userData, 'academic_calendar.update') || userData.canManageEmail === true;
+    case 'roles': case 'badges': case 'audit': case 'maintenance': case 'event-process-teams': return false;
+    default: return true;
+  }
+}

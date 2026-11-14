@@ -21,7 +21,8 @@ import { mainHostFor } from '@/lib/adminHost';
 import AdminTopbar from '@/components/admin/AdminTopbar';
 import { AdminTopbarActionsProvider } from '@/components/admin/AdminTopbarActions';
 import { StaffMessagesProvider } from '@/components/admin/messages/StaffMessagesContext';
-import { useAdminNav, type AdminNavItem } from '@/components/admin/useAdminNav';
+import { canOpenAdminPath, useAdminNav, type AdminNavItem } from '@/components/admin/useAdminNav';
+import AdminOnboarding, { useOnboarding } from '@/components/admin/onboarding/AdminOnboarding';
 
 const subscribeSidebar = (notify: () => void) => {
   window.addEventListener('storage', notify);
@@ -96,6 +97,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     || (userData.canReviewTemplates === true && /\/admin\/templates(?:\/|$)/.test(pathname))
     || (userData.canManageEmail === true && /\/admin\/(settings|mail)(?:\/|$)/.test(pathname)));
 
+  // Staff (members, organizers, super admins) finish a short setup before the board opens: profile, app, notifications.
+  const isStaff = !!userData && ['member', 'event_organizer', 'super_admin'].includes(userData.role ?? '');
+  const onboarding = useOnboarding(!loading && !!user && isStaff);
+
   useEffect(() => {
     if (loading || (user && isDashboardUser)) return;
     // On a hard refresh Clerk can report "not signed in yet" for an instant before it finishes
@@ -110,6 +115,29 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return (
       <div className={`${themeClass} min-h-screen flex items-center justify-center bg-[var(--color-page)]`}>
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-accent)]"></div>
+      </div>
+    );
+  }
+
+  if (isStaff && user && !onboarding.checked) {
+    return (
+      <div className={`${themeClass} min-h-screen flex items-center justify-center bg-[var(--color-page)]`}>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-accent)]"></div>
+      </div>
+    );
+  }
+
+  if (isStaff && user && onboarding.state?.required && !onboarding.state.complete) {
+    return <AdminOnboarding isAr={isAr} state={onboarding.state} onChanged={onboarding.reload} />;
+  }
+
+  if (user && isDashboardUser && isStaff && !canOpenAdminPath(pathname, userData)) {
+    return (
+      <div className={`${themeClass} min-h-screen flex flex-col items-center justify-center bg-[var(--color-page)] px-4 text-center`}>
+        <ShieldAlert className="w-14 h-14 text-[var(--color-danger)] mb-4" />
+        <h1 className="text-xl font-black text-[var(--color-text-primary)] mb-2">{isAr ? 'هذه الصفحة غير متاحة لك' : 'This page is not available to you'}</h1>
+        <p className="text-sm text-[var(--color-text-secondary)] mb-5">{isAr ? 'لا تملك صلاحية لأي جزء من هذه الميزة.' : 'You have no privilege for any part of this feature.'}</p>
+        <Link href="/admin" className="rounded-xl bg-[var(--color-accent)] px-5 py-2.5 text-sm font-bold text-[var(--color-accent-contrast)]">{isAr ? 'العودة إلى الرئيسية' : 'Back to the overview'}</Link>
       </div>
     );
   }

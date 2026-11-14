@@ -9,6 +9,7 @@ import { AdminError, AdminLoading } from '@/components/admin/AdminData';
 import { useToast } from '@/context/ToastContext';
 import { Link } from '@/i18n/routing';
 import PrivilegesBadgesPanel from '@/components/admin/PrivilegesBadgesPanel';
+import { PrivilegeGrid, type Privilege } from '@/components/admin/PrivilegeGrid';
 import { useAdminTopbarActions } from '@/components/admin/AdminTopbarActions';
 import type { MemberSearchResult } from '@/lib/adminTypes';
 import { ArrowDown, ArrowUp, BadgeCheck, Briefcase, Crown, Edit2, KeyRound, Plus, ShieldCheck, Star, Trash2, UserMinus, X } from 'lucide-react';
@@ -26,7 +27,8 @@ const sortedMembersOf = (team: Team) =>
 interface Team {
   id: string; nameAr: string; nameEn: string; descriptionAr: string | null; descriptionEn: string | null;
   icon: string | null; position: number; isPublic: boolean; kind: TeamKind; members: TeamMember[];
-  // null = uncapped; otherwise the only privileges a leader/vice-leader of this team may grant.
+  // null = no maximum set; otherwise the most privileges anyone on this team may hold through it.
+  maxPrivileges?: string[] | null;
 }
 interface SearchResultUser { id: string; email?: string; displayName?: string; arabicFullName?: string; photoURL?: string; role?: string }
 
@@ -51,6 +53,24 @@ export default function AdminTeamsPage() {
   const [searching, setSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [privilegesUserId, setPrivilegesUserId] = useState<string | null>(null);
+  const [catalog, setCatalog] = useState<Privilege[]>([]);
+  const [maxTeamId, setMaxTeamId] = useState<string | null>(null);
+  const [maxUnlimited, setMaxUnlimited] = useState(true);
+  const [maxSelection, setMaxSelection] = useState<Set<string>>(new Set());
+  const openMax = async (team: Team) => {
+    if (maxTeamId === team.id) { setMaxTeamId(null); return; }
+    if (!catalog.length) { try { setCatalog(await apiGetArray<Privilege>('/api/admin/privileges')); } catch { /* shown when saving */ } }
+    setMaxTeamId(team.id); setMaxUnlimited(team.maxPrivileges == null); setMaxSelection(new Set(team.maxPrivileges ?? []));
+  };
+  const saveMax = async (team: Team) => {
+    setBusy(true);
+    try {
+      await apiSend('PATCH', `/api/admin/teams/${encodeURIComponent(team.id)}`, { maxPrivileges: maxUnlimited ? null : [...maxSelection] });
+      showToast(isAr ? 'تم حفظ الحد الأقصى للصلاحيات.' : 'Maximum privileges saved.', 'success');
+      setMaxTeamId(null); await load({ silent: true });
+    } catch (reason) { showToast(reason instanceof Error ? reason.message : (isAr ? 'تعذر الحفظ.' : 'Could not save.'), 'error'); }
+    finally { setBusy(false); }
+  };
   const isSuperAdmin = userData?.isSuperAdmin === true;
 
   // `silent` skips the loading-spinner toggle -- used for reloads after a mutation so the whole
@@ -300,11 +320,30 @@ export default function AdminTeamsPage() {
               </div>
               {isSuperAdmin && (
                 <div className="flex items-center gap-2 shrink-0">
+                  <button type="button" onClick={() => void openMax(team)} title={isAr ? 'الحد الأقصى للصلاحيات' : 'Maximum privileges'} aria-pressed={maxTeamId === team.id}
+                          className="cursor-pointer rounded-lg bg-[var(--color-surface-2)] p-1.5 hover:opacity-80 text-[var(--color-text-secondary)]"><ShieldCheck size={16} /></button>
                   <button type="button" onClick={() => startEdit(team)} className="cursor-pointer rounded-lg bg-[var(--color-surface-2)] p-1.5 hover:opacity-80 text-[var(--color-text-secondary)]"><Edit2 size={14} /></button>
                   <button type="button" onClick={() => deleteTeam(team.id)} className="cursor-pointer rounded-lg p-1.5 text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)]"><Trash2 size={16} /></button>
                 </div>
               )}
             </div>
+
+            {isSuperAdmin && maxTeamId === team.id && (
+              <div className="mt-3 space-y-3 border-t border-[var(--color-border)]/50 pt-3">
+                <p className="text-xs text-[var(--color-text-secondary)] leading-6">
+                  {isAr ? 'الحد الأقصى للصلاحيات: يحصل عليه قائد الفريق ونائبه تلقائيًا، ويستطيعان منح جزء منه للأعضاء. أما الأعضاء فيبقون على الحد الأدنى لدورهم إلى أن يغيّره القائد أو نائبه أو المدير العام. الميزة التي لا تُختار هنا تختفي كليًا من لوحة من لا يملك أيًّا من صلاحياتها.' : 'The maximum privileges: the team’s leader and vice-leader get them automatically and may grant part of them to members. Members stay on their role’s minimum until the leader, vice-leader or a super admin changes it. A feature with no privilege selected disappears completely for anyone who has none of it.'}
+                </p>
+                <label className="flex items-center gap-2 text-sm font-bold">
+                  <input type="checkbox" checked={maxUnlimited} onChange={e => setMaxUnlimited(e.target.checked)} />
+                  {isAr ? 'بدون حد أقصى محدد (القاعدة القديمة: صلاحيات القائد نفسها)' : 'No maximum set (the old rule: the leader’s own privileges)'}
+                </label>
+                {!maxUnlimited && <PrivilegeGrid privileges={catalog} selected={maxSelection} onChange={setMaxSelection} isAr={isAr} />}
+                <div className="flex gap-2">
+                  <button type="button" disabled={busy} onClick={() => void saveMax(team)} className="cursor-pointer rounded-xl bg-[var(--color-accent)] px-4 py-2 text-sm font-bold text-[var(--color-accent-contrast)] disabled:opacity-50">{isAr ? 'حفظ' : 'Save'}</button>
+                  <button type="button" onClick={() => setMaxTeamId(null)} className="cursor-pointer rounded-xl bg-[var(--color-surface-2)] px-4 py-2 text-sm font-bold">{isAr ? 'إغلاق' : 'Close'}</button>
+                </div>
+              </div>
+            )}
 
             {isSuperAdmin && editingId === team.id && (
               <div className="mt-3 border-t border-[var(--color-border)]/50 pt-3 space-y-3">

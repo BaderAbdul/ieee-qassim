@@ -7,7 +7,7 @@
  *   - /icons, logo, fonts, images from this origin     -> stale-while-revalidate
  *   - navigations                                       -> network, falling back to /offline.html
  */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const SHELL_CACHE = `shell-${VERSION}`;
 const STATIC_CACHE = 'next-static'; // names are content-hashed, so this one survives version bumps
 const ASSET_CACHE = `assets-${VERSION}`;
@@ -91,4 +91,36 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/icons/') || /\.(?:png|jpe?g|webp|avif|svg|ico|woff2?)$/.test(url.pathname) || url.pathname.startsWith('/_next/image')) {
     event.respondWith(staleWhileRevalidate(event, ASSET_CACHE, MAX_ASSET_ENTRIES));
   }
+});
+
+// --- Push notifications (tasks, projects, event stages): shown by the browser even when the app is closed ---------
+self.addEventListener('push', (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch { data = { body: event.data ? event.data.text() : '' }; }
+  event.waitUntil(self.registration.showNotification(data.title || 'IEEE QU', {
+    body: data.body || '',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    tag: data.tag || undefined,
+    renotify: !!data.tag,
+    dir: 'auto',
+    lang: 'ar',
+    data: { url: data.url || '/ar/admin' },
+  }));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = new URL((event.notification.data && event.notification.data.url) || '/ar/admin', self.location.origin).href;
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const client of windows) {
+      if ('focus' in client) {
+        await client.focus();
+        if ('navigate' in client) { try { await client.navigate(target); } catch { /* cross-origin or closed */ } }
+        return;
+      }
+    }
+    await self.clients.openWindow(target);
+  })());
 });
