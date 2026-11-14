@@ -34,6 +34,6 @@ export default function AdminMailPage() {
   if (!allowed) return <p role="alert">{t('لا تملك صلاحية إدارة البريد.', 'You do not have permission to manage mail.')}</p>;
 
   return <div className="space-y-6">
-    {tab === 'tracking' ? <MailTrackingTab isAr={isAr} /> : <MailSendTab isAr={isAr} />}
+    {tab === 'tracking' ? <MailTrackingTab isAr={isAr} canCancel={canSend} /> : <MailSendTab isAr={isAr} />}
   </div>;
 }

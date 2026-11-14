@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Clock, Mail, Paperclip, RefreshCw, Search, Send, TrendingUp } from 'lucide-react';
-import { apiGet } from '@/lib/backend';
+import { AlertTriangle, CheckCircle2, Clock, Mail, Paperclip, RefreshCw, Search, Send, Trash2, TrendingUp } from 'lucide-react';
+import { apiGet, apiSend } from '@/lib/backend';
 import { useToast } from '@/context/ToastContext';
 
 interface Stats { totalSent: number; sentToday: number; dailyLimit: number; remainingToday: number; totalStudents: number }
@@ -22,7 +22,7 @@ type Group = 'queue' | 'sent' | 'problems';
 const input = 'w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2.5 text-sm';
 const panel = 'rounded-2xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/60 backdrop-blur-md shadow-sm';
 
-export default function MailTrackingTab({ isAr }: { isAr: boolean }) {
+export default function MailTrackingTab({ isAr, canCancel = false }: { isAr: boolean; canCancel?: boolean }) {
   const t = (ar: string, en: string) => isAr ? ar : en;
   const { showToast } = useToast();
   const [stats, setStats] = useState<Stats | null>(null);
@@ -37,8 +37,7 @@ export default function MailTrackingTab({ isAr }: { isAr: boolean }) {
   const [busy, setBusy] = useState(false);
 
   const loadStats = useCallback(async () => {
-    setError('');
-    try { setStats(await apiGet<Stats>('/api/admin/mail/stats')); }
+    try { setStats(await apiGet<Stats>('/api/admin/mail/stats')); setError(''); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to load mail stats'); }
   }, []);
 
@@ -52,6 +51,8 @@ export default function MailTrackingTab({ isAr }: { isAr: boolean }) {
     finally { setLoading(false); }
   }, [group, search]);
 
+  // Initial load; the state is set once the request answers.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void loadStats(); }, [loadStats]);
   useEffect(() => {
     const timer = window.setTimeout(() => { void loadJobs(true); }, 250);
@@ -67,6 +68,28 @@ export default function MailTrackingTab({ isAr }: { isAr: boolean }) {
     finally { setBusy(false); }
   };
 
+  const cancelOne = async (job: Job) => {
+    const queued = job.status === 'PENDING';
+    if (!window.confirm(queued
+      ? t('إلغاء هذه الرسالة وإزالتها من قائمة الانتظار؟ لن تُرسل.', 'Cancel this email and remove it from the queue? It will not be sent.')
+      : t('إزالة هذه الرسالة من القائمة؟', 'Remove this email from the list?'))) return;
+    try {
+      await apiSend('DELETE', `/api/admin/mail/jobs/${encodeURIComponent(job.id)}`);
+      setJobs(previous => previous.filter(item => item.id !== job.id));
+      void loadStats(); void loadJobs(true);
+    } catch (reason) { showToast(reason instanceof Error ? reason.message : t('تعذر الإلغاء', 'Could not cancel'), 'error'); }
+  };
+  const cancelAll = async () => {
+    if (!window.confirm(t('إلغاء كل الرسائل التي بالانتظار؟ لن تُرسل، ولا يمكن التراجع.', 'Cancel every email waiting in the queue? They will not be sent, and this cannot be undone.'))) return;
+    setBusy(true);
+    try {
+      const result = await apiSend<{ count: number }>('POST', '/api/admin/mail/jobs/cancel-queue');
+      showToast(t(`أُلغيت ${result.count} رسالة.`, `${result.count} email(s) cancelled.`), 'success');
+      void loadStats(); void loadJobs(true);
+    } catch (reason) { showToast(reason instanceof Error ? reason.message : t('تعذر الإلغاء', 'Could not cancel'), 'error'); }
+    finally { setBusy(false); }
+  };
+
   const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString(isAr ? 'ar-SA' : 'en-US', { dateStyle: 'short', timeStyle: 'short' }) : '—');
   const statusChip = (status: string) => ({
     PENDING: { label: t('بالانتظار', 'Queued'), cls: 'bg-amber-100 text-amber-700' },
@@ -74,6 +97,7 @@ export default function MailTrackingTab({ isAr }: { isAr: boolean }) {
     DELIVERED: { label: t('أُرسلت', 'Sent'), cls: 'bg-emerald-100 text-emerald-700' },
     FAILED: { label: t('فشلت', 'Failed'), cls: 'bg-red-100 text-red-700' },
     REVIEW: { label: t('بحاجة مراجعة', 'Needs review'), cls: 'bg-orange-100 text-orange-700' },
+    CANCELLED: { label: t('ملغاة', 'Cancelled'), cls: 'bg-slate-100 text-slate-600' },
   }[status] ?? { label: status, cls: 'bg-slate-100 text-slate-600' });
   const groups: { id: Group; label: string; Icon: typeof Clock; count: number | undefined }[] = [
     { id: 'queue', label: t('قيد الانتظار', 'In queue'), Icon: Clock, count: data?.counts.queue },
@@ -117,6 +141,11 @@ export default function MailTrackingTab({ isAr }: { isAr: boolean }) {
           <Search size={15} className="absolute start-3 top-3 text-[var(--color-text-muted)]" />
           <input className={`${input} ps-9`} value={search} onChange={e => setSearch(e.target.value)} placeholder={t('ابحث بالمستلم أو العنوان…', 'Search by recipient or subject…')} />
         </div>
+        {canCancel && group === 'queue' && (data?.counts.queue ?? 0) > 0 && (
+          <button type="button" disabled={busy} onClick={() => void cancelAll()} className="inline-flex items-center gap-1.5 rounded-xl bg-red-50 px-3 py-2.5 text-xs font-bold text-red-600 disabled:opacity-50">
+            <Trash2 size={14} />{t('إلغاء كل الرسائل بالانتظار', 'Cancel all queued')}
+          </button>
+        )}
         <button type="button" onClick={() => void loadJobs(true)} aria-label={t('تحديث', 'Refresh')} className="rounded-xl bg-[var(--color-surface-2)] p-2.5"><RefreshCw size={16} className={loading ? 'animate-spin' : ''} /></button>
       </div>
 
@@ -134,6 +163,12 @@ export default function MailTrackingTab({ isAr }: { isAr: boolean }) {
                   <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${chip.cls}`}>{chip.label}</span>
                   <span className="min-w-0 flex-1 truncate font-bold">{job.subject}</span>
                   {job.attachmentCount > 0 && <span className="inline-flex items-center gap-1 text-[11px] text-[var(--color-text-muted)]"><Paperclip size={12} />{job.attachmentCount}</span>}
+                  {canCancel && ['PENDING', 'FAILED', 'REVIEW'].includes(job.status) && (
+                    <button type="button" onClick={() => void cancelOne(job)} aria-label={job.status === 'PENDING' ? t('إلغاء الرسالة', 'Cancel email') : t('إزالة الرسالة', 'Remove email')}
+                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold text-red-600 hover:bg-red-50">
+                      <Trash2 size={13} />{job.status === 'PENDING' ? t('إلغاء', 'Cancel') : t('إزالة', 'Remove')}
+                    </button>
+                  )}
                 </div>
                 <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[var(--color-text-secondary)]">
                   <span>{t('إلى:', 'To:')} <b dir="ltr">{job.recipient}</b>{job.recipientName ? ` (${job.recipientName})` : ''}</span>
