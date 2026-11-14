@@ -10,10 +10,15 @@ export default function CertificateAppearanceControls({ field, isAr, onChange }:
   if (field.source !== 'certificate.QR') return <div className="space-y-3">
     <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={field.maxWidth !== undefined} onChange={e => onChange({ maxWidth: e.target.checked ? 60 : undefined })} />{t('تحديد أقصى عرض للنص', 'Limit text width')}</label>
     {field.maxWidth !== undefined && <label className="block space-y-1 text-sm"><span>{t('أقصى عرض (% من الشهادة)', 'Maximum width (% of certificate)')}</span><input className={input} type="number" min={1} max={100} step={.5} value={field.maxWidth} onChange={e => { const value = Number(e.target.value); if (value >= 1 && value <= 100) onChange({ maxWidth: value }); }} /></label>}
-    <label className="block space-y-1 text-sm"><span>{t('اتجاه قراءة النص', 'Text reading direction')}</span><select className={input} value={field.direction ?? 'auto'} onChange={e => onChange({ direction: e.target.value as TemplateField['direction'] })}>
+    <label className="block space-y-1 text-sm"><span>{t('اتجاه قراءة النص', 'Text reading direction')}</span><select className={input} value={field.direction ?? 'auto'} onChange={e => {
+      // The reading direction also decides which edge stays put: RTL pins the right edge (text grows to the
+      // left as letters are added), LTR pins the left edge (text grows to the right). Automatic changes nothing.
+      const direction = e.target.value as TemplateField['direction'];
+      onChange({ direction, ...(direction === 'rtl' ? { align: 'right' as const } : direction === 'ltr' ? { align: 'left' as const } : {}) });
+    }}>
       <option value="auto">{t('تلقائي', 'Automatic')}</option><option value="ltr">{t('من اليسار لليمين (LTR)', 'Left to right (LTR)')}</option><option value="rtl">{t('من اليمين لليسار (RTL)', 'Right to left (RTL)')}</option>
     </select></label>
-    <p className="text-xs text-[var(--color-text-muted)]">{t('الموضع هو نقطة الارتكاز. النص المتمركز يتوسع بالتساوي حولها؛ اليسار يثبت بداية المساحة واليمين يثبت نهايتها. يُصغّر الخط عند تجاوز أقصى عرض.', 'The position is the anchor. Centered text grows equally around it; left anchors the left edge and right anchors the right edge. Text shrinks when it exceeds the maximum width.')}</p>
+    <p className="text-xs text-[var(--color-text-muted)]">{t('الموضع هو نقطة الارتكاز. اختيار RTL يثبت الحافة اليمنى فيتوسع النص يسارًا عند إضافة حروف، واختيار LTR يثبت الحافة اليسرى فيتوسع يمينًا؛ ويمكنك تغيير الارتكاز يدويًا (مثل التوسيط) من خيار «الارتكاز واتجاه التوسع». يُصغّر الخط عند تجاوز أقصى عرض.', 'The position is the anchor. Choosing RTL pins the right edge so the text grows to the left as letters are added; choosing LTR pins the left edge so it grows to the right. You can still override the anchor (e.g. centered) with “Anchor and text growth”. Text shrinks when it exceeds the maximum width.')}</p>
   </div>;
   return <div className="space-y-3 text-sm">
     {([
