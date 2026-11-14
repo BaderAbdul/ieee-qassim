@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { useAuth } from '@/context/AuthContext';
 import { Link } from '@/i18n/routing';
-import { Bell, Search, Settings, LogOut, CircleUserRound, ChevronDown } from 'lucide-react';
+import { Bell, Search, CircleUserRound, ChevronDown } from 'lucide-react';
 import { useAdminQuery } from '@/components/admin/AdminData';
 import type { AdminOverview } from '@/lib/adminTypes';
 import AdminSearchModal from '@/components/admin/AdminSearchModal';
@@ -25,7 +25,7 @@ function useClickOutside(onOutside: () => void) {
 export default function AdminTopbar({ pageTitle, hidden }: { pageTitle?: string; hidden?: boolean }) {
   const locale = useLocale();
   const isAr = locale === 'ar';
-  const { user, userData, logout } = useAuth();
+  const { user, userData } = useAuth();
   const { data } = useAdminQuery<AdminOverview>('getAdminOverview');
   const pageActions = useAdminTopbarActionsSlot();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -159,30 +159,6 @@ export default function AdminTopbar({ pageTitle, hidden }: { pageTitle?: string;
                     <CircleUserRound size={16} />
                     {isAr ? 'ملفي الشخصي' : 'My profile'}
                   </Link>
-                  <Link
-                    href="/profile"
-                    onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-[var(--color-surface-2)] text-sm font-medium text-[var(--color-text-secondary)] transition-colors"
-                  >
-                    <CircleUserRound size={16} />
-                    {isAr ? 'صفحتي كطالب' : 'My student page'}
-                  </Link>
-                  <Link
-                    href="/admin/settings"
-                    onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-[var(--color-surface-2)] text-sm font-medium text-[var(--color-text-secondary)] transition-colors"
-                  >
-                    <Settings size={16} />
-                    {isAr ? 'الإعدادات' : 'Settings'}
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => { setProfileOpen(false); void logout(); }}
-                    className="cursor-pointer w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-[var(--color-danger-soft)] text-sm font-bold text-[var(--color-danger)] transition-colors"
-                  >
-                    <LogOut size={16} />
-                    {isAr ? 'تسجيل الخروج' : 'Log out'}
-                  </button>
                 </div>
               </div>
             )}

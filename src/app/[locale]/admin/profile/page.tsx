@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Award, Briefcase, Calendar, CheckCircle2, Sparkles, Trophy } from 'lucide-react';
+import { Award, Briefcase, Calendar, CheckCircle2, LogOut, Sparkles, Trophy } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { apiGet } from '@/lib/backend';
 import { AdminError, AdminLoading } from '@/components/admin/AdminData';
@@ -33,7 +33,7 @@ type Tab = 'events' | 'student' | 'admin';
 export default function AdminProfilePage() {
   const isAr = useLocale() === 'ar';
   const t = (ar: string, en: string) => (isAr ? ar : en);
-  const { user, userData, retry } = useAuth();
+  const { user, userData, retry, logout } = useAuth();
   const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('events');
@@ -124,6 +124,13 @@ export default function AdminProfilePage() {
         {tab === 'student' && ledger(data.pointTransactions, t('لا توجد عمليات نقاط بعد.', 'No point transactions yet.'))}
         {tab === 'admin' && ledger(data.adminPointTransactions ?? [], t('لا توجد نقاط إدارية بعد.', 'No administrative points yet.'))}
       </section>
+
+      <div className="flex justify-end">
+        <button type="button" onClick={() => void logout()}
+                className="inline-flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-2.5 text-sm font-bold text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)]">
+          <LogOut size={16} />{t('تسجيل الخروج', 'Log out')}
+        </button>
+      </div>
 
       {editing && <ProfileSettingsPanel userData={userData} isAr={isAr} onClose={() => setEditing(false)} onSaved={() => { retry(); void load(); }} />}
     </div>

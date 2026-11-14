@@ -275,7 +275,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="min-w-0 flex-1 flex flex-col">
         <StaffMessagesProvider>
         <AdminTopbarActionsProvider>
-          <AdminTopbar pageTitle={[...navItems, ...footerItems].find(item => isCurrentPath(item.href))?.name} hidden={topbarHidden} />
+          <AdminTopbar pageTitle={[...navItems, ...footerItems].find(item => isCurrentPath(item.href))?.name ?? (isCurrentPath('/admin/profile') ? (isAr ? 'ملفي الشخصي' : 'My profile') : undefined)} hidden={topbarHidden} />
           <div className="p-4 sm:p-6 lg:p-8">
             <div className="max-w-6xl mx-auto">
               <ConfigurationNotice />

@@ -8,12 +8,14 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { apiGet, apiSend } from '@/lib/backend';
 import { EMAIL_VARIABLE_GROUPS, MAX_TEMPLATE_ATTACHMENTS, insertAtCursor, variableToken } from '@/lib/emailTemplates';
+import { builderSamples, builderSubject, defaultBuilderState, generateEmail, normalizeBuilderState, type BuilderState } from '@/lib/emailBuilder';
+import EmailBuilder from '@/components/admin/email/EmailBuilder';
 import {
   type Candidate, type StudioSamples, countOccurrences, detectCandidates, escapeHtml, fileToBase64, highlightVariables,
   addGreeting, replaceLiteral, scanHardcoded, unknownVariables, usedVariables,
 } from '@/lib/emailStudio';
 
-interface StudioApi { getHtml: () => string; getSubject: () => string; getSamples: () => StudioSamples }
+const BUILDER_KEY = 'email-studio-builder-v1';
 interface AttachmentDraft { key: string; kind: 'certificate' | 'fixed'; title: string; certificateTemplateId?: string; file?: File }
 interface Snapshot { html: string; subject: string }
 
@@ -47,7 +49,8 @@ export default function EmailStudio() {
   const t = (ar: string, en: string) => (isAr ? ar : en);
   const { userData } = useAuth();
   const { showToast } = useToast();
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [builder, setBuilder] = useState<BuilderState>(defaultBuilderState);
+  const loadedBuilder = useRef(false);
   const subjectRef = useRef<HTMLInputElement>(null);
   const canApprove = !!(userData?.isSuperAdmin || userData?.role === 'super_admin' || userData?.canManageEmail);
 
@@ -89,11 +92,20 @@ export default function EmailStudio() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantsAttachments]);
 
+  // The design is remembered in this browser so a refresh never loses it.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    try { const saved = localStorage.getItem(BUILDER_KEY); if (saved) setBuilder(normalizeBuilderState(JSON.parse(saved))); } catch { /* ignore */ }
+    loadedBuilder.current = true;
+  }, []);
+  useEffect(() => {
+    if (!loadedBuilder.current) return;
+    try { localStorage.setItem(BUILDER_KEY, JSON.stringify(builder)); } catch { /* ignore */ }
+  }, [builder]);
+
   const fromDesign = () => {
-    const api = (iframeRef.current?.contentWindow as (Window & { studioApi?: StudioApi }) | null)?.studioApi;
-    if (!api) { showToast(t('لم يكتمل تحميل أداة التصميم بعد.', 'The design tool has not finished loading.'), 'error'); return; }
     if (history.length && !confirm(t('المتابعة من التصميم ستعيد توليد الكود وتلغي الاستبدالات التي أجريتها. هل تريد المتابعة؟', 'Continuing from the design regenerates the code and discards your variable replacements. Continue?'))) return;
-    setHtml(api.getHtml()); setSamples(api.getSamples()); setSubject(api.getSubject());
+    setHtml(generateEmail(builder)); setSamples(builderSamples(builder.p)); setSubject(builderSubject(builder.p));
     setHistory([]); setApplied([]); setChoices({});
     setStep(2);
   };
@@ -208,13 +220,13 @@ export default function EmailStudio() {
         </ol>
       </header>
 
-      {/* Step 1 stays mounted (hidden) so going back never loses the design. */}
-      <section className={step === 1 ? 'space-y-3' : 'hidden'} aria-hidden={step !== 1}>
+      {step === 1 && (
+      <section className="space-y-3">
         <p className="text-sm text-[var(--color-text-secondary)]">{t('صمّم الرسالة بأداة IEEE QU، ثم اضغط «التالي» للحصول على الكود واستبدال البيانات المكتوبة يدويًا بمتغيرات.', 'Design the message with the IEEE QU builder, then press Next to take its code and swap the hard-written data for variables.')}</p>
-        <iframe ref={iframeRef} title="IEEE QU email builder" src="/email-studio/builder.html?embedded=1"
-                className="h-[calc(100dvh-17rem)] min-h-[560px] w-full rounded-2xl border border-[var(--color-border)] bg-white" />
+        <EmailBuilder state={builder} onChange={setBuilder} />
         <div className="flex justify-end"><button type="button" onClick={fromDesign} className={primary}>{t('التالي: استبدال البيانات بمتغيرات', 'Next: replace data with variables')}<ArrowLeft size={16} className="rtl:hidden" /><ArrowRight size={16} className="ltr:hidden" /></button></div>
       </section>
+      )}
 
       {step === 2 && (
         <section className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
