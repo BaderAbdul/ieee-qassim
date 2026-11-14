@@ -34,6 +34,8 @@ export const EMAIL_VARIABLE_GROUPS: { id: string; ar: string; en: string; variab
     { source: 'event.en.interviewer', ar: 'مقدّم الحوار (إنجليزي)', en: 'Interviewer (English)' },
     { source: 'event.ar.speakers', ar: 'المتحدثون (عربي)', en: 'Speakers (Arabic)' },
     { source: 'event.en.speakers', ar: 'المتحدثون (إنجليزي)', en: 'Speakers (English)' },
+    { source: 'event.ar.organizers', ar: 'المنظمون (عربي)', en: 'Organizers (Arabic)' },
+    { source: 'event.en.organizers', ar: 'المنظمون (إنجليزي)', en: 'Organizers (English)' },
     { source: 'event.url', ar: 'رابط صفحة الفعالية', en: 'Event page link' },
   ] },
   { id: 'student', ar: 'الطالب', en: 'Student', variables: [

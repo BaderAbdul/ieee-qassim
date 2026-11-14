@@ -29,7 +29,7 @@ import { STAGES, type DesignFields, type InterviewerFields, type MainDataFields,
 const emptyMainData: MainDataFields = { title: '', titleEn: '', description: '', descriptionEn: '', type: 'Workshop', gains: '', gainsEn: '' };
 const emptyTimePlace: TimePlaceFields = { days: [], locationType: 'in_person', location: '', locationEn: '', capacity: 50, isUnlimitedCapacity: false, hideExactCapacity: false, gender: 'both' };
 const emptySecurity: SecurityFields = { securityFormAcknowledged: false };
-const emptyInterviewer: InterviewerFields = { interviewer: '', interviewerEn: '', speakers: '', speakersEn: '' };
+const emptyInterviewer: InterviewerFields = { organizers: [], interviewer: '', interviewerEn: '', speakers: '', speakersEn: '' };
 const emptyDesign: DesignFields = { coverUrl: '' };
 const emptySettings: SettingsFields = { requiresRegistration: true, registrationMode: 'Auto', vtoolsUuid: '', hasCertificate: false, certificateTemplateId: '', emailTemplateId: '' };
 const emptyReview: ReviewFields = { feedbackQuestions: [] };
@@ -87,6 +87,7 @@ export default function CreateEventPage() {
         });
         setSecurity({ securityFormAcknowledged: !!event.securityFormAcknowledged });
         setInterviewerData({
+          organizers: event.organizers || [],
           interviewer: event.interviewer || '', interviewerEn: event.interviewerEn || '',
           speakers: (event.speakers || []).join('\n'), speakersEn: (event.speakersEn || []).join('\n'),
         });

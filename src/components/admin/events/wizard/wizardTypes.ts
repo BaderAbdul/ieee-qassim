@@ -14,7 +14,7 @@ export const STAGES: StageMeta[] = [
   { id: 'main', labelAr: 'البيانات الأساسية', labelEn: 'Main data', implemented: true },
   { id: 'time', labelAr: 'الزمان والمكان', labelEn: 'Time & place', implemented: true },
   { id: 'security', labelAr: 'التصريح الأمني', labelEn: 'Security screening', implemented: true },
-  { id: 'interviewer', labelAr: 'المحاور', labelEn: 'Interviewer', implemented: true },
+  { id: 'interviewer', labelAr: 'المحاور والمنظمون', labelEn: 'Interviewer & organizers', implemented: true },
   { id: 'sponsors', labelAr: 'الرعاة', labelEn: 'Sponsors', implemented: true },
   { id: 'design', labelAr: 'التصميم', labelEn: 'Design', implemented: true },
   { id: 'settings', labelAr: 'الإعدادات', labelEn: 'Settings', implemented: true },
@@ -52,7 +52,10 @@ export interface SecurityFields {
   securityFormAcknowledged: boolean;
 }
 
+export interface OrganizerAccount { id: string; name: string; nameEn?: string | null; role?: string; photoURL?: string | null }
+
 export interface InterviewerFields {
+  organizers: OrganizerAccount[];
   interviewer: string;
   interviewerEn: string;
   speakers: string;

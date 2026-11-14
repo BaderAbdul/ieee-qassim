@@ -50,6 +50,8 @@ export interface PlatformEvent {
   gainsEn: string[];
   speakers: string[];
   speakersEn: string[];
+  organizerIds?: string[];
+  organizers?: { id: string; name: string; nameEn?: string | null; role?: string; photoURL?: string | null }[];
   capacity: number;
   isUnlimitedCapacity?: boolean;
   hideExactCapacity?: boolean;
