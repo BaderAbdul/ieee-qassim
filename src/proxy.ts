@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import createMiddleware from 'next-intl/middleware';
 import { routing } from './i18n/routing';
-import { adminRoute } from './lib/adminHost';
+import { adminRoute, configuredAdminHost } from './lib/adminHost';
 import { isMaintenanceOn, MAINTENANCE_BYPASS_COOKIE, verifyBypassCookieValue } from './lib/server/maintenance';
 
 const intlMiddleware = createMiddleware(routing);
@@ -14,8 +14,8 @@ async function middleware(request: NextRequest) {
   // Clerk's matcher now covers /api too; the maintenance rewrite must not catch API routes
   // (especially /api/maintenance-bypass itself) or JSON callers would get an HTML page back.
   if (/^\/(api|trpc)(\/|$)/.test(request.nextUrl.pathname)) return NextResponse.next();
-  // Admin panel on its own subdomain (inert until NEXT_PUBLIC_ADMIN_HOST is set).
-  const adminHost = process.env.NEXT_PUBLIC_ADMIN_HOST || '';
+  // Admin panel on its own subdomain (admin.ieeequ.online; NEXT_PUBLIC_ADMIN_HOST overrides, "off" disables).
+  const adminHost = configuredAdminHost(process.env.NEXT_PUBLIC_ADMIN_HOST);
   const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || '';
   const onAdminHost = !!adminHost && host.toLowerCase().split(':')[0] === adminHost.toLowerCase();
   const route = adminRoute(host, request.nextUrl.pathname, adminHost);

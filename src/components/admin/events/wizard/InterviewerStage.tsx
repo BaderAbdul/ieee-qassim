@@ -13,12 +13,14 @@ interface InterviewerStageProps extends StageEmbedProps {
   value: InterviewerFields;
   /** The saved event: guests can be mailed only once their data is stored. */
   eventId?: number | null;
+  /** Organizers are on-site people: the section exists only for in-person events. */
+  inPerson?: boolean;
   onChange: (next: InterviewerFields) => void;
   onSave: (fields: Record<string, unknown>) => Promise<void>;
   saving: boolean;
 }
 
-export default function InterviewerStage({ isAr, value, eventId, onChange, onSave, saving, hideSave, registerCollect }: InterviewerStageProps) {
+export default function InterviewerStage({ isAr, value, eventId, inPerson = true, onChange, onSave, saving, hideSave, registerCollect }: InterviewerStageProps) {
   const { showToast } = useToast();
   const [emailError, setEmailError] = useState('');
   const [sending, setSending] = useState(false);
@@ -136,14 +138,14 @@ export default function InterviewerStage({ isAr, value, eventId, onChange, onSav
           {sendResult && <p role="status" className="text-xs font-bold text-emerald-600">{sendResult}</p>}
         </div>
       </div>
-      <div className="space-y-3 rounded-2xl border border-[var(--color-border)] p-4">
+      {inPerson ? <div className="space-y-3 rounded-2xl border border-[var(--color-border)] p-4">
         <div>
           <h3 className="font-bold">{isAr ? 'المنظمون' : 'Organizers'}</h3>
-          <p className="text-xs text-[var(--color-text-muted)]">{isAr ? 'ابحث عن اسم المنظم بين حسابات المنصة وأضفه. تُستخدم أسماؤهم في متغيرات الشهادات والبريد.' : 'Search the platform accounts by name to add an organizer. Their names feed the certificate and email variables.'}</p>
+          <p className="text-xs text-[var(--color-text-muted)]">{isAr ? 'ابحث عن المنظم (يجب أن يكون لديه حساب في المنصة) بالاسم أو البريد الإلكتروني الكامل أو الرقم الجامعي. تُستخدم أسماؤهم في متغيرات الشهادات والبريد.' : 'Find the organizer (they must have a platform account) by name, full e-mail address or university ID. Their names feed the certificate and email variables.'}</p>
         </div>
         <div className="relative">
           <Search size={15} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]" />
-          <input className={`${input} ps-9`} value={query} onChange={e => setQuery(e.target.value)} placeholder={isAr ? 'ابحث بالاسم (حرفان على الأقل)…' : 'Search by name (at least 2 characters)…'} />
+          <input className={`${input} ps-9`} value={query} onChange={e => setQuery(e.target.value)} placeholder={isAr ? 'الاسم أو البريد الإلكتروني أو الرقم الجامعي…' : 'Name, e-mail or university ID…'} />
           {searching && <Loader2 size={15} className="absolute end-3 top-1/2 -translate-y-1/2 animate-spin text-[var(--color-text-muted)]" />}
         </div>
         {shown.length > 0 && (
@@ -154,6 +156,7 @@ export default function InterviewerStage({ isAr, value, eventId, onChange, onSav
                         className="flex w-full items-center gap-3 px-3 py-2.5 text-start text-sm hover:bg-[var(--color-surface-2)] disabled:opacity-40">
                   <UserPlus size={15} className="shrink-0 text-[var(--color-accent)]" />
                   <span className="min-w-0 flex-1 truncate font-bold">{account.name}{account.nameEn ? <span dir="ltr" className="ms-2 font-normal text-[var(--color-text-muted)]">{account.nameEn}</span> : null}</span>
+                  <span dir="ltr" className="shrink-0 text-[11px] text-[var(--color-text-muted)]">{[account.universityId, account.emailHint].filter(Boolean).join(' · ')}</span>
                   <span className="shrink-0 text-[11px] text-[var(--color-text-muted)]">{account.role === 'student' ? (isAr ? 'طالب' : 'Student') : (isAr ? 'إدارة' : 'Staff')}</span>
                 </button>
               </li>
@@ -173,7 +176,7 @@ export default function InterviewerStage({ isAr, value, eventId, onChange, onSav
             ))}
           </ul>
         )}
-      </div>
+      </div> : <p className="rounded-xl bg-[var(--color-surface-2)] p-3 text-xs text-[var(--color-text-muted)]">{isAr ? 'المنظمون يُضافون للفعاليات الحضورية فقط (غيّر طريقة الحضور من مرحلة «البيانات الأساسية والزمان والمكان»).' : 'Organizers are added to in-person events only (change the attendance format in the “Main data, time & place” stage).'}</p>}
       {!hideSave && <div className="flex justify-end">
         <button type="button" disabled={saving} onClick={save} className={primaryButton}>
           <Save size={16} />{saving ? (isAr ? 'جارٍ الحفظ...' : 'Saving...') : (isAr ? 'حفظ' : 'Save')}

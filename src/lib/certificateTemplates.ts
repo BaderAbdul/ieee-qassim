@@ -1,7 +1,9 @@
-export type Source = 'student.name' | 'student.gender' | 'event.vtoolsUUID' | 'certificate.UUID' | 'certificate.QR' | 'event.name' | 'event.title' | 'event.date' | 'event.speakers' | 'event.speakers.ar' | 'event.speaker' | 'event.speaker.ar' | 'event.interviewer' | 'event.interviewer.ar' | 'event.organizers' | 'event.organizers.ar' | 'event.organizer' | 'event.organizer.ar' | 'partner.name' | 'conditional' | 'literal';
+export type Source = 'student.name' | 'student.name.ar' | 'student.name.en' | 'student.gender' | 'event.vtoolsUUID' | 'certificate.UUID' | 'certificate.QR' | 'event.name' | 'event.title' | 'event.date' | 'event.speakers' | 'event.speakers.ar' | 'event.speaker' | 'event.speaker.ar' | 'event.interviewer' | 'event.interviewer.ar' | 'event.organizers' | 'event.organizers.ar' | 'event.organizer' | 'event.organizer.ar' | 'partner.name' | 'conditional' | 'literal';
 // Explicit code-owned registry. No fields are inferred from event/user records.
 export const fieldGroups: { id: string; ar: string; en: string; fields: { source: Source; ar: string; en: string }[] }[] = [
-  { id: 'student', ar: 'الطالب', en: 'Student', fields: [{ source: 'student.name', ar: 'الاسم', en: 'Name' }] },
+  { id: 'student', ar: 'الطالب', en: 'Student', fields: [
+    { source: 'student.name', ar: 'الاسم', en: 'Name' }, { source: 'student.name.ar', ar: 'الاسم (عربي)', en: 'Name (Arabic)' }, { source: 'student.name.en', ar: 'الاسم (إنجليزي)', en: 'Name (English)' },
+  ] },
   { id: 'event', ar: 'الفعالية', en: 'Event', fields: [
     { source: 'event.name', ar: 'الاسم', en: 'Name' }, { source: 'event.date', ar: 'التاريخ', en: 'Date' }, { source: 'event.vtoolsUUID', ar: 'معرّف vTools', en: 'vTools UUID' },
     { source: 'event.speakers', ar: 'المتحدثون (إنجليزي)', en: 'Speakers (English)' }, { source: 'event.speakers.ar', ar: 'المتحدثون (عربي)', en: 'Speakers (Arabic)' },
@@ -17,7 +19,7 @@ export const fieldGroups: { id: string; ar: string; en: string; fields: { source
   ] },
 ];
 // Gender remains a condition/test context and is supported in older saved templates.
-export const sources: Source[] = ['student.name', 'student.gender', 'event.name', 'event.date', 'event.vtoolsUUID', 'event.speakers', 'event.speakers.ar', 'event.speaker', 'event.speaker.ar', 'event.interviewer', 'event.interviewer.ar', 'event.organizers', 'event.organizers.ar', 'event.organizer', 'event.organizer.ar', 'partner.name', 'certificate.UUID'];
+export const sources: Source[] = ['student.name', 'student.name.ar', 'student.name.en', 'student.gender', 'event.name', 'event.date', 'event.vtoolsUUID', 'event.speakers', 'event.speakers.ar', 'event.speaker', 'event.speaker.ar', 'event.interviewer', 'event.interviewer.ar', 'event.organizers', 'event.organizers.ar', 'event.organizer', 'event.organizer.ar', 'partner.name', 'certificate.UUID'];
 export interface TemplateField {
   id: string; label: string; source: Source; x: number; y: number; fontSize: number;
   align: 'left' | 'center' | 'right'; color: string; bold: boolean;

@@ -54,7 +54,7 @@ export interface SecurityFields {
   securityFormAcknowledged: boolean;
 }
 
-export interface OrganizerAccount { id: string; name: string; nameEn?: string | null; role?: string; photoURL?: string | null }
+export interface OrganizerAccount { id: string; name: string; nameEn?: string | null; role?: string; photoURL?: string | null; universityId?: string | null; emailHint?: string | null }
 
 /** A speaker: Arabic and English name and the e-mail the event's mail and certificate are sent to. */
 export interface SpeakerRow { name: string; nameEn: string; email: string }

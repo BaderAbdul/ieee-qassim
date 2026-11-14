@@ -5,8 +5,17 @@
  *   admin.ieeequ.online/ar            -> the overview   (internally /ar/admin)
  *   admin.ieeequ.online/ar/operations -> Task Center    (internally /ar/admin/operations)
  * The old form (/ar/admin/...) redirects to the clean one, and on the main site /ar/admin/... redirects to the
- * admin host. Everything is inert until NEXT_PUBLIC_ADMIN_HOST is set (e.g. "admin.ieeequ.online").
+ * admin host. The production admin host is built in; NEXT_PUBLIC_ADMIN_HOST overrides it ("off" disables the split).
  */
+
+const PRODUCTION_ADMIN_HOST = 'admin.ieeequ.online';
+
+/** The admin host to use: the env override when set ("off" or empty-but-set disables), else the production host. */
+export function configuredAdminHost(value: string | undefined): string {
+  if (value === undefined) return PRODUCTION_ADMIN_HOST;
+  const host = value.trim().toLowerCase();
+  return host === 'off' ? '' : host;
+}
 
 export type AdminRoute =
   | { action: 'none' }

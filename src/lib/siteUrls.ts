@@ -1,7 +1,7 @@
-import { mainHostFor } from './adminHost';
+import { configuredAdminHost, mainHostFor } from './adminHost';
 
-/** Set (e.g. "admin.ieeequ.online") once the admin panel has its own subdomain; empty keeps everything on one host. */
-export const ADMIN_HOST = (process.env.NEXT_PUBLIC_ADMIN_HOST || '').trim().toLowerCase();
+/** The admin panel's own subdomain (admin.ieeequ.online); NEXT_PUBLIC_ADMIN_HOST=off keeps everything on one host. */
+export const ADMIN_HOST = configuredAdminHost(process.env.NEXT_PUBLIC_ADMIN_HOST);
 
 /**
  * Origin to use for links meant for students and the public (event pages, check-in links, QR codes).

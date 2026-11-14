@@ -214,7 +214,7 @@ export default function CreateEventPage() {
           <MergedStage isAr={isAr} saving={saving}
             parts={[
               { id: 'interviewer', title: isAr ? 'المحاور والمتحدثون والمنظمون' : 'Interviewer, speakers & organizers', render: register => (
-                <InterviewerStage isAr={isAr} eventId={eventId} value={interviewerData} onChange={setInterviewerData} saving={saving} hideSave registerCollect={register}
+                <InterviewerStage isAr={isAr} eventId={eventId} inPerson={timePlace.locationType !== 'online'} value={interviewerData} onChange={setInterviewerData} saving={saving} hideSave registerCollect={register}
                   onSave={async () => {}} />) },
               { id: 'security', title: isAr ? 'التصريح الأمني' : 'Security screening', render: register => (
                 <SecurityScreeningStage isAr={isAr} value={security} onChange={setSecurity} saving={saving} hideSave registerCollect={register}
