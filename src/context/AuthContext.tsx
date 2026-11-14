@@ -90,6 +90,19 @@ const AuthContext = createContext<AuthContextType>({
   refreshUser: async () => null,
 });
 
+/** Reads the signed-in account, trying again a few times when the network or the server is briefly unreachable
+ *  (a server restart or a flaky connection shows up as "Failed to fetch"); real answers, errors included, are never retried. */
+async function loadAccount(): Promise<UserData> {
+  for (let attempt = 0; ; attempt++) {
+    try { return await apiGet<UserData>('/api/me'); }
+    catch (reason) {
+      const unreachable = reason instanceof TypeError || (reason instanceof DOMException && reason.name === 'TimeoutError');
+      if (!unreachable || attempt >= 3) throw reason;
+      await new Promise(resolve => setTimeout(resolve, 700 * (attempt + 1)));
+    }
+  }
+}
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const clerk = useClerk();
   const { isLoaded: userLoaded, isSignedIn, user: clerkUser } = useUser();
@@ -115,7 +128,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setError(null);
     (async () => {
       try {
-        const me = await apiGet<UserData>('/api/me');
+        const me = await loadAccount();
         if (!alive) return;
         loadedFor.current = clerkUser.id;
         setUserData(me);
@@ -164,7 +177,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const refreshUser = async (): Promise<UserData | null> => {
-    const me = await apiGet<UserData>('/api/me');
+    const me = await loadAccount();
     setUserData(me);
     return me;
   };
