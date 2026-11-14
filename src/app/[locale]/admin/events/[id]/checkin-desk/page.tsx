@@ -44,6 +44,7 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
   const [scanResult, setScanResult] = useState<{ status: 'success' | 'error' | 'already_checked_in' | null, message: string }>({ status: null, message: '' });
   const [showCamera, setShowCamera] = useState(false);
   const [isGeneratingToken, setIsGeneratingToken] = useState(false);
+  const [isAdjusting, setIsAdjusting] = useState(false);
   const [tokenDurationMinutes, setTokenDurationMinutes] = useState<number>(15);
   const [tokenExpiry, setTokenExpiry] = useState<number | null>(null);
   const [now, setNow] = useState(0);
@@ -74,12 +75,51 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
     return `${m}:${String(s).padStart(2, '0')}`;
   };
 
-  const handleGenerateToken = async (customMinutes?: number) => {
+  const remainingMinutes = Math.max(1, Math.ceil(secondsLeft / 60));
+
+  // Another operator may have generated the QR first; show theirs instead of leaving this tab blank.
+  const reloadLiveToken = async () => {
+    try {
+      const live = await apiGet<{ token: string; expiresAt: number; durationMinutes: number } | null>(`/api/admin/events/${eventId}/checkin-token`);
+      if (live) {
+        setEvent(prev => prev ? { ...prev, checkinToken: live.token } : prev);
+        setTokenExpiry(live.expiresAt);
+        setNow(Date.now());
+      }
+    } catch { /* the original error message is already shown */ }
+  };
+
+  const handleAdjustTime = async (minutes: number) => {
+    setIsAdjusting(true);
+    try {
+      const adjust = httpsCallable<{ eventId: string; minutes: number }, { expiresAt: number }>(null, 'updateCheckInDuration');
+      const { data } = await adjust({ eventId, minutes });
+      setTokenExpiry(data.expiresAt);
+      setNow(Date.now());
+      setMessage(`تم ضبط الرمز ليبقى فعالًا ${minutes >= 60 ? `${Math.round(minutes / 6) / 10} ساعة` : `${minutes} دقيقة`} من الآن.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'تعذر تعديل مدة الرمز');
+    } finally { setIsAdjusting(false); }
+  };
+
+  const handleDeleteToken = async () => {
+    setIsAdjusting(true);
+    try {
+      await httpsCallable<{ eventId: string }, { deleted: boolean }>(null, 'deleteCheckInToken')({ eventId });
+      setEvent(prev => prev ? { ...prev, checkinToken: undefined } : prev);
+      setTokenExpiry(null);
+      setMessage('تم حذف الرمز. أنشئ رمزًا جديدًا عند الحاجة.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'تعذر حذف الرمز');
+    } finally { setIsAdjusting(false); }
+  };
+
+  const handleGenerateToken = async (customMinutes?: number, replace = false) => {
     const mins = customMinutes ?? tokenDurationMinutes;
     setIsGeneratingToken(true);
     try {
-      const generate = httpsCallable<{ eventId: string; durationMinutes?: number }, { token: string; expiresAt: number; durationMinutes?: number }>(null, 'generateCheckInToken');
-      const { data } = await generate({ eventId, durationMinutes: mins });
+      const generate = httpsCallable<{ eventId: string; durationMinutes?: number; replace?: boolean }, { token: string; expiresAt: number; durationMinutes?: number }>(null, 'generateCheckInToken');
+      const { data } = await generate({ eventId, durationMinutes: mins, ...(replace ? { replace: true } : {}) });
       setEvent(prev => prev ? { ...prev, checkinToken: data.token } : null);
       setTokenExpiry(data.expiresAt);
       setNow(Date.now());
@@ -88,6 +128,7 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
     } catch (error) {
       console.error("Error generating check-in token:", error);
       setMessage(error instanceof Error ? error.message : 'تعذر توليد رمز التحضير');
+      void reloadLiveToken();
     } finally {
       setIsGeneratingToken(false);
     }
@@ -294,32 +335,34 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
                     <LinkIcon className="w-4 h-4 me-2" />
                     نسخ الرابط
                   </button>
-                  <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <select
-                      value={tokenDurationMinutes}
-                      onChange={(e) => setTokenDurationMinutes(Number(e.target.value))}
-                      className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold text-slate-700 outline-none"
-                      aria-label="تحديد مدة الرمز الجديد"
-                    >
-                      <option value={15}>15 د</option>
-                      <option value={30}>30 د</option>
-                      <option value={60}>1 س</option>
-                      <option value={120}>2 س</option>
-                      <option value={240}>4 س</option>
-                      <option value={480}>8 س</option>
-                      <option value={1440}>24 س</option>
+                </div>
+                <div className="mt-4 w-full max-w-xl space-y-3 rounded-2xl border border-slate-200 bg-white p-4 text-start">
+                  <p className="text-xs font-bold text-slate-500">التحكم في الرمز الحالي (رابط واحد فعال فقط في كل مرة)</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button type="button" disabled={isAdjusting} onClick={() => void handleAdjustTime(Math.max(1, remainingMinutes - 15))}
+                            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 disabled:opacity-50">− 15 د</button>
+                    <button type="button" disabled={isAdjusting} onClick={() => void handleAdjustTime(Math.min(1440, remainingMinutes + 15))}
+                            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 disabled:opacity-50">+ 15 د</button>
+                    <button type="button" disabled={isAdjusting} onClick={() => void handleAdjustTime(Math.min(1440, remainingMinutes + 60))}
+                            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 disabled:opacity-50">+ ساعة</button>
+                    <select value={tokenDurationMinutes} onChange={(e) => setTokenDurationMinutes(Number(e.target.value))}
+                            className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs font-bold text-slate-700 outline-none" aria-label="المدة المتبقية للرمز">
+                      <option value={15}>15 د</option><option value={30}>30 د</option><option value={60}>1 س</option>
+                      <option value={120}>2 س</option><option value={240}>4 س</option><option value={480}>8 س</option><option value={1440}>24 س</option>
                     </select>
-                    <button 
-                      onClick={() => {
-                        if (confirm('هل أنت متأكد من إنشاء رمز تحضير جديد؟ الرابط الحالي سيتوقف عن العمل.')) {
-                          handleGenerateToken();
-                        }
-                      }}
-                      disabled={isGeneratingToken}
-                      className="shrink-0 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors flex items-center shadow-sm w-full sm:w-auto justify-center disabled:opacity-50"
-                    >
-                      <RefreshCw className={`w-4 h-4 me-2 ${isGeneratingToken ? 'animate-spin' : ''}`} />
-                      تحديث الرمز
+                    <button type="button" disabled={isAdjusting} onClick={() => void handleAdjustTime(tokenDurationMinutes)}
+                            className="rounded-xl bg-[#00629B] px-3 py-2 text-xs font-bold text-white disabled:opacity-50">ضبط المدة المتبقية</button>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+                    <button type="button" disabled={isGeneratingToken || isAdjusting}
+                            onClick={() => { if (confirm('تغيير الرمز يعني رابطًا جديدًا ويتوقف الرابط الحالي فورًا عن العمل. هل تريد المتابعة؟')) void handleGenerateToken(undefined, true); }}
+                            className="inline-flex items-center rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 disabled:opacity-50">
+                      <RefreshCw className={`me-2 h-3.5 w-3.5 ${isGeneratingToken ? 'animate-spin' : ''}`} />تغيير الرمز (رابط جديد)
+                    </button>
+                    <button type="button" disabled={isAdjusting}
+                            onClick={() => { if (confirm('حذف الرمز سيوقف الرابط فورًا ولن يتمكن أحد من التحضير الذاتي حتى تنشئ رمزًا جديدًا. هل تريد الحذف؟')) void handleDeleteToken(); }}
+                            className="inline-flex items-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 disabled:opacity-50">
+                      <X className="me-2 h-3.5 w-3.5" />حذف الرمز
                     </button>
                   </div>
                 </div>

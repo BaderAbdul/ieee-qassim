@@ -69,8 +69,8 @@ export default function AdminEventSummaryPage() {
   };
 
   const registrationStats: { label: string; value: number; icon: LucideIcon; color: StatColor }[] = data ? [
-    { label: isAr ? 'كل السجلات (تسجيل مسبق + زوار بدون تسجيل)' : 'All records (pre-registered + walk-ins)', value: data.counts.registrations, icon: Users, color: 'purple' },
-    { label: isAr ? 'مسجلون مسبقًا (رقم «المسجلون» في بطاقة الفعالية)' : 'Pre-registered (the “Registered” number on the event card)', value: data.counts.registrations - (data.counts.walkIns ?? 0), icon: UserCheck, color: 'blue' },
+    { label: isAr ? 'المسجلون (تسجيل مسبق + زوار) — رقم البطاقة' : 'Registered (pre-registered + walk-ins) — card number', value: data.counts.registrations, icon: Users, color: 'purple' },
+    { label: isAr ? 'مسجلون مسبقًا (التسجيل قبل الفعالية)' : 'Pre-registered (before the event)', value: data.counts.registrations - (data.counts.walkIns ?? 0), icon: UserCheck, color: 'blue' },
     { label: isAr ? 'زوار بدون تسجيل مسبق' : 'Walk-ins (no prior registration)', value: data.counts.walkIns ?? 0, icon: Users, color: 'slate' },
     { label: isAr ? 'بانتظار الموافقة' : 'Pending', value: data.counts.pending, icon: Clock, color: 'amber' },
     { label: isAr ? 'مقبول · لم يحضر بعد' : 'Approved · not attended', value: data.counts.approved, icon: UserCheck, color: 'blue' },
