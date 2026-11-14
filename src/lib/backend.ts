@@ -80,6 +80,19 @@ export async function downloadEventReport(eventId: number, filename: string): Pr
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
+/** Downloads the caller's personal PDF attachment of a staff message. */
+export async function downloadMessageAttachment(messageId: string, filename = 'certificate.pdf'): Promise<void> {
+  const token = await clerkToken();
+  const response = await fetch(`${API_BASE_URL}/api/me/messages/${encodeURIComponent(messageId)}/attachment`, {
+    headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(45000),
+  });
+  if (!response.ok) { await readBackendResponse(response, true, true); return; }
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a'); link.href = url; link.download = filename;
+  document.body.appendChild(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
 import { compressImage } from './imageCompressor';
 
 export async function uploadImage(file: File, purpose: 'avatar' | 'event' | 'email', previousUrl?: string | null) {

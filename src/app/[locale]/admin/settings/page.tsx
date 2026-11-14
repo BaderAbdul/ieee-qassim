@@ -13,6 +13,7 @@ import AdminAcademicTermPage from '../academic-term/page';
 import AdminEventProcessTeamsPage from '../event-process-teams/page';
 import EmailSettings from '@/components/admin/EmailSettings';
 import EventAutomationSettings from '@/components/admin/EventAutomationSettings';
+import MessagesComposer from '@/components/admin/messages/MessagesComposer';
 
 export default function AdminSettingsPage() {
   const isAr = useLocale() === 'ar';
@@ -24,6 +25,7 @@ export default function AdminSettingsPage() {
   const tabs: AdminTab[] = [
     ...(isSuperAdmin || userData?.canManageEmail ? [{ key: 'email-sender', label: isAr ? 'البريد المرسل' : 'Email sender', content: <EmailSettings /> }] : []),
     ...(isSuperAdmin || canEditContent ? [{ key: 'event-automation', label: isAr ? 'أتمتة الفعاليات' : 'Event automation', content: <EventAutomationSettings /> }] : []),
+    ...(isSuperAdmin ? [{ key: 'messages', label: isAr ? 'رسائل الإدارة' : 'Staff messages', content: <MessagesComposer /> }] : []),
     ...(isSuperAdmin ? [{ key: 'roles', label: isAr ? 'الأدوار والصلاحيات' : 'Roles & Privileges', content: <AdminRolesPage /> }] : []),
     ...(canEditContent ? [{ key: 'content', label: isAr ? 'محتوى الموقع' : 'Site content', content: <AdminContentPage /> }] : []),
     ...(canEditAcademicCalendar ? [{ key: 'academic-term', label: isAr ? 'الفصل الدراسي' : 'Academic term', content: <AdminAcademicTermPage /> }] : []),

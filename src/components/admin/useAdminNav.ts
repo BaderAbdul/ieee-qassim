@@ -7,6 +7,7 @@ import {
   UsersRound,
   Mail,
   Layers,
+  Inbox,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 
@@ -41,6 +42,7 @@ export function useAdminNav(userData: UserData | null, isAr: boolean) {
     ...(canViewMembers || isSuperAdmin ? [{ name: isAr ? 'الهيكلة والطلاب' : 'Structure & Students', href: '/admin/people', icon: UsersRound }] : []),
     ...(hasAnyPrivilegeOf(userData, 'email_templates', 'certificate_templates') || userData?.canReviewTemplates ? [{ name: isAr ? 'القوالب' : 'Templates', href: '/admin/templates', icon: Layers }] : []),
     ...(isSuperAdmin || userData?.canManageEmail || hasAnyPrivilege(userData, 'mail') ? [{ name: isAr ? 'البريد' : 'Mail', href: '/admin/mail', icon: Mail }] : []),
+    { name: isAr ? 'الرسائل' : 'Messages', href: '/admin/messages', icon: Inbox },
     ...(hasAnyPrivilegeOf(userData, 'operations', 'projects', 'tasks', 'cross_team_requests', 'goals', 'ideas') ? [{ name: isAr ? 'مركز المهام' : 'Operations', href: '/admin/operations', icon: Activity }] : []),
   ];
 
