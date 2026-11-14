@@ -28,12 +28,9 @@ import {
   Edit2,
   X,
   Save,
-  Briefcase,
 } from 'lucide-react';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import DigitalMemberCard from '@/components/ui/DigitalMemberCard';
-import ProfileHero from '@/components/profile/ProfileHero';
-import ProfileSettingsPanel from '@/components/profile/ProfileSettingsPanel';
 import { certificateLabel, normalizeStudentId, registrationLabel } from '@/lib/studentExperience';
 
 interface CertificateData extends Certificate {
@@ -54,8 +51,6 @@ interface OverviewResponse {
   pointTransactions: PointTransaction[];
   totalPoints: number;
   rank: number | null;
-  adminPoints?: number;
-  adminPointTransactions?: { id: number; amount: number; reason: string; createdAt: string }[];
 }
 
 async function patchMe(data: Record<string, unknown>): Promise<void> {
@@ -159,10 +154,6 @@ export default function EngineeringProfilePage() {
   const [transactions, setTransactions] = useState<PointTransaction[]>([]);
   
   const [userRank, setUserRank] = useState<number | null>(null);
-  const [adminTransactions, setAdminTransactions] = useState<NonNullable<OverviewResponse['adminPointTransactions']>>([]);
-  const [adminPoints, setAdminPoints] = useState(0);
-  const [pointsKind, setPointsKind] = useState<'student' | 'admin'>('student');
-  const [showSettings, setShowSettings] = useState(false);
   const [downloadingCert, setDownloadingCert] = useState<string | null>(null);
   const [certificateLinks, setCertificateLinks] = useState<Record<string, { url: string; expiresAt: number }>>({});
   const [certificateMessage, setCertificateMessage] = useState('');
@@ -319,8 +310,6 @@ setReloadKey(k => k + 1);
           setCertificates(certsData);
           setTransactions(ptsData);
           setUserRank(overview.rank);
-          setAdminTransactions(overview.adminPointTransactions ?? []);
-          setAdminPoints(overview.adminPoints ?? 0);
         }
       } catch (err) {
         console.error('Error fetching profile data:', err);
@@ -462,8 +451,6 @@ setReloadKey(k => k + 1);
           </div>
         )}
 
-        <ProfileHero user={user} userData={userData} isAr={isAr} onEdit={() => setShowSettings(true)} />
-
         {/* 1. Digital Member Card */}
         <div className="relative">
           <DigitalMemberCard 
@@ -540,8 +527,37 @@ setReloadKey(k => k + 1);
           </div>
         </div>
 
+        {/* Public Board Profile Edit Button (Admin/Organizer Only) */}
+        {isAdminRole(userData) && (
+          <div className="bg-white rounded-3xl p-5 border border-blue-100 shadow-sm flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+                <UserCheck className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900">{isAr ? 'الملف التعريفي العام (أعضاء الإدارة)' : 'Public Board Profile'}</h3>
+                <p className="text-xs text-slate-500 mt-0.5">{isAr ? 'تحديث اللينكدإن، النبذة والصورة لصفحة الهيكلة.' : 'Update your avatar, LinkedIn & Bio for the Structure page.'}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setEditingPublicProfile({
+                  linkedin: userData?.publicProfile?.linkedin || '',
+                  bio: userData?.publicProfile?.bio || '',
+                  avatar: userData?.publicProfile?.avatar || '',
+                  showAvatar: userData?.publicProfile?.showAvatar !== false
+                });
+                setShowPublicProfileModal(true);
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-sm whitespace-nowrap"
+            >
+              {isAr ? 'تعديل الملف' : 'Edit Profile'}
+            </button>
+          </div>
+        )}
+
         {/* 2. Gamification Summary Cards */}
-        <section className={`grid grid-cols-2 gap-4 sm:gap-6 ${isAdminRole(userData) ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex items-center gap-4">
             <div className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-400 text-white flex items-center justify-center shadow-md shadow-amber-500/20 flex-shrink-0">
               <Trophy className="h-7 w-7" />
@@ -597,21 +613,6 @@ setReloadKey(k => k + 1);
               </span>
             </div>
           </div>
-          {isAdminRole(userData) && (
-            <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex items-center gap-4">
-              <div className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-slate-700 to-slate-500 text-white flex items-center justify-center shadow-md shadow-slate-500/20 flex-shrink-0">
-                <Briefcase className="h-7 w-7" />
-              </div>
-              <div>
-                <span className="text-xs sm:text-sm font-semibold text-slate-500 block">
-                  {isAr ? 'النقاط الإدارية' : 'Administrative points'}
-                </span>
-                <span className="text-2xl sm:text-3xl font-black font-cairo text-slate-900">
-                  {loading ? '...' : adminPoints}
-                </span>
-              </div>
-            </div>
-          )}
         </section>
 
         {/* 3. Earned Badges Showcase */}
@@ -835,32 +836,7 @@ setReloadKey(k => k + 1);
                 {/* Points Tab */}
                 {activeTab === 'points' && (
                   <div className="space-y-3">
-                    {isAdminRole(userData) && (
-                      <div className="inline-flex rounded-xl bg-slate-100 p-1 text-xs font-bold">
-                        {(['student', 'admin'] as const).map(kind => (
-                          <button key={kind} type="button" onClick={() => setPointsKind(kind)}
-                                  className={`rounded-lg px-4 py-1.5 transition ${pointsKind === kind ? 'bg-white text-[#00629B] shadow' : 'text-slate-500'}`}>
-                            {kind === 'student' ? (isAr ? 'نقاط الطلاب' : 'Student points') : (isAr ? 'النقاط الإدارية' : 'Administrative points')}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {pointsKind === 'admin' && isAdminRole(userData) ? (
-                      adminTransactions.length === 0 ? (
-                        <div className="text-center py-16 flex flex-col items-center">
-                          <Briefcase className="h-16 w-16 text-slate-200 mb-4" />
-                          <h3 className="text-xl font-bold text-slate-800 font-cairo mb-2">{isAr ? 'لا توجد نقاط إدارية بعد' : 'No administrative points yet'}</h3>
-                        </div>
-                      ) : adminTransactions.map(tx => (
-                        <div key={tx.id} className="border border-slate-100 rounded-2xl p-4 flex items-center justify-between text-start">
-                          <div>
-                            <h4 className="font-bold text-slate-900 text-sm">{tx.reason}</h4>
-                            <p className="text-xs text-slate-400 mt-0.5">{formatDateSafe(tx.createdAt, 'dd MMMM yyyy HH:mm', { locale: dateLocale })}</p>
-                          </div>
-                          <div className={`font-black text-xl font-cairo ${tx.amount > 0 ? 'text-emerald-600' : 'text-red-600'}`}>{tx.amount > 0 ? '+' : ''}{tx.amount}</div>
-                        </div>
-                      ))
-                    ) : transactions.length === 0 ? (
+                    {transactions.length === 0 ? (
                       <div className="text-center py-16 flex flex-col items-center">
                         <Trophy className="h-16 w-16 text-slate-200 mb-4" />
                         <h3 className="text-xl font-bold text-slate-800 font-cairo mb-2">{tActivity('noPoints')}</h3>
@@ -966,7 +942,6 @@ setReloadKey(k => k + 1);
 
       </div>
 
-      {showSettings && <ProfileSettingsPanel userData={userData} isAr={isAr} onClose={() => setShowSettings(false)} onSaved={() => { retryAuth(); setReloadKey(k => k + 1); }} />}
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl relative">

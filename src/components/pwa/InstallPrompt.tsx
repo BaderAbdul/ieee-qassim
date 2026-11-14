@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Download, Share, X } from 'lucide-react';
 import { usePathname } from '@/i18n/routing';
+import { isAdminRole, useAuth } from '@/context/AuthContext';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -23,12 +24,16 @@ function recentlyDismissed() {
 
 /**
  * Small bottom card offering installation. Chromium browsers give us a real install prompt;
- * iOS Safari has none, so there we explain Share → Add to Home Screen. Never shown inside the
- * installed app, in the admin area, or for 14 days after being dismissed.
+ * iOS Safari has none, so there we explain Share → Add to Home Screen. The app is for staff only
+ * (it will carry their tasks and project notifications): it is offered solely to signed-in super
+ * admins / admins / members, solely inside the admin area. Students and visitors are never asked,
+ * the app is never offered inside the installed app itself, and not for 14 days after a dismissal.
  */
 export default function InstallPrompt() {
   const isAr = useLocale() === 'ar';
   const pathname = usePathname();
+  const { userData } = useAuth();
+  const staff = isAdminRole(userData);
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [ios, setIos] = useState(false);
   const [visible, setVisible] = useState(false);
@@ -76,7 +81,7 @@ export default function InstallPrompt() {
     if (outcome === 'dismissed') dismiss(); else setVisible(false);
   };
 
-  if (!visible || (!deferred && !ios) || pathname.startsWith('/admin')) return null;
+  if (!staff || !pathname.startsWith('/admin') || !visible || (!deferred && !ios)) return null;
 
   return (
     <div

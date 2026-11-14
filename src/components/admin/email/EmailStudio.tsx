@@ -10,7 +10,7 @@ import { apiGet, apiSend } from '@/lib/backend';
 import { EMAIL_VARIABLE_GROUPS, MAX_TEMPLATE_ATTACHMENTS, insertAtCursor, variableToken } from '@/lib/emailTemplates';
 import {
   type Candidate, type StudioSamples, countOccurrences, detectCandidates, escapeHtml, fileToBase64, highlightVariables,
-  replaceLiteral, scanHardcoded, unknownVariables, usedVariables,
+  addGreeting, replaceLiteral, scanHardcoded, unknownVariables, usedVariables,
 } from '@/lib/emailStudio';
 
 interface StudioApi { getHtml: () => string; getSubject: () => string; getSamples: () => StudioSamples }
@@ -61,6 +61,7 @@ export default function EmailStudio() {
   const [manualFind, setManualFind] = useState('');
   const [manualVar, setManualVar] = useState('student.name');
   const [previewMobile, setPreviewMobile] = useState(false);
+  const [greetingVar, setGreetingVar] = useState<'student.name' | 'student.firstName'>('student.name');
 
   const [wantsAttachments, setWantsAttachments] = useState<boolean | null>(null);
   const [attachments, setAttachments] = useState<AttachmentDraft[]>([]);
@@ -119,6 +120,13 @@ export default function EmailStudio() {
     if (!done.length) return;
     snapshot(); setHtml(nextHtml); setSubject(nextSubject); setApplied(list => [...list, ...done]);
     showToast(t(`تم استبدال ${done.length} عناصر بمتغيرات.`, `Replaced ${done.length} items with variables.`), 'success');
+  };
+
+  const insertGreeting = () => {
+    const result = addGreeting(html, greetingVar);
+    if (!result.added) { showToast(t('تعذر العثور على نص الرسالة الأساسي لإضافة التحية.', 'Could not find the main message to add the greeting to.'), 'error'); return; }
+    snapshot(); setHtml(result.html);
+    setApplied(list => [...list, { literal: 'أهلًا …', variable: greetingVar }]);
   };
 
   const undo = () => {
@@ -234,6 +242,20 @@ export default function EmailStudio() {
                 </ul>
               )}
               <button type="button" className={`${btn} w-full`} disabled={history.length === 0} onClick={undo}><Undo2 size={15} />{t('تراجع عن آخر استبدال', 'Undo last replacement')}</button>
+            </div>
+
+            <div className={`${panel} space-y-3 p-4`}>
+              <h2 className="font-bold">{t('اسم المستلم', 'Recipient name')}</h2>
+              <p className="text-xs leading-6 text-[var(--color-text-secondary)]">
+                {t('الأداة لا تكتب اسمًا للمستلم إلا إذا كان نص الرسالة التلقائي يحتويه، لذلك قد لا يوجد اسم لاستبداله. أضف تحية تستخدم متغير اسم الطالب ليصل كل شخص باسمه.', 'The builder only prints a recipient name when its automatic text contains one, so there may be none to replace. Add a greeting that uses the student-name variable so each person is greeted by name.')}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <select className={small} value={greetingVar} onChange={event => setGreetingVar(event.target.value as 'student.name' | 'student.firstName')}>
+                  <option value="student.name">{t('الاسم الكامل', 'Full name')}</option>
+                  <option value="student.firstName">{t('الاسم الأول', 'First name')}</option>
+                </select>
+                <button type="button" className={`${btn} px-3 py-1.5 text-xs`} disabled={used.includes('student.name') && used.includes(greetingVar)} onClick={insertGreeting}>{t('إضافة تحية باسم الطالب', 'Add greeting with the student name')}</button>
+              </div>
             </div>
 
             <div className={`${panel} space-y-3 p-4`}>

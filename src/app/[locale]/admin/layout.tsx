@@ -17,6 +17,7 @@ import { useLocale } from 'next-intl';
 import ConfigurationNotice from '@/components/admin/ConfigurationNotice';
 import AdminTopbar from '@/components/admin/AdminTopbar';
 import { AdminTopbarActionsProvider } from '@/components/admin/AdminTopbarActions';
+import { StaffMessagesProvider } from '@/components/admin/messages/StaffMessagesContext';
 import { useAdminNav, type AdminNavItem } from '@/components/admin/useAdminNav';
 
 const subscribeSidebar = (notify: () => void) => {
@@ -272,6 +273,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Main Content */}
       <div className="min-w-0 flex-1 flex flex-col">
+        <StaffMessagesProvider>
         <AdminTopbarActionsProvider>
           <AdminTopbar pageTitle={[...navItems, ...footerItems].find(item => isCurrentPath(item.href))?.name} hidden={topbarHidden} />
           <div className="p-4 sm:p-6 lg:p-8">
@@ -281,6 +283,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
           </div>
         </AdminTopbarActionsProvider>
+        </StaffMessagesProvider>
       </div>
     </div>
   );

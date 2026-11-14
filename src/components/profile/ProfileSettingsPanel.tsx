@@ -29,14 +29,14 @@ function splitArabicName(userData: UserData | null) {
   };
 }
 
-const field = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-[#00629B] focus:outline-none focus:ring-2 focus:ring-[#00629B]/20';
+const field = 'w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] focus:border-[#00629B] focus:outline-none focus:ring-2 focus:ring-[#00629B]/20';
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
-    <section className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50/60 p-4 sm:p-5">
+    <section className="space-y-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-2)] p-4 sm:p-5">
       <div>
-        <h3 className="font-cairo text-base font-black text-slate-900">{title}</h3>
-        {hint && <p className="mt-0.5 text-xs text-slate-500">{hint}</p>}
+        <h3 className="font-cairo text-base font-black text-[var(--color-text-primary)]">{title}</h3>
+        {hint && <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">{hint}</p>}
       </div>
       {children}
     </section>
@@ -44,7 +44,7 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
 }
 
 function Label({ text, children }: { text: string; children: React.ReactNode }) {
-  return <label className="block space-y-1"><span className="text-xs font-bold text-slate-600">{text}</span>{children}</label>;
+  return <label className="block space-y-1"><span className="text-xs font-bold text-[var(--color-text-secondary)]">{text}</span>{children}</label>;
 }
 
 /** One panel for everything a person can edit about themselves; saves only what changed. */
@@ -136,24 +136,24 @@ export default function ProfileSettingsPanel({ userData, isAr, onClose, onSaved 
   return (
     <div className="fixed inset-0 z-[120] flex items-end justify-center bg-slate-900/60 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose}>
       <form onSubmit={save} onClick={event => event.stopPropagation()}
-            className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl"
+            className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl bg-[var(--color-surface)] shadow-2xl sm:rounded-3xl"
             role="dialog" aria-modal="true" aria-label={t('تعديل الملف الشخصي', 'Edit profile')}>
-        <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-          <h2 className="font-cairo text-lg font-black text-slate-900">{t('تعديل الملف الشخصي', 'Edit profile')}</h2>
-          <button type="button" onClick={onClose} aria-label={t('إغلاق', 'Close')} className="rounded-full p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
+        <header className="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4">
+          <h2 className="font-cairo text-lg font-black text-[var(--color-text-primary)]">{t('تعديل الملف الشخصي', 'Edit profile')}</h2>
+          <button type="button" onClick={onClose} aria-label={t('إغلاق', 'Close')} className="rounded-full p-2 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-2)]"><X className="h-5 w-5" /></button>
         </header>
 
         <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
           <Section title={t('الصورة', 'Photo')} hint={t('أضف صورة أو بدّلها، وتحكّم في ظهورها للآخرين (صفحة الهيكلة واللوحة).', 'Add or replace your photo and choose whether others can see it (Structure page, leaderboard).')}>
             <div className="flex flex-wrap items-center gap-4">
-              <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white">
+              <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
                 {shownPhoto
                   // eslint-disable-next-line @next/next/no-img-element
                   ? <img src={shownPhoto} alt="" className={`h-full w-full object-cover ${showAvatar ? '' : 'opacity-40 grayscale'}`} referrerPolicy="no-referrer" />
-                  : <Camera className="h-6 w-6 text-slate-300" />}
+                  : <Camera className="h-6 w-6 text-[var(--color-text-muted)]" />}
               </div>
               <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => fileInput.current?.click()} className="inline-flex items-center gap-2 rounded-xl bg-[#00629B] px-4 py-2 text-xs font-bold text-white">
+                <button type="button" onClick={() => fileInput.current?.click()} className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-accent)] px-4 py-2 text-xs font-bold text-white">
                   <Camera className="h-4 w-4" />{shownPhoto ? t('تغيير الصورة', 'Change photo') : t('إضافة صورة', 'Add photo')}
                 </button>
                 {(avatar || avatarPreview) && (
@@ -163,7 +163,7 @@ export default function ProfileSettingsPanel({ userData, isAr, onClose, onSaved 
                   </button>
                 )}
                 <button type="button" onClick={() => setShowAvatar(value => !value)} aria-pressed={showAvatar}
-                        className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold ${showAvatar ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-200 text-slate-700'}`}>
+                        className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold ${showAvatar ? 'bg-emerald-50 text-emerald-700' : 'bg-[var(--color-surface-2)] text-[var(--color-text-secondary)]'}`}>
                   {showAvatar ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                   {showAvatar ? t('الصورة ظاهرة', 'Photo visible') : t('الصورة مخفية', 'Photo hidden')}
                 </button>
@@ -207,7 +207,7 @@ export default function ProfileSettingsPanel({ userData, isAr, onClose, onSaved 
               {SOCIALS.map(({ key, labelAr, labelEn, placeholder, Icon }) => (
                 <Label key={key} text={isAr ? labelAr : labelEn}>
                   <div className="relative">
-                    <Icon aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Icon aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-muted)]" />
                     <input dir="ltr" type="url" className={`${field} ps-9`} value={socials[key as SocialKey] || ''} placeholder={placeholder}
                            onChange={e => setSocials({ ...socials, [key]: e.target.value })} />
                   </div>
@@ -217,9 +217,9 @@ export default function ProfileSettingsPanel({ userData, isAr, onClose, onSaved 
           </Section>
         </div>
 
-        <footer className="flex items-center justify-end gap-2 border-t border-slate-100 bg-white px-5 py-3" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
-          <button type="button" onClick={onClose} className="rounded-xl bg-slate-100 px-5 py-2.5 text-sm font-bold text-slate-700">{t('إلغاء', 'Cancel')}</button>
-          <button type="submit" disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-[#00629B] px-6 py-2.5 text-sm font-bold text-white disabled:opacity-60">
+        <footer className="flex items-center justify-end gap-2 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-3" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
+          <button type="button" onClick={onClose} className="rounded-xl bg-[var(--color-surface-2)] px-5 py-2.5 text-sm font-bold text-[var(--color-text-secondary)]">{t('إلغاء', 'Cancel')}</button>
+          <button type="submit" disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-accent)] px-6 py-2.5 text-sm font-bold text-white disabled:opacity-60">
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}{t('حفظ', 'Save')}
           </button>
         </footer>

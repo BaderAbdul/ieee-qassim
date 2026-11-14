@@ -6,8 +6,11 @@ export interface InboxMessage {
   title: string;
   body: string;
   hasAttachment: boolean;
-  attachmentEventName: string | null;
+  attachmentKind: 'file' | 'template' | null;
+  attachmentName: string | null;
   createdAt: string;
+  showAt: string;
+  hideAt: string | null;
   readAt: string | null;
   senderName: string;
 }
@@ -20,6 +23,9 @@ export interface SentMessage {
   audience: { mode: 'all' | 'roles' | 'users'; roles?: string[]; userIds?: string[] };
   hasAttachment: boolean;
   createdAt: string;
+  showAt: string;
+  hideAt: string | null;
+  state: 'scheduled' | 'active' | 'ended';
   recipients: number;
   readCount: number;
 }
@@ -31,4 +37,12 @@ export interface StaffEntry {
   englishName: string | null;
   roleNameAr: string | null;
   roleNameEn: string | null;
+}
+
+export interface MessageEvent {
+  id: number;
+  title: string;
+  titleEn: string | null;
+  date: string;
+  vtoolsUuid: string | null;
 }

@@ -9,7 +9,6 @@ import { useAdminQuery } from '@/components/admin/AdminData';
 import type { AdminOverview } from '@/lib/adminTypes';
 import AdminSearchModal from '@/components/admin/AdminSearchModal';
 import { useAdminTopbarActionsSlot } from '@/components/admin/AdminTopbarActions';
-import MessagesBell from '@/components/admin/messages/MessagesBell';
 
 function useClickOutside(onOutside: () => void) {
   const ref = useRef<HTMLDivElement>(null);
@@ -76,8 +75,6 @@ export default function AdminTopbar({ pageTitle, hidden }: { pageTitle?: string;
             <span className="hidden md:inline text-xs font-bold">{isAr ? 'بحث' : 'Search'}</span>
             <kbd className="hidden md:inline text-[10px] font-mono bg-white/10 border border-white/10 rounded px-1.5 py-0.5">Ctrl K</kbd>
           </button>
-
-          <MessagesBell />
 
           {/* Notifications */}
           <div className="relative" ref={notifRef}>
@@ -155,12 +152,20 @@ export default function AdminTopbar({ pageTitle, hidden }: { pageTitle?: string;
                 </div>
                 <div className="p-1.5">
                   <Link
+                    href="/admin/profile"
+                    onClick={() => setProfileOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-[var(--color-surface-2)] text-sm font-medium text-[var(--color-text-secondary)] transition-colors"
+                  >
+                    <CircleUserRound size={16} />
+                    {isAr ? 'ملفي الشخصي' : 'My profile'}
+                  </Link>
+                  <Link
                     href="/profile"
                     onClick={() => setProfileOpen(false)}
                     className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-[var(--color-surface-2)] text-sm font-medium text-[var(--color-text-secondary)] transition-colors"
                   >
                     <CircleUserRound size={16} />
-                    {isAr ? 'صفحتي' : 'My page'}
+                    {isAr ? 'صفحتي كطالب' : 'My student page'}
                   </Link>
                   <Link
                     href="/admin/settings"

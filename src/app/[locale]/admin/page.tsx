@@ -10,6 +10,7 @@ import { AdminError, AdminLoading, useAdminQuery } from '@/components/admin/Admi
 import AdminCalendar, { type CalendarEvent, type VacationSettings } from '@/components/admin/home/AdminCalendar';
 import DayDetailsPanel from '@/components/admin/home/DayDetailsPanel';
 import HomeEventsTable from '@/components/admin/home/HomeEventsTable';
+import MessagesContainer from '@/components/admin/messages/MessagesContainer';
 import {
   overviewApi, projectsApi, crossTeamRequestsApi, tasksApi,
   type RemainingTasksEntry, type CrossTeamRequest, type Project, type TCTask,
@@ -98,6 +99,7 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
+      <MessagesContainer />
       {error ? (
         <AdminError message={error} retry={refresh} />
       ) : loading && !data ? (

@@ -41,6 +41,8 @@ export function detectCandidates(html: string, samples: StudioSamples): Candidat
     { id: 'date', label: 'تاريخ الفعالية', literal: samples.dateText, variable: 'event.ar.date' },
     { id: 'start', label: 'وقت البداية', literal: samples.start, variable: 'event.startingTime' },
     { id: 'end', label: 'وقت النهاية', literal: samples.end, variable: 'event.endingTime' },
+    { id: 'location', label: 'المكان', literal: samples.location, variable: hasArabic(samples.location) ? 'event.ar.location' : 'event.en.location' },
+    { id: 'speaker', label: 'المتحدث', literal: samples.speaker, variable: hasArabic(samples.speaker) ? 'event.ar.speakers' : 'event.en.speakers' },
   ];
   return rows
     .map(row => ({ ...row, count: Math.max(countOccurrences(html, escapeHtml(row.literal)), countOccurrences(html, row.literal)) }))
@@ -91,3 +93,14 @@ export const fileToBase64 = (file: File) => new Promise<string>((resolve, reject
   reader.onerror = reject;
   reader.readAsDataURL(file);
 });
+
+/** First block of the email body in the builder's markup: the main message. */
+const BODY_OPEN = '<div style="font-size:15px;line-height:2;color:#35546a">';
+
+/** Adds "أهلًا {{ student.name }}،" above the main message so every recipient is greeted by their own name. */
+export function addGreeting(html: string, variable: 'student.name' | 'student.firstName'): { html: string; added: boolean } {
+  const at = html.indexOf(BODY_OPEN);
+  if (at === -1) return { html, added: false };
+  const insert = at + BODY_OPEN.length;
+  return { html: `${html.slice(0, insert)}<strong>أهلًا ${variableToken(variable)}،</strong><br>${html.slice(insert)}`, added: true };
+}

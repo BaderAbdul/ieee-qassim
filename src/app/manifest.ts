@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 
-// One manifest for both locales: the installed app opens on the default (Arabic) locale and the
-// language switcher is still one tap away. `id` keeps the install identity stable if start_url changes.
+// The installed app is for staff (super admins / admins / members): it opens the admin overview.
+// Students are never prompted to install it. `id` keeps the install identity stable if start_url changes.
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: '/',
@@ -10,7 +10,7 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'المنصة الرسمية لمجتمع IEEE جامعة القصيم التقني — The official IEEE Qassim Technology Community platform.',
     lang: 'ar',
     dir: 'rtl',
-    start_url: '/?source=pwa',
+    start_url: '/ar/admin?source=pwa',
     scope: '/',
     display: 'standalone',
     orientation: 'portrait',
@@ -24,9 +24,9 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: '/icons/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     ],
     shortcuts: [
-      { name: 'الفعاليات / Events', short_name: 'Events', url: '/events?source=pwa', icons: [{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }] },
-      { name: 'ملفي / Profile', short_name: 'Profile', url: '/profile?source=pwa', icons: [{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }] },
-      { name: 'لوحة الشرف / Leaderboard', short_name: 'Leaderboard', url: '/leaderboard?source=pwa', icons: [{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }] },
+      { name: 'لوحة الإدارة / Overview', short_name: 'Overview', url: '/ar/admin?source=pwa', icons: [{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }] },
+      { name: 'مركز المهام / Task Center', short_name: 'Tasks', url: '/ar/admin/operations?source=pwa', icons: [{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }] },
+      { name: 'ملفي الشخصي / My profile', short_name: 'Profile', url: '/ar/admin/profile?source=pwa', icons: [{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }] },
     ],
   };
 }
