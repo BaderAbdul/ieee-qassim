@@ -75,6 +75,8 @@ interface AuthContextType {
   login: () => Promise<void>;
   logout: () => Promise<void>;
   retry: () => void;
+  /** Re-reads the signed-in user's account (e.g. right after the profile was saved) and resolves with it. */
+  refreshUser: () => Promise<UserData | null>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -85,6 +87,7 @@ const AuthContext = createContext<AuthContextType>({
   login: async () => {},
   logout: async () => {},
   retry: () => {},
+  refreshUser: async () => null,
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -160,10 +163,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setAttempt(value => value + 1);
   };
 
+  const refreshUser = async (): Promise<UserData | null> => {
+    const me = await apiGet<UserData>('/api/me');
+    setUserData(me);
+    return me;
+  };
+
   const loading = !userLoaded || (isSignedIn && fetching && !userData);
 
   return (
-    <AuthContext.Provider value={{ user, userData, loading, error, login, logout, retry }}>
+    <AuthContext.Provider value={{ user, userData, loading, error, login, logout, retry, refreshUser }}>
       {!userLoaded && authTimedOut && (
         <div role="status" dir="auto" className="fixed bottom-4 inset-x-4 z-50 mx-auto max-w-lg rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 shadow-lg">
           تعذر تحميل تسجيل الدخول. يمكنك تصفح الموقع وإعادة تحميل الصفحة للمحاولة مجددًا.

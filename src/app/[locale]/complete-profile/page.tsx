@@ -14,7 +14,7 @@ export default function CompleteProfilePage() {
   const locale = useLocale();
   const isAr = locale === 'ar';
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { showToast } = useToast();
 
   const [isStudent, setIsStudent] = useState<boolean | null>(null);
@@ -116,7 +116,10 @@ export default function CompleteProfilePage() {
 
       // The server owns identity validation and the unique student-ID claim.
       await httpsCallable(null, 'saveProfile')(updateData);
-      
+      // The app still holds the account as it was before saving (profile not completed), and the profile guard would
+      // send the user straight back here. Re-read it first, so leaving this page is allowed.
+      await refreshUser();
+
       setSuccess(true);
       // Brief pause to show success state before redirecting
       setTimeout(() => {
