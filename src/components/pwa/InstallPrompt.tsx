@@ -6,6 +6,7 @@ import { Download, Share, X } from 'lucide-react';
 import { usePathname } from '@/i18n/routing';
 import { inAdminArea, useOnAdminHost } from '@/lib/adminPath';
 import { isAdminRole, useAuth } from '@/context/AuthContext';
+import { isMobileDevice } from '@/lib/pwa';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -83,7 +84,7 @@ export default function InstallPrompt() {
     if (outcome === 'dismissed') dismiss(); else setVisible(false);
   };
 
-  if (!staff || !inAdminArea(pathname, onAdminHost) || !visible || (!deferred && !ios)) return null;
+  if (!staff || !isMobileDevice() || !inAdminArea(pathname, onAdminHost) || !visible || (!deferred && !ios)) return null;
 
   return (
     <div

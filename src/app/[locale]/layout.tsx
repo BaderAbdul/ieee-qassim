@@ -19,6 +19,7 @@ import IdeaFloatingButton from '@/components/ui/IdeaFloatingButton';
 import { FeedbackSurfaceProvider } from '@/components/events/RequiredFeedbackDialog';
 import PendingAttendanceModal from '@/components/events/PendingAttendanceModal';
 import PwaRegister from '@/components/pwa/PwaRegister';
+import InstallReporter from '@/components/pwa/InstallReporter';
 import InstallPrompt from '@/components/pwa/InstallPrompt';
 import OfflineIndicator from '@/components/pwa/OfflineIndicator';
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -152,6 +153,7 @@ export default async function RootLayout({
                 <OfflineIndicator />
                 <InstallPrompt />
                 <PwaRegister />
+                <InstallReporter />
               </div>
             </ProfileGuard>
             </AccountEnhancements>

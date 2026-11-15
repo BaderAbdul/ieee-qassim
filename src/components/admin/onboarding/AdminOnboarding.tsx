@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { BellRing, CheckCircle2, Circle, Download, Loader2, Share, ShieldCheck, Smartphone, UserRound } from 'lucide-react';
 import { apiGet, apiSend, httpsCallable } from '@/lib/backend';
 import { useAuth } from '@/context/AuthContext';
-import { enableNotifications, installAvailable, isIos, isStandalone, onInstallChange, promptInstall, pushSupported, refreshDevice } from '@/lib/pwa';
+import { enableNotifications, installAvailable, isIos, isMobileDevice, isStandalone, onInstallChange, promptInstall, pushSupported, refreshDevice } from '@/lib/pwa';
 
 export interface OnboardingState {
   required: boolean; requireApp: boolean; missingProfile: string[]; installed: boolean; devices: number; testConfirmed: boolean;
@@ -163,7 +163,7 @@ export function useOnboarding(enabled: boolean) {
   const [state, setState] = useState<OnboardingState | null>(null);
   const [checked, setChecked] = useState(false);
   const reload = useCallback(async () => {
-    try { setState(await apiGet<OnboardingState>('/api/me/onboarding')); }
+    try { setState(await apiGet<OnboardingState>('/api/me/onboarding', { mobile: String(isMobileDevice()) })); }
     catch { setState(null); }
     finally { setChecked(true); }
   }, []);
