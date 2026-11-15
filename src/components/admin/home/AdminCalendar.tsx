@@ -124,16 +124,24 @@ export default function AdminCalendar({
           {isAr ? 'يوم سابق' : 'Past day'}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-sm bg-transparent border-2 border-amber-500" />
-          {isAr ? 'مهمة' : 'Task'}
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-sm bg-transparent border-2 border-violet-500" />
-          {isAr ? 'موعد تسليم مشروع' : 'Project deadline'}
+          <span className="w-2.5 h-2.5 rounded-sm bg-sky-200 border border-sky-400" />
+          {isAr ? 'مهمة أو موعد مشروع' : 'Task or project deadline'}
         </span>
         <span className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-sm bg-rose-100 border border-rose-300" />
           {isAr ? 'عطلة' : 'Vacation'}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-sm bg-amber-200 border border-amber-700" />
+          {isAr ? 'فعالية في يوم عطلة' : 'Event on a vacation day'}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-sm bg-transparent border-2 border-[var(--color-accent)]" />
+          {isAr ? 'اليوم وفيه فعالية/عطلة' : 'Today with an event/vacation'}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-2.5 rounded-sm bg-sky-200 border-4 border-double border-[var(--color-accent)]" />
+          {isAr ? 'اليوم وفيه أيضًا مهمة/مشروع' : 'Today, also with a task/project'}
         </span>
       </div>
 
@@ -175,35 +183,65 @@ export default function AdminCalendar({
                     (eventsByDay.get(format(d, 'yyyy-MM-dd')) || []).filter(ev => !ev.kind || ev.kind === 'event').map(ev => ev.id);
                   const connectsPrev = hasEvent && di > 0 && dayEventIds.some(id => eventIdsOf(week[di - 1]).includes(id));
                   const connectsNext = hasEvent && di < 6 && dayEventIds.some(id => eventIdsOf(week[di + 1]).includes(id));
-                  // Task/project deadlines are outlines layered on top of the background, not a
-                  // fill of their own -- a day can have an event AND a task deadline at once.
-                  const ringClass = hasTaskDeadline
-                    ? 'ring-2 ring-inset ring-amber-500'
-                    : hasProjectDeadline ? 'ring-2 ring-inset ring-violet-500' : '';
+                  // How a day looks (the only place these rules live):
+                  //  - a task or a project deadline turns the background blue;
+                  //  - an event on a vacation day turns the whole day brown/orange;
+                  //  - today gets a blue border when it holds an event or a vacation, and a double blue border
+                  //    when it also holds a task or a project.
+                  const hasWork = hasTaskDeadline || hasProjectDeadline;
+                  const today = isToday(day);
+                  const hasMarker = hasEvent || vacation;
+                  const eventOnVacation = hasEvent && vacation;
+                  const tone = active
+                    ? 'bg-[var(--color-accent)] text-[var(--color-accent-contrast)]'
+                    : hasWork
+                    ? 'bg-sky-200 text-sky-900 hover:bg-sky-300/70'
+                    : eventOnVacation
+                    ? 'bg-amber-200 text-amber-950 hover:bg-amber-300/70'
+                    : hasEvent && allEventsCompleted
+                    ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200/70'
+                    : hasEvent
+                    ? 'bg-[var(--color-highlight)]/30 text-[var(--color-text-primary)] hover:bg-[var(--color-highlight)]/40'
+                    : vacation
+                    ? 'bg-rose-100 text-rose-700 hover:bg-rose-200/70'
+                    : today
+                    ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
+                    : isPastDay && inMonth
+                    ? 'bg-slate-100 text-slate-400 hover:bg-slate-200/70'
+                    : inMonth
+                    ? 'text-[var(--color-text-primary)] hover:bg-[var(--color-surface-2)]'
+                    : 'text-[var(--color-text-muted)]/50 hover:bg-[var(--color-surface-2)]';
+                  const border = active
+                    ? 'border border-[var(--color-accent)]'
+                    : today && hasMarker && hasWork
+                    ? 'border-4 border-double border-[var(--color-accent)]'
+                    : today && hasMarker
+                    ? 'border-2 border-[var(--color-accent)]'
+                    : eventOnVacation
+                    ? 'border border-amber-700'
+                    : hasEvent && allEventsCompleted
+                    ? 'border border-emerald-400'
+                    : hasEvent
+                    ? 'border border-[var(--color-highlight)]/60'
+                    : hasWork
+                    ? 'border border-sky-400'
+                    : vacation
+                    ? 'border border-rose-300'
+                    : today
+                    ? 'border border-[var(--color-accent)]/30'
+                    : isPastDay && inMonth
+                    ? 'border border-slate-200'
+                    : inMonth
+                    ? 'border border-[var(--color-border)]/40'
+                    : 'border border-[var(--color-border)]/20';
                   return (
                     <div key={key} className={`p-0.5 ${connectsPrev ? 'ps-0' : ''} ${connectsNext ? 'pe-0' : ''}`}>
                       <button
                         type="button"
                         onClick={() => onSelectDay(selected && isSameDay(selected, day) ? null : day)}
-                        className={`cursor-pointer relative h-14 w-full flex flex-col items-center justify-center text-xs border transition-colors ${
+                        className={`cursor-pointer relative h-14 w-full flex flex-col items-center justify-center text-xs transition-colors ${tone} ${border} ${
                           connectsPrev ? 'rounded-s-none border-s-0' : 'rounded-s-xl'
-                        } ${connectsNext ? 'rounded-e-none border-e-0' : 'rounded-e-xl'} ${ringClass} ${
-                          active
-                            ? 'bg-[var(--color-accent)] text-[var(--color-accent-contrast)] border-[var(--color-accent)]'
-                            : hasEvent && allEventsCompleted
-                            ? 'bg-emerald-100 border-emerald-400 text-emerald-700 hover:bg-emerald-200/70'
-                            : hasEvent
-                            ? 'bg-[var(--color-highlight)]/30 border-[var(--color-highlight)]/60 text-[var(--color-text-primary)] hover:bg-[var(--color-highlight)]/40'
-                            : vacation
-                            ? 'bg-rose-100 border-rose-300 text-rose-700 hover:bg-rose-200/70'
-                            : isToday(day)
-                            ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)] border-[var(--color-accent)]/30'
-                            : isPastDay && inMonth
-                            ? 'bg-slate-100 border-slate-200 text-slate-400 hover:bg-slate-200/70'
-                            : inMonth
-                            ? 'text-[var(--color-text-primary)] border-[var(--color-border)]/40 hover:bg-[var(--color-surface-2)]'
-                            : 'text-[var(--color-text-muted)]/50 border-[var(--color-border)]/20 hover:bg-[var(--color-surface-2)]'
-                        }`}
+                        } ${connectsNext ? 'rounded-e-none border-e-0' : 'rounded-e-xl'}`}
                       >
                         <span className="font-extrabold">{day.getDate()}</span>
                       </button>
