@@ -23,14 +23,14 @@ const colorClasses: Record<StatColor, string> = {
 
 function StatTile({ label, value, icon: Icon, color, locale }: { label: string; value: number; icon: LucideIcon; color: StatColor; locale: string }) {
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-      <div className="flex items-center gap-2 text-sm text-slate-500 mb-2">
+    <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm sm:p-5">
+      <div className="mb-2 flex items-center gap-2 text-xs text-slate-500 sm:text-sm">
         <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${colorClasses[color]}`}>
           <Icon className="w-4 h-4" />
         </span>
         <span>{label}</span>
       </div>
-      <div className="text-3xl font-black text-slate-900">{value.toLocaleString(locale)}</div>
+      <div className="text-2xl font-black text-slate-900 sm:text-3xl">{value.toLocaleString(locale)}</div>
     </div>
   );
 }
@@ -101,7 +101,7 @@ export default function AdminEventSummaryPage() {
       {error ? <AdminError message={error} retry={refresh} /> : loading ? <AdminLoading /> : data ? <>
         <section className="space-y-3">
           <h3 className="text-sm font-bold text-slate-500">{isAr ? 'التسجيل والحضور' : 'Registration & attendance'}</h3>
-          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <dl className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             {registrationStats.map(stat => <StatTile key={stat.label} {...stat} locale={locale} />)}
           </dl>
         </section>
@@ -134,7 +134,7 @@ export default function AdminEventSummaryPage() {
 
         <section className="space-y-3">
           <h3 className="text-sm font-bold text-slate-500">{isAr ? 'الشهادات' : 'Certificates'}</h3>
-          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <dl className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
             {certificateStats.map(stat => <StatTile key={stat.label} {...stat} locale={locale} />)}
           </dl>
         </section>

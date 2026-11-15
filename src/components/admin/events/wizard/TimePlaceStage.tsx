@@ -94,14 +94,14 @@ export default function TimePlaceStage({ isAr, value, onChange, onSave, saving, 
         </div>
         {!value.days.length && <p className="text-sm text-[var(--color-text-muted)]">{isAr ? 'لم تتم إضافة أي يوم بعد.' : 'No days added yet.'}</p>}
         {value.days.map((day, index) => (
-          <div key={index} className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3">
-            <label className={label}><span>{isAr ? 'التاريخ' : 'Date'}</span>
+          <div key={index} className="grid grid-cols-2 items-end gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3 sm:grid-cols-[1.4fr_1fr_1fr_auto]">
+            <label className={`${label} col-span-2 min-w-0 sm:col-span-1`}><span>{isAr ? 'التاريخ' : 'Date'}</span>
               <input type="date" className={input} value={day.date} onChange={e => patchDay(index, { date: e.target.value })} /></label>
-            <label className={label}><span>{isAr ? 'البداية' : 'Start'}</span>
+            <label className={`${label} min-w-0`}><span>{isAr ? 'البداية' : 'Start'}</span>
               <input type="time" className={input} value={day.startTime} onChange={e => patchDay(index, { startTime: e.target.value })} /></label>
-            <label className={label}><span>{isAr ? 'النهاية' : 'End'}</span>
+            <label className={`${label} min-w-0`}><span>{isAr ? 'النهاية' : 'End'}</span>
               <input type="time" className={input} value={day.endTime} onChange={e => patchDay(index, { endTime: e.target.value })} /></label>
-            <button type="button" onClick={() => removeDay(index)} className="rounded-xl p-2.5 text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)]" aria-label={isAr ? 'حذف اليوم' : 'Remove day'}>
+            <button type="button" onClick={() => removeDay(index)} className="col-span-2 justify-self-end rounded-xl p-2.5 text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)] sm:col-span-1" aria-label={isAr ? 'حذف اليوم' : 'Remove day'}>
               <Trash2 size={16} />
             </button>
           </div>

@@ -299,7 +299,7 @@ export default function CertificatesManagementPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 sm:p-6">
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
         <div>
           <h1 className="text-2xl font-black font-cairo text-slate-900">إدارة الشهادات</h1>

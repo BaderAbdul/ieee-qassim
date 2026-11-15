@@ -438,11 +438,11 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
         </div>
       )}
 
-      <div className={`grid grid-cols-1 ${isBoothOrWalkIn ? 'sm:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-4'} gap-6 mb-8`}>
+      <div className={`grid grid-cols-2 ${isBoothOrWalkIn ? 'sm:grid-cols-3' : 'lg:grid-cols-4'} gap-3 sm:gap-6 mb-8`}>
         {isBoothOrWalkIn ? (
           <>
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-emerald-100 flex items-center">
-              <div className="h-12 w-12 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center me-4">
+            <div className="bg-white rounded-xl p-3.5 sm:p-6 shadow-sm border border-emerald-100 flex items-center">
+              <div className="h-9 w-9 sm:h-12 sm:w-12 shrink-0 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center me-2.5 sm:me-4">
                 <UserCheck size={24} />
               </div>
               <div>
@@ -450,8 +450,8 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
                 <h3 className="text-2xl font-bold text-gray-900">{totals.attended}</h3>
               </div>
             </div>
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-purple-100 flex items-center">
-              <div className="h-12 w-12 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center me-4">
+            <div className="bg-white rounded-xl p-3.5 sm:p-6 shadow-sm border border-purple-100 flex items-center">
+              <div className="h-9 w-9 sm:h-12 sm:w-12 shrink-0 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center me-2.5 sm:me-4">
                 <Users size={24} />
               </div>
               <div>
@@ -459,8 +459,8 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
                 <h3 className="text-xl font-bold text-gray-900">حضور مباشر (بوث)</h3>
               </div>
             </div>
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-yellow-100 flex items-center">
-              <div className="h-12 w-12 rounded-lg bg-yellow-100 text-yellow-600 flex items-center justify-center me-4">
+            <div className="bg-white rounded-xl p-3.5 sm:p-6 shadow-sm border border-yellow-100 flex items-center">
+              <div className="h-9 w-9 sm:h-12 sm:w-12 shrink-0 rounded-lg bg-yellow-100 text-yellow-600 flex items-center justify-center me-2.5 sm:me-4">
                 <Trophy size={24} />
               </div>
               <div>
@@ -471,8 +471,8 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
           </>
         ) : (
           <>
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex items-center">
-              <div className="h-12 w-12 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center me-4">
+            <div className="bg-white rounded-xl p-3.5 sm:p-6 shadow-sm border border-gray-100 flex items-center">
+              <div className="h-9 w-9 sm:h-12 sm:w-12 shrink-0 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center me-2.5 sm:me-4">
                 <Users size={24} />
               </div>
               <div>
@@ -480,8 +480,8 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
                 <h3 className="text-2xl font-bold text-gray-900">{totals.all}</h3>
               </div>
             </div>
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex items-center">
-              <div className="h-12 w-12 rounded-lg bg-green-100 text-green-600 flex items-center justify-center me-4">
+            <div className="bg-white rounded-xl p-3.5 sm:p-6 shadow-sm border border-gray-100 flex items-center">
+              <div className="h-9 w-9 sm:h-12 sm:w-12 shrink-0 rounded-lg bg-green-100 text-green-600 flex items-center justify-center me-2.5 sm:me-4">
                 <Check size={24} />
               </div>
               <div>
@@ -489,8 +489,8 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
                 <h3 className="text-2xl font-bold text-gray-900">{totals.approved}</h3>
               </div>
             </div>
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-emerald-100 flex items-center">
-              <div className="h-12 w-12 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center me-4">
+            <div className="bg-white rounded-xl p-3.5 sm:p-6 shadow-sm border border-emerald-100 flex items-center">
+              <div className="h-9 w-9 sm:h-12 sm:w-12 shrink-0 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center me-2.5 sm:me-4">
                 <UserCheck size={24} />
               </div>
               <div>
@@ -498,8 +498,8 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
                 <h3 className="text-2xl font-bold text-gray-900">{totals.attended}</h3>
               </div>
             </div>
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex items-center">
-              <div className="h-12 w-12 rounded-lg bg-yellow-100 text-yellow-600 flex items-center justify-center me-4">
+            <div className="bg-white rounded-xl p-3.5 sm:p-6 shadow-sm border border-gray-100 flex items-center">
+              <div className="h-9 w-9 sm:h-12 sm:w-12 shrink-0 rounded-lg bg-yellow-100 text-yellow-600 flex items-center justify-center me-2.5 sm:me-4">
                 <Clock size={24} />
               </div>
               <div>

@@ -116,13 +116,13 @@ export default function MailTrackingTab({ isAr, canCancel = false }: { isAr: boo
     {data && data.sending.enabled && !data.sending.configured && (
       <div role="status" className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">{t('حساب الإرسال غير مكتمل الإعداد.', 'The sender account is not fully configured.')}</div>
     )}
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
       {[
         { label: t('إجمالي الرسائل المرسلة', 'Total emails sent'), value: stats?.totalSent, Icon: TrendingUp, color: 'text-indigo-500' },
         { label: t('المرسلة اليوم', 'Sent today'), value: stats ? `${stats.sentToday} / ${stats.dailyLimit}` : undefined, Icon: Send, color: 'text-sky-500' },
         { label: t('المتبقي اليوم', 'Remaining today'), value: stats?.remainingToday, Icon: CheckCircle2, color: 'text-emerald-500' },
       ].map(({ label, value, Icon, color }) => (
-        <div key={label} className={`${panel} flex items-center gap-3.5 p-5`}>
+        <div key={label} className={`${panel} flex items-center gap-3 p-3.5 sm:gap-3.5 sm:p-5 last:odd:col-span-2 sm:last:odd:col-span-1`}>
           <div className={`rounded-xl bg-[var(--color-surface-2)] p-3 ${color}`}><Icon size={24} /></div>
           <div><p className="text-xs font-bold text-[var(--color-text-muted)]">{label}</p><p dir="ltr" className="mt-1 text-2xl font-black">{value ?? '…'}</p></div>
         </div>

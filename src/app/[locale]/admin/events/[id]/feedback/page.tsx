@@ -123,7 +123,7 @@ export default function EventFeedbackDashboardPage({ params }: { params: Promise
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
         <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl p-6 text-white shadow-lg shadow-amber-500/20 flex items-center justify-between">
           <div>
             <div className="text-amber-100 text-xs font-bold mb-1">{isAr ? 'متوسط التقييم العام' : 'Average Star Rating'}</div>
