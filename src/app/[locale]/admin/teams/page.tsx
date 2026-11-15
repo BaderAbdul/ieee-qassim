@@ -318,7 +318,6 @@ export default function AdminTeamsPage() {
       <div className="space-y-4">
         {sortedTeams.map((team, teamIndex) => {
           const isOpen = openTeams.has(team.id);
-          const leaders = sortedMembersOf(team).filter(m => m.teamRole !== 'member');
           return (
           <section key={team.id} className={`overflow-hidden rounded-3xl border bg-[var(--color-surface)]/80 shadow-sm backdrop-blur-md transition-shadow hover:shadow-md ${isOpen ? 'border-[var(--color-accent)]/40' : 'border-[var(--color-border)]/60'}`}>
             <div className="flex items-center gap-2 p-3 sm:p-4">
@@ -331,7 +330,6 @@ export default function AdminTeamsPage() {
                   </span>
                   <span className="mt-0.5 flex flex-wrap items-center gap-x-3 text-[11px] text-[var(--color-text-muted)]">
                     <span>{team.members.length} {isAr ? (team.members.length === 1 ? 'عضو' : 'أعضاء') : (team.members.length === 1 ? 'member' : 'members')}</span>
-                    {leaders.length > 0 && <span className="truncate">{leaders.map(l => l.displayName).join(' · ')}</span>}
                   </span>
                 </span>
                 <ChevronDown size={18} className={`shrink-0 text-[var(--color-text-muted)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />

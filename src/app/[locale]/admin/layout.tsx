@@ -91,6 +91,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
   const themeClass = `ieee-admin-theme${isDark ? ' dark' : ''}`;
 
+  // The phone's status/top bar takes the same colour as the board's background (light or dark).
+  useEffect(() => {
+    const color = isDark ? '#0B1220' : '#E4EAF1';
+    const tags = Array.from(document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]'));
+    const previous = tags.map(tag => tag.content);
+    const created = tags.length === 0 ? document.head.appendChild(Object.assign(document.createElement('meta'), { name: 'theme-color' })) : null;
+    (created ? [created] : tags).forEach(tag => { tag.content = color; tag.removeAttribute('media'); });
+    return () => {
+      if (created) { created.remove(); return; }
+      tags.forEach((tag, index) => { tag.content = previous[index]; });
+    };
+  }, [isDark]);
+
   const { navItems, footerItems } = useAdminNav(userData, isAr);
 
   const isDashboardUser = !!userData && (userData.role !== 'student'

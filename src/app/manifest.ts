@@ -14,8 +14,8 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: '/',
     display: 'standalone',
     orientation: 'portrait',
-    background_color: '#f8fafc',
-    theme_color: '#00629B',
+    background_color: '#E4EAF1',
+    theme_color: '#E4EAF1', // the admin board's background, which is where the installed app opens
     categories: ['education', 'social'],
     icons: [
       { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },

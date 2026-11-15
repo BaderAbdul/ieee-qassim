@@ -58,7 +58,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#00629B',
+  themeColor: '#f8fafc', // same as the page background (globals.css --background)
 };
 
 export const metadata: Metadata = {
