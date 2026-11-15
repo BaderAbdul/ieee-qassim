@@ -2,7 +2,7 @@ import React from 'react';
 import { API_BASE_URL } from '@/lib/apiBase';
 import StructureAccordion, { Committee } from './StructureAccordion';
 
-export const revalidate = 300; // Cache on edge for 5 minutes
+export const dynamic = 'force-dynamic'; // team changes show on the first refresh
 
 export default async function StructurePage({ params }: { params: Promise<{ locale: string }> }) {
   const resolvedParams = await params;
@@ -10,7 +10,7 @@ export default async function StructurePage({ params }: { params: Promise<{ loca
 
   let committees: Committee[] = [];
   try {
-    const response = await fetch(`${API_BASE_URL}/api/public/structure`, { next: { revalidate: 300 } });
+    const response = await fetch(`${API_BASE_URL}/api/public/structure`, { cache: 'no-store' });
     if (!response.ok) throw new Error(`structure fetch failed: ${response.status}`);
     const body = await response.json() as { committees?: Committee[] };
     committees = body.committees ?? [];

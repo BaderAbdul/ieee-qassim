@@ -5,7 +5,8 @@ import { PlatformEvent } from '@/lib/types';
 import { sortEventsByClosestDate } from '@/lib/dateUtils';
 import EventsList from './EventsList';
 
-export const revalidate = 60; // Enable ISR Edge Caching, revalidate every 60s
+// Always rendered fresh: a newly created or changed event must show on the very first refresh (no page or data cache).
+export const dynamic = 'force-dynamic';
 
 export default async function EventsPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -17,7 +18,7 @@ export default async function EventsPage({ params }: { params: Promise<{ locale:
   const requestTime = Date.now();
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/public/events?limit=24`, { next: { revalidate: 60 } });
+    const response = await fetch(`${API_BASE_URL}/api/public/events?limit=24`, { cache: 'no-store' });
     if (!response.ok) throw new Error(`events fetch failed: ${response.status}`);
     const body = await response.json() as { events: PlatformEvent[]; nextCursor: number | null };
     events = sortEventsByClosestDate(body.events);

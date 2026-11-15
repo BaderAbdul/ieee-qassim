@@ -8,7 +8,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const base: Metadata = { title: locale === 'ar' ? 'الفعالية | IEEE القصيم' : 'Event | IEEE Qassim', alternates: { canonical: `${SITE_URL}/${locale}/events/${encodeURIComponent(id)}`, languages: { ar: `${SITE_URL}/ar/events/${encodeURIComponent(id)}`, en: `${SITE_URL}/en/events/${encodeURIComponent(id)}` } } };
   if (!id || id.includes('/') || id.length > 128) return { ...base, robots: { index: false, follow: false } };
   try {
-    const response = await fetch(`${API_BASE_URL}/api/public/events/${encodeURIComponent(id)}`, { next: { revalidate: 60 } });
+    const response = await fetch(`${API_BASE_URL}/api/public/events/${encodeURIComponent(id)}`, { cache: 'no-store' });
     if (!response.ok) return { ...base, robots: { index: false, follow: false } };
     const event = await response.json() as { title?: string; titleEn?: string; description?: string; descriptionEn?: string; coverUrl?: string };
     const title = String((locale === 'en' ? event.titleEn : event.title) || event.title || 'IEEE Qassim');

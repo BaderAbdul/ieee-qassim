@@ -146,7 +146,7 @@ export interface CrossTeamRequest {
   createdAt: string;
 }
 
-export interface TeamLeaderboardMember { userId: string; name: string; role: string; totalPoints: number }
+export interface TeamLeaderboardMember { userId: string; name: string; role: string; adminPoints: number }
 export interface TeamLeaderboardEntry { id: string; nameAr: string; nameEn: string; members: TeamLeaderboardMember[] }
 export interface RemainingTasksEntry { userId: string; name: string; remainingCount: number }
 

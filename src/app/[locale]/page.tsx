@@ -2,17 +2,18 @@ import React from 'react';
 import { PlatformEvent } from '@/lib/types';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/routing';
-import dynamic from 'next/dynamic';
+import dynamicImport from 'next/dynamic';
 import { Calendar, ArrowRight, UserCircle, Users } from 'lucide-react';
 
-const HeroUserCards = dynamic(() => import('./HeroUserCards'), { ssr: true });
-const HeroActionButtons = dynamic(() => import('./HeroActionButtons'), { ssr: true });
-const LeaderboardQuickLink = dynamic(() => import('./LeaderboardQuickLink'), { ssr: true });
+const HeroUserCards = dynamicImport(() => import('./HeroUserCards'), { ssr: true });
+const HeroActionButtons = dynamicImport(() => import('./HeroActionButtons'), { ssr: true });
+const LeaderboardQuickLink = dynamicImport(() => import('./LeaderboardQuickLink'), { ssr: true });
 import EventCard from '@/components/ui/EventCard';
 import { sortEventsByClosestDate } from '@/lib/dateUtils';
 import { API_BASE_URL } from '@/lib/apiBase';
 
-export const revalidate = 60; // Enable ISR, cache for 60 seconds
+// Always rendered fresh (see the events page): the home page lists the newest events.
+export const dynamic = 'force-dynamic';
 
 interface PageProps {
   params: Promise<{ locale: string }>;
@@ -30,7 +31,7 @@ export default async function HomePage({ params }: PageProps) {
   let latestEvent: PlatformEvent | null = null;
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/public/home`, { next: { revalidate: 60 } });
+    const response = await fetch(`${API_BASE_URL}/api/public/home`, { cache: 'no-store' });
     if (!response.ok) throw new Error(`home fetch failed: ${response.status}`);
     const home = await response.json() as { settings: typeof stats; events: PlatformEvent[]; featuredEvent: PlatformEvent | null };
     stats = { ...stats, ...home.settings };

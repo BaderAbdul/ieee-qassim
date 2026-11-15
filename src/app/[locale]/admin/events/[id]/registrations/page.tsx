@@ -4,6 +4,8 @@ import { useEffect, useState, use, useRef } from 'react';
 import { downloadCSV } from '@/lib/csv';
 import { registrationAction, runOperations, type OperationResult } from '@/lib/admin-operations';
 import { apiGet, httpsCallable } from '@/lib/backend';
+import { useLocale } from 'next-intl';
+import RecommendStar, { type Recommendation } from '@/components/admin/events/RecommendStar';
 import { apiGetArray } from '@/lib/backendResponse';
 import { PlatformEvent } from '@/lib/types';
 import { Link } from '@/i18n/routing';
@@ -27,6 +29,7 @@ interface RegistrationData {
   timestamp: string | Date | null;
   attendedAt?: string | Date | null;
   registeredAt?: string | Date | null;
+  recommendations?: Recommendation[];
 }
 
 interface RegistrationsPage {
@@ -44,6 +47,7 @@ const toDate = (val: string | Date | null | undefined): Date | null => {
 
 export default function RegistrationDeskPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: eventId } = use(params);
+  const isArabic = useLocale() === 'ar';
   
   const [event, setEvent] = useState<PlatformEvent | null>(null);
   const [registrations, setRegistrations] = useState<RegistrationData[]>([]);
@@ -541,7 +545,11 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
                       </button>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="font-bold text-gray-900">{reg.userName}</div>
+                      <div className="flex items-center gap-1 font-bold text-gray-900">
+                        <span>{reg.userName}</span>
+                        <RecommendStar isAr={isArabic} eventId={eventId} userId={reg.userId} items={reg.recommendations ?? []}
+                                       onChange={next => setRegistrations(previous => previous.map(item => item.id === reg.id ? { ...item, recommendations: next } : item))} />
+                      </div>
                       <div className="text-sm text-gray-500">{reg.userEmail}</div>
                       {reg.universityId && <div className="text-xs text-slate-400 font-mono mt-0.5">{reg.universityId}</div>}
                     </td>

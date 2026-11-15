@@ -13,7 +13,7 @@ function Podium({ members, isAr }: { members: TeamLeaderboardMember[]; isAr: boo
         <Crown className="shrink-0 text-amber-500" size={20} />
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500 text-xs font-black text-white">{first.name.trim().charAt(0) || '?'}</div>
         <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{first.name}</p></div>
-        <span className="shrink-0 text-sm font-black text-amber-700">{first.totalPoints} {isAr ? 'نقطة' : 'pts'}</span>
+        <span className="shrink-0 text-sm font-black text-amber-700">{first.adminPoints} {isAr ? 'نقطة' : 'pts'}</span>
       </div>
     )}
     {(second || third) && (
@@ -23,7 +23,7 @@ function Podium({ members, isAr }: { members: TeamLeaderboardMember[]; isAr: boo
             <Medal size={15} className={i === 0 ? 'text-slate-400' : 'text-amber-700'} />
             <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-[10px] font-black text-[var(--color-accent)]">{member.name.trim().charAt(0) || '?'}</div>
             <div className="min-w-0 flex-1"><p className="truncate text-xs font-bold">{member.name}</p></div>
-            <span className="shrink-0 text-xs font-black text-[var(--color-text-secondary)]">{member.totalPoints}</span>
+            <span className="shrink-0 text-xs font-black text-[var(--color-text-secondary)]">{member.adminPoints}</span>
           </div>
         ))}
       </div>
@@ -33,7 +33,7 @@ function Podium({ members, isAr }: { members: TeamLeaderboardMember[]; isAr: boo
         {rest.map((member, i) => (
           <li key={member.userId} className="flex items-center justify-between rounded-lg px-2 py-1 text-xs">
             <span className="text-[var(--color-text-muted)]">#{i + 4} {member.name}</span>
-            <span className="font-bold">{member.totalPoints} {isAr ? 'نقطة' : 'pts'}</span>
+            <span className="font-bold">{member.adminPoints} {isAr ? 'نقطة' : 'pts'}</span>
           </li>
         ))}
       </ol>
@@ -73,7 +73,7 @@ export default function TeamLeaderboardPanel({ teams, isAr }: { teams: TeamLeade
               <span>{isAr ? team.nameAr : team.nameEn}</span>
               <span>{team.members.length} {t('من أعضاء الفريق في القائمة', 'team members ranked')}</span>
             </div>
-            <Podium members={[...team.members].sort((a, b) => b.totalPoints - a.totalPoints).slice(0, 3)} isAr={isAr} />
+            <Podium members={[...team.members].sort((a, b) => b.adminPoints - a.adminPoints).slice(0, 3)} isAr={isAr} />
           </div>
         ))}
         {withMembers.length === 0 && <p className="py-6 text-center text-sm text-[var(--color-text-muted)]"><Award size={22} className="mx-auto mb-2 text-[var(--color-text-muted)]" />{t('لا يوجد أعضاء في الفرق بعد.', 'No team members yet.')}</p>}
@@ -81,7 +81,7 @@ export default function TeamLeaderboardPanel({ teams, isAr }: { teams: TeamLeade
     ) : (() => {
       const team = withMembers.find(tm => tm.id === tab);
       if (!team) return null;
-      return <Podium members={[...team.members].sort((a, b) => b.totalPoints - a.totalPoints)} isAr={isAr} />;
+      return <Podium members={[...team.members].sort((a, b) => b.adminPoints - a.adminPoints)} isAr={isAr} />;
     })()}
   </div>;
 }

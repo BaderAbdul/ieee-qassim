@@ -2,7 +2,7 @@ import { BadgeCheck, ShieldX } from 'lucide-react';
 import { setRequestLocale } from 'next-intl/server';
 import { API_BASE_URL } from '@/lib/apiBase';
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 interface Verification { valid: boolean; revoked?: boolean; kind?: 'student' | 'speaker' | 'interviewer'; holderName?: string; eventTitle?: string; issueDate?: string }
 
@@ -13,7 +13,7 @@ export default async function VerifyCertificatePage({ params }: { params: Promis
   let result: Verification = { valid: false };
   try {
     const response = await fetch(`${API_BASE_URL}/api/public/certificates/${encodeURIComponent(code)}`, {
-      next: { revalidate: 60 }, signal: AbortSignal.timeout(10000),
+      cache: 'no-store', signal: AbortSignal.timeout(10000),
     });
     if (response.ok) result = await response.json() as Verification;
   } catch { /* shown as "not found" below */ }

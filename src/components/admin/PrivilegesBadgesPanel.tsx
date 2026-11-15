@@ -7,8 +7,8 @@ import { apiSend } from '@/lib/backend';
 import { apiGetArray } from '@/lib/backendResponse';
 import { AdminError, AdminLoading } from './AdminData';
 import { Award, Shield, X } from 'lucide-react';
+import { PrivilegeAccordion, type Privilege } from './PrivilegeGrid';
 
-interface Privilege { key: string; feature: string; action: string; labelAr: string; labelEn: string }
 interface Badge { key: string; nameAr: string; nameEn: string; privileges: string[] }
 interface Override { privilegeKey: string; granted: boolean }
 interface MemberOverview {
@@ -70,34 +70,34 @@ export default function PrivilegesBadgesPanel({ userId, onClose }: { userId: str
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[85vh] overflow-y-auto">
-        <div className="p-5 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
-          <h3 className="text-lg font-bold font-cairo flex items-center gap-2"><Shield size={18} />{isAr ? 'الصلاحيات والأوسمة' : 'Privileges & Badges'}</h3>
-          <button type="button" onClick={onClose} className="rounded-lg p-1.5 hover:bg-gray-100"><X size={18} /></button>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose}>
+      <div role="dialog" aria-modal="true" aria-label={isAr ? 'الصلاحيات والأوسمة' : 'Privileges & badges'} onClick={event => event.stopPropagation()}
+           className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-l from-sky-50 to-white px-5 py-4">
+          <h3 className="flex items-center gap-2 font-cairo text-lg font-black text-slate-900"><Shield size={18} className="text-[#00629B]" />{isAr ? 'الصلاحيات والأوسمة' : 'Privileges & Badges'}</h3>
+          <button type="button" onClick={onClose} aria-label={isAr ? 'إغلاق' : 'Close'} className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100"><X size={18} /></button>
         </div>
-        <div className="p-5 space-y-4">
+        <div className="space-y-5 overflow-y-auto p-5">
           {loading && <AdminLoading />}
           {error && <AdminError message={error} retry={load} />}
           {data && !loading && (
             <>
-              <p className="text-sm text-gray-600">
-                {isAr ? 'الدور' : 'Role'}: <strong>{isAr ? data.member.roleNameAr : data.member.roleNameEn}</strong>
-                {data.member.teams.length > 0 && (
-                  <span className="ms-2 text-gray-400">
-                    · {data.member.teams.map(t => `${isAr ? t.nameAr : t.nameEn}${t.isLeader ? ' (leader)' : ''}`).join(', ')}
-                  </span>
-                )}
-              </p>
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="rounded-full bg-[#00629B]/10 px-3 py-1 font-bold text-[#00629B]">{isAr ? 'الدور' : 'Role'}: {isAr ? data.member.roleNameAr : data.member.roleNameEn}</span>
+                {data.member.teams.map(t => (
+                  <span key={t.id} className="rounded-full bg-slate-100 px-3 py-1 font-bold text-slate-600">{isAr ? t.nameAr : t.nameEn}{t.isLeader ? (isAr ? ' · قائد' : ' · leader') : ''}</span>
+                ))}
+                <span className="ms-auto text-slate-400">{isAr ? `${data.member.effectivePrivileges.length} صلاحية فعلية` : `${data.member.effectivePrivileges.length} effective privileges`}</span>
+              </div>
 
               {!data.canManagePrivileges && (
-                <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-800">
-                  {isAr ? 'للعرض فقط: لا يمكنك تعديل صلاحيات هذا المستخدم.' : 'Read-only: you can\'t edit this user\'s privileges.'}
+                <p className="rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-800">
+                  {isAr ? 'للعرض فقط: لا يمكنك تعديل صلاحيات هذا المستخدم.' : "Read-only: you can't edit this user's privileges."}
                 </p>
               )}
 
               <div>
-                <p className="text-sm font-bold text-gray-800 mb-2">{isAr ? 'الأوسمة الإدارية' : 'Admin badges'}</p>
+                <p className="mb-2 text-sm font-black text-slate-800">{isAr ? 'الأوسمة الإدارية' : 'Admin badges'}</p>
                 <div className="flex flex-wrap gap-2">
                   {badges.map(badge => {
                     const has = data.member.badges.some(b => b.key === badge.key);
@@ -106,44 +106,45 @@ export default function PrivilegesBadgesPanel({ userId, onClose }: { userId: str
                       <button key={badge.key} type="button" disabled={busy || !data.canManagePrivileges || blocked}
                               onClick={() => toggleBadge(badge.key, has)}
                               title={blocked ? (isAr ? 'يتجاوز الحد الأقصى لصلاحيات الفريق' : "Beyond your team's privilege ceiling") : undefined}
-                              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${has ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-500'} disabled:opacity-50`}>
-                        <Award size={12} />{isAr ? badge.nameAr : badge.nameEn}
+                              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition ${has ? 'border-amber-300 bg-amber-100 text-amber-800' : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'} disabled:opacity-50`}>
+                        <Award size={13} />{isAr ? badge.nameAr : badge.nameEn}
                       </button>
                     );
                   })}
-                  {badges.length === 0 && <p className="text-xs text-gray-400">{isAr ? 'لا توجد أوسمة معرّفة بعد.' : 'No badges defined yet.'}</p>}
+                  {badges.length === 0 && <p className="text-xs text-slate-400">{isAr ? 'لا توجد أوسمة معرّفة بعد.' : 'No badges defined yet.'}</p>}
                 </div>
               </div>
 
               <div>
-                <p className="text-sm font-bold text-gray-800 mb-2">{isAr ? 'الصلاحيات الفعلية' : 'Effective privileges'}</p>
-                <div className="space-y-1 max-h-72 overflow-y-auto">
-                  {catalog.map(privilege => {
+                <p className="mb-1 text-sm font-black text-slate-800">{isAr ? 'الصلاحيات الفعلية' : 'Effective privileges'}</p>
+                <p className="mb-3 text-[11px] text-slate-500">{isAr ? 'افتح أي مجموعة لتعديل صلاحياتها: «+» منح مباشر، «−» سحب مباشر، «تراجع» يعيدها لما يقرره الدور والأوسمة.' : 'Open a group to edit it: “+” grants directly, “−” revokes directly, “reset” returns to what the role and badges decide.'}</p>
+                <PrivilegeAccordion privileges={catalog} isAr={isAr}
+                  countOf={items => items.filter(item => data.member.effectivePrivileges.includes(item.key)).length}
+                  renderItem={privilege => {
                     const override = overrideFor(privilege.key);
                     const effective = data.member.effectivePrivileges.includes(privilege.key);
                     return (
-                      <div key={privilege.key} className="flex items-center justify-between text-xs py-1 border-b border-gray-50">
-                        <span className={effective ? 'text-gray-800' : 'text-gray-400'}>
+                      <div className="flex items-center justify-between gap-2 rounded-lg px-1 py-1 text-xs hover:bg-slate-50">
+                        <span className={`flex-1 ${effective ? 'font-bold text-slate-800' : 'text-slate-400'}`}>
                           {isAr ? privilege.labelAr : privilege.labelEn}
-                          {override && <span className={`ms-1 ${override.granted ? 'text-emerald-600' : 'text-rose-600'}`}>({isAr ? 'تعديل مباشر' : 'override'})</span>}
+                          {override && <span className={`ms-1 text-[10px] ${override.granted ? 'text-emerald-600' : 'text-rose-600'}`}>({isAr ? 'مباشر' : 'direct'})</span>}
                         </span>
                         {data.canManagePrivileges && (
-                          <div className="flex gap-1">
+                          <div className="flex shrink-0 gap-1">
                             <button type="button" disabled={busy || !grantAllowed(privilege.key)} onClick={() => setOverride(privilege.key, true)}
                                     title={!grantAllowed(privilege.key) ? (isAr ? 'يتجاوز الحد الأقصى لصلاحيات الفريق' : "Beyond your team's privilege ceiling") : undefined}
-                                    className={`rounded px-2 py-0.5 disabled:opacity-40 ${override?.granted === true ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>+</button>
+                                    className={`rounded-md px-2 py-0.5 font-bold disabled:opacity-40 ${override?.granted === true ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>+</button>
                             <button type="button" disabled={busy} onClick={() => setOverride(privilege.key, false)}
-                                    className={`rounded px-2 py-0.5 ${override?.granted === false ? 'bg-rose-100 text-rose-700' : 'bg-gray-100 text-gray-500'}`}>-</button>
+                                    className={`rounded-md px-2 py-0.5 font-bold ${override?.granted === false ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>−</button>
                             {override && (
                               <button type="button" disabled={busy} onClick={() => setOverride(privilege.key, null)}
-                                      className="rounded px-2 py-0.5 bg-gray-100 text-gray-500">{isAr ? 'تراجع' : 'reset'}</button>
+                                      className="rounded-md bg-slate-100 px-2 py-0.5 text-slate-500 hover:bg-slate-200">{isAr ? 'تراجع' : 'reset'}</button>
                             )}
                           </div>
                         )}
                       </div>
                     );
-                  })}
-                </div>
+                  }} />
               </div>
             </>
           )}

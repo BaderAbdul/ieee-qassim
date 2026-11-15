@@ -6,7 +6,7 @@ import { httpsCallable } from '@/lib/backend';
 import { hasAnyPrivilege, useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { apiGetArray } from '@/lib/backendResponse';
-import { Search, Trophy, Shield, ShieldAlert, Trash2, Edit3, Lock, Unlock, Filter, ArrowUpDown, KeyRound } from 'lucide-react';
+import { Search, Trophy, Shield, ShieldAlert, Trash2, Edit3, Lock, Unlock, Filter, ArrowUpDown, KeyRound, Briefcase } from 'lucide-react';
 import type { MemberSearchResult } from '@/lib/adminTypes';
 import { AdminError } from '@/components/admin/AdminData';
 import PrivilegesBadgesPanel from '@/components/admin/PrivilegesBadgesPanel';
@@ -19,6 +19,7 @@ interface AdminUserItem {
   email?: string;
   role?: string;
   totalPoints?: number;
+  adminPoints?: number;
   isRestricted?: boolean;
 }
 
@@ -183,10 +184,12 @@ export default function AdminUsersPage() {
     }
 
     // Sort order
+    // Staff are ranked by their administrative points, students by their points; a staff member's student points never show here.
+    const shownPoints = (u: { role?: string; totalPoints?: number; adminPoints?: number }) => (u.role && u.role !== 'student' ? u.adminPoints : u.totalPoints) || 0;
     if (sortBy === 'points_desc') {
-      result.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
+      result.sort((a, b) => shownPoints(b) - shownPoints(a));
     } else if (sortBy === 'points_asc') {
-      result.sort((a, b) => (a.totalPoints || 0) - (b.totalPoints || 0));
+      result.sort((a, b) => shownPoints(a) - shownPoints(b));
     } else if (sortBy === 'name_asc') {
       result.sort((a, b) => {
         const nameA = a.arabicFullName || a.displayName || a.id;
@@ -324,20 +327,29 @@ export default function AdminUsersPage() {
                     )}
                   </td>
                   <td className="py-4 px-6">
-                    <div className="flex items-center text-green-600 font-bold">
-                      <Trophy className="h-4 w-4 me-1" />
-                      {u.totalPoints || 0}
-                    </div>
+                    {u.role && u.role !== 'student' ? (
+                      <div title="النقاط الإدارية" className="flex items-center text-sky-600 font-bold">
+                        <Briefcase className="h-4 w-4 me-1" />
+                        {u.adminPoints || 0}
+                      </div>
+                    ) : (
+                      <div className="flex items-center text-green-600 font-bold">
+                        <Trophy className="h-4 w-4 me-1" />
+                        {u.totalPoints || 0}
+                      </div>
+                    )}
                   </td>
                   <td className="py-4 px-6">
                     <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => { setSelectedUser(u); setIsModalOpen(true); }}
-                        className="text-purple-600 hover:bg-purple-50 p-2 rounded-lg transition-colors"
-                        title="تعديل النقاط"
-                      >
-                        <Edit3 className="h-4 w-4" />
-                      </button>
+                      {(!u.role || u.role === 'student') && (
+                        <button
+                          onClick={() => { setSelectedUser(u); setIsModalOpen(true); }}
+                          className="text-purple-600 hover:bg-purple-50 p-2 rounded-lg transition-colors"
+                          title="تعديل النقاط"
+                        >
+                          <Edit3 className="h-4 w-4" />
+                        </button>
+                      )}
                       <button
                         onClick={() => setPrivilegesUserId(u.id)}
                         className="text-indigo-600 hover:bg-indigo-50 p-2 rounded-lg transition-colors"

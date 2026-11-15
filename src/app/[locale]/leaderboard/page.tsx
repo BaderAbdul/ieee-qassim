@@ -4,7 +4,7 @@ import { setRequestLocale } from 'next-intl/server';
 import { API_BASE_URL } from '@/lib/apiBase';
 import LeaderboardList, { type LeaderboardUser } from './LeaderboardList';
 
-export const revalidate = 30;
+export const dynamic = 'force-dynamic';
 
 type LeaderboardRow = { id: string; arabicFullName?: string; displayName?: string; totalPoints?: number; major?: string };
 
@@ -13,7 +13,7 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ lo
   setRequestLocale(locale);
   const isAr = locale === 'ar';
   const response = await fetch(`${API_BASE_URL}/api/public/leaderboard?limit=50`, {
-    next: { revalidate: 30 }, signal: AbortSignal.timeout(10000),
+    cache: 'no-store', signal: AbortSignal.timeout(10000),
   });
   if (!response.ok) throw new Error('Unable to load leaderboard');
   const rows = await response.json() as LeaderboardRow[];

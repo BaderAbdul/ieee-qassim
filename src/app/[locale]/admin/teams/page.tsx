@@ -12,14 +12,16 @@ import PrivilegesBadgesPanel from '@/components/admin/PrivilegesBadgesPanel';
 import { PrivilegeGrid, type Privilege } from '@/components/admin/PrivilegeGrid';
 import { useAdminTopbarActions } from '@/components/admin/AdminTopbarActions';
 import type { MemberSearchResult } from '@/lib/adminTypes';
-import { ArrowDown, ArrowUp, BadgeCheck, Briefcase, Crown, Edit2, KeyRound, Plus, ShieldCheck, Star, Trash2, UserMinus, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, BadgeCheck, Briefcase, CheckCircle2, ChevronDown, Crown, Edit2, KeyRound, Plus, ShieldCheck, Trash2, UserMinus, Users, X } from 'lucide-react';
 
 type TeamRole = 'leader' | 'vice_leader' | 'member';
 type TeamKind = 'administrative' | 'specialized';
 interface TeamBadge { key: string; nameAr: string; nameEn: string; icon: string | null }
 interface TeamMember {
   userId: string; teamRole: TeamRole; position: number; displayName: string; role: string;
-  roleNameAr?: string; roleNameEn?: string; totalPoints?: number; adminPoints?: number; badges?: TeamBadge[];
+  roleNameAr?: string; roleNameEn?: string; adminPoints?: number; badges?: TeamBadge[];
+  /** Only sent to technician-badge holders and super admins: this person opened the installed app. */
+  pwaInstalled?: boolean;
 }
 const ROLE_TIER: Record<TeamRole, number> = { leader: 0, vice_leader: 1, member: 2 };
 const sortedMembersOf = (team: Team) =>
@@ -53,6 +55,8 @@ export default function AdminTeamsPage() {
   const [searching, setSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [privilegesUserId, setPrivilegesUserId] = useState<string | null>(null);
+  const [openTeams, setOpenTeams] = useState<Set<string>>(new Set());
+  const toggleTeam = (id: string) => setOpenTeams(previous => { const next = new Set(previous); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   const [catalog, setCatalog] = useState<Privilege[]>([]);
   const [maxTeamId, setMaxTeamId] = useState<string | null>(null);
   const [maxUnlimited, setMaxUnlimited] = useState(true);
@@ -78,7 +82,11 @@ export default function AdminTeamsPage() {
   const load = async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
     setError(null);
-    try { setTeams(await apiGetArray<Team>('/api/admin/teams')); }
+    try {
+      const loaded = await apiGetArray<Team>('/api/admin/teams');
+      setTeams(loaded);
+      setOpenTeams(previous => previous.size ? previous : new Set(loaded[0] ? [loaded[0].id] : []));
+    }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to load teams'); }
     finally { if (!opts?.silent) setLoading(false); }
   };
@@ -245,11 +253,11 @@ export default function AdminTeamsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 font-cairo">{isAr ? 'الفرق' : 'Teams'}</h1>
-        <p className="text-gray-500 text-sm">
+        <h1 className="font-cairo text-2xl font-black text-[var(--color-text-primary)]">{isAr ? 'الفرق' : 'Teams'}</h1>
+        <p className="max-w-3xl text-sm leading-6 text-[var(--color-text-secondary)]">
           {isAr
-            ? 'قائد الفريق أو نائبه يمكنه إدارة صلاحيات وأوسمة أعضاء فريقه فقط، وأقصى ما يمنحه هو صلاحياته هو نفسه — فضبط صلاحيات القائد/النائب يحدد تلقائيًا الحد الأقصى لأعضاء فريقه. الفرق العلنية تظهر على صفحة "الهيكلة" في الموقع، بالترتيب الظاهر هنا.'
-            : "A team's leader or vice-leader can manage privileges & badges only for their own team members, and the most they can grant is their own privileges — so setting the leader/vice-leader's privileges automatically sets the maximum for their team members. Public teams appear on the website's Structure page, in the order shown here."}
+            ? 'افتح أي قسم لرؤية أعضائه. قائد القسم ونائبه يديران صلاحيات وأوسمة أعضاء قسمهما ضمن الحد الأقصى الذي يحدده المدير العام للقسم (زر الدرع).'
+            : "Open a team to see its members. A team's leader and vice-leader manage their members' privileges and badges within the maximum the super admin sets for the team (the shield button)."}
         </p>
       </div>
 
@@ -308,28 +316,43 @@ export default function AdminTeamsPage() {
       )}
 
       <div className="space-y-4">
-        {sortedTeams.map((team) => (
-          <div key={team.id} className="rounded-3xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/60 backdrop-blur-md p-5 shadow-xs flex flex-col">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="font-bold text-[var(--color-text-primary)] font-cairo">
-                  {isAr ? team.nameAr : team.nameEn} <span className="text-[var(--color-text-muted)] text-xs font-normal">({team.members.length} {isAr ? (team.members.length === 1 ? 'عضو' : 'أعضاء') : team.members.length === 1 ? 'member' : 'members'})</span>
-                  {!team.isPublic && <span className="ms-2 rounded-lg bg-[var(--color-surface-2)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--color-text-muted)]">{isAr ? 'داخلي' : 'internal'}</span>}
-                </p>
-                {(team.descriptionAr || team.descriptionEn) && <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">{isAr ? team.descriptionAr : team.descriptionEn}</p>}
-              </div>
+        {sortedTeams.map((team, teamIndex) => {
+          const isOpen = openTeams.has(team.id);
+          const leaders = sortedMembersOf(team).filter(m => m.teamRole !== 'member');
+          return (
+          <section key={team.id} className={`overflow-hidden rounded-3xl border bg-[var(--color-surface)]/80 shadow-sm backdrop-blur-md transition-shadow hover:shadow-md ${isOpen ? 'border-[var(--color-accent)]/40' : 'border-[var(--color-border)]/60'}`}>
+            <div className="flex items-center gap-2 p-3 sm:p-4">
+              <button type="button" aria-expanded={isOpen} onClick={() => toggleTeam(team.id)} className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-start">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--color-accent)] to-sky-500 text-white shadow-sm"><Users size={20} /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <span className="font-cairo text-base font-black text-[var(--color-text-primary)]">{isAr ? team.nameAr : team.nameEn}</span>
+                    {!team.isPublic && <span className="rounded-md bg-[var(--color-surface-2)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--color-text-muted)]">{isAr ? 'داخلي' : 'internal'}</span>}
+                  </span>
+                  <span className="mt-0.5 flex flex-wrap items-center gap-x-3 text-[11px] text-[var(--color-text-muted)]">
+                    <span>{team.members.length} {isAr ? (team.members.length === 1 ? 'عضو' : 'أعضاء') : (team.members.length === 1 ? 'member' : 'members')}</span>
+                    {leaders.length > 0 && <span className="truncate">{leaders.map(l => l.displayName).join(' · ')}</span>}
+                  </span>
+                </span>
+                <ChevronDown size={18} className={`shrink-0 text-[var(--color-text-muted)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+              </button>
               {isSuperAdmin && (
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex shrink-0 items-center gap-1">
                   <button type="button" onClick={() => void openMax(team)} title={isAr ? 'الحد الأقصى للصلاحيات' : 'Maximum privileges'} aria-pressed={maxTeamId === team.id}
-                          className="cursor-pointer rounded-lg bg-[var(--color-surface-2)] p-1.5 hover:opacity-80 text-[var(--color-text-secondary)]"><ShieldCheck size={16} /></button>
-                  <button type="button" onClick={() => startEdit(team)} className="cursor-pointer rounded-lg bg-[var(--color-surface-2)] p-1.5 hover:opacity-80 text-[var(--color-text-secondary)]"><Edit2 size={14} /></button>
-                  <button type="button" onClick={() => deleteTeam(team.id)} className="cursor-pointer rounded-lg p-1.5 text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)]"><Trash2 size={16} /></button>
+                          className="cursor-pointer rounded-xl bg-[var(--color-surface-2)] p-2 text-[var(--color-text-secondary)] hover:opacity-80"><ShieldCheck size={16} /></button>
+                  <button type="button" onClick={() => startEdit(team)} title={isAr ? 'تعديل' : 'Edit'} className="cursor-pointer rounded-xl bg-[var(--color-surface-2)] p-2 text-[var(--color-text-secondary)] hover:opacity-80"><Edit2 size={15} /></button>
+                  <button type="button" onClick={() => deleteTeam(team.id)} title={isAr ? 'حذف' : 'Delete'} className="cursor-pointer rounded-xl p-2 text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)]"><Trash2 size={16} /></button>
                 </div>
               )}
             </div>
 
+            <div className={`grid transition-[grid-template-rows] duration-300 ease-out ${isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+              <div className="overflow-hidden">
+                <div className="space-y-3 border-t border-[var(--color-border)]/50 p-3 sm:p-4">
+                  {(team.descriptionAr || team.descriptionEn) && <p className="text-xs leading-6 text-[var(--color-text-secondary)]">{isAr ? team.descriptionAr : team.descriptionEn}</p>}
+
             {isSuperAdmin && maxTeamId === team.id && (
-              <div className="mt-3 space-y-3 border-t border-[var(--color-border)]/50 pt-3">
+              <div className="space-y-3 border-t border-[var(--color-border)]/50 pt-3">
                 <p className="text-xs text-[var(--color-text-secondary)] leading-6">
                   {isAr ? 'الحد الأقصى للصلاحيات: يحصل عليه قائد الفريق ونائبه تلقائيًا، ويستطيعان منح جزء منه للأعضاء. أما الأعضاء فيبقون على الحد الأدنى لدورهم إلى أن يغيّره القائد أو نائبه أو المدير العام. الميزة التي لا تُختار هنا تختفي كليًا من لوحة من لا يملك أيًّا من صلاحياتها.' : 'The maximum privileges: the team’s leader and vice-leader get them automatically and may grant part of them to members. Members stay on their role’s minimum until the leader, vice-leader or a super admin changes it. A feature with no privilege selected disappears completely for anyone who has none of it.'}
                 </p>
@@ -346,7 +369,7 @@ export default function AdminTeamsPage() {
             )}
 
             {isSuperAdmin && editingId === team.id && (
-              <div className="mt-3 border-t border-[var(--color-border)]/50 pt-3 space-y-3">
+              <div className="border-t border-[var(--color-border)]/50 pt-3 space-y-3">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <input value={editTeam.nameAr} onChange={e => setEditTeam({ ...editTeam, nameAr: e.target.value })} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" placeholder="Arabic name" />
                   <input value={editTeam.nameEn} onChange={e => setEditTeam({ ...editTeam, nameEn: e.target.value })} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" placeholder="English name" />
@@ -368,54 +391,43 @@ export default function AdminTeamsPage() {
               </div>
             )}
 
-            <div className="mt-4 flex-1 space-y-2">
-              {sortedMembersOf(team).map((member) => {
-                const membersOnly = sortedMembersOf(team).filter(m => m.teamRole === 'member');
-                const memberIdx = membersOnly.findIndex(m => m.userId === member.userId);
-                const tierStyle = member.teamRole === 'leader'
-                  ? { bg: 'bg-amber-500/10', text: 'text-amber-600', Icon: Crown, label: isAr ? 'قائد' : 'Leader' }
-                  : member.teamRole === 'vice_leader'
-                  ? { bg: 'bg-sky-500/10', text: 'text-sky-600', Icon: ShieldCheck, label: isAr ? 'نائب قائد' : 'Vice Leader' }
-                  : { bg: 'bg-[var(--color-surface-2)]', text: 'text-[var(--color-text-secondary)]', Icon: null, label: isAr ? 'عضو' : 'Member' };
-                const accountLabel = (isAr ? member.roleNameAr : member.roleNameEn) || member.role;
-                return (
-                  <div key={member.userId} className="rounded-xl border border-[var(--color-border)]/50 bg-[var(--color-surface-2)]/60 p-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
-                    <div className="w-8 h-8 rounded-lg bg-[var(--color-accent-soft)] text-[var(--color-accent)] flex items-center justify-center font-black text-sm shrink-0">
-                      {member.displayName.trim().charAt(0) || '?'}
-                    </div>
 
-                    <div className="min-w-0 flex-1">
-                      <Link href={`/admin/users/${encodeURIComponent(member.userId)}`}
-                            className="block font-bold text-[var(--color-text-primary)] text-sm truncate hover:text-[var(--color-accent)] hover:underline">{member.displayName}</Link>
-                      <p className="text-[11px] text-[var(--color-text-muted)] truncate">{accountLabel}</p>
-                    </div>
-
-                    <span className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold shrink-0 ${tierStyle.bg} ${tierStyle.text}`}>
-                      {tierStyle.Icon && <tierStyle.Icon size={12} />}
-                      {tierStyle.label}
-                    </span>
-
-                    <span title={isAr ? 'النقاط العادية' : 'Regular points'} className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--color-warning)] shrink-0">
-                      <Star size={12} className="fill-current" />
-                      {member.totalPoints ?? 0}
-                    </span>
-                    <span title={isAr ? 'النقاط الإدارية' : 'Administrative points'} className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--color-accent)] shrink-0">
-                      <Briefcase size={12} />
-                      {member.adminPoints ?? 0}
-                    </span>
-
-                    {member.badges && member.badges.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 basis-full">
-                        {member.badges.map(badge => (
-                          <span key={badge.key} className="inline-flex items-center gap-1 rounded-lg bg-[var(--color-accent-soft)] text-[var(--color-accent)] px-2 py-0.5 text-[10px] font-bold">
-                            <BadgeCheck size={11} />
-                            {isAr ? badge.nameAr : badge.nameEn}
+                  <div className="space-y-2">
+                    {sortedMembersOf(team).map((member) => {
+                      const membersOnly = sortedMembersOf(team).filter(m => m.teamRole === 'member');
+                      const memberIdx = membersOnly.findIndex(m => m.userId === member.userId);
+                      const tierStyle = member.teamRole === 'leader'
+                        ? { bg: 'bg-amber-500/10', text: 'text-amber-600', Icon: Crown, label: isAr ? 'قائد' : 'Leader' }
+                        : member.teamRole === 'vice_leader'
+                        ? { bg: 'bg-sky-500/10', text: 'text-sky-600', Icon: ShieldCheck, label: isAr ? 'نائب قائد' : 'Vice Leader' }
+                        : { bg: 'bg-[var(--color-surface-2)]', text: 'text-[var(--color-text-secondary)]', Icon: null, label: isAr ? 'عضو' : 'Member' };
+                      const accountLabel = (isAr ? member.roleNameAr : member.roleNameEn) || member.role;
+                      return (
+                        <div key={member.userId} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-[var(--color-border)]/50 bg-[var(--color-surface-2)]/50 p-2.5 transition-colors hover:bg-[var(--color-surface-2)]">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--color-accent-soft)] text-sm font-black text-[var(--color-accent)]">
+                            {member.displayName.trim().charAt(0) || '?'}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            {/* name and the account's badges share one line */}
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <Link href={`/admin/users/${encodeURIComponent(member.userId)}`} className="max-w-full truncate text-sm font-bold text-[var(--color-text-primary)] hover:text-[var(--color-accent)] hover:underline">{member.displayName}</Link>
+                              {member.pwaInstalled && <CheckCircle2 size={15} className="shrink-0 text-emerald-500" aria-label={isAr ? 'ثبّت التطبيق' : 'Installed the app'}><title>{isAr ? 'ثبّت التطبيق' : 'Installed the app'}</title></CheckCircle2>}
+                              {(member.badges ?? []).map(badge => (
+                                <span key={badge.key} className="inline-flex items-center gap-1 rounded-md bg-[var(--color-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--color-accent)]">
+                                  <BadgeCheck size={10} />{isAr ? badge.nameAr : badge.nameEn}
+                                </span>
+                              ))}
+                            </div>
+                            <p className="truncate text-[11px] text-[var(--color-text-muted)]">{accountLabel}</p>
+                          </div>
+                          <span className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold ${tierStyle.bg} ${tierStyle.text}`}>
+                            {tierStyle.Icon && <tierStyle.Icon size={12} />}{tierStyle.label}
                           </span>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-1.5 shrink-0 ms-auto">
+                          {/* staff show only their administrative points, never student points */}
+                          <span title={isAr ? 'النقاط الإدارية' : 'Administrative points'} className="inline-flex shrink-0 items-center gap-1 text-[11px] font-bold text-[var(--color-accent)]">
+                            <Briefcase size={12} />{member.adminPoints ?? 0}
+                          </span>
+                          <div className="ms-auto flex shrink-0 items-center gap-1.5">
                       {isSuperAdmin && (
                         <select
                           value={member.teamRole}
@@ -433,19 +445,19 @@ export default function AdminTeamsPage() {
                           <button type="button" disabled={memberIdx === membersOnly.length - 1} onClick={() => moveMemberWithinTier(team, member.userId, 'down')} className="cursor-pointer p-0.5 text-[var(--color-text-muted)] hover:text-[var(--color-accent)] disabled:opacity-20"><ArrowDown size={12} /></button>
                         </div>
                       )}
-                      <button type="button" onClick={() => setPrivilegesUserId(member.userId)} title={isAr ? 'الصلاحيات والأوسمة' : 'Privileges & badges'} className="cursor-pointer text-[var(--color-text-muted)] hover:text-[var(--color-accent)] shrink-0"><KeyRound size={16} /></button>
+                            <button type="button" onClick={() => setPrivilegesUserId(member.userId)} title={isAr ? 'الصلاحيات والأوسمة' : 'Privileges & badges'} className="cursor-pointer rounded-lg bg-[var(--color-surface)] p-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-accent)]"><KeyRound size={15} /></button>
                       {isSuperAdmin && (
                         <button type="button" onClick={() => removeMember(team, member.userId)} className="cursor-pointer text-[var(--color-text-muted)] hover:text-[var(--color-danger)] shrink-0"><UserMinus size={16} /></button>
                       )}
-                    </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {team.members.length === 0 && <p className="py-2 text-sm text-[var(--color-text-muted)]">{isAr ? 'لا يوجد أعضاء بعد.' : 'No members yet.'}</p>}
                   </div>
-                );
-              })}
-              {team.members.length === 0 && <p className="text-sm text-[var(--color-text-muted)] py-2">{isAr ? 'لا يوجد أعضاء بعد.' : 'No members yet.'}</p>}
-            </div>
 
             {isSuperAdmin && (
-              <div className="mt-3 flex gap-2">
+              <div className="flex gap-2">
                 <select onChange={e => {
                           if (e.target.value) {
                             setSearchQuery(''); setSearchResults([]); setHasSearched(false);
@@ -461,8 +473,13 @@ export default function AdminTeamsPage() {
                 </select>
               </div>
             )}
-          </div>
-        ))}
+
+                </div>
+              </div>
+            </div>
+          </section>
+          );
+        })}
         {sortedTeams.length === 0 && (
           <p className="rounded-2xl border border-dashed border-[var(--color-border)] p-8 text-center text-sm text-[var(--color-text-muted)]">
             {isAr ? 'لا توجد أقسام في هذا النوع بعد. غيّر نوع أي قسم من زر التعديل لنقله إلى هنا.' : 'No departments of this type yet. Change a department’s type from its edit button to move it here.'}
