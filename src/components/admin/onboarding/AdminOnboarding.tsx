@@ -47,7 +47,10 @@ export default function AdminOnboarding({ isAr, state, onChanged }: { isAr: bool
 
   useEffect(() => onInstallChange(() => setInstallable(installAvailable())), []);
   // Opened inside the installed app: tell the server so the "install" step is recognised.
-  useEffect(() => { if (standalone) void refreshDevice().then(onChanged); }, [standalone, onChanged]);
+  useEffect(() => {
+    if (!standalone) return;
+    void apiSend('POST', '/api/me/pwa/installed').catch(() => {}).then(() => refreshDevice()).then(() => onChanged());
+  }, [standalone, onChanged]);
 
   const run = async (name: string, action: () => Promise<void>) => {
     setBusy(name); setError('');
@@ -109,7 +112,7 @@ export default function AdminOnboarding({ isAr, state, onChanged }: { isAr: bool
           <>
             <Step n={2} done={steps.installed} active={next === 'installed'} icon={Smartphone} title={t('ثبّت التطبيق', 'Install the app')}>
               {steps.installed ? <p>{t('التطبيق مثبّت.', 'The app is installed.')}</p> : standalone ? (
-                <p>{t('أنت داخل التطبيق؛ سيُسجَّل تثبيته بعد تفعيل الإشعارات في الخطوة التالية.', 'You are inside the app; its installation is recorded once you enable notifications in the next step.')}</p>
+                <p className="flex items-center gap-2"><Loader2 size={16} className="animate-spin" />{t('أنت داخل التطبيق؛ جارٍ تسجيل التثبيت…', 'You are inside the app; recording the installation…')}</p>
               ) : (
                 <>
                   <p>{t('ثبّت تطبيق IEEE القصيم على جهازك لتصلك الإشعارات حتى وهو مغلق. بعد التثبيت افتحه من شاشتك الرئيسية أو قائمة التطبيقات وسجّل الدخول لإكمال بقية الخطوات.', 'Install the IEEE Qassim app so notifications reach you even when it is closed. After installing, open it from your home screen or app list and sign in to finish the remaining steps.')}</p>
