@@ -410,7 +410,7 @@ export default function AdminTeamsPage() {
                           <div className="min-w-0 flex-1">
                             {/* name and the account's badges share one line */}
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                              <Link href={`/admin/users/${encodeURIComponent(member.userId)}`} className="max-w-full truncate text-sm font-bold text-[var(--color-text-primary)] hover:text-[var(--color-accent)] hover:underline">{member.displayName}</Link>
+                              <Link href={`/admin/users/${encodeURIComponent(member.userId)}`} className="break-words text-sm font-bold text-[var(--color-text-primary)] hover:text-[var(--color-accent)] hover:underline">{member.displayName}</Link>
                               {member.pwaInstalled && <CheckCircle2 size={15} className="shrink-0 text-emerald-500" aria-label={isAr ? 'ثبّت التطبيق' : 'Installed the app'}><title>{isAr ? 'ثبّت التطبيق' : 'Installed the app'}</title></CheckCircle2>}
                               {(member.badges ?? []).map(badge => (
                                 <span key={badge.key} className="inline-flex items-center gap-1 rounded-md bg-[var(--color-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--color-accent)]">
@@ -427,7 +427,7 @@ export default function AdminTeamsPage() {
                           <span title={isAr ? 'النقاط الإدارية' : 'Administrative points'} className="inline-flex shrink-0 items-center gap-1 text-[11px] font-bold text-[var(--color-accent)]">
                             <Briefcase size={12} />{member.adminPoints ?? 0}
                           </span>
-                          <div className="ms-auto flex shrink-0 items-center gap-1.5">
+                          <div className="flex basis-full flex-wrap items-center justify-end gap-1.5 sm:ms-auto sm:basis-auto sm:shrink-0">
                       {isSuperAdmin && (
                         <select
                           value={member.teamRole}
