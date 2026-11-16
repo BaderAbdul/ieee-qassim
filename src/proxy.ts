@@ -5,6 +5,7 @@ import type { NextRequest } from 'next/server';
 import createMiddleware from 'next-intl/middleware';
 import { routing } from './i18n/routing';
 import { adminRoute, configuredAdminHost } from './lib/adminHost';
+import { authRoute, configuredAuthHost } from './lib/authHost';
 import { isMaintenanceOn, MAINTENANCE_BYPASS_COOKIE, verifyBypassCookieValue } from './lib/server/maintenance';
 
 const intlMiddleware = createMiddleware(routing);
@@ -16,16 +17,23 @@ async function middleware(request: NextRequest) {
   if (/^\/(api|trpc)(\/|$)/.test(request.nextUrl.pathname)) return NextResponse.next();
   // Admin panel on its own subdomain (admin.ieeequ.online; NEXT_PUBLIC_ADMIN_HOST overrides, "off" disables).
   const adminHost = configuredAdminHost(process.env.NEXT_PUBLIC_ADMIN_HOST);
+  // Sign-in/up on their own subdomain (auth.ieeequ.online; NEXT_PUBLIC_AUTH_HOST overrides, "off" disables).
+  const authHost = configuredAuthHost(process.env.NEXT_PUBLIC_AUTH_HOST);
   const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || '';
-  const onAdminHost = !!adminHost && host.toLowerCase().split(':')[0] === adminHost.toLowerCase();
-  const route = adminRoute(host, request.nextUrl.pathname, adminHost);
+  const hostOnly = host.toLowerCase().split(':')[0];
+  const onAdminHost = !!adminHost && hostOnly === adminHost.toLowerCase();
+  const onAuthHost = !!authHost && hostOnly === authHost.toLowerCase();
+  // A request is on at most one of these hosts, so at most one of the two calls below is non-'none'.
+  const adminRouteResult = adminRoute(host, request.nextUrl.pathname, adminHost);
+  const authRouteResult = authRoute(host, request.nextUrl.pathname, authHost);
+  const route = adminRouteResult.action !== 'none' ? adminRouteResult : authRouteResult;
   if (route.action === 'redirect') {
     const target = request.nextUrl.clone();
     if (route.host) { target.host = route.host; target.port = ''; target.protocol = 'https:'; }
     target.pathname = route.path;
     return NextResponse.redirect(target, 308);
   }
-  const hidden = (response: NextResponse) => { if (onAdminHost) response.headers.set('X-Robots-Tag', 'noindex, nofollow'); return response; };
+  const hidden = (response: NextResponse) => { if (onAdminHost || onAuthHost) response.headers.set('X-Robots-Tag', 'noindex, nofollow'); return response; };
 
   const secret = process.env.MAINTENANCE_BYPASS_SECRET;
   const hasBypass = !!secret && verifyBypassCookieValue(request.cookies.get(MAINTENANCE_BYPASS_COOKIE)?.value, secret);

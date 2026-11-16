@@ -231,3 +231,10 @@ html { scroll-padding-top: 5rem; }
   /* Keep the home-indicator area clear of fixed bottom controls and the page end. */
   footer { padding-bottom: env(safe-area-inset-bottom); }
 }
+
+/* Clerk's one-time-code (OTP/2FA) field has no dir of its own, so it inherits the page's RTL
+   direction in Arabic -- reversing both the digit fill order and the focus box position. It must
+   always read left-to-right regardless of locale. */
+[dir='rtl'] .cl-otpCodeField {
+  direction: ltr;
+}
