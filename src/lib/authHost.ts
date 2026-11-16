@@ -11,12 +11,22 @@
 
 const PRODUCTION_AUTH_HOST = 'auth.ieeequ.online';
 
-/** The auth host to use: the env override when set ("off" or empty-but-set disables), else the production host. */
+/**
+ * The auth host to use: disabled until NEXT_PUBLIC_AUTH_HOST is explicitly set.
+ *
+ * Unlike adminHost's "on by default" (admin.ieeequ.online already exists in DNS/Vercel), this
+ * defaults OFF: the auth subdomain doesn't exist yet, and defaulting it on would 308-redirect
+ * every production sign-in/sign-up to a host with no DNS record the moment this deploys. Once the
+ * DNS record and Vercel domain are added, set NEXT_PUBLIC_AUTH_HOST=auth.ieeequ.online to flip it on.
+ */
 export function configuredAuthHost(value: string | undefined): string {
-  if (value === undefined) return PRODUCTION_AUTH_HOST;
+  if (value === undefined) return '';
   const host = value.trim().toLowerCase();
   return host === 'off' ? '' : host;
 }
+
+/** The production host value to set NEXT_PUBLIC_AUTH_HOST to once the subdomain is ready. */
+export { PRODUCTION_AUTH_HOST };
 
 export type AuthRoute =
   | { action: 'none' }
