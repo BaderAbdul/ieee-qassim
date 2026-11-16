@@ -53,8 +53,8 @@ export default function MobileBottomNav({
   return (
     <nav
       aria-label={isAr ? 'التنقل السفلي' : 'Bottom navigation'}
-      className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-slate-900/90 backdrop-blur-xl shadow-[0_-8px_30px_rgba(0,0,0,0.3)]"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      className="md:hidden fixed inset-x-3 z-40 rounded-3xl border border-white/10 bg-slate-900/90 backdrop-blur-xl shadow-2xl"
+      style={{ bottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
     >
       <div className="flex items-stretch">
         {items.map((item) => {

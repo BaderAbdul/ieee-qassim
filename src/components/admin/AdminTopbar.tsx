@@ -176,33 +176,35 @@ export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
       </header>
 
       {/* Mobile top bar: the only chrome on phones -- title, search, notifications, profile, fixed
-          in place on every page, with the page's own inner-tab switcher (if any) docked right
-          under it instead of wrapping awkwardly inside the same row like the desktop header.
-          The manifest runs `display: "fullscreen"` (no OS status bar at all), so this bar -- not
-          the OS -- is what keeps the notch/camera cutout clear; env() is just 0 in a regular tab. */}
-      <div className="md:hidden sticky top-0 z-30 border-b border-white/10 bg-slate-900/90 backdrop-blur-xl shadow-lg" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <div className="flex items-center justify-between gap-2 px-3 py-2.5">
-          <h1 className="min-w-0 truncate text-sm font-black font-cairo text-white">
+          in place on every page. Styled to read as part of the page itself (page background,
+          no border/shadow/blur), not a distinct bar, so only the icon buttons and title float on
+          the page. The page's own inner-tab switcher (if any) gets its own small floating pill
+          underneath instead of wrapping into this row like the desktop header does.
+          The manifest runs `display: "fullscreen"` (no OS status bar at all), so this is what
+          keeps the notch/camera cutout clear; env() is just 0 in a regular tab. */}
+      <div className="md:hidden sticky top-0 z-30 bg-[var(--color-page)]" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <div className="flex items-center justify-between gap-2 px-4 py-3">
+          <h1 className="min-w-0 truncate text-base font-black font-cairo text-[var(--color-text-primary)]">
             {pageTitle || (isAr ? 'لوحة الإدارة' : 'Admin Portal')}
           </h1>
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1 shrink-0">
             <button
               type="button"
               onClick={() => setSearchOpen(true)}
-              className="cursor-pointer p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all"
+              className="cursor-pointer p-2 rounded-xl text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-2)] transition-all"
               aria-label={isAr ? 'بحث' : 'Search'}
             >
-              <Search size={17} />
+              <Search size={18} />
             </button>
 
             <div className="relative" ref={mNotifRef}>
               <button
                 type="button"
                 onClick={() => setMNotifOpen(value => !value)}
-                className="cursor-pointer relative p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all"
+                className="cursor-pointer relative p-2 rounded-xl text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-2)] transition-all"
                 aria-label={isAr ? 'الإشعارات' : 'Notifications'}
               >
-                <Bell size={17} />
+                <Bell size={18} />
                 {notifCount > 0 && (
                   <span dir="ltr" className="absolute -top-1 -end-1 min-w-[16px] h-[16px] px-1 rounded-full bg-[var(--color-danger)] text-white text-[9px] font-bold flex items-center justify-center">
                     {notifCount > 99 ? '99+' : notifCount}
@@ -216,15 +218,15 @@ export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
               <button
                 type="button"
                 onClick={() => setMProfileOpen(value => !value)}
-                className="cursor-pointer flex items-center rounded-xl bg-white/10 hover:bg-white/20 p-0.5 transition-all"
+                className="cursor-pointer flex items-center rounded-xl hover:opacity-80 transition-opacity"
                 aria-label={isAr ? 'حسابي' : 'My account'}
               >
                 {user?.photoURL ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={user.photoURL} alt="" className="w-7 h-7 rounded-lg object-cover" />
+                  <img src={user.photoURL} alt="" className="w-8 h-8 rounded-lg object-cover" />
                 ) : (
-                  <div className="w-7 h-7 rounded-lg bg-[var(--color-accent)] text-[var(--color-accent-contrast)] flex items-center justify-center">
-                    <CircleUserRound size={16} />
+                  <div className="w-8 h-8 rounded-lg bg-[var(--color-accent)] text-[var(--color-accent-contrast)] flex items-center justify-center">
+                    <CircleUserRound size={17} />
                   </div>
                 )}
               </button>
@@ -234,8 +236,10 @@ export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
         </div>
 
         {pageActions && (
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar px-3 pb-2.5">
-            {pageActions}
+          <div className="px-4 pb-3 -mt-1">
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar rounded-2xl border border-white/10 bg-slate-900/80 backdrop-blur-xl shadow-lg p-1.5 w-fit max-w-full">
+              {pageActions}
+            </div>
           </div>
         )}
       </div>

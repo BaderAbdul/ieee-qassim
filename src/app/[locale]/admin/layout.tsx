@@ -256,7 +256,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <StaffMessagesProvider>
         <AdminTopbarActionsProvider>
           <AdminTopbar pageTitle={[...navItems, ...footerItems].find(item => isCurrentPath(item.href))?.name ?? (isCurrentPath('/admin/profile') ? (isAr ? 'ملفي الشخصي' : 'My profile') : undefined)} />
-          <div className="p-4 sm:p-6 lg:p-8 pb-24 md:pb-6">
+          <div className="p-4 sm:p-6 lg:p-8 pb-28 md:pb-6">
             <div className="max-w-6xl mx-auto">
               <ConfigurationNotice />
               {children}
