@@ -37,6 +37,21 @@ export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
   const [mNotifOpen, setMNotifOpen] = useState(false);
   const mProfileRef = useClickOutside(() => setMProfileOpen(false));
   const mNotifRef = useClickOutside(() => setMNotifOpen(false));
+  const mobileHeaderRef = useRef<HTMLDivElement>(null);
+
+  // The mobile header is `fixed`, not `sticky`, so nothing below it reserves its space on its
+  // own; its height also varies page to page (the pushed inner-tab row is optional). Measure it
+  // and expose it as a CSS var so the spacer right under it can match exactly. Reports 0 (and the
+  // spacer collapses) once `md:hidden` makes it display:none on desktop widths.
+  useEffect(() => {
+    const el = mobileHeaderRef.current;
+    if (!el) return;
+    const sync = () => document.documentElement.style.setProperty('--admin-mobile-topbar-h', `${el.offsetHeight}px`);
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [pageActions]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -176,37 +191,38 @@ export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
       </header>
 
       {/* Mobile top bar: the only chrome on phones -- title, search, notifications, profile, fixed
-          in place on every page. Styled to read as part of the page itself (page background,
-          no border/shadow/blur), not a distinct bar, so only the icon buttons and title float on
-          the page. The page's own inner-tab switcher (if any) gets its own small floating pill
-          underneath instead of wrapping into this row like the desktop header does.
+          in place on every page (not sticky: it never scrolls with the content). Styled to read
+          as part of the page itself (transparent, no border/shadow/blur), not a distinct bar, so
+          only the icon buttons and title float on the page. The page's own inner-tab switcher
+          (if any) gets its own small floating pill underneath instead of wrapping into this row
+          like the desktop header does.
           The manifest runs `display: "fullscreen"` (no OS status bar at all), so this is what
           keeps the notch/camera cutout clear; env() is just 0 in a regular tab. */}
-      <div className="md:hidden sticky top-0 z-30 bg-transparent" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <div className="flex items-center justify-between gap-2 px-4 py-3">
-          <h1 className="min-w-0 truncate text-base font-black font-cairo text-[var(--color-text-primary)]">
+      <div ref={mobileHeaderRef} className="md:hidden fixed top-0 inset-x-0 z-30 bg-transparent" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <div className="flex items-center justify-between gap-2 px-4 py-3.5">
+          <h1 className="min-w-0 truncate text-lg font-black font-cairo text-[var(--color-text-primary)]">
             {pageTitle || (isAr ? 'لوحة الإدارة' : 'Admin Portal')}
           </h1>
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
               onClick={() => setSearchOpen(true)}
-              className="cursor-pointer p-2 rounded-xl text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-2)] transition-all"
+              className="cursor-pointer p-2.5 rounded-xl text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-2)] transition-all"
               aria-label={isAr ? 'بحث' : 'Search'}
             >
-              <Search size={18} />
+              <Search size={21} />
             </button>
 
             <div className="relative" ref={mNotifRef}>
               <button
                 type="button"
                 onClick={() => setMNotifOpen(value => !value)}
-                className="cursor-pointer relative p-2 rounded-xl text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-2)] transition-all"
+                className="cursor-pointer relative p-2.5 rounded-xl text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-2)] transition-all"
                 aria-label={isAr ? 'الإشعارات' : 'Notifications'}
               >
-                <Bell size={18} />
+                <Bell size={21} />
                 {notifCount > 0 && (
-                  <span dir="ltr" className="absolute -top-1 -end-1 min-w-[16px] h-[16px] px-1 rounded-full bg-[var(--color-danger)] text-white text-[9px] font-bold flex items-center justify-center">
+                  <span dir="ltr" className="absolute -top-1 -end-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--color-danger)] text-white text-[10px] font-bold flex items-center justify-center">
                     {notifCount > 99 ? '99+' : notifCount}
                   </span>
                 )}
@@ -223,10 +239,10 @@ export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
               >
                 {user?.photoURL ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={user.photoURL} alt="" className="w-8 h-8 rounded-lg object-cover" />
+                  <img src={user.photoURL} alt="" className="w-10 h-10 rounded-lg object-cover" />
                 ) : (
-                  <div className="w-8 h-8 rounded-lg bg-[var(--color-accent)] text-[var(--color-accent-contrast)] flex items-center justify-center">
-                    <CircleUserRound size={17} />
+                  <div className="w-10 h-10 rounded-lg bg-[var(--color-accent)] text-[var(--color-accent-contrast)] flex items-center justify-center">
+                    <CircleUserRound size={20} />
                   </div>
                 )}
               </button>
@@ -243,6 +259,7 @@ export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
           </div>
         )}
       </div>
+      <div className="md:hidden" style={{ height: 'var(--admin-mobile-topbar-h, 64px)' }} aria-hidden="true" />
 
       <AdminSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
     </>
