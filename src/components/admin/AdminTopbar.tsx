@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocale } from 'next-intl';
 import { useAuth } from '@/context/AuthContext';
 import { Link } from '@/i18n/routing';
@@ -9,6 +10,7 @@ import { useAdminQuery } from '@/components/admin/AdminData';
 import type { AdminOverview } from '@/lib/adminTypes';
 import AdminSearchModal from '@/components/admin/AdminSearchModal';
 import { useAdminTopbarActionsSlot } from '@/components/admin/AdminTopbarActions';
+import { useAdminTheme } from '@/lib/adminTheme';
 
 function useClickOutside(onOutside: () => void) {
   const ref = useRef<HTMLDivElement>(null);
@@ -22,12 +24,21 @@ function useClickOutside(onOutside: () => void) {
   return ref;
 }
 
+const subscribeNever = () => () => {};
+/** document doesn't exist during server rendering; true once mounted on the client. */
+function useMounted() {
+  return useSyncExternalStore(subscribeNever, () => true, () => false);
+}
+
 export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
   const locale = useLocale();
   const isAr = locale === 'ar';
   const { user, userData } = useAuth();
   const { data } = useAdminQuery<AdminOverview>('getAdminOverview');
   const pageActions = useAdminTopbarActionsSlot();
+  const mounted = useMounted();
+  const { isDark } = useAdminTheme();
+  const themeClass = `ieee-admin-theme${isDark ? ' dark' : ''}`;
   const [searchOpen, setSearchOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -192,73 +203,81 @@ export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
 
       {/* Mobile top bar: the only chrome on phones -- title, search, notifications, profile, fixed
           in place on every page (not sticky: it never scrolls with the content). Styled to read
-          as part of the page itself (transparent, no border/shadow/blur), not a distinct bar, so
-          only the icon buttons and title float on the page. The page's own inner-tab switcher
-          (if any) gets its own small floating pill underneath instead of wrapping into this row
-          like the desktop header does.
+          as part of the page itself (transparent, no bar background/border/shadow/blur), so only
+          the icon buttons and title float on the page. The page's own inner-tab switcher (if
+          any) gets its own small floating pill underneath instead of wrapping into this row like
+          the desktop header does.
+          Portaled to document.body: a backdrop-blur ancestor (the desktop sidebar/header, admin
+          cards) becomes a containing block for its own fixed descendants, same reasoning as
+          ConfirmDialog -- rendering inline here previously trapped this bar inside the admin
+          layout instead of actually pinning it to the viewport. Carries its own theme class since
+          document.body is outside .ieee-admin-theme's scope for the CSS var-based colors.
           The manifest runs `display: "fullscreen"` (no OS status bar at all), so this is what
           keeps the notch/camera cutout clear; env() is just 0 in a regular tab. */}
-      <div ref={mobileHeaderRef} className="md:hidden fixed top-0 inset-x-0 z-30 bg-transparent" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <div className="flex items-center justify-between gap-2 px-4 py-3.5">
-          <h1 className="min-w-0 truncate text-lg font-black font-cairo text-[var(--color-text-primary)]">
-            {pageTitle || (isAr ? 'لوحة الإدارة' : 'Admin Portal')}
-          </h1>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => setSearchOpen(true)}
-              className="cursor-pointer p-2.5 rounded-xl text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-2)] transition-all"
-              aria-label={isAr ? 'بحث' : 'Search'}
-            >
-              <Search size={21} />
-            </button>
-
-            <div className="relative" ref={mNotifRef}>
+      {mounted && createPortal(
+        <div ref={mobileHeaderRef} className={`${themeClass} md:hidden fixed top-0 inset-x-0 z-30 bg-transparent`} style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+          <div className="flex items-center justify-between gap-2 px-4 py-3.5">
+            <h1 className="min-w-0 truncate text-lg font-black font-cairo text-[var(--color-text-primary)]">
+              {pageTitle || (isAr ? 'لوحة الإدارة' : 'Admin Portal')}
+            </h1>
+            <div className="flex items-center gap-1.5 shrink-0">
               <button
                 type="button"
-                onClick={() => setMNotifOpen(value => !value)}
-                className="cursor-pointer relative p-2.5 rounded-xl text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-2)] transition-all"
-                aria-label={isAr ? 'الإشعارات' : 'Notifications'}
+                onClick={() => setSearchOpen(true)}
+                className="cursor-pointer p-2.5 rounded-xl bg-[var(--color-surface-2)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)] hover:text-[var(--color-text-primary)] transition-all"
+                aria-label={isAr ? 'بحث' : 'Search'}
               >
-                <Bell size={21} />
-                {notifCount > 0 && (
-                  <span dir="ltr" className="absolute -top-1 -end-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--color-danger)] text-white text-[10px] font-bold flex items-center justify-center">
-                    {notifCount > 99 ? '99+' : notifCount}
-                  </span>
-                )}
+                <Search size={21} />
               </button>
-              {mNotifOpen && renderNotifPanel(() => setMNotifOpen(false))}
-            </div>
 
-            <div className="relative" ref={mProfileRef}>
-              <button
-                type="button"
-                onClick={() => setMProfileOpen(value => !value)}
-                className="cursor-pointer flex items-center rounded-xl hover:opacity-80 transition-opacity"
-                aria-label={isAr ? 'حسابي' : 'My account'}
-              >
-                {user?.photoURL ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={user.photoURL} alt="" className="w-10 h-10 rounded-lg object-cover" />
-                ) : (
-                  <div className="w-10 h-10 rounded-lg bg-[var(--color-accent)] text-[var(--color-accent-contrast)] flex items-center justify-center">
-                    <CircleUserRound size={20} />
-                  </div>
-                )}
-              </button>
-              {mProfileOpen && renderProfilePanel(() => setMProfileOpen(false))}
+              <div className="relative" ref={mNotifRef}>
+                <button
+                  type="button"
+                  onClick={() => setMNotifOpen(value => !value)}
+                  className="cursor-pointer relative p-2.5 rounded-xl bg-[var(--color-surface-2)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)] hover:text-[var(--color-text-primary)] transition-all"
+                  aria-label={isAr ? 'الإشعارات' : 'Notifications'}
+                >
+                  <Bell size={21} />
+                  {notifCount > 0 && (
+                    <span dir="ltr" className="absolute -top-1 -end-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--color-danger)] text-white text-[10px] font-bold flex items-center justify-center">
+                      {notifCount > 99 ? '99+' : notifCount}
+                    </span>
+                  )}
+                </button>
+                {mNotifOpen && renderNotifPanel(() => setMNotifOpen(false))}
+              </div>
+
+              <div className="relative" ref={mProfileRef}>
+                <button
+                  type="button"
+                  onClick={() => setMProfileOpen(value => !value)}
+                  className="cursor-pointer flex items-center rounded-xl hover:opacity-80 transition-opacity"
+                  aria-label={isAr ? 'حسابي' : 'My account'}
+                >
+                  {user?.photoURL ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={user.photoURL} alt="" className="w-10 h-10 rounded-lg object-cover" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-lg bg-[var(--color-accent)] text-[var(--color-accent-contrast)] flex items-center justify-center">
+                      <CircleUserRound size={20} />
+                    </div>
+                  )}
+                </button>
+                {mProfileOpen && renderProfilePanel(() => setMProfileOpen(false))}
+              </div>
             </div>
           </div>
-        </div>
 
-        {pageActions && (
-          <div className="px-4 pb-3 -mt-1">
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar rounded-2xl border border-white/10 bg-slate-900/80 backdrop-blur-xl shadow-lg p-1.5 w-fit max-w-full">
-              {pageActions}
+          {pageActions && (
+            <div className="px-4 pb-3 -mt-1">
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar rounded-2xl border border-white/10 bg-slate-900/80 backdrop-blur-xl shadow-lg p-1.5 w-fit max-w-full">
+                {pageActions}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>,
+        document.body
+      )}
       <div className="md:hidden" style={{ height: 'var(--admin-mobile-topbar-h, 64px)' }} aria-hidden="true" />
 
       <AdminSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
