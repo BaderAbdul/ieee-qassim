@@ -182,7 +182,7 @@ export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
           underneath instead of wrapping into this row like the desktop header does.
           The manifest runs `display: "fullscreen"` (no OS status bar at all), so this is what
           keeps the notch/camera cutout clear; env() is just 0 in a regular tab. */}
-      <div className="md:hidden sticky top-0 z-30 bg-[var(--color-page)]" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <div className="md:hidden sticky top-0 z-30 bg-transparent" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="flex items-center justify-between gap-2 px-4 py-3">
           <h1 className="min-w-0 truncate text-base font-black font-cairo text-[var(--color-text-primary)]">
             {pageTitle || (isAr ? 'لوحة الإدارة' : 'Admin Portal')}

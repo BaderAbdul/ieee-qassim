@@ -101,12 +101,12 @@ export default function MobileBottomNav({
                   onClick={() => setThemeOpen(value => !value)}
                   aria-haspopup="menu"
                   aria-expanded={themeOpen}
-                  className={`flex w-full flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-bold transition-colors ${
+                  className={`flex w-full flex-col items-center justify-center gap-1.5 py-4 text-xs font-bold transition-colors ${
                     active || themeOpen ? 'text-white' : 'text-slate-400'
                   }`}
                 >
-                  <ThemeIcon size={21} className={active ? 'text-[#4DA8DA]' : ''} />
-                  <span className="truncate max-w-[72px]">{item.name}</span>
+                  <ThemeIcon size={26} className={active ? 'text-[#4DA8DA]' : ''} />
+                  <span className="truncate max-w-[80px]">{item.name}</span>
                 </button>
               </div>
             );
@@ -117,12 +117,12 @@ export default function MobileBottomNav({
               key={item.href}
               href={item.href}
               aria-current={active ? 'page' : undefined}
-              className={`flex flex-1 flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-bold transition-colors ${
+              className={`flex flex-1 flex-col items-center justify-center gap-1.5 py-4 text-xs font-bold transition-colors ${
                 active ? 'text-white' : 'text-slate-400 hover:text-white'
               }`}
             >
-              <span className={active ? 'text-[#4DA8DA]' : ''}><Icon size={21} /></span>
-              <span className="truncate max-w-[72px]">{item.name}</span>
+              <span className={active ? 'text-[#4DA8DA]' : ''}><Icon size={26} /></span>
+              <span className="truncate max-w-[80px]">{item.name}</span>
             </Link>
           );
         })}
