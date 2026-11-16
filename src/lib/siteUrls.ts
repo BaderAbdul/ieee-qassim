@@ -19,3 +19,13 @@ export function publicOrigin(): string {
 
 /** Absolute URL of the admin overview for a locale, or null when the panel is not on its own host. */
 export const adminHomeUrl = (locale: string): string | null => (ADMIN_HOST ? `https://${ADMIN_HOST}/${locale}` : null);
+
+/**
+ * Where the navbar's "sign in" button sends the visitor: the auth host when it's on, the same
+ * path on this host otherwise (the escape hatch before the subdomain existed/was configured).
+ * `returnTo` is carried as Clerk's own `redirect_url` param, so sign-in lands back on it.
+ */
+export function authSignInUrl(locale: string, returnTo?: string): string {
+  const query = returnTo ? `?redirect_url=${encodeURIComponent(returnTo)}` : '';
+  return (AUTH_HOST ? `https://${AUTH_HOST}` : '') + `/${locale}/sign-in${query}`;
+}

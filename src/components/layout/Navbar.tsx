@@ -1,23 +1,37 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Link, usePathname } from '@/i18n/routing';
 import { useAuth, isAdminRole } from '@/context/AuthContext';
-import { adminHomeUrl } from '@/lib/siteUrls';
+import { adminHomeUrl, authSignInUrl } from '@/lib/siteUrls';
 import { inAdminArea, useOnAdminHost } from '@/lib/adminPath';
 import { useOnAuthHost } from '@/lib/authPath';
 import Image from 'next/image';
-import { 
-  Calendar, 
-  Trophy, 
-  UserCircle, 
-  Globe, 
-  ShieldCheck, 
-  LogIn, 
+import {
+  Calendar,
+  Trophy,
+  UserCircle,
+  Globe,
+  ShieldCheck,
+  LogIn,
+  LogOut,
+  ChevronDown,
   Sparkles,
   Users
 } from 'lucide-react';
+
+function useClickOutside(onOutside: () => void) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onOutside();
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onOutside]);
+  return ref;
+}
 
 export default function Navbar() {
   const t = useTranslations('Navbar');
@@ -26,8 +40,10 @@ export default function Navbar() {
   const pathname = usePathname();
   const onAdminHost = useOnAdminHost();
   const onAuthHost = useOnAuthHost();
-  const { user, userData, login } = useAuth();
+  const { user, userData, logout } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useClickOutside(() => setProfileOpen(false));
 
   useEffect(() => {
     const handleScroll = () => {
@@ -58,9 +74,6 @@ export default function Navbar() {
     { href: '/structure', label: t('structure'), icon: Users },
     ...(user ? [
       { href: '/profile', label: t('profile'), icon: UserCircle },
-    ] : []),
-    ...(isAdminRole(userData) ? [
-      { href: '/admin', label: t('admin'), icon: ShieldCheck, isAdmin: true }
     ] : []),
   ];
 
@@ -118,13 +131,10 @@ export default function Navbar() {
                   href={item.href}
                   aria-label={item.label}
                   aria-current={active ? 'page' : undefined}
-                  onClick={event => { const url = item.isAdmin ? adminHomeUrl(locale) : null; if (url) { event.preventDefault(); window.location.assign(url); } }}
                   className={`inline-flex shrink-0 items-center gap-2 px-2.5 sm:px-3.5 py-2 rounded-xl text-sm font-semibold transition-all ${
-                    active 
-                      ? 'bg-blue-50 text-blue-700 shadow-xs' 
-                      : item.isAdmin
-                        ? 'text-purple-600 hover:bg-purple-50 hover:text-purple-700'
-                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100/70'
+                    active
+                      ? 'bg-blue-50 text-blue-700 shadow-xs'
+                      : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100/70'
                   }`}
                 >
                   <Icon aria-hidden="true" className="h-4 w-4 sm:h-4 sm:w-4 flex-shrink-0" />
@@ -149,20 +159,23 @@ export default function Navbar() {
 
             {/* Auth Session */}
             {user ? (
-              <div className="flex items-center gap-2 ps-2 border-s border-gray-200">
-                <Link 
-                  href="/profile" 
-                  className="hidden sm:flex items-center gap-2.5 p-1 pe-3 rounded-full hover:bg-slate-100/70 transition-colors"
+              <div className="relative ps-2 border-s border-gray-200" ref={profileRef}>
+                <button
+                  type="button"
+                  onClick={() => setProfileOpen(value => !value)}
+                  className="flex items-center gap-2 p-1 pe-2 sm:pe-3 rounded-full hover:bg-slate-100/70 transition-colors"
                   title={displayName}
+                  aria-haspopup="menu"
+                  aria-expanded={profileOpen}
                 >
-                  <div className="h-8 w-8 relative rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center overflow-hidden border border-blue-200 shadow-xs">
+                  <div className="h-8 w-8 relative rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center overflow-hidden border border-blue-200 shadow-xs shrink-0">
                     {user.photoURL ? (
                       <Image src={user.photoURL} alt={displayName} fill sizes="32px" className="object-cover" />
                     ) : (
                       <span>{displayName.charAt(0).toUpperCase()}</span>
                     )}
                   </div>
-                  <div className="flex flex-col text-start">
+                  <div className="hidden sm:flex flex-col text-start">
                     <span className="text-xs font-bold text-slate-900 max-w-[140px] truncate leading-tight">
                       {displayName}
                     </span>
@@ -170,11 +183,36 @@ export default function Navbar() {
                       {userData?.totalPoints ?? 0} {isAr ? 'نقطة' : 'pts'}
                     </span>
                   </div>
-                </Link>
+                  <ChevronDown className={`hidden sm:block h-4 w-4 text-slate-400 transition-transform ${profileOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {profileOpen && (
+                  <div role="menu" className="absolute end-0 top-full mt-2 w-56 rounded-2xl border border-gray-100 bg-white shadow-xl overflow-hidden z-50">
+                    {isAdminRole(userData) && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => { setProfileOpen(false); const url = adminHomeUrl(locale); if (url) window.location.assign(url); }}
+                        className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-purple-600 hover:bg-purple-50 transition-colors"
+                      >
+                        <ShieldCheck className="h-4 w-4 shrink-0" />
+                        {t('admin')}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => { setProfileOpen(false); void logout(); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <LogOut className="h-4 w-4 shrink-0" />
+                      {t('logout')}
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <button
-                onClick={login}
+                onClick={() => window.location.assign(authSignInUrl(locale, window.location.href))}
                 className="inline-flex items-center gap-1.5 sm:gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold shadow-sm shadow-blue-500/20 hover:shadow-md transition-all transform hover:-translate-y-0.5"
               >
                 <LogIn className="h-4 w-4" />
