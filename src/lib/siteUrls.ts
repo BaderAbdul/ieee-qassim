@@ -1,7 +1,11 @@
 import { configuredAdminHost, mainHostFor } from './adminHost';
+import { configuredAuthHost } from './authHost';
 
 /** The admin panel's own subdomain (admin.ieeequ.online); NEXT_PUBLIC_ADMIN_HOST=off keeps everything on one host. */
 export const ADMIN_HOST = configuredAdminHost(process.env.NEXT_PUBLIC_ADMIN_HOST);
+
+/** The auth subdomain (auth.ieeequ.online); unset/"off" keeps sign-in/up on the main site. */
+export const AUTH_HOST = configuredAuthHost(process.env.NEXT_PUBLIC_AUTH_HOST);
 
 /**
  * Origin to use for links meant for students and the public (event pages, check-in links, QR codes).

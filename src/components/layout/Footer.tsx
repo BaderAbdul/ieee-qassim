@@ -4,6 +4,7 @@ import React from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Link, usePathname } from '@/i18n/routing';
 import { inAdminArea, useOnAdminHost } from '@/lib/adminPath';
+import { useOnAuthHost } from '@/lib/authPath';
 import Image from 'next/image';
 import { 
   Calendar, 
@@ -38,11 +39,13 @@ export default function Footer() {
   const locale = useLocale();
   const pathname = usePathname();
   const onAdminHost = useOnAdminHost();
+  const onAuthHost = useOnAuthHost();
   const isAr = locale === 'ar';
   const currentYear = new Date().getFullYear();
 
-  // If in admin dashboard, let admin layout manage its own viewport
-  if (inAdminArea(pathname, onAdminHost)) {
+  // If in admin dashboard, let admin layout manage its own viewport. The auth host serves
+  // nothing but sign-in/up, so it gets no footer either -- same reasoning as Navbar.
+  if (inAdminArea(pathname, onAdminHost) || onAuthHost) {
     return null;
   }
 

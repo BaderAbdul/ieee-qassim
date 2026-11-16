@@ -9,6 +9,7 @@ import { readBackendResponse } from '@/lib/backendResponse';
 import { useLocale } from 'next-intl';
 import { usePathname } from '@/i18n/routing';
 import { inAdminArea, useOnAdminHost } from '@/lib/adminPath';
+import { useOnAuthHost } from '@/lib/authPath';
 
 async function postIdea(data: Record<string, unknown>) {
   const token = await window.Clerk?.session?.getToken();
@@ -34,9 +35,11 @@ export default function IdeaFloatingButton() {
   const isAr = locale === 'ar';
   const pathname = usePathname();
   const onAdminHost = useOnAdminHost();
+  const onAuthHost = useOnAuthHost();
 
   // Admin dashboard has its own tools; this public widget only makes sense on the main site.
-  if (inAdminArea(pathname, onAdminHost)) return null;
+  // The auth host redirects away right after sign-in, so it never needs this either.
+  if (inAdminArea(pathname, onAdminHost) || onAuthHost) return null;
   // Only show to logged in users
   if (!user) return null;
 

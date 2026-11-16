@@ -6,6 +6,7 @@ import { Link, usePathname } from '@/i18n/routing';
 import { useAuth, isAdminRole } from '@/context/AuthContext';
 import { adminHomeUrl } from '@/lib/siteUrls';
 import { inAdminArea, useOnAdminHost } from '@/lib/adminPath';
+import { useOnAuthHost } from '@/lib/authPath';
 import Image from 'next/image';
 import { 
   Calendar, 
@@ -24,6 +25,7 @@ export default function Navbar() {
   const isAr = locale === 'ar';
   const pathname = usePathname();
   const onAdminHost = useOnAdminHost();
+  const onAuthHost = useOnAuthHost();
   const { user, userData, login } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -35,8 +37,10 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // If in admin dashboard, let admin layout manage its own sidebar & navigation
-  if (inAdminArea(pathname, onAdminHost)) {
+  // If in admin dashboard, let admin layout manage its own sidebar & navigation. The auth host
+  // serves nothing but sign-in/up, so it gets no nav either -- its links target the main site
+  // and would be CORS-blocked as cross-origin fetches from here.
+  if (inAdminArea(pathname, onAdminHost) || onAuthHost) {
     return null;
   }
 

@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth as useClerkAuth, useClerk, useUser } from '@clerk/nextjs';
 import { apiGet } from '@/lib/backend';
+import { useOnAuthHost } from '@/lib/authPath';
 
 export interface UserTeam {
   id: string;
@@ -107,6 +108,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const clerk = useClerk();
   const { isLoaded: userLoaded, isSignedIn, user: clerkUser } = useUser();
   const { getToken } = useClerkAuth();
+  const onAuthHost = useOnAuthHost();
   const [userData, setUserData] = useState<UserData | null>(null);
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -122,6 +124,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (!userLoaded) return;
     if (!isSignedIn || !clerkUser) { setUserData(null); loadedFor.current = null; return; }
+    // The auth host only needs Clerk's own session for the post-sign-in redirect; the app's own
+    // account data lives behind the main API host and that fetch would be CORS-blocked from here.
+    if (onAuthHost) return;
     if (loadedFor.current === clerkUser.id) return;
     let alive = true;
     setFetching(true);
@@ -140,7 +145,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     })();
     return () => { alive = false; };
-  }, [userLoaded, isSignedIn, clerkUser, attempt]);
+  }, [userLoaded, isSignedIn, clerkUser, attempt, onAuthHost]);
 
   const user: AuthUser | null = isSignedIn && clerkUser ? {
     uid: userData?.id || clerkUser.id,

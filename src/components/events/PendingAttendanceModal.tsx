@@ -8,6 +8,7 @@ import { useToast } from '@/context/ToastContext';
 import { useLocale } from 'next-intl';
 import { usePathname } from 'next/navigation';
 import { useOnAdminHost } from '@/lib/adminPath';
+import { useOnAuthHost } from '@/lib/authPath';
 import { RequiredFeedbackDialog, useFeedbackSurface } from './RequiredFeedbackDialog';
 import { Star, Sparkles, Award, Send, AlertCircle, Loader2 } from 'lucide-react';
 
@@ -34,6 +35,7 @@ export default function PendingAttendanceModal() {
   const { user, userData } = useAuth();
   const pathname = usePathname();
   const onAdminHost = useOnAdminHost();
+  const onAuthHost = useOnAuthHost();
   const inAdmin = pathname.includes('/admin') || onAdminHost;
   const locale = useLocale();
   const surface = useFeedbackSurface();
@@ -53,8 +55,11 @@ export default function PendingAttendanceModal() {
   // whole site sluggish after a while. It only ever matters for someone who could plausibly have
   // just had their badge scanned at a physical event, so: skip it entirely on admin pages (same
   // condition the render-gate below already uses), pause it while the tab is in the background,
-  // and poll far less often -- a human at a check-in desk won't notice 12s instead of 4s.
-  const skipPolling = !!user && !!userData && userData.role !== 'student' && inAdmin;
+  // and poll far less often -- a human at a check-in desk won't notice 12s instead of 4s. Also
+  // skip it outright on the auth host: that fetch targets the main API host and is CORS-blocked
+  // as a cross-origin request from there, and the auth host redirects away right after sign-in
+  // anyway.
+  const skipPolling = (!!user && !!userData && userData.role !== 'student' && inAdmin) || onAuthHost;
   useEffect(() => {
     if (!user || skipPolling) return;
     let active = true;
