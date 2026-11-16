@@ -15,7 +15,7 @@ import {
 import { usePathname } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import ConfigurationNotice from '@/components/admin/ConfigurationNotice';
-import { ADMIN_HOST } from '@/lib/siteUrls';
+import { ADMIN_HOST, authSignInUrl } from '@/lib/siteUrls';
 import { toAdminPath, useOnAdminHost } from '@/lib/adminPath';
 import { mainHostFor } from '@/lib/adminHost';
 import AdminTopbar from '@/components/admin/AdminTopbar';
@@ -86,12 +86,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (loading || (user && isDashboardUser)) return;
     // On a hard refresh Clerk can report "not signed in yet" for an instant before it finishes
-    // restoring the session from the browser, which would otherwise redirect a valid admin out
+    // restoring the session from the browser, which would otherwise send a valid admin to sign-in
     // before /api/me even gets a chance to answer. Wait briefly for that to settle; if the real
     // state changes (loading again, or now authorized), this effect reruns and cancels the timer.
-    const timer = window.setTimeout(() => { router.replace('/'); }, 800);
+    const timer = window.setTimeout(() => {
+      // Not signed in at all: send them to sign in instead of denying access, carrying this admin
+      // page as redirect_url so they land back here once authenticated. A signed-in user who just
+      // lacks the role/privilege is a different case (handled by the Access Denied screen below)
+      // -- they don't need to sign in again, so they go home instead.
+      if (!user) { window.location.assign(authSignInUrl(locale, window.location.href)); return; }
+      router.replace('/');
+    }, 800);
     return () => window.clearTimeout(timer);
-  }, [user, userData, isDashboardUser, loading, router]);
+  }, [user, userData, isDashboardUser, loading, router, locale]);
 
   if (loading) {
     return (
@@ -124,7 +131,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  if (!user || !isDashboardUser) {
+  if (!user) {
+    // Not signed in: the effect above is sending them to sign in (after its grace window for
+    // Clerk's own session restore), so this is a brief redirect state, not a denial -- no need to
+    // alarm them with "Access Denied" for something they just need to log into.
+    return (
+      <div className={`${themeClass} min-h-screen flex items-center justify-center bg-[var(--color-page)]`}>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-accent)]"></div>
+      </div>
+    );
+  }
+
+  if (!isDashboardUser) {
     return (
       <div className={`${themeClass} min-h-screen flex flex-col items-center justify-center bg-[var(--color-page)] px-4 text-center`}>
         <ShieldAlert className="w-16 h-16 text-[var(--color-danger)] mb-4 animate-bounce" />

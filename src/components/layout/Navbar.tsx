@@ -72,9 +72,6 @@ export default function Navbar() {
     { href: '/events', label: t('events'), icon: Calendar },
     { href: '/leaderboard', label: t('leaderboard'), icon: Trophy },
     { href: '/structure', label: t('structure'), icon: Users },
-    ...(user ? [
-      { href: '/profile', label: t('profile'), icon: UserCircle },
-    ] : []),
   ];
 
   const getFirstAndLastName = (fullName?: string, fallback?: string | null) => {
@@ -163,7 +160,11 @@ export default function Navbar() {
                 <button
                   type="button"
                   onClick={() => setProfileOpen(value => !value)}
-                  className="flex items-center gap-2 p-1 pe-2 sm:pe-3 rounded-full hover:bg-slate-100/70 transition-colors"
+                  className={`flex items-center gap-2 p-1 pe-2 sm:pe-3 rounded-full border transition-colors ${
+                    profileOpen
+                      ? 'bg-slate-200/80 border-slate-300'
+                      : 'bg-slate-100/70 border-gray-200 hover:bg-slate-200/70'
+                  }`}
                   title={displayName}
                   aria-haspopup="menu"
                   aria-expanded={profileOpen}
@@ -187,6 +188,15 @@ export default function Navbar() {
                 </button>
                 {profileOpen && (
                   <div role="menu" className="absolute end-0 top-full mt-2 w-56 rounded-2xl border border-gray-100 bg-white shadow-xl overflow-hidden z-50">
+                    <Link
+                      href="/profile"
+                      role="menuitem"
+                      onClick={() => setProfileOpen(false)}
+                      className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      <UserCircle className="h-4 w-4 shrink-0" />
+                      {t('profile')}
+                    </Link>
                     {isAdminRole(userData) && (
                       <button
                         type="button"

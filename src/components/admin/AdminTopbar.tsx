@@ -203,19 +203,21 @@ export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
 
       {/* Mobile top bar: the only chrome on phones -- title, search, notifications, profile, fixed
           in place on every page (not sticky: it never scrolls with the content). Styled to read
-          as part of the page itself (transparent, no bar background/border/shadow/blur), so only
-          the icon buttons and title float on the page. The page's own inner-tab switcher (if
-          any) gets its own small floating pill underneath instead of wrapping into this row like
-          the desktop header does.
+          as part of the page itself (no border/shadow, color-matched to the page), not a distinct
+          bar -- but it does need a translucent+blurred backdrop of its own, or page content
+          scrolling underneath shows straight through and collides with the title/icons. The
+          page's own inner-tab switcher (if any) gets its own small floating pill underneath
+          instead of wrapping into this row like the desktop header does.
           Portaled to document.body: a backdrop-blur ancestor (the desktop sidebar/header, admin
           cards) becomes a containing block for its own fixed descendants, same reasoning as
           ConfirmDialog -- rendering inline here previously trapped this bar inside the admin
-          layout instead of actually pinning it to the viewport. Carries its own theme class since
-          document.body is outside .ieee-admin-theme's scope for the CSS var-based colors.
+          layout instead of actually pinning it to the viewport (confirmed fixed via devtools: it
+          no longer moves on scroll). Carries its own theme class since document.body is outside
+          .ieee-admin-theme's scope for the CSS var-based colors.
           The manifest runs `display: "fullscreen"` (no OS status bar at all), so this is what
           keeps the notch/camera cutout clear; env() is just 0 in a regular tab. */}
       {mounted && createPortal(
-        <div ref={mobileHeaderRef} className={`${themeClass} md:hidden fixed top-0 inset-x-0 z-30 bg-transparent`} style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <div ref={mobileHeaderRef} className={`${themeClass} md:hidden fixed top-0 inset-x-0 z-30 bg-[var(--color-page)]/75 backdrop-blur-md`} style={{ paddingTop: 'env(safe-area-inset-top)' }}>
           <div className="flex items-center justify-between gap-2 px-4 py-3.5">
             <h1 className="min-w-0 truncate text-lg font-black font-cairo text-[var(--color-text-primary)]">
               {pageTitle || (isAr ? 'لوحة الإدارة' : 'Admin Portal')}
