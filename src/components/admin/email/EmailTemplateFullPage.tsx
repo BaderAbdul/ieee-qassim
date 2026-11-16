@@ -7,6 +7,7 @@ import { Link, useRouter } from '@/i18n/routing';
 import { useAuth } from '@/context/AuthContext';
 import { apiGet, apiSend, uploadImage } from '@/lib/backend';
 import { useToast } from '@/context/ToastContext';
+import { useIsPhone } from '@/components/admin/DesktopOnlyGate';
 import {
   EMAIL_VARIABLE_GROUPS, MAX_TEMPLATE_ATTACHMENTS, MAX_TEST_RECIPIENTS, imageDimensions, insertAtCursor,
   variableToken, type EmailBoilerplateSummary, type EmailTemplate, type EmailTemplateAttachment,
@@ -70,7 +71,10 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [approveBusy, setApproveBusy] = useState(false);
 
-  const canEdit = !templateId || canManage || createdBy === userData?.id;
+  // Editing (new or existing) is a computer-only task on this page; a phone only ever gets the
+  // read-only preview/code view below, regardless of ownership or manage privilege.
+  const phone = useIsPhone();
+  const canEdit = !phone && (!templateId || canManage || createdBy === userData?.id);
   const previewRef = useRef<HTMLDivElement>(null);
   const savedRange = useRef<Range | null>(null);
   const codeRef = useRef<HTMLTextAreaElement>(null);
@@ -280,7 +284,13 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
         <span className="text-xs text-[var(--color-text-muted)]">{saveState === 'saving' ? t('جارٍ الحفظ…', 'Saving…') : saveState === 'saved' ? t('تم الحفظ', 'Saved') : saveState === 'error' ? t('فشل الحفظ', 'Save failed') : ''}</span>
       </div>
     </div>
-    {!canEdit && <p className="mb-3 rounded-xl bg-amber-500/10 p-3 text-sm text-amber-700">{t('هذا القالب لمنشئ آخر — للعرض فقط.', 'This template belongs to another author -- read only.')}</p>}
+    {!canEdit && (
+      <p className="mb-3 rounded-xl bg-amber-500/10 p-3 text-sm text-amber-700">
+        {phone
+          ? t('تعديل القوالب متاح من الحاسوب فقط — هذا عرض للقراءة فقط.', 'Editing templates is available on a computer only -- this is a read-only view.')
+          : t('هذا القالب لمنشئ آخر — للعرض فقط.', 'This template belongs to another author -- read only.')}
+      </p>
+    )}
 
     {/* dir="ltr" here only fixes the grid's own track order so the editor is always physically on
         the left, as asked -- it does not affect the RTL/LTR direction of anything inside the columns. */}
