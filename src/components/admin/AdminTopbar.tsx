@@ -22,7 +22,7 @@ function useClickOutside(onOutside: () => void) {
   return ref;
 }
 
-export default function AdminTopbar({ pageTitle, hidden }: { pageTitle?: string; hidden?: boolean }) {
+export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
   const locale = useLocale();
   const isAr = locale === 'ar';
   const { user, userData } = useAuth();
@@ -33,6 +33,10 @@ export default function AdminTopbar({ pageTitle, hidden }: { pageTitle?: string;
   const [notifOpen, setNotifOpen] = useState(false);
   const profileRef = useClickOutside(() => setProfileOpen(false));
   const notifRef = useClickOutside(() => setNotifOpen(false));
+  const [mProfileOpen, setMProfileOpen] = useState(false);
+  const [mNotifOpen, setMNotifOpen] = useState(false);
+  const mProfileRef = useClickOutside(() => setMProfileOpen(false));
+  const mNotifRef = useClickOutside(() => setMNotifOpen(false));
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -51,15 +55,69 @@ export default function AdminTopbar({ pageTitle, hidden }: { pageTitle?: string;
     ? data.counts.pendingRegistrations + data.counts.failedCertificates + data.notifications.failed + data.notifications.review
     : 0;
 
+  const renderNotifPanel = (onClose: () => void) => (
+    <div className="absolute end-0 mt-2 w-72 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl overflow-hidden z-40">
+      <div className="px-4 py-3 border-b border-[var(--color-border)] font-bold text-sm text-[var(--color-text-primary)]">
+        {isAr ? 'الإشعارات' : 'Notifications'}
+      </div>
+      {data ? (
+        <div className="p-2">
+          {[
+            { label: isAr ? 'تسجيلات تنتظر الموافقة' : 'Pending registrations', value: data.counts.pendingRegistrations },
+            { label: isAr ? 'شهادات فاشلة' : 'Failed certificates', value: data.counts.failedCertificates },
+            { label: isAr ? 'بريد بحاجة مراجعة' : 'Mail needing review', value: data.notifications.review + data.notifications.failed },
+          ].map(row => (
+            <Link
+              key={row.label}
+              href="/admin/operations"
+              onClick={onClose}
+              className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl hover:bg-[var(--color-surface-2)] transition-colors"
+            >
+              <span className="text-xs font-bold text-[var(--color-text-secondary)]">{row.label}</span>
+              <span className={`text-sm font-black font-mono ${row.value > 0 ? 'text-[var(--color-warning)]' : 'text-[var(--color-text-muted)]'}`}>{row.value}</span>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <p className="px-4 py-6 text-center text-xs text-[var(--color-text-muted)]">{isAr ? 'جارٍ التحميل…' : 'Loading…'}</p>
+      )}
+    </div>
+  );
+
+  const renderProfilePanel = (onClose: () => void) => (
+    <div className="absolute end-0 mt-2 w-56 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl overflow-hidden z-40">
+      <div className="px-4 py-3 border-b border-[var(--color-border)]">
+        <p className="text-sm font-bold text-[var(--color-text-primary)] truncate">{user?.displayName}</p>
+        <p className="text-xs text-[var(--color-text-muted)] truncate">{user?.email}</p>
+        {userData?.roleNameAr && (
+          <p className="mt-1 inline-block text-[10px] font-bold text-[var(--color-accent)] bg-[var(--color-accent-soft)] px-2 py-0.5 rounded-full">
+            {isAr ? userData.roleNameAr : userData.roleNameEn}
+          </p>
+        )}
+      </div>
+      <div className="p-1.5">
+        <Link
+          href="/admin/profile"
+          onClick={onClose}
+          className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-[var(--color-surface-2)] text-sm font-medium text-[var(--color-text-secondary)] transition-colors"
+        >
+          <CircleUserRound size={16} />
+          {isAr ? 'ملفي الشخصي' : 'My profile'}
+        </Link>
+      </div>
+    </div>
+  );
+
   return (
     <>
-      <header className={`sticky top-3 z-30 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-white/10 bg-slate-900/70 backdrop-blur-xl shadow-2xl px-4 sm:px-6 py-3.5 transition-all duration-300 md:translate-y-0 md:opacity-100 ${hidden ? '-translate-y-24 opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'}`}>
+      {/* Desktop top bar */}
+      <header className="hidden md:flex sticky top-3 z-30 flex-wrap items-center justify-between gap-3 rounded-3xl border border-white/10 bg-slate-900/70 backdrop-blur-xl shadow-2xl px-4 sm:px-6 py-3.5">
         <h1 className="text-base sm:text-lg font-black font-cairo text-white truncate shrink-0">
           {pageTitle || (isAr ? 'لوحة الإدارة' : 'Admin Portal')}
         </h1>
 
         {pageActions && (
-          <div className="flex flex-wrap items-center gap-2 order-last md:order-none md:mx-auto">
+          <div className="flex flex-wrap items-center gap-2 md:mx-auto">
             {pageActions}
           </div>
         )}
@@ -91,34 +149,7 @@ export default function AdminTopbar({ pageTitle, hidden }: { pageTitle?: string;
                 </span>
               )}
             </button>
-            {notifOpen && (
-              <div className="absolute end-0 mt-2 w-72 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl overflow-hidden z-40">
-                <div className="px-4 py-3 border-b border-[var(--color-border)] font-bold text-sm text-[var(--color-text-primary)]">
-                  {isAr ? 'الإشعارات' : 'Notifications'}
-                </div>
-                {data ? (
-                  <div className="p-2">
-                    {[
-                      { label: isAr ? 'تسجيلات تنتظر الموافقة' : 'Pending registrations', value: data.counts.pendingRegistrations },
-                      { label: isAr ? 'شهادات فاشلة' : 'Failed certificates', value: data.counts.failedCertificates },
-                      { label: isAr ? 'بريد بحاجة مراجعة' : 'Mail needing review', value: data.notifications.review + data.notifications.failed },
-                    ].map(row => (
-                      <Link
-                        key={row.label}
-                        href="/admin/operations"
-                        onClick={() => setNotifOpen(false)}
-                        className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl hover:bg-[var(--color-surface-2)] transition-colors"
-                      >
-                        <span className="text-xs font-bold text-[var(--color-text-secondary)]">{row.label}</span>
-                        <span className={`text-sm font-black font-mono ${row.value > 0 ? 'text-[var(--color-warning)]' : 'text-[var(--color-text-muted)]'}`}>{row.value}</span>
-                      </Link>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="px-4 py-6 text-center text-xs text-[var(--color-text-muted)]">{isAr ? 'جارٍ التحميل…' : 'Loading…'}</p>
-                )}
-              </div>
-            )}
+            {notifOpen && renderNotifPanel(() => setNotifOpen(false))}
           </div>
 
           {/* Profile */}
@@ -139,32 +170,75 @@ export default function AdminTopbar({ pageTitle, hidden }: { pageTitle?: string;
               )}
               <ChevronDown size={14} className="text-slate-400" />
             </button>
-            {profileOpen && (
-              <div className="absolute end-0 mt-2 w-56 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl overflow-hidden z-40">
-                <div className="px-4 py-3 border-b border-[var(--color-border)]">
-                  <p className="text-sm font-bold text-[var(--color-text-primary)] truncate">{user?.displayName}</p>
-                  <p className="text-xs text-[var(--color-text-muted)] truncate">{user?.email}</p>
-                  {userData?.roleNameAr && (
-                    <p className="mt-1 inline-block text-[10px] font-bold text-[var(--color-accent)] bg-[var(--color-accent-soft)] px-2 py-0.5 rounded-full">
-                      {isAr ? userData.roleNameAr : userData.roleNameEn}
-                    </p>
-                  )}
-                </div>
-                <div className="p-1.5">
-                  <Link
-                    href="/admin/profile"
-                    onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-[var(--color-surface-2)] text-sm font-medium text-[var(--color-text-secondary)] transition-colors"
-                  >
-                    <CircleUserRound size={16} />
-                    {isAr ? 'ملفي الشخصي' : 'My profile'}
-                  </Link>
-                </div>
-              </div>
-            )}
+            {profileOpen && renderProfilePanel(() => setProfileOpen(false))}
           </div>
         </div>
       </header>
+
+      {/* Mobile top bar: the only chrome on phones -- title, search, notifications, profile, fixed
+          in place on every page, with the page's own inner-tab switcher (if any) docked right
+          under it instead of wrapping awkwardly inside the same row like the desktop header.
+          The manifest runs `display: "fullscreen"` (no OS status bar at all), so this bar -- not
+          the OS -- is what keeps the notch/camera cutout clear; env() is just 0 in a regular tab. */}
+      <div className="md:hidden sticky top-0 z-30 border-b border-white/10 bg-slate-900/90 backdrop-blur-xl shadow-lg" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <div className="flex items-center justify-between gap-2 px-3 py-2.5">
+          <h1 className="min-w-0 truncate text-sm font-black font-cairo text-white">
+            {pageTitle || (isAr ? 'لوحة الإدارة' : 'Admin Portal')}
+          </h1>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              className="cursor-pointer p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all"
+              aria-label={isAr ? 'بحث' : 'Search'}
+            >
+              <Search size={17} />
+            </button>
+
+            <div className="relative" ref={mNotifRef}>
+              <button
+                type="button"
+                onClick={() => setMNotifOpen(value => !value)}
+                className="cursor-pointer relative p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all"
+                aria-label={isAr ? 'الإشعارات' : 'Notifications'}
+              >
+                <Bell size={17} />
+                {notifCount > 0 && (
+                  <span dir="ltr" className="absolute -top-1 -end-1 min-w-[16px] h-[16px] px-1 rounded-full bg-[var(--color-danger)] text-white text-[9px] font-bold flex items-center justify-center">
+                    {notifCount > 99 ? '99+' : notifCount}
+                  </span>
+                )}
+              </button>
+              {mNotifOpen && renderNotifPanel(() => setMNotifOpen(false))}
+            </div>
+
+            <div className="relative" ref={mProfileRef}>
+              <button
+                type="button"
+                onClick={() => setMProfileOpen(value => !value)}
+                className="cursor-pointer flex items-center rounded-xl bg-white/10 hover:bg-white/20 p-0.5 transition-all"
+                aria-label={isAr ? 'حسابي' : 'My account'}
+              >
+                {user?.photoURL ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={user.photoURL} alt="" className="w-7 h-7 rounded-lg object-cover" />
+                ) : (
+                  <div className="w-7 h-7 rounded-lg bg-[var(--color-accent)] text-[var(--color-accent-contrast)] flex items-center justify-center">
+                    <CircleUserRound size={16} />
+                  </div>
+                )}
+              </button>
+              {mProfileOpen && renderProfilePanel(() => setMProfileOpen(false))}
+            </div>
+          </div>
+        </div>
+
+        {pageActions && (
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar px-3 pb-2.5">
+            {pageActions}
+          </div>
+        )}
+      </div>
 
       <AdminSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
     </>

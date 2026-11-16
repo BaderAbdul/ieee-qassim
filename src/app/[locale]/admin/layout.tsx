@@ -19,10 +19,12 @@ import { ADMIN_HOST } from '@/lib/siteUrls';
 import { toAdminPath, useOnAdminHost } from '@/lib/adminPath';
 import { mainHostFor } from '@/lib/adminHost';
 import AdminTopbar from '@/components/admin/AdminTopbar';
+import MobileBottomNav from '@/components/admin/MobileBottomNav';
 import { AdminTopbarActionsProvider } from '@/components/admin/AdminTopbarActions';
 import { StaffMessagesProvider } from '@/components/admin/messages/StaffMessagesContext';
 import { canOpenAdminPath, useAdminNav, type AdminNavItem } from '@/components/admin/useAdminNav';
 import AdminOnboarding, { useOnboarding } from '@/components/admin/onboarding/AdminOnboarding';
+import { useAdminTheme } from '@/lib/adminTheme';
 
 const subscribeSidebar = (notify: () => void) => {
   window.addEventListener('storage', notify);
@@ -37,19 +39,6 @@ const getSidebarSnapshot = () => {
   catch { return false; }
 };
 
-const subscribeTheme = (notify: () => void) => {
-  window.addEventListener('storage', notify);
-  window.addEventListener('ieee-admin-theme', notify);
-  return () => {
-    window.removeEventListener('storage', notify);
-    window.removeEventListener('ieee-admin-theme', notify);
-  };
-};
-const getThemeSnapshot = () => {
-  try { return localStorage.getItem('admin_theme') === 'dark'; }
-  catch { return false; }
-};
-
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, userData, loading } = useAuth();
   const router = useRouter();
@@ -58,7 +47,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = toAdminPath(rawPathname, onAdminHost);
   const locale = useLocale();
   const isAr = locale === 'ar';
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [hoveredNav, setHoveredNav] = useState<string | null>(null);
 
   const isCollapsed = useSyncExternalStore(subscribeSidebar, getSidebarSnapshot, () => false);
@@ -68,27 +56,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     window.dispatchEvent(new Event('ieee-sidebar'));
   };
 
-  const [topbarHidden, setTopbarHidden] = useState(false);
-  useEffect(() => {
-    let lastY = window.scrollY;
-    const onScroll = () => {
-      const y = window.scrollY;
-      if (window.innerWidth >= 768) { setTopbarHidden(false); lastY = y; return; }
-      const delta = y - lastY;
-      if (Math.abs(delta) < 10) return; // ignore small jitter (rubber-banding, address-bar resize)
-      setTopbarHidden(delta > 0 && y > 72);
-      lastY = y;
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  const isDark = useSyncExternalStore(subscribeTheme, getThemeSnapshot, () => false);
-  const toggleTheme = () => {
-    try { localStorage.setItem('admin_theme', isDark ? 'light' : 'dark'); }
-    catch { return; }
-    window.dispatchEvent(new Event('ieee-admin-theme'));
-  };
+  const { isDark, setMode: setThemeMode } = useAdminTheme();
+  const toggleTheme = () => setThemeMode(isDark ? 'light' : 'dark');
   const themeClass = `ieee-admin-theme${isDark ? ' dark' : ''}`;
 
   // The phone's status/top bar takes the same colour as the board's background (light or dark).
@@ -191,7 +160,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <Link
         key={item.href}
         href={item.href}
-        onClick={() => setMobileOpen(false)}
         onMouseEnter={() => setHoveredNav(item.href)}
         onMouseLeave={() => setHoveredNav(null)}
         aria-label={item.name}
@@ -205,10 +173,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         }`}
       >
         <div className="flex-shrink-0"><Icon size={20} /></div>
-        <span className={`text-sm truncate leading-none ${isCollapsed ? 'md:hidden' : ''}`}>{item.name}</span>
+        <span className={`text-sm truncate leading-none ${isCollapsed ? 'hidden' : ''}`}>{item.name}</span>
         {isCollapsed && (
           <span
-            className={`${hoveredNav === item.href ? 'md:block' : 'hidden'} absolute start-full ms-3 top-1/2 -translate-y-1/2 z-50 whitespace-nowrap rounded-lg bg-slate-900 text-white text-xs font-bold px-3 py-1.5 shadow-xl border border-white/10`}
+            className={`${hoveredNav === item.href ? 'block' : 'hidden'} absolute start-full ms-3 top-1/2 -translate-y-1/2 z-50 whitespace-nowrap rounded-lg bg-slate-900 text-white text-xs font-bold px-3 py-1.5 shadow-xl border border-white/10`}
           >
             {item.name}
             <span className="absolute top-1/2 -start-1.5 h-3.5 w-3.5 -translate-y-1/2 rotate-45 bg-slate-900 shadow-[1px_1px_2px_rgba(0,0,0,0.3)]" />
@@ -219,7 +187,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
 
   return (
-    <div className={`${themeClass} min-h-screen bg-[var(--color-page)] flex flex-col md:flex-row gap-3 p-3 font-sans relative isolate`}>
+    <div className={`${themeClass} min-h-screen bg-[var(--color-page)] flex flex-col md:flex-row gap-3 p-0 md:p-3 font-sans relative isolate`}>
       {/* Decorative background shapes -- fixed to the viewport (not the document) so every
           page reads the same regardless of how tall its content is, and so they stay put
           while the page scrolls */}
@@ -229,15 +197,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="absolute bottom-0 start-1/4 w-[22rem] h-[22rem] rounded-full bg-[var(--color-accent)]/15 blur-3xl animate-blob animation-delay-4000" />
       </div>
 
-      {/* Sidebar: floats over the background, glassmorphic, stays in view while the page scrolls */}
+      {/* Sidebar: desktop only -- phones get the fixed top bar + bottom nav instead. Floats over
+          the background, glassmorphic, stays in view while the page scrolls. */}
       <aside
-        className={`sticky top-3 self-start z-10 w-full bg-slate-900/70 backdrop-blur-xl text-white md:h-[calc(100vh-1.5rem)] rounded-3xl flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out border border-white/10 shadow-2xl ${
-          isCollapsed ? 'md:w-20' : 'md:w-64'
+        className={`hidden md:flex sticky top-3 self-start z-10 bg-slate-900/70 backdrop-blur-xl text-white h-[calc(100vh-1.5rem)] rounded-3xl flex-col flex-shrink-0 transition-all duration-300 ease-in-out border border-white/10 shadow-2xl ${
+          isCollapsed ? 'w-20' : 'w-64'
         }`}
       >
         {/* Header & Toggle Button */}
-        <div className={`border-b border-white/10 flex items-center justify-between p-3 sm:p-5 ${isCollapsed ? 'md:flex-col md:justify-center md:gap-2 md:p-3' : ''}`}>
-          <div className={`truncate ${isCollapsed ? 'md:hidden' : ''}`}>
+        <div className={`border-b border-white/10 flex items-center justify-between p-3 sm:p-5 ${isCollapsed ? 'flex-col justify-center gap-2 p-3' : ''}`}>
+          <div className={`truncate ${isCollapsed ? 'hidden' : ''}`}>
             <h2 className="text-base sm:text-lg font-black font-cairo text-[#4DA8DA] tracking-wide">
               {isAr ? 'لوحة الإدارة' : 'Admin Portal'}
             </h2>
@@ -245,7 +214,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               IEEE Qassim
             </p>
           </div>
-          <div className={`flex items-center gap-1.5 ${isCollapsed ? 'md:flex-col' : ''}`}>
+          <div className={`flex items-center gap-1.5 ${isCollapsed ? 'flex-col' : ''}`}>
             <button
               onClick={toggleTheme}
               aria-label={isDark ? (isAr ? 'الوضع الفاتح' : 'Light mode') : (isAr ? 'الوضع الداكن' : 'Dark mode')}
@@ -255,22 +224,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               {isDark ? <Sun className="w-4 h-4 sm:w-5 sm:h-5" /> : <Moon className="w-4 h-4 sm:w-5 sm:h-5" />}
             </button>
 
-            {/* Mobile partial collapse / expand button */}
-            <button
-              type="button"
-              aria-controls="admin-navigation-panel"
-              aria-expanded={mobileOpen}
-              onClick={() => setMobileOpen(value => !value)}
-              className="cursor-pointer md:hidden inline-flex items-center gap-1.5 rounded-xl bg-white/10 hover:bg-white/20 px-3 py-1.5 text-xs font-bold text-slate-200 transition-colors"
-            >
-              {mobileOpen ? (isAr ? 'إخفاء جزئي (أيقونات)' : 'Icons only') : (isAr ? 'عرض العناوين' : 'Full menu')}
-            </button>
-
             <button
               onClick={toggleSidebar}
               aria-label={isCollapsed ? (isAr ? 'توسيع القائمة' : 'Expand sidebar') : (isAr ? 'طي القائمة' : 'Collapse sidebar')}
               aria-expanded={!isCollapsed}
-              className="cursor-pointer hidden md:block p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all"
+              className="cursor-pointer p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all"
               title={isCollapsed ? (isAr ? 'توسيع القائمة' : 'Expand Sidebar') : (isAr ? 'طَيّ القائمة (أيقونات فقط)' : 'Collapse Sidebar')}
             >
               {isCollapsed ? (
@@ -282,33 +240,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
         </div>
 
-        {/* Mobile quick icons strip when full menu is closed (partial collapse) */}
-        {!mobileOpen && (
-          <div className="md:hidden flex items-center gap-1 p-2 overflow-x-auto no-scrollbar border-b border-white/10 bg-slate-900/60">
-            {[...navItems, ...footerItems].map((item) => {
-              const active = isCurrentPath(item.href);
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-label={item.name}
-                  title={item.name}
-                  className={`p-2.5 rounded-xl shrink-0 transition-colors ${
-                    active
-                      ? 'bg-[#00629B] text-white shadow-sm'
-                      : 'text-slate-400 hover:text-white hover:bg-white/10'
-                  }`}
-                >
-                  <Icon size={20} />
-                </Link>
-              );
-            })}
-          </div>
-        )}
-
         {/* Navigation Links */}
-        <div id="admin-navigation-panel" className={`${mobileOpen ? 'flex' : 'hidden'} md:flex flex-1 flex-col min-h-0`}>
+        <div className="flex flex-1 flex-col min-h-0">
           <nav aria-label={isAr ? 'التنقل الإداري' : 'Admin navigation'} className="flex-1 p-3 space-y-1.5">
             {navItems.map(renderNavLink)}
           </nav>
@@ -322,8 +255,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="min-w-0 flex-1 flex flex-col">
         <StaffMessagesProvider>
         <AdminTopbarActionsProvider>
-          <AdminTopbar pageTitle={[...navItems, ...footerItems].find(item => isCurrentPath(item.href))?.name ?? (isCurrentPath('/admin/profile') ? (isAr ? 'ملفي الشخصي' : 'My profile') : undefined)} hidden={topbarHidden} />
-          <div className="p-4 sm:p-6 lg:p-8">
+          <AdminTopbar pageTitle={[...navItems, ...footerItems].find(item => isCurrentPath(item.href))?.name ?? (isCurrentPath('/admin/profile') ? (isAr ? 'ملفي الشخصي' : 'My profile') : undefined)} />
+          <div className="p-4 sm:p-6 lg:p-8 pb-24 md:pb-6">
             <div className="max-w-6xl mx-auto">
               <ConfigurationNotice />
               {children}
@@ -332,6 +265,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </AdminTopbarActionsProvider>
         </StaffMessagesProvider>
       </div>
+
+      <MobileBottomNav navItems={navItems} footerItems={footerItems} isCurrentPath={isCurrentPath} isAr={isAr} />
     </div>
   );
 }

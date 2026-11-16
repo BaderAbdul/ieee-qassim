@@ -27,7 +27,8 @@ export default function AuthBackButton({ isAr, fallbackHref }: { isAr: boolean; 
       type="button"
       onClick={handleClick}
       aria-label={isAr ? 'العودة' : 'Back'}
-      className="fixed top-4 start-4 z-10 inline-flex items-center gap-1.5 rounded-full bg-white/90 backdrop-blur-sm border border-slate-200 ps-2.5 pe-3.5 py-2 text-sm font-bold text-slate-700 shadow-sm hover:bg-white hover:shadow-md hover:-translate-y-0.5 transition-all"
+      className="fixed start-4 z-10 inline-flex items-center gap-1.5 rounded-full bg-white/90 backdrop-blur-sm border border-slate-200 ps-2.5 pe-3.5 py-2 text-sm font-bold text-slate-700 shadow-sm hover:bg-white hover:shadow-md hover:-translate-y-0.5 transition-all"
+      style={{ top: 'calc(1rem + env(safe-area-inset-top))' }}
     >
       <Icon className="h-4 w-4" />
       <span>{isAr ? 'رجوع' : 'Back'}</span>
