@@ -251,7 +251,7 @@ export default function AdminEventsPage() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder={isAr ? 'ابحث باسم الفعالية، الوصف، أو المكان…' : 'Search by title, description, or location…'}
-            className="w-full pr-10 pl-4 py-2.5 text-xs sm:text-sm bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-xl focus:bg-[var(--color-surface)] focus:ring-2 focus:ring-[var(--color-accent)] focus:border-[var(--color-accent)] transition-all"
+            className="w-full pr-10 pl-4 py-2.5 text-xs sm:text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-xl focus:bg-[var(--color-surface)] focus:ring-2 focus:ring-[var(--color-accent)] focus:border-[var(--color-accent)] transition-all"
           />
           {search && (
             <button

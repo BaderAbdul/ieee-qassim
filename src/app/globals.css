@@ -85,6 +85,19 @@
 .ieee-admin-theme .border-slate-200, .ieee-admin-theme .border-gray-200,
 .ieee-admin-theme .border-slate-300, .ieee-admin-theme .border-gray-300 { border-color: var(--color-border); }
 
+/* Most admin inputs/textareas/selects set a themed background but never their own text/placeholder
+   color, so both stayed whatever the browser's default (near-black) is -- unreadable once the
+   field's own background goes dark. No admin form field currently sets its own text-* class, so
+   this blanket default is a pure fix today; if one ever needs its own color, give it enough
+   specificity to beat this selector (e.g. an id, or !text-*) rather than a plain utility class. */
+.ieee-admin-theme input, .ieee-admin-theme textarea, .ieee-admin-theme select {
+  color: var(--color-text-primary);
+}
+.ieee-admin-theme input::placeholder, .ieee-admin-theme textarea::placeholder {
+  color: var(--color-text-muted);
+  opacity: 1;
+}
+
 .ieee-admin-theme.dark {
   --color-page: #0B1220;
   --color-surface: #17213A;
