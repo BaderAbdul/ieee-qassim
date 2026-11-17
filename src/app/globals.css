@@ -69,11 +69,27 @@
   background-color: color-mix(in oklab, var(--color-surface-2) 80%, transparent);
 }
 
+/* Same reasoning for the neutral text/border utilities a lot of older admin pages still use
+   literally: in dark mode, text-slate-900 (near-black) and border-slate-100 (near-white-on-white)
+   are each only legible against a *light* page, and these pages never got a dark-specific pass.
+   Mapping them to the matching design token keeps them legible under either theme instead of
+   adding --color-* everywhere by hand. Only the darker numbers (500+) are remapped -- 300/400 are
+   also used as light-gray text *inside* the sidebar/topbar's own permanently-dark glass chrome,
+   which must keep its own already-tuned contrast regardless of the page theme toggle. */
+.ieee-admin-theme .text-slate-900, .ieee-admin-theme .text-gray-900,
+.ieee-admin-theme .text-slate-800, .ieee-admin-theme .text-gray-800 { color: var(--color-text-primary); }
+.ieee-admin-theme .text-slate-700, .ieee-admin-theme .text-gray-700,
+.ieee-admin-theme .text-slate-600, .ieee-admin-theme .text-gray-600 { color: var(--color-text-secondary); }
+.ieee-admin-theme .text-slate-500, .ieee-admin-theme .text-gray-500 { color: var(--color-text-muted); }
+.ieee-admin-theme .border-slate-100, .ieee-admin-theme .border-gray-100,
+.ieee-admin-theme .border-slate-200, .ieee-admin-theme .border-gray-200,
+.ieee-admin-theme .border-slate-300, .ieee-admin-theme .border-gray-300 { border-color: var(--color-border); }
+
 .ieee-admin-theme.dark {
   --color-page: #0B1220;
-  --color-surface: #121A2B;
-  --color-surface-2: #16213A;
-  --color-border: #243249;
+  --color-surface: #17213A;
+  --color-surface-2: #1E2A47;
+  --color-border: #35456A;
   --color-text-primary: #E7ECF3;
   --color-text-secondary: #9AA7BD;
   --color-text-muted: #6B7A94;
