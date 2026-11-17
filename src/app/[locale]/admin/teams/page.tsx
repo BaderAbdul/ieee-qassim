@@ -33,6 +33,7 @@ interface Team {
   maxPrivileges?: string[] | null;
 }
 interface SearchResultUser { id: string; email?: string; displayName?: string; arabicFullName?: string; photoURL?: string; role?: string }
+interface RoleRow { key: string; privileges: string[] }
 
 export default function AdminTeamsPage() {
   const isAr = useLocale() === 'ar';
@@ -58,18 +59,29 @@ export default function AdminTeamsPage() {
   const [openTeams, setOpenTeams] = useState<Set<string>>(new Set());
   const toggleTeam = (id: string) => setOpenTeams(previous => { const next = new Set(previous); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   const [catalog, setCatalog] = useState<Privilege[]>([]);
+  // Every privilege guaranteed by some role's own minimum (super_admin excluded -- its row holds
+  // every key for display only). A team's maximum can never un-grant these: whoever holds that
+  // role keeps them regardless, so letting the grid uncheck them here would just be misleading.
+  const [roleFloor, setRoleFloor] = useState<Set<string>>(new Set());
   const [maxTeamId, setMaxTeamId] = useState<string | null>(null);
   const [maxUnlimited, setMaxUnlimited] = useState(true);
   const [maxSelection, setMaxSelection] = useState<Set<string>>(new Set());
   const openMax = async (team: Team) => {
     if (maxTeamId === team.id) { setMaxTeamId(null); return; }
-    if (!catalog.length) { try { setCatalog(await apiGetArray<Privilege>('/api/admin/privileges')); } catch { /* shown when saving */ } }
+    try {
+      const [privileges, roles] = await Promise.all([
+        catalog.length ? Promise.resolve(catalog) : apiGetArray<Privilege>('/api/admin/privileges'),
+        apiGetArray<RoleRow>('/api/admin/roles'),
+      ]);
+      if (!catalog.length) setCatalog(privileges);
+      setRoleFloor(new Set(roles.filter(r => r.key !== 'super_admin').flatMap(r => r.privileges)));
+    } catch { /* shown when saving; the grid just renders with no locked keys yet */ }
     setMaxTeamId(team.id); setMaxUnlimited(team.maxPrivileges == null); setMaxSelection(new Set(team.maxPrivileges ?? []));
   };
   const saveMax = async (team: Team) => {
     setBusy(true);
     try {
-      await apiSend('PATCH', `/api/admin/teams/${encodeURIComponent(team.id)}`, { maxPrivileges: maxUnlimited ? null : [...maxSelection] });
+      await apiSend('PATCH', `/api/admin/teams/${encodeURIComponent(team.id)}`, { maxPrivileges: maxUnlimited ? null : [...new Set([...maxSelection, ...roleFloor])] });
       showToast(isAr ? 'تم حفظ الحد الأقصى للصلاحيات.' : 'Maximum privileges saved.', 'success');
       setMaxTeamId(null); await load({ silent: true });
     } catch (reason) { showToast(reason instanceof Error ? reason.message : (isAr ? 'تعذر الحفظ.' : 'Could not save.'), 'error'); }
@@ -352,13 +364,13 @@ export default function AdminTeamsPage() {
             {isSuperAdmin && maxTeamId === team.id && (
               <div className="space-y-3 border-t border-[var(--color-border)]/50 pt-3">
                 <p className="text-xs text-[var(--color-text-secondary)] leading-6">
-                  {isAr ? 'الحد الأقصى للصلاحيات: يحصل عليه قائد الفريق ونائبه تلقائيًا، ويستطيعان منح جزء منه للأعضاء. أما الأعضاء فيبقون على الحد الأدنى لدورهم إلى أن يغيّره القائد أو نائبه أو المدير العام. الميزة التي لا تُختار هنا تختفي كليًا من لوحة من لا يملك أيًّا من صلاحياتها.' : 'The maximum privileges: the team’s leader and vice-leader get them automatically and may grant part of them to members. Members stay on their role’s minimum until the leader, vice-leader or a super admin changes it. A feature with no privilege selected disappears completely for anyone who has none of it.'}
+                  {isAr ? 'الحد الأقصى للصلاحيات: يحصل عليه قائد الفريق ونائبه تلقائيًا، ويستطيعان منح جزء منه للأعضاء. أما الأعضاء فيبقون على الحد الأدنى لدورهم إلى أن يغيّره القائد أو نائبه أو المدير العام. الميزة التي لا تُختار هنا تختفي كليًا من لوحة من لا يملك أيًّا من صلاحياتها. الصلاحيات المقفلة (أيقونة 🔒) مضمونة أصلًا لأي دور يملكها كحد أدنى، فلا يمكن إخفاؤها من هنا.' : 'The maximum privileges: the team’s leader and vice-leader get them automatically and may grant part of them to members. Members stay on their role’s minimum until the leader, vice-leader or a super admin changes it. A feature with no privilege selected disappears completely for anyone who has none of it. Locked privileges (🔒) are already guaranteed by some role’s own minimum, so they can’t be hidden here.'}
                 </p>
                 <label className="flex items-center gap-2 text-sm font-bold">
                   <input type="checkbox" checked={maxUnlimited} onChange={e => setMaxUnlimited(e.target.checked)} />
                   {isAr ? 'بدون حد أقصى محدد (القاعدة القديمة: صلاحيات القائد نفسها)' : 'No maximum set (the old rule: the leader’s own privileges)'}
                 </label>
-                {!maxUnlimited && <PrivilegeGrid privileges={catalog} selected={maxSelection} onChange={setMaxSelection} isAr={isAr} />}
+                {!maxUnlimited && <PrivilegeGrid privileges={catalog} selected={maxSelection} onChange={setMaxSelection} isAr={isAr} locked={roleFloor} />}
                 <div className="flex gap-2">
                   <button type="button" disabled={busy} onClick={() => void saveMax(team)} className="cursor-pointer rounded-xl bg-[var(--color-accent)] px-4 py-2 text-sm font-bold text-[var(--color-accent-contrast)] disabled:opacity-50">{isAr ? 'حفظ' : 'Save'}</button>
                   <button type="button" onClick={() => setMaxTeamId(null)} className="cursor-pointer rounded-xl bg-[var(--color-surface-2)] px-4 py-2 text-sm font-bold">{isAr ? 'إغلاق' : 'Close'}</button>

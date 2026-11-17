@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, type ReactNode } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Lock } from 'lucide-react';
 
 export interface Privilege { key: string; feature: string; action: string; labelAr: string; labelEn: string }
 
@@ -64,34 +64,46 @@ export function PrivilegeAccordion({ privileges, isAr, renderItem, countOf, head
   );
 }
 
-/** Pick privileges with checkboxes (roles' minimums, a team's maximum). */
-export function PrivilegeGrid({ privileges, selected, onChange, disabled, isAr }: {
-  privileges: Privilege[]; selected: Set<string>; onChange: (next: Set<string>) => void; disabled?: boolean; isAr: boolean;
+/**
+ * Pick privileges with checkboxes (roles' minimums, a team's maximum).
+ * `locked`: keys that can never be unchecked here (e.g. a team's maximum can't drop below what
+ * every role's own minimum already guarantees -- unchecking it wouldn't actually remove the
+ * privilege from anyone who holds that role, so the grid shouldn't pretend it would). Locked keys
+ * are always shown checked and disabled, and `toggleAll` leaves them untouched either way.
+ */
+export function PrivilegeGrid({ privileges, selected, onChange, disabled, isAr, locked }: {
+  privileges: Privilege[]; selected: Set<string>; onChange: (next: Set<string>) => void; disabled?: boolean; isAr: boolean; locked?: Set<string>;
 }) {
   const toggle = (key: string) => {
+    if (locked?.has(key)) return;
     const next = new Set(selected);
     if (next.has(key)) next.delete(key); else next.add(key);
     onChange(next);
   };
   const toggleAll = (keys: string[], all: boolean) => {
     const next = new Set(selected);
-    for (const key of keys) { if (all) next.delete(key); else next.add(key); }
+    for (const key of keys) { if (locked?.has(key)) continue; if (all) next.delete(key); else next.add(key); }
     onChange(next);
   };
   return (
     <PrivilegeAccordion privileges={privileges} isAr={isAr}
-      countOf={items => items.filter(item => selected.has(item.key)).length}
+      countOf={items => items.filter(item => selected.has(item.key) || locked?.has(item.key)).length}
       headerExtra={items => {
         const keys = items.map(item => item.key);
-        const all = keys.every(key => selected.has(key));
+        const all = keys.every(key => selected.has(key) || locked?.has(key));
         return <input type="checkbox" aria-label={isAr ? 'تحديد كل المجموعة' : 'Select the whole group'} className="h-4 w-4 shrink-0 cursor-pointer" checked={all} disabled={disabled} onChange={() => toggleAll(keys, all)} />;
       }}
-      renderItem={item => (
-        <label className="flex cursor-pointer items-center gap-2 rounded-lg px-1 py-1 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-2)]">
-          <input type="checkbox" checked={selected.has(item.key)} disabled={disabled} onChange={() => toggle(item.key)} />
-          <span className="flex-1">{isAr ? item.labelAr : item.labelEn}</span>
-          <span className="text-[10px] text-[var(--color-text-muted)]">{item.action}</span>
-        </label>
-      )} />
+      renderItem={item => {
+        const isLocked = locked?.has(item.key);
+        return (
+          <label className={`flex items-center gap-2 rounded-lg px-1 py-1 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-2)] ${isLocked ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
+                 title={isLocked ? (isAr ? 'مضمونة لكل من يملك دورًا يتضمنها كحد أدنى -- لا يمكن إخفاؤها من هنا' : 'Guaranteed to anyone whose role already includes it as a minimum -- can’t be hidden here') : undefined}>
+            <input type="checkbox" checked={selected.has(item.key) || !!isLocked} disabled={disabled || isLocked} onChange={() => toggle(item.key)} />
+            <span className="flex-1">{isAr ? item.labelAr : item.labelEn}</span>
+            {isLocked && <Lock size={11} className="shrink-0 text-[var(--color-text-muted)]" />}
+            <span className="text-[10px] text-[var(--color-text-muted)]">{item.action}</span>
+          </label>
+        );
+      }} />
   );
 }
