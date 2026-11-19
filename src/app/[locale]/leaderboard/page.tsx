@@ -6,7 +6,7 @@ import LeaderboardList, { type LeaderboardUser } from './LeaderboardList';
 
 export const dynamic = 'force-dynamic';
 
-type LeaderboardRow = { id: string; arabicFullName?: string; displayName?: string; totalPoints?: number; major?: string };
+type LeaderboardRow = { id: string; arabicFullName?: string; displayName?: string; studentPoints?: number; totalPoints?: number; major?: string };
 
 export default async function LeaderboardPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -18,11 +18,12 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ lo
   if (!response.ok) throw new Error('Unable to load leaderboard');
   const rows = await response.json() as LeaderboardRow[];
   if (!Array.isArray(rows)) throw new Error('Invalid leaderboard response');
-  // The API orders by points DESC, then ID: preserve its deterministic tie order.
-  const topUsers: LeaderboardUser[] = rows.filter(row => (row.totalPoints ?? 0) > 0).map(row => ({
+  // totalPoints is the student balance on older API deployments too; never add adminPoints.
+  const studentPoints = (row: LeaderboardRow) => row.studentPoints ?? row.totalPoints ?? 0;
+  const topUsers: LeaderboardUser[] = rows.filter(row => studentPoints(row) > 0).map(row => ({
     id: row.id,
     name: row.arabicFullName || row.displayName || (isAr ? 'عضو' : 'Member'),
-    points: row.totalPoints ?? 0,
+    points: studentPoints(row),
     department: row.major,
   }));
 
@@ -41,8 +42,8 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ lo
             </h1>
             <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
               {isAr
-                ? 'أعلى 50 عضوًا حسب مجموع نقاط المشاركة. عند تساوي النقاط، يُحافظ على ترتيب ثابت.'
-                : 'Top 50 members by lifetime participation points. Members with equal scores have a consistent order.'}
+                ? 'أعلى 50 عضوًا حسب نقاط المشاركة الطلابية فقط، دون النقاط الإدارية. عند تساوي النقاط، يُحافظ على ترتيب ثابت.'
+                : 'Top 50 members by student participation points only. Administrative points are excluded. Equal scores have a consistent order.'}
             </p>
           </div>
 
