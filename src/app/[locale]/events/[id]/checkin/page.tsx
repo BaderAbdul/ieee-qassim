@@ -16,6 +16,7 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
   const { id: eventId, locale } = use(params);
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
+  const attendanceDate = searchParams.get('day');
   const [feedbackMode, setFeedbackMode] = useState(searchParams.get('feedback') === '1');
   const { user, login, loading: authLoading } = useAuth();
   const { showToast } = useToast();
@@ -42,15 +43,15 @@ export default function SelfCheckinPage({ params }: { params: Promise<{ id: stri
   const attendanceRequest = useRef<{ key: string; promise: Promise<unknown> } | null>(null);
   const ensureAttendance = useCallback(() => {
     if (!token || !user) return Promise.resolve();
-    const key = `${eventId}:${user.uid}:${token}`;
+    const key = `${eventId}:${user.uid}:${token}:${attendanceDate || ''}`;
     if (attendanceRequest.current?.key === key) return attendanceRequest.current.promise;
-    const promise = httpsCallable(null, 'submitCheckIn')({ eventId, token }).then(result => {
+    const promise = httpsCallable(null, 'submitCheckIn')({ eventId, token, ...(attendanceDate ? { attendanceDate } : {}) }).then(result => {
       setFeedbackMode(true);
       return result;
     }).catch(error => { attendanceRequest.current = null; throw error; });
     attendanceRequest.current = { key, promise };
     return promise;
-  }, [eventId, token, user]);
+  }, [eventId, token, attendanceDate, user]);
 
   // Confirmation runs behind the visible, editable rating form.
   useEffect(() => {

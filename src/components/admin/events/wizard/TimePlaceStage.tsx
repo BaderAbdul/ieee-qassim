@@ -72,6 +72,7 @@ export default function TimePlaceStage({ isAr, value, onChange, onSave, saving, 
     // or open-registration event can leave Draft; public UI continues to use the explicit flags.
     const capacity = value.isUnlimitedCapacity ? Math.max(1, value.capacity || 1) : value.capacity;
     return {
+      attendanceMode: value.attendanceMode,
       days: value.days, date: earliest!.toISOString(), durationHours: Math.round(totalHours * 100) / 100,
       locationType: value.locationType,
       location: online ? 'عن بُعد' : value.location.trim(), locationEn: online ? 'Online' : value.locationEn.trim(),
@@ -86,6 +87,19 @@ export default function TimePlaceStage({ isAr, value, onChange, onSave, saving, 
   return (
     <div className="space-y-5">
       {error && <p role="alert" className="rounded-xl p-3 text-sm" style={{ backgroundColor: 'var(--color-danger-soft)', color: 'var(--color-danger)' }}>{error}</p>}
+
+      <fieldset className="space-y-2">
+        <legend className="mb-2 text-sm font-bold text-[var(--color-text-secondary)]">{isAr ? 'تسجيل الحضور' : 'Attendance tracking'}</legend>
+        <div className="grid grid-cols-2 gap-1 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-2)] p-1">
+          {(['daily', 'event'] as const).map(mode => (
+            <label key={mode} className={`relative cursor-pointer rounded-xl px-3 py-3 text-center text-sm font-bold transition-colors ${value.attendanceMode === mode ? 'bg-[var(--color-accent)] text-[var(--color-accent-contrast)] shadow-sm' : 'text-[var(--color-text-secondary)]'}`}>
+              <input type="radio" name="attendanceMode" className="sr-only" value={mode} checked={value.attendanceMode === mode} onChange={() => set('attendanceMode', mode)} />
+              {mode === 'daily' ? (isAr ? 'تسجيل الحضور لكل يوم' : 'Attendance for each day') : (isAr ? 'تسجيل الحضور مرة واحدة للفعالية' : 'Attendance once for the event')}
+            </label>
+          ))}
+        </div>
+        <p className="text-xs leading-5 text-[var(--color-text-muted)]">{isAr ? 'لكل يوم رمز تحضير وسجل مستقل. تُمنح النقاط والشهادة مرة واحدة للفعالية.' : 'Each day has its own QR and attendance record. Points and certificates are awarded once per event.'}</p>
+      </fieldset>
 
       <div className="space-y-3">
         <div className="flex items-center justify-between">

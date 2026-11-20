@@ -35,6 +35,9 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
   const { loading: authLoading } = useAuth();
   
   const [event, setEvent] = useState<PlatformEvent | null>(null);
+  const [attendanceDate, setAttendanceDate] = useState('');
+  const dayPayload = event?.attendanceMode === 'daily' && attendanceDate ? { attendanceDate } : {};
+  const tokenPath = `/api/admin/events/${eventId}/checkin-token${dayPayload.attendanceDate ? `?attendanceDate=${dayPayload.attendanceDate}` : ''}`;
   const [loading, setLoading] = useState(true);
   
   const [activeTab, setActiveTab] = useState<'qr' | 'manual'>('qr');
@@ -62,7 +65,7 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
   // Self Check-in Link
   const baseUrl = publicOrigin();   // student-facing link: never the admin subdomain
   const secondsLeft = tokenExpiry ? Math.max(0, Math.ceil((tokenExpiry - now) / 1000)) : 0;
-  const selfCheckinUrl = event?.checkinToken && secondsLeft > 0 ? `${baseUrl}/${locale}/events/${eventId}/checkin?token=${event.checkinToken}` : '';
+  const selfCheckinUrl = event?.checkinToken && secondsLeft > 0 ? `${baseUrl}/${locale}/events/${eventId}/checkin?token=${event.checkinToken}${dayPayload.attendanceDate ? `&day=${dayPayload.attendanceDate}` : ''}` : '';
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
@@ -81,7 +84,7 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
   // Another operator may have generated the QR first; show theirs instead of leaving this tab blank.
   const reloadLiveToken = async () => {
     try {
-      const live = await apiGet<{ token: string; expiresAt: number; durationMinutes: number } | null>(`/api/admin/events/${eventId}/checkin-token`);
+      const live = await apiGet<{ token: string; expiresAt: number; durationMinutes: number } | null>(tokenPath);
       if (live) {
         setEvent(prev => prev ? { ...prev, checkinToken: live.token } : prev);
         setTokenExpiry(live.expiresAt);
@@ -94,7 +97,7 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
     setIsAdjusting(true);
     try {
       const adjust = httpsCallable<{ eventId: string; minutes: number }, { expiresAt: number }>(null, 'updateCheckInDuration');
-      const { data } = await adjust({ eventId, minutes });
+      const { data } = await adjust({ eventId, minutes, ...dayPayload });
       setTokenExpiry(data.expiresAt);
       setNow(Date.now());
       setMessage(`تم ضبط الرمز ليبقى فعالًا ${minutes >= 60 ? `${Math.round(minutes / 6) / 10} ساعة` : `${minutes} دقيقة`} من الآن.`);
@@ -106,7 +109,7 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
   const handleDeleteToken = async () => {
     setIsAdjusting(true);
     try {
-      await httpsCallable<{ eventId: string }, { deleted: boolean }>(null, 'deleteCheckInToken')({ eventId });
+      await httpsCallable<{ eventId: string; attendanceDate?: string }, { deleted: boolean }>(null, 'deleteCheckInToken')({ eventId, ...dayPayload });
       setEvent(prev => prev ? { ...prev, checkinToken: undefined } : prev);
       setTokenExpiry(null);
       setMessage('تم حذف الرمز. أنشئ رمزًا جديدًا عند الحاجة.');
@@ -120,7 +123,7 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
     setIsGeneratingToken(true);
     try {
       const generate = httpsCallable<{ eventId: string; durationMinutes?: number; replace?: boolean }, { token: string; expiresAt: number; durationMinutes?: number }>(null, 'generateCheckInToken');
-      const { data } = await generate({ eventId, durationMinutes: mins, ...(replace ? { replace: true } : {}) });
+      const { data } = await generate({ eventId, durationMinutes: mins, ...dayPayload, ...(replace ? { replace: true } : {}) });
       setEvent(prev => prev ? { ...prev, checkinToken: data.token } : null);
       setTokenExpiry(data.expiresAt);
       setNow(Date.now());
@@ -157,6 +160,10 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
       try {
         const eventData = await apiGet<PlatformEvent>(`/api/admin/events/${eventId}`);
         setEvent(eventData);
+        const dates = [...new Set((eventData.days || []).map(day => day.date))].sort();
+        if (!dates.length && eventData.date) dates.push(new Date(eventData.date).toLocaleDateString('en-CA', { timeZone: 'Asia/Riyadh' }));
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Riyadh' });
+        setAttendanceDate(dates.find(day => day >= today) || dates[dates.length - 1] || '');
       } catch (error) {
         console.error("Error fetching event", error);
       } finally {
@@ -173,11 +180,15 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
   // invalidating the first admin's QR code. Checked once on load only; `handleGenerateToken`
   // already updates this same state directly when a new token is created, so no polling is needed.
   useEffect(() => {
+    if (!event || (event.attendanceMode === 'daily' && !attendanceDate)) return;
+    let active = true;
+    setEvent(prev => prev ? { ...prev, checkinToken: undefined } : prev);
+    setTokenExpiry(null);
     const fetchLiveToken = async () => {
       try {
         const live = await apiGet<{ token: string; expiresAt: number; durationMinutes: number } | null>(
-          `/api/admin/events/${eventId}/checkin-token`);
-        if (live) {
+          tokenPath);
+        if (active && live) {
           setEvent(prev => prev ? { ...prev, checkinToken: live.token } : prev);
           setTokenExpiry(live.expiresAt);
           setNow(Date.now());
@@ -188,7 +199,8 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
     };
 
     fetchLiveToken();
-  }, [eventId]);
+    return () => { active = false; };
+  }, [eventId, event?.attendanceMode, attendanceDate, tokenPath]);
 
   const executeCheckIn = async (userIdToSubmit: string) => {
     if (submitting.current) return;
@@ -202,6 +214,7 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
       const response = await submitCheckInFn({
         eventId,
         targetUserId: userIdToSubmit,
+        ...dayPayload,
       });
       
       const result = response.data as CheckInResult;
@@ -267,6 +280,21 @@ export default function CheckinDeskPage({ params }: { params: Promise<{ id: stri
           الحالة: {event.state}
         </div>
       </div>
+
+      {event.attendanceMode === 'daily' && (
+        <div className="mb-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+          <label className="flex flex-wrap items-center gap-3 text-sm font-bold">
+            <span>{locale === 'ar' ? 'يوم التحضير' : 'Attendance day'}</span>
+            <select aria-label={locale === 'ar' ? 'يوم التحضير' : 'Attendance day'} value={attendanceDate}
+              disabled={isSubmitting || isGeneratingToken || isAdjusting}
+              onChange={e => { setAttendanceDate(e.target.value); setMessage(''); setScanResult({ status: null, message: '' }); }}
+              className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2">
+              {(event.days?.length ? [...new Set(event.days.map(day => day.date))].sort() : [attendanceDate]).map(day => <option key={day} value={day}>{day}</option>)}
+            </select>
+          </label>
+          <p className="mt-2 text-xs text-[var(--color-text-secondary)]">{locale === 'ar' ? 'رمز وسجل حضور مستقل لكل يوم. التحضير الذاتي يعمل في التاريخ المحدد بتوقيت الرياض، والنقاط تُمنح مرة واحدة.' : 'Each day has its own QR and attendance record. Self-check-in is valid on that date in Riyadh time. Points are awarded once.'}</p>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-8">

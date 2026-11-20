@@ -36,6 +36,7 @@ export interface MainDataFields {
 }
 
 export interface TimePlaceFields {
+  attendanceMode: 'daily' | 'event';
   days: EventDay[];
   locationType: EventLocationType;
   location: string;

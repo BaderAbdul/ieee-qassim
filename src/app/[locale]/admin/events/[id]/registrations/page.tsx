@@ -28,6 +28,7 @@ interface RegistrationData {
   isWalkIn?: boolean;
   timestamp: string | Date | null;
   attendedAt?: string | Date | null;
+  attendanceDates?: string[];
   registeredAt?: string | Date | null;
   recommendations?: Recommendation[];
 }
@@ -551,6 +552,7 @@ export default function RegistrationDeskPage({ params }: { params: Promise<{ id:
                                        onChange={next => setRegistrations(previous => previous.map(item => item.id === reg.id ? { ...item, recommendations: next } : item))} />
                       </div>
                       <div className="text-sm text-gray-500">{reg.userEmail}</div>
+                      {!!reg.attendanceDates?.length && <div className="mt-1 text-xs text-[var(--color-accent)]">{isArabic ? 'أيام الحضور: ' : 'Attendance days: '}{reg.attendanceDates.join('، ')}</div>}
                       {reg.universityId && <div className="text-xs text-slate-400 font-mono mt-0.5">{reg.universityId}</div>}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">

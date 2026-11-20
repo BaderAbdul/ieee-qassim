@@ -28,7 +28,7 @@ import { useToast } from '@/context/ToastContext';
 import { LEGACY_STAGE, STAGES, type Collect, type DesignFields, type InterviewerFields, type MainDataFields, type ReviewFields, type SecurityFields, type SettingsFields, type ShareFields, type SponsorsFields, type StageId, type TimePlaceFields } from '@/components/admin/events/wizard/wizardTypes';
 
 const emptyMainData: MainDataFields = { title: '', titleEn: '', description: '', descriptionEn: '', type: 'Workshop', gains: '', gainsEn: '' };
-const emptyTimePlace: TimePlaceFields = { days: [], locationType: 'in_person', location: '', locationEn: '', capacity: 50, isUnlimitedCapacity: false, hideExactCapacity: false, gender: 'both' };
+const emptyTimePlace: TimePlaceFields = { attendanceMode: 'daily', days: [], locationType: 'in_person', location: '', locationEn: '', capacity: 50, isUnlimitedCapacity: false, hideExactCapacity: false, gender: 'both' };
 const emptySecurity: SecurityFields = { securityFormAcknowledged: false };
 const emptyInterviewer: InterviewerFields = { organizers: [], interviewer: '', interviewerEn: '', interviewerEmail: '', speakers: [] };
 const emptyDesign: DesignFields = { coverUrl: '' };
@@ -103,6 +103,7 @@ export default function CreateEventPage() {
           type: event.type, gains: (event.gains || []).join('\n'), gainsEn: (event.gainsEn || []).join('\n'),
         });
         setTimePlace({
+          attendanceMode: event.attendanceMode || 'event',
           days: event.days || [], locationType: event.locationType || 'in_person', location: event.location, locationEn: event.locationEn,
           capacity: event.capacity, isUnlimitedCapacity: !!event.isUnlimitedCapacity, hideExactCapacity: !!event.hideExactCapacity,
           gender: event.gender || 'both',

@@ -68,6 +68,7 @@ export interface PlatformEvent {
   feedbackQuestions?: CustomQuestion[];
   isPinned?: boolean;
   days?: EventDay[]; // multi-day schedule from the creation wizard's "time & place" stage
+  attendanceMode?: 'daily' | 'event';
   gender?: EventGender;
   interviewer?: string;
   interviewerEn?: string;
