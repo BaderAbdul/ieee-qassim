@@ -61,7 +61,8 @@ export default function CreateEventPage() {
   const { userData } = useAuth();
   const { showToast } = useToast();
   const searchParams = useSearchParams();
-  const resumeParam = searchParams.get('eventId');
+  // Accept older delivered push links too; never open a blank event for an existing-event alert.
+  const resumeParam = searchParams.get('eventId') ?? searchParams.get('id');
   const resumeId = resumeParam && /^\d+$/.test(resumeParam) ? Number(resumeParam) : null;
   const rawStageParam = searchParams.get('stage');
   // Old links still say time / security / share / review / report: those stages are now sections of the merged ones.
