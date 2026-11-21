@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { useAuth } from '@/context/AuthContext';
 import { Link } from '@/i18n/routing';
-import { Bell, Search, CircleUserRound, ChevronDown } from 'lucide-react';
+import { Bell, Search, CircleUserRound, ChevronDown, LogOut } from 'lucide-react';
 import { useAdminQuery } from '@/components/admin/AdminData';
 import type { AdminOverview } from '@/lib/adminTypes';
 import AdminSearchModal from '@/components/admin/AdminSearchModal';
@@ -25,7 +25,7 @@ function useClickOutside(onOutside: () => void) {
 export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
   const locale = useLocale();
   const isAr = locale === 'ar';
-  const { user, userData } = useAuth();
+  const { user, userData, logout } = useAuth();
   const { data } = useAdminQuery<AdminOverview>('getAdminOverview');
   const pageActions = useAdminTopbarActionsSlot();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -104,6 +104,14 @@ export default function AdminTopbar({ pageTitle }: { pageTitle?: string }) {
           <CircleUserRound size={16} />
           {isAr ? 'ملفي الشخصي' : 'My profile'}
         </Link>
+        <button
+          type="button"
+          onClick={() => { onClose(); void logout(); }}
+          className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-start text-sm font-medium text-[var(--color-danger)] transition-colors hover:bg-[var(--color-danger-soft)] focus-visible:outline-2 focus-visible:outline-[var(--color-danger)]"
+        >
+          <LogOut size={16} />
+          {isAr ? 'تسجيل الخروج' : 'Sign out'}
+        </button>
       </div>
     </div>
   );
