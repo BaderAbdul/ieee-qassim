@@ -1,6 +1,9 @@
 import { EMAIL_VARIABLE_GROUPS, variableToken } from './emailTemplates';
 
-export const KNOWN_VARIABLES = new Set(EMAIL_VARIABLE_GROUPS.flatMap(group => group.variables.map(variable => variable.source)));
+export const KNOWN_VARIABLES = new Set([
+  ...EMAIL_VARIABLE_GROUPS.flatMap(group => group.variables.map(variable => variable.source)),
+  'event.ar.organizers', 'event.en.organizers', // Saved templates remain compatible.
+]);
 const TOKEN_RE = /\{\{\s*([a-zA-Z][a-zA-Z0-9_.]*)\s*\}\}/g;
 
 /** Same escaping the builder applies to every value it prints, so literal values can be found in its HTML. */

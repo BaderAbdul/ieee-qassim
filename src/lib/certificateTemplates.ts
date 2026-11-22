@@ -9,8 +9,7 @@ export const fieldGroups: { id: string; ar: string; en: string; fields: { source
     { source: 'event.speakers', ar: 'المتحدثون (إنجليزي)', en: 'Speakers (English)' }, { source: 'event.speakers.ar', ar: 'المتحدثون (عربي)', en: 'Speakers (Arabic)' },
     { source: 'event.speaker', ar: 'المتحدث الأول (إنجليزي)', en: 'First speaker (English)' }, { source: 'event.speaker.ar', ar: 'المتحدث الأول (عربي)', en: 'First speaker (Arabic)' },
     { source: 'event.interviewer', ar: 'المحاور (إنجليزي)', en: 'Interviewer (English)' }, { source: 'event.interviewer.ar', ar: 'المحاور (عربي)', en: 'Interviewer (Arabic)' },
-    { source: 'event.organizers', ar: 'المنظمون (إنجليزي)', en: 'Organizers (English)' }, { source: 'event.organizers.ar', ar: 'المنظمون (عربي)', en: 'Organizers (Arabic)' },
-    { source: 'event.organizer', ar: 'المنظم الأول (إنجليزي)', en: 'First organizer (English)' }, { source: 'event.organizer.ar', ar: 'المنظم الأول (عربي)', en: 'First organizer (Arabic)' },
+    { source: 'event.organizer', ar: 'اسم المنظم (إنجليزي)', en: 'Organizer name (English)' }, { source: 'event.organizer.ar', ar: 'اسم المنظم (عربي)', en: 'Organizer name (Arabic)' },
   ] },
   { id: 'partner', ar: 'الراعي', en: 'Partner', fields: [{ source: 'partner.name', ar: 'الاسم', en: 'Name' }] },
   { id: 'others', ar: 'أخرى', en: 'Others', fields: [
@@ -19,7 +18,7 @@ export const fieldGroups: { id: string; ar: string; en: string; fields: { source
   ] },
 ];
 // Gender remains a condition/test context and is supported in older saved templates.
-export const sources: Source[] = ['student.name', 'student.name.ar', 'student.name.en', 'student.gender', 'event.name', 'event.date', 'event.vtoolsUUID', 'event.speakers', 'event.speakers.ar', 'event.speaker', 'event.speaker.ar', 'event.interviewer', 'event.interviewer.ar', 'event.organizers', 'event.organizers.ar', 'event.organizer', 'event.organizer.ar', 'partner.name', 'certificate.UUID'];
+export const sources: Source[] = ['student.name', 'student.name.ar', 'student.name.en', 'student.gender', 'event.name', 'event.date', 'event.vtoolsUUID', 'event.speakers', 'event.speakers.ar', 'event.speaker', 'event.speaker.ar', 'event.interviewer', 'event.interviewer.ar', 'event.organizer', 'event.organizer.ar', 'partner.name', 'certificate.UUID'];
 export interface TemplateField {
   id: string; label: string; source: Source; x: number; y: number; fontSize: number;
   align: 'left' | 'center' | 'right'; color: string; bold: boolean;
@@ -41,11 +40,14 @@ export function fieldText(field: TemplateField, values: Record<string, string>) 
   return sourceValue(field.source, values);
 }
 function sourceValue(source: Source, values: Record<string, string>) {
+  if (source === 'event.organizers' || source === 'event.organizers.ar') {
+    return values[source === 'event.organizers' ? 'event.organizer' : 'event.organizer.ar'] || values[source] || '';
+  }
   return source === 'event.name' || source === 'event.title' ? values['event.name'] || values['event.title'] || '' : values[source] || '';
 }
 export function testSources(fields: TemplateField[]): Source[] {
   const used = new Set<Source | undefined>(fields.map(field => field.source === 'conditional' ? field.conditionSource : field.source)
-    .map(source => source === 'certificate.QR' ? 'certificate.UUID' : source === 'event.title' ? 'event.name' : source));
+    .map(source => source === 'certificate.QR' ? 'certificate.UUID' : source === 'event.title' ? 'event.name' : source === 'event.organizers' ? 'event.organizer' : source === 'event.organizers.ar' ? 'event.organizer.ar' : source));
   return sources.filter(source => used.has(source));
 }
 export function qrGeometry(field: TemplateField) {

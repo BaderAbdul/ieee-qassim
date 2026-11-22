@@ -115,7 +115,6 @@ export default function CertificatesManagementPage() {
         ]);
         if (!active) return;
         setEvent(eventData);
-        setTemplateId(prev => prev || eventData.certificateTemplateId || '');
 
         const certsByUserId: Record<string, Certificate> = {};
         certs.forEach(c => { certsByUserId[c.userId] = c; });

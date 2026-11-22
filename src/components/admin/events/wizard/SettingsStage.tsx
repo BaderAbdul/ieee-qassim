@@ -4,11 +4,8 @@ import { useEffect, useState } from 'react';
 import { Paperclip, Save, Trash2 } from 'lucide-react';
 import { apiGet, apiSend } from '@/lib/backend';
 import { useToast } from '@/context/ToastContext';
-import TemplatePreview from './TemplatePreview';
 import { input, label, primaryButton, type SettingsFields, type StageEmbedProps } from './wizardTypes';
 
-interface CertTemplate { id: string; nameAr: string }
-interface MailTemplate { id: string; name: string; subject: string }
 interface EventAttachment { id: string; title: string; filename: string; contentType: string }
 
 interface SettingsStageProps extends StageEmbedProps {
@@ -28,32 +25,9 @@ export default function SettingsStage({ isAr, value, onChange, onSave, saving, e
   const t = (ar: string, en: string) => isAr ? ar : en;
   const { showToast } = useToast();
   const [highlight, setHighlight] = useState(highlightField);
-  const [templates, setTemplates] = useState<CertTemplate[]>([]);
-  const [templatesError, setTemplatesError] = useState('');
-  const [mailTemplates, setMailTemplates] = useState<MailTemplate[]>([]);
-  const [mailTemplatesError, setMailTemplatesError] = useState('');
   const [eventAttachments, setEventAttachments] = useState<EventAttachment[]>([]);
   const [attachBusy, setAttachBusy] = useState(false);
   const [attachTitle, setAttachTitle] = useState('');
-
-  useEffect(() => {
-    if (!value.hasCertificate) return;
-    let active = true;
-    apiGet<{ templates: CertTemplate[] }>('/api/admin/templates', { scope: 'approved' })
-      .then(result => { if (active) setTemplates(result.templates); })
-      .catch(error => { if (active) setTemplatesError(error instanceof Error ? error.message : (isAr ? 'تعذر تحميل قوالب الشهادات.' : 'Could not load certificate templates.')); });
-    return () => { active = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value.hasCertificate]);
-
-  useEffect(() => {
-    let active = true;
-    apiGet<{ templates: MailTemplate[] }>('/api/admin/mail/templates', { scope: 'approved' })
-      .then(result => { if (active) setMailTemplates(result.templates); })
-      .catch(error => { if (active) setMailTemplatesError(error instanceof Error ? error.message : (isAr ? 'تعذر تحميل قوالب البريد.' : 'Could not load email templates.')); });
-    return () => { active = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const loadEventAttachments = () => {
     if (!eventId) return;
@@ -100,8 +74,6 @@ export default function SettingsStage({ isAr, value, onChange, onSave, saving, e
     registrationMode: value.registrationMode,
     vtoolsUuid: value.vtoolsUuid.trim(),
     hasCertificate: value.hasCertificate,
-    certificateTemplateId: value.hasCertificate && value.certificateTemplateId ? value.certificateTemplateId : null,
-    emailTemplateId: value.emailTemplateId || null,
     };
   };
   const save = async () => { const fields = collect(); if (fields) await onSave(fields); };
@@ -156,32 +128,10 @@ export default function SettingsStage({ isAr, value, onChange, onSave, saving, e
           <input type="checkbox" checked={value.hasCertificate} onChange={e => set('hasCertificate', e.target.checked)} />
           {isAr ? 'تصدر هذه الفعالية شهادات حضور' : 'This event issues certificates'}
         </label>
-        {value.hasCertificate && (
-          <label className={label}><span>{isAr ? 'قالب الشهادة' : 'Certificate template'}</span>
-            <select className={`${input} ${highlight === 'certificateTemplateId' ? invalidClass : ''}`} value={value.certificateTemplateId}
-                    onChange={e => set('certificateTemplateId', e.target.value)}>
-              <option value="">{isAr ? 'التصميم الافتراضي' : 'Default design'}</option>
-              {templates.map(t => <option key={t.id} value={t.id}>{t.nameAr}</option>)}
-            </select>
-          </label>
-        )}
-        {value.hasCertificate && <TemplatePreview isAr={isAr} kind="certificate" templateId={value.certificateTemplateId} eventId={eventId} />}
-        {templatesError && <p role="alert" className="text-xs" style={{ color: 'var(--color-danger)' }}>{templatesError}</p>}
+        <p className="text-xs text-[var(--color-text-muted)]">{t('تُستخدم القوالب المحددة لكل مستلم في الإعدادات ← ربط الرسائل والمستلمين. يُحدد تصميم الشهادة من مرفق قالب البريد أو التصميم الافتراضي في الإعدادات.', 'Uses the recipient templates configured in Settings → Email routing. Certificate designs come from the mapped email attachments or the default certificate in Settings.')}</p>
       </div>
 
       <div className="space-y-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] p-4">
-        <label className={label}><span>{isAr ? 'قالب البريد الإلكتروني' : 'Email template'}</span>
-          <select className={input} value={value.emailTemplateId} onChange={e => set('emailTemplateId', e.target.value)}>
-            <option value="">{isAr ? 'بلا قالب' : 'No template'}</option>
-            {mailTemplates.map(m => <option key={m.id} value={m.id}>{m.name || m.subject || m.id}</option>)}
-          </select>
-        </label>
-        {!value.emailTemplateId && (
-          <p className="text-xs text-[var(--color-text-muted)]">{isAr ? 'اختياري: يمكن أن تكون الفعالية بلا بريد إلكتروني.' : 'Optional: an event can go without any email.'}</p>
-        )}
-        {value.emailTemplateId && <TemplatePreview isAr={isAr} kind="email" templateId={value.emailTemplateId} eventId={eventId} />}
-        {mailTemplatesError && <p role="alert" className="text-xs" style={{ color: 'var(--color-danger)' }}>{mailTemplatesError}</p>}
-        {value.emailTemplateId && (
           <div className="space-y-2 border-t border-[var(--color-border)] pt-3">
             <p className="flex items-center gap-2 text-sm font-bold text-[var(--color-text-secondary)]"><Paperclip size={15} />{isAr ? 'مرفقات خاصة بهذه الفعالية' : 'Attachments specific to this event'}</p>
             <p className="text-xs text-[var(--color-text-muted)]">{isAr ? 'تُضاف إلى مرفقات القالب نفسه عند إرسال بريد هذه الفعالية.' : 'Added on top of the template’s own attachments when sending this event’s email.'}</p>
@@ -197,7 +147,6 @@ export default function SettingsStage({ isAr, value, onChange, onSave, saving, e
               <input type="file" disabled={attachBusy} onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void addEventAttachment(file); }} />
             </>}
           </div>
-        )}
       </div>
 
       {!hideSave && <div className="flex justify-end">
