@@ -34,11 +34,18 @@ export const EMAIL_VARIABLE_GROUPS: { id: string; ar: string; en: string; variab
     { source: 'event.en.interviewer', ar: 'مقدّم الحوار (إنجليزي)', en: 'Interviewer (English)' },
     { source: 'event.ar.speakers', ar: 'المتحدثون (عربي)', en: 'Speakers (Arabic)' },
     { source: 'event.en.speakers', ar: 'المتحدثون (إنجليزي)', en: 'Speakers (English)' },
+    { source: 'event.ar.speaker', ar: 'المتحدث الأول (عربي)', en: 'First speaker (Arabic)' },
+    { source: 'event.en.speaker', ar: 'المتحدث الأول (إنجليزي)', en: 'First speaker (English)' },
     { source: 'event.ar.organizers', ar: 'المنظمون (عربي)', en: 'Organizers (Arabic)' },
     { source: 'event.en.organizers', ar: 'المنظمون (إنجليزي)', en: 'Organizers (English)' },
     { source: 'event.ar.organizer', ar: 'المنظم الأول (عربي)', en: 'First organizer (Arabic)' },
     { source: 'event.en.organizer', ar: 'المنظم الأول (إنجليزي)', en: 'First organizer (English)' },
     { source: 'event.url', ar: 'رابط صفحة الفعالية', en: 'Event page link' },
+    { source: 'event.joinUrl', ar: 'رابط الاجتماع (للتذكير)', en: 'Meeting URL (reminders)' },
+  ] },
+  { id: 'recipient', ar: 'المستلم (طالب / منظم / متحدث / محاور)', en: 'Recipient (student / organizer / speaker / interviewer)', variables: [
+    { source: 'recipient.ar.name', ar: 'اسم المستلم (عربي)', en: 'Recipient name (Arabic)' },
+    { source: 'recipient.en.name', ar: 'اسم المستلم (إنجليزي)', en: 'Recipient name (English)' },
   ] },
   { id: 'student', ar: 'الطالب', en: 'Student', variables: [
     { source: 'student.name', ar: 'الاسم الكامل', en: 'Full name' },

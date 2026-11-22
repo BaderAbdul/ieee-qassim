@@ -15,6 +15,7 @@ import EmailSettings from '@/components/admin/EmailSettings';
 import OnboardingSettings from '@/components/admin/onboarding/OnboardingSettings';
 import EventAutomationSettings from '@/components/admin/EventAutomationSettings';
 import MessagesComposer from '@/components/admin/messages/MessagesComposer';
+import EventCommunicationSettings from '@/components/admin/EventCommunicationSettings';
 
 export default function AdminSettingsPage() {
   const isAr = useLocale() === 'ar';
@@ -22,8 +23,10 @@ export default function AdminSettingsPage() {
   const isSuperAdmin = userData?.isSuperAdmin === true || userData?.role === 'super_admin';
   const canEditContent = hasPrivilege(userData, 'content.update');
   const canEditAcademicCalendar = hasPrivilege(userData, 'academic_calendar.update');
+  if (!hasPrivilege(userData, 'settings.read')) return <AdminError message={isAr ? 'لا تملك صلاحية الوصول إلى صفحة الإعدادات.' : 'You cannot access settings.'} />;
 
   const tabs: AdminTab[] = [
+    ...(isSuperAdmin || canEditContent || userData?.canManageEmail ? [{ key: 'communications', label: isAr ? 'ربط الرسائل والمستلمين' : 'Email routing', content: <EventCommunicationSettings /> }] : []),
     ...(isSuperAdmin || userData?.canManageEmail ? [{ key: 'email-sender', label: isAr ? 'البريد المرسل' : 'Email sender', content: <EmailSettings /> }] : []),
     ...(isSuperAdmin || canEditContent ? [{ key: 'event-automation', label: isAr ? 'أتمتة الفعاليات' : 'Event automation', content: <EventAutomationSettings /> }] : []),
     ...(isSuperAdmin ? [{ key: 'messages', label: isAr ? 'رسائل الإدارة' : 'Staff messages', content: <MessagesComposer /> }] : []),

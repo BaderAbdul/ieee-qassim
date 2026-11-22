@@ -6,6 +6,7 @@ import { ChevronDown, Lock } from 'lucide-react';
 export interface Privilege { key: string; feature: string; action: string; labelAr: string; labelEn: string }
 
 const FEATURES: Record<string, [string, string]> = {
+  settings: ['الوصول إلى الإعدادات', 'Settings access'],
   events: ['الفعاليات', 'Events'], event_status: ['حالة الفعالية', 'Event status'], registrations: ['التسجيلات', 'Registrations'],
   attendance: ['الحضور', 'Attendance'], certificates: ['الشهادات', 'Certificates'], certificate_templates: ['قوالب الشهادات', 'Certificate templates'],
   email_templates: ['قوالب البريد', 'E-mail templates'], mail: ['البريد', 'Mail'], feedback: ['التقييمات', 'Feedback'],

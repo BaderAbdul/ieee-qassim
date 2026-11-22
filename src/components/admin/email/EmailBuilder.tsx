@@ -111,6 +111,9 @@ export default function EmailBuilder({ state, onChange }: { state: BuilderState;
             {toggle('details', 'تفاصيل التاريخ والوقت والمكان')}{toggle('agendaVisible', 'برنامج الفعالية')}{toggle('speakerVisible', 'المتحدث')}
             {toggle('extraVisible', 'متطلب / تسجيل إضافي')}{toggle('noticeVisible', 'تنبيه بارز')}{toggle('mapVisible', 'زر الموقع')}
             {toggle('joinVisible', 'زر الانضمام عن بُعد')}{toggle('registrationVisible', 'زر التسجيل')}{toggle('certificateVisible', 'زر الشهادة')}
+            {p.joinVisible && <div className="space-y-2 rounded-xl border border-[var(--color-accent)] p-3">{text('joinUrl', 'رابط الاجتماع / Meet URL', 'url')}
+              {!/^https:\/\/[^\s]+$/.test(p.joinUrl) && <p role="alert" className="text-xs text-[var(--color-danger)]">أدخل رابط الاجتماع الصحيح (HTTPS) ليظهر زر الانضمام.</p>}
+            </div>}
             {toggle('feedbackVisible', 'زر التقييم')}{toggle('customVisible', 'زر مخصص')}{toggle('footerVisible', 'التذييل الرسمي')}
             <h3 className="pt-2 text-sm font-black">الأقسام المخصصة</h3>
             <button type="button" className={ghost} onClick={() => onChange({ ...state, blocks: [...state.blocks, { title: '', body: '' }] })}><Plus size={14} />إضافة قسم</button>

@@ -72,7 +72,7 @@ export default function InterviewerStage({ isAr, value, eventId, inPerson = true
   /** Mails the event's e-mail and certificate to every guest with an address, once each. Works on the saved data. */
   const sendNow = async () => {
     if (!eventId || sending) return;
-    if (!window.confirm(isAr ? 'سيُرسل بريد الفعالية وشهادتها الآن إلى المحاور والمتحدثين الذين أُدخلت بريداتهم (ولن يُكرَّر الإرسال لمن أُرسل له). المتابعة؟' : 'This sends the event’s e-mail and certificate now to every interviewer/speaker with an address (nobody is mailed twice). Continue?')) return;
+    if (!window.confirm(isAr ? 'سيُضاف بريد المحاور والمتحدثين والمنظمين المرتبطين بقالب إلى قائمة الإرسال، دون تكرار من أُرسل له. المتابعة؟' : 'Queue mail for interviewers, speakers and organizers with a mapped template, once per recipient and role. Continue?')) return;
     setSending(true); setSendResult('');
     try {
       const { data } = await httpsCallable<{ eventId: number }, { queuedCount: number; alreadySentCount: number }>(null, 'sendEventGuestEmails')({ eventId });
@@ -89,6 +89,7 @@ export default function InterviewerStage({ isAr, value, eventId, inPerson = true
 
   return (
     <div className="space-y-5">
+      <p className="rounded-xl bg-[var(--color-accent-soft)] px-4 py-3 text-xs text-[var(--color-text-secondary)]">{isAr ? 'لا تنسى اضافة اللقب مثال: م. او المهندس' : 'Remember to include the title, for example: Eng. or Engineer.'}</p>
       <p className="text-sm text-[var(--color-text-muted)]">
         {isAr ? 'لإظهار الفعالية للعامة لا بد من محاور أو متحدث واحد على الأقل.' : 'At least one interviewer or speaker is required before the event can be shown publicly.'}
       </p>
@@ -134,7 +135,7 @@ export default function InterviewerStage({ isAr, value, eventId, inPerson = true
               {isAr ? 'إرسال البريد والشهادة الآن' : 'Send e-mail & certificate now'}
             </button>
           ) : <p className="text-xs text-[var(--color-text-muted)]">{isAr ? 'احفظ الفعالية أولًا لتتمكن من الإرسال.' : 'Save the event first to be able to send.'}</p>}
-          {eventId ? <p className="text-[11px] text-[var(--color-text-muted)]">{isAr ? 'يعمل الإرسال على البيانات المحفوظة؛ احفظ التعديلات قبل الضغط. يتطلب قالب بريد أو شهادة من «الإعدادات».' : 'Sending uses the saved data — save your edits first. Needs an e-mail or certificate template chosen in “Settings”.'}</p> : null}
+          {eventId ? <p className="text-[11px] text-[var(--color-text-muted)]">{isAr ? 'يعمل الإرسال على البيانات المحفوظة؛ احفظ قبل الإرسال. اختر قوالب المستلمين من الإعدادات ← ربط الرسائل والمستلمين.' : 'Sending uses saved data. Choose recipient templates under Settings → Email routing.'}</p> : null}
           {sendResult && <p role="status" className="text-xs font-bold text-emerald-600">{sendResult}</p>}
         </div>
       </div>

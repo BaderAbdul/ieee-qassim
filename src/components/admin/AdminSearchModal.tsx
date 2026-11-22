@@ -7,7 +7,7 @@ import { useRouter } from '@/i18n/routing';
 import { X, Search, Calendar, Activity } from 'lucide-react';
 import { httpsCallable } from '@/lib/backend';
 import type { AdminEventsPage } from '@/lib/adminTypes';
-import { useAdminNav, operationsShortcuts } from '@/components/admin/useAdminNav';
+import { useAdminNav, operationsShortcuts, canOpenAdminPath } from '@/components/admin/useAdminNav';
 
 export default function AdminSearchModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const locale = useLocale();
@@ -55,8 +55,8 @@ export default function AdminSearchModal({ open, onClose }: { open: boolean; onC
     [events, matches]
   );
   const opsResults = useMemo(
-    () => operationsShortcuts(isAr).filter(item => matches(item.name)),
-    [isAr, matches]
+    () => operationsShortcuts(isAr).filter(item => canOpenAdminPath(`/ar${item.href}`, userData) && matches(item.name)),
+    [isAr, matches, userData]
   );
 
   if (!open) return null;

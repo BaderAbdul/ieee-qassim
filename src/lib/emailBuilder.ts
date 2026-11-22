@@ -111,6 +111,7 @@ export function builderSamples(p: BuilderParams) {
 export function builderWarnings(p: BuilderParams): string[] {
   const warnings: string[] = [];
   if (!p.event.trim()) warnings.push('اسم الفعالية مفقود');
+  if (p.joinVisible && !/^https:\/\/[^\s]+$/.test(p.joinUrl)) warnings.push('أدخل رابط الاجتماع HTTPS عند تفعيل رابط الانضمام');
   if (p.mapVisible && p.attendance === 'inperson' && !safeUrl(p.mapUrl)) warnings.push('تم تفعيل زر الخريطة دون رابط صالح');
   if (p.extraVisible && p.extraUrl && !safeUrl(p.extraUrl)) warnings.push('رابط التسجيل الإضافي غير صالح');
   return warnings;

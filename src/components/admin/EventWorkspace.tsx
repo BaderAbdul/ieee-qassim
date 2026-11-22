@@ -10,6 +10,7 @@ import { Link } from '@/i18n/routing';
 import { ArrowRight, ExternalLink, Users, CheckCircle2 } from 'lucide-react';
 import type { PlatformEvent, EventState } from '@/lib/types';
 import { AdminError, AdminLoading } from './AdminData';
+import EventReminderButton from './EventReminderButton';
 
 const EventContext = createContext<PlatformEvent | null>(null);
 export const useAdminEvent = () => useContext(EventContext);
@@ -112,6 +113,7 @@ export default function EventWorkspace({ children }: { children: React.ReactNode
                 <ExternalLink size={15} />
                 {isAr ? 'عرض صفحة الطالب' : 'View student page'}
               </a>
+              <EventReminderButton eventId={event.id} />
             </div>
           </div>
 

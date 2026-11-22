@@ -29,7 +29,7 @@ export function useAdminNav(userData: UserData | null, isAr: boolean) {
         ...(userData.canManageEmail ? [{ name: isAr ? 'البريد' : 'Mail', href: '/admin/mail', icon: Mail }] : []),
       ],
       footerItems: [
-        ...(userData.canManageEmail ? [{ name: isAr ? 'الإعدادات' : 'Settings', href: '/admin/settings', icon: Settings }] : []),
+        ...(hasPrivilege(userData, 'settings.read') ? [{ name: isAr ? 'الإعدادات' : 'Settings', href: '/admin/settings', icon: Settings }] : []),
       ],
       isSuperAdmin, canEditContent, canViewMembers,
     };
@@ -45,7 +45,7 @@ export function useAdminNav(userData: UserData | null, isAr: boolean) {
   ];
 
   const footerItems: AdminNavItem[] = [
-    ...(isSuperAdmin || canEditContent || hasPrivilege(userData, 'academic_calendar.update') || userData?.canManageEmail ? [{ name: isAr ? 'الإعدادات' : 'Settings', href: '/admin/settings', icon: Settings }] : []),
+    ...(hasPrivilege(userData, 'settings.read') ? [{ name: isAr ? 'الإعدادات' : 'Settings', href: '/admin/settings', icon: Settings }] : []),
   ];
 
   return { navItems, footerItems, isSuperAdmin, canEditContent, canViewMembers };
@@ -76,7 +76,7 @@ export function canOpenAdminPath(pathname: string, userData: UserData | null): b
     case 'templates': return hasAnyPrivilegeOf(userData, 'email_templates', 'certificate_templates') || userData.canReviewTemplates === true;
     case 'mail': return userData.canManageEmail === true || hasAnyPrivilege(userData, 'mail');
     case 'operations': return hasAnyPrivilegeOf(userData, 'operations', 'projects', 'tasks', 'cross_team_requests', 'goals', 'ideas');
-    case 'settings': return hasPrivilege(userData, 'content.update') || hasPrivilege(userData, 'academic_calendar.update') || userData.canManageEmail === true;
+    case 'settings': return hasPrivilege(userData, 'settings.read');
     case 'roles': case 'badges': case 'audit': case 'maintenance': case 'event-process-teams': return false;
     default: return true;
   }
