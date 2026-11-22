@@ -100,10 +100,6 @@ export default function AdminEventSummaryPage() {
         </button>
       </div>
 
-      <p className="rounded-xl border border-[var(--color-accent)]/20 bg-[var(--color-accent-soft)] p-4 text-sm text-[var(--color-text-secondary)]">
-        {isAr ? 'قبل بدء الفعالية: راجع التسجيلات المقبولة، افتح مكتب التحضير واختبر الكاميرا. بعد الانتهاء: راجع الحضور والنقاط ثم أصدر الشهادات.' : 'Before starting: review approved registrations, open the check-in desk and test the camera. After completion: review attendance and points, then issue certificates.'}
-      </p>
-
       {error ? <AdminError message={error} retry={refresh} /> : loading ? <AdminLoading /> : data ? <>
         <section className="space-y-3">
           <h3 className="text-sm font-bold text-[var(--color-text-muted)]">{isAr ? 'التسجيل والحضور' : 'Registration & attendance'}</h3>
