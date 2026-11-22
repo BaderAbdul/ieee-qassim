@@ -257,8 +257,8 @@ export default function EventCard({
         tone="accent"
         title={isAr ? 'تغيير حالة الفعالية؟' : 'Change the event state?'}
         message={isAr
-          ? `تغيير «${event.title}» إلى «${pendingState ? eventStateLabel(pendingState, true) : ''}».`
-          : `Change "${event.title}" to "${pendingState}".`}
+          ? `تغيير «${event.title}» إلى «${pendingState ? eventStateLabel(pendingState, true) : ''}».${pendingState === 'Completed' && event.hasCertificate ? ' ستُرسل رسائل الشهادات للمستلمين. إعادة الفعالية إلى جارية ثم مكتملة ترسلها مرة أخرى.' : ''}`
+          : `Change "${event.title}" to "${pendingState}".${pendingState === 'Completed' && event.hasCertificate ? ' Certificate emails will be sent. Reopening and completing the event sends them again.' : ''}`}
         confirmLabel={isAr ? 'تأكيد' : 'Confirm'}
         cancelLabel={isAr ? 'إلغاء' : 'Cancel'}
         busy={busy}
