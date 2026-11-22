@@ -113,7 +113,7 @@ export default function EventWorkspace({ children }: { children: React.ReactNode
                 <ExternalLink size={15} />
                 {isAr ? 'عرض صفحة الطالب' : 'View student page'}
               </a>
-              <EventReminderButton eventId={event.id} />
+              <EventReminderButton eventId={event.id} isOnline={event.locationType === 'online'} />
             </div>
           </div>
 

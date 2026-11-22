@@ -8,7 +8,7 @@ import { hasPrivilege, useAuth } from '@/context/AuthContext';
 import { httpsCallable } from '@/lib/backend';
 import { useToast } from '@/context/ToastContext';
 
-export default function EventReminderButton({ eventId }: { eventId: number }) {
+export default function EventReminderButton({ eventId, isOnline = false }: { eventId: number; isOnline?: boolean }) {
   const isAr = useLocale() === 'ar';
   const { userData } = useAuth();
   const { showToast } = useToast();
@@ -16,6 +16,7 @@ export default function EventReminderButton({ eventId }: { eventId: number }) {
   const [busy, setBusy] = useState(false);
   const [count, setCount] = useState<number | null>(null);
   const [join, setJoin] = useState(false);
+  const includeJoin = isOnline || join;
   const [url, setUrl] = useState('');
   const [batchId, setBatchId] = useState('');
   const [error, setError] = useState('');
@@ -31,7 +32,7 @@ export default function EventReminderButton({ eventId }: { eventId: number }) {
     if (busy || !count) return;
     setBusy(true); setError('');
     try {
-      const result = await call({ eventId, includeJoinLink: join, joinUrl: join ? url : '', batchId });
+      const result = await call({ eventId, includeJoinLink: includeJoin, joinUrl: includeJoin ? url : '', batchId });
       const data = result.data as { queuedCount: number; alreadyQueuedCount: number };
       showToast(isAr ? `أُضيف ${data.queuedCount} بريدًا إلى قائمة الإرسال (${data.alreadyQueuedCount} أُضيف سابقًا).` : `${data.queuedCount} reminders queued (${data.alreadyQueuedCount} already queued).`, 'success');
       setOpen(false);
@@ -45,8 +46,8 @@ export default function EventReminderButton({ eventId }: { eventId: number }) {
       <form onSubmit={send} role="dialog" aria-modal="true" aria-labelledby="reminder-title" className="max-h-[90dvh] w-full max-w-md space-y-4 overflow-y-auto rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-2xl">
         <div className="flex items-center justify-between"><h2 id="reminder-title" className="text-lg font-bold">{isAr ? 'إرسال إيميل تذكير' : 'Send reminder email'}</h2><button type="button" disabled={busy} onClick={() => setOpen(false)} aria-label={isAr ? 'إغلاق' : 'Close'}><X size={20} /></button></div>
         <p className="text-sm leading-7 text-[var(--color-text-secondary)]">{count === null ? (isAr ? 'جارٍ تحميل المستلمين…' : 'Loading recipients…') : isAr ? `سيُرسل إلى ${count} بريدًا للمسجلين (المقبولين، المنتظرين، قيد المراجعة والحاضرين)، دون الملغاة والمرفوضة والحسابات المقيدة. يُستخدم قالب الطلاب من ربط الرسائل أو رسالة تذكير جاهزة.` : `Will email ${count} active registrants: approved, waitlisted, pending and attended. Cancelled, rejected and restricted accounts are excluded. Uses the student reminder mapping, or built-in reminder text.`}</p>
-        <label className="flex items-center gap-2"><input type="checkbox" checked={join} disabled={busy} onChange={e => setJoin(e.target.checked)} />{isAr ? 'رابط الانضمام' : 'Include meeting link'}</label>
-        {join && <label className="block space-y-2"><span>{isAr ? 'رابط اجتماع Meet / الانضمام' : 'Meet / meeting URL'}</span><input required type="url" pattern="https://.*" dir="ltr" disabled={busy} value={url} onChange={e => setUrl(e.target.value)} placeholder="https://meet.google.com/..." className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3" /></label>}
+        {!isOnline && <label className="flex items-center gap-2"><input type="checkbox" checked={join} disabled={busy} onChange={e => setJoin(e.target.checked)} />{isAr ? 'رابط الانضمام' : 'Include meeting link'}</label>}
+        {includeJoin && <label className="block space-y-2"><span>{isAr ? 'رابط اجتماع Meet / الانضمام' : 'Meet / meeting URL'}</span><input required type="url" pattern="https://.*" dir="ltr" disabled={busy} value={url} onChange={e => setUrl(e.target.value)} placeholder="https://meet.google.com/..." className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3" /></label>}
         {error && <p role="alert" className="text-sm text-[var(--color-danger)]">{error}</p>}
         <p className="text-xs text-[var(--color-text-muted)]">{isAr ? 'تأكيد الإرسال يضيف الرسائل إلى قائمة البريد. إذا كان الإرسال متوقفًا تبقى في الانتظار.' : 'Confirming queues the messages. If delivery is paused, they remain pending.'}</p>
         <button disabled={busy || !count} type="submit" className="w-full rounded-xl bg-[var(--color-accent)] p-3 font-bold text-[var(--color-accent-contrast)] disabled:opacity-50">{isAr ? (busy ? 'جارٍ الإضافة…' : 'تأكيد إرسال التذكير') : (busy ? 'Queuing…' : 'Confirm reminder')}</button>
