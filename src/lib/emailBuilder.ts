@@ -111,7 +111,6 @@ export function builderSamples(p: BuilderParams) {
 export function builderWarnings(p: BuilderParams): string[] {
   const warnings: string[] = [];
   if (!p.event.trim()) warnings.push('اسم الفعالية مفقود');
-  if (p.joinVisible && !/^https:\/\/[^\s]+$/.test(p.joinUrl)) warnings.push('أدخل رابط الاجتماع HTTPS عند تفعيل رابط الانضمام');
   if (p.mapVisible && p.attendance === 'inperson' && !safeUrl(p.mapUrl)) warnings.push('تم تفعيل زر الخريطة دون رابط صالح');
   if (p.extraVisible && p.extraUrl && !safeUrl(p.extraUrl)) warnings.push('رابط التسجيل الإضافي غير صالح');
   return warnings;
@@ -125,8 +124,8 @@ export function generateEmail(state: BuilderState): string {
   const body = p.message || a[2];
   const pad = p.compact ? '17px 23px' : '26px 30px';
   const tx = (value: string) => esc(value).replace(/\n/g, '<br>');
-  const btn = (name: string, link: string, color: string = p.accentColor) => safeUrl(link)
-    ? `<a href="${esc(safeUrl(link))}" style="display:inline-block;margin:5px;background:${esc(color)};padding:13px 21px;border-radius:9px;color:white;text-decoration:none;font-size:14px;font-weight:bold">${esc(name)}</a>` : '';
+  const btn = (name: string, link: string, color: string = p.accentColor) => (link === '{{ event.joinUrl }}' || safeUrl(link))
+    ? `<a href="${esc(link === '{{ event.joinUrl }}' ? link : safeUrl(link))}" style="display:inline-block;margin:5px;background:${esc(color)};padding:13px 21px;border-radius:9px;color:white;text-decoration:none;font-size:14px;font-weight:bold">${esc(name)}</a>` : '';
   const section = (inner: string) => `<tr><td style="padding:${pad}">${inner}</td></tr>`;
   const panel = (title: string, inner: string, color = '#eef6f8') =>
     `<div style="background:${color};border-radius:14px;padding:20px 23px;text-align:right"><strong style="color:#075b88;font-size:16px">${esc(title)}</strong><div style="line-height:2.1;color:#35546a;font-size:14px;margin-top:8px">${inner}</div></div>`;
@@ -153,7 +152,7 @@ export function generateEmail(state: BuilderState): string {
   let links = '';
   if (p.timing !== 'cancelled') {
     if (p.mapVisible && p.attendance !== 'online' && p.attendance !== 'none') links += btn('📍 الموقع على الخريطة', p.mapUrl);
-    if (p.joinVisible) links += btn('💻 رابط الانضمام', p.joinUrl);
+    if (p.joinVisible) links += btn('💻 رابط الانضمام', '{{ event.joinUrl }}');
     if (p.registrationVisible) links += btn('سجّل الآن', p.registrationUrl);
     if (p.certificateVisible) links += btn('عرض الشهادة', p.certificateUrl);
     if (p.feedbackVisible) links += btn('شاركنا تقييمك', p.feedbackUrl);

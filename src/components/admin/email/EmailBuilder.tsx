@@ -111,9 +111,7 @@ export default function EmailBuilder({ state, onChange }: { state: BuilderState;
             {toggle('details', 'تفاصيل التاريخ والوقت والمكان')}{toggle('agendaVisible', 'برنامج الفعالية')}{toggle('speakerVisible', 'المتحدث')}
             {toggle('extraVisible', 'متطلب / تسجيل إضافي')}{toggle('noticeVisible', 'تنبيه بارز')}{toggle('mapVisible', 'زر الموقع')}
             {toggle('joinVisible', 'زر الانضمام عن بُعد')}{toggle('registrationVisible', 'زر التسجيل')}{toggle('certificateVisible', 'زر الشهادة')}
-            {p.joinVisible && <div className="space-y-2 rounded-xl border border-[var(--color-accent)] p-3">{text('joinUrl', 'رابط الاجتماع / Meet URL', 'url')}
-              {!/^https:\/\/[^\s]+$/.test(p.joinUrl) && <p role="alert" className="text-xs text-[var(--color-danger)]">أدخل رابط الاجتماع الصحيح (HTTPS) ليظهر زر الانضمام.</p>}
-            </div>}
+            {p.joinVisible && <p className="text-xs text-[var(--color-text-muted)]">يُستخدم رابط الاجتماع الذي تدخله عند إرسال التذكير تلقائيًا في زر الانضمام.</p>}
             {toggle('feedbackVisible', 'زر التقييم')}{toggle('customVisible', 'زر مخصص')}{toggle('footerVisible', 'التذييل الرسمي')}
             <h3 className="pt-2 text-sm font-black">الأقسام المخصصة</h3>
             <button type="button" className={ghost} onClick={() => onChange({ ...state, blocks: [...state.blocks, { title: '', body: '' }] })}><Plus size={14} />إضافة قسم</button>
@@ -128,7 +126,7 @@ export default function EmailBuilder({ state, onChange }: { state: BuilderState;
           {tab === 'links' && <>
             <h2 className="font-cairo text-base font-black">الروابط والتعليمات</h2>
             <p className="text-xs text-[var(--color-text-muted)]">الزر لا يظهر دون رابط صحيح ومع تفعيل خياره في الإضافات.</p>
-            {text('mapUrl', 'رابط الموقع', 'url')}{text('joinUrl', 'رابط الاجتماع', 'url')}{text('registrationUrl', 'رابط التسجيل', 'url')}
+            {text('mapUrl', 'رابط الموقع', 'url')}{text('registrationUrl', 'رابط التسجيل', 'url')}
             {text('certificateUrl', 'رابط الشهادة', 'url')}{text('feedbackUrl', 'رابط التقييم', 'url')}{text('customLabel', 'نص الزر المخصص')}{text('customUrl', 'رابط الزر المخصص', 'url')}
             <h3 className="pt-2 text-sm font-black">متطلبات خاصة</h3>
             {text('extraTitle', 'عنوان التعليمات')}{text('extraText', 'شرح التعليمات', 'textarea')}{text('extraLabel', 'نص زر التسجيل الإضافي')}{text('extraUrl', 'رابط التسجيل الإضافي', 'url')}

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { replaceEmailBody } from '../src/lib/emailDocument.ts';
+import { defaultBuilderState, generateEmail, builderWarnings } from '../src/lib/emailBuilder.ts';
 
 const source = '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><style>p{direction:rtl;color:#123456}</style></head><body style="margin:0;font-family:Tahoma"><p dir="auto">مرحبًا Ahmed — IEEE Qassim</p></body></html>';
 const edited = replaceEmailBody(source, '<p dir="auto">مرحبًا Ahmed — IEEE Qassim updated</p>');
@@ -7,3 +8,13 @@ assert.equal(edited, source.replace('IEEE Qassim</p>', 'IEEE Qassim updated</p>'
 assert.equal(replaceEmailBody(source, '<p dir="auto">مرحبًا Ahmed — IEEE Qassim</p>'), source);
 assert.equal(replaceEmailBody('<p dir="rtl">مرحبا IEEE</p>', '<p dir="rtl">مرحبا Ahmed</p>'), '<p dir="rtl">مرحبا Ahmed</p>');
 console.log('Email document: full HTML, RTL, styles and fragment editing preserved.');
+const state = defaultBuilderState();
+state.p.joinVisible = true;
+state.p.joinUrl = 'https://old.example.com';
+const generated = generateEmail(state);
+assert.ok(generated.includes('href="{{ event.joinUrl }}"'));
+assert.ok(!generated.includes('https://old.example.com'));
+state.p.joinUrl = '';
+assert.ok(generateEmail(state).includes('href="{{ event.joinUrl }}"'));
+assert.ok(!builderWarnings(state.p).some(warning => warning.includes('HTTPS')));
+console.log('Join button uses the reminder URL variable without a fixed template URL.');

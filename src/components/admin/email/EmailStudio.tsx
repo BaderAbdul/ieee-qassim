@@ -161,7 +161,6 @@ export default function EmailStudio() {
   };
 
   const save = async () => {
-    if (builder.p.joinVisible && !/^https:\/\/[^\s]+$/.test(builder.p.joinUrl)) { showToast(t('أدخل رابط الاجتماع HTTPS قبل حفظ القالب.', 'Enter the HTTPS meeting URL before saving.'), 'error'); return; }
     if (!name.trim()) { showToast(t('اكتب اسم القالب.', 'Enter a template name.'), 'error'); return; }
     if (!subject.trim()) { showToast(t('اكتب عنوان الرسالة.', 'Enter the email subject.'), 'error'); return; }
     if (unknown.length) { showToast(t(`متغيرات غير معروفة: ${unknown.join('، ')}`, `Unknown variables: ${unknown.join(', ')}`), 'error'); return; }
