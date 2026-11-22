@@ -30,6 +30,8 @@ export const EMAIL_VARIABLE_GROUPS: { id: string; ar: string; en: string; variab
     { source: 'event.endingTime', ar: 'وقت الانتهاء', en: 'Ending time' },
     { source: 'event.ar.location', ar: 'المكان (عربي)', en: 'Location (Arabic)' },
     { source: 'event.en.location', ar: 'المكان (إنجليزي)', en: 'Location (English)' },
+    { source: 'event.ar.attendanceType', ar: 'نوع الحضور: حضوري / عن بُعد (عربي)', en: 'Event format: online / in-person (Arabic)' },
+    { source: 'event.en.attendanceType', ar: 'نوع الحضور: حضوري / عن بُعد (إنجليزي)', en: 'Event format: online / in-person (English)' },
     { source: 'event.ar.interviewer', ar: 'مقدّم الحوار (عربي)', en: 'Interviewer (Arabic)' },
     { source: 'event.en.interviewer', ar: 'مقدّم الحوار (إنجليزي)', en: 'Interviewer (English)' },
     { source: 'event.ar.speakers', ar: 'المتحدثون (عربي)', en: 'Speakers (Arabic)' },

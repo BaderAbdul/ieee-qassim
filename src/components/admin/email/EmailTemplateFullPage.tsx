@@ -1,6 +1,8 @@
 'use client';
 
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import EmailDocumentEditor from './EmailDocumentEditor';
+import { replaceEmailBody } from '@/lib/emailDocument';
 import { useLocale } from 'next-intl';
 import { ArrowRight, Check, Code2, Eye, Image as ImageIcon, Paperclip, Send, ShieldCheck, Smartphone, Trash2 } from 'lucide-react';
 import { Link, useRouter } from '@/i18n/routing';
@@ -75,7 +77,7 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
   // read-only preview/code view below, regardless of ownership or manage privilege.
   const phone = useIsPhone();
   const canEdit = !phone && (!templateId || canManage || createdBy === userData?.id);
-  const previewRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLIFrameElement>(null);
   const savedRange = useRef<Range | null>(null);
   const codeRef = useRef<HTMLTextAreaElement>(null);
   const subjectRef = useRef<HTMLInputElement>(null);
@@ -106,14 +108,6 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [templateId]);
-
-  // The rich preview is only synced from state on load / tab switch / mobile toggle (each of
-  // which (re)mounts the contentEditable node) -- not on every keystroke, which would otherwise
-  // fight the browser's own caret position while typing.
-  useEffect(() => {
-    if (tab === 'preview' && !mobile && !loading && previewRef.current) previewRef.current.innerHTML = draft.html;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, mobile, draft.id, loading]);
 
   useEffect(() => {
     if (!draft.id) { setLinkedEvents([]); return; }
@@ -156,30 +150,31 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
   // Variable/image insertion targets whichever surface is on screen: the rich preview (via a
   // DOM Range, so the result keeps styling intact) or the raw-code textarea (plain text splice).
   const saveSelection = () => {
-    const selection = window.getSelection();
-    if (selection && selection.rangeCount && previewRef.current?.contains(selection.anchorNode)) savedRange.current = selection.getRangeAt(0).cloneRange();
+    const doc = previewRef.current?.contentDocument;
+    const selection = doc?.getSelection();
+    if (selection && selection.rangeCount && doc?.body.contains(selection.anchorNode)) savedRange.current = selection.getRangeAt(0).cloneRange();
   };
   // Falls back to appending plain text at the end of the HTML if the Range/Selection APIs throw
   // for any reason (they vary across browsers and can misbehave on an empty or unusual DOM) --
   // inserting at the wrong spot is a minor inconvenience; crashing the whole page is not.
   const insertNodeInPreview = (node: Node) => {
-    const area = previewRef.current;
+    const area = previewRef.current?.contentDocument?.body;
     if (!area) return;
     try {
       area.focus();
-      const selection = window.getSelection();
+      const selection = area.ownerDocument.getSelection();
       let range = savedRange.current;
-      if (!range || !area.contains(range.startContainer)) { range = document.createRange(); range.selectNodeContents(area); range.collapse(false); }
+      if (!range || !area.contains(range.startContainer)) { range = area.ownerDocument.createRange(); range.selectNodeContents(area); range.collapse(false); }
       selection?.removeAllRanges(); selection?.addRange(range);
       range.deleteContents(); range.insertNode(node);
       range.setStartAfter(node); range.setEndAfter(node);
       selection?.removeAllRanges(); selection?.addRange(range);
       savedRange.current = range.cloneRange();
-      setDraft(previous => ({ ...previous, html: area.innerHTML }));
+      setDraft(previous => ({ ...previous, html: replaceEmailBody(previous.html, area.innerHTML) }));
     } catch {
       savedRange.current = null;
       area.appendChild(node);
-      setDraft(previous => ({ ...previous, html: area.innerHTML }));
+      setDraft(previous => ({ ...previous, html: replaceEmailBody(previous.html, area.innerHTML) }));
     }
   };
   const insertInEditor = (text: string) => {
@@ -194,7 +189,6 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
     try {
       const boilerplate = await apiGet<{ html: string }>(`/api/admin/mail/boilerplates/${boilerplateId}`);
       setDraft(previous => ({ ...previous, html: boilerplate.html, boilerplateId }));
-      if (previewRef.current && tab === 'preview') previewRef.current.innerHTML = boilerplate.html;
     } catch (reason) { showToast(reason instanceof Error ? reason.message : t('تعذر تحميل القالب الأساسي', 'Unable to load the boilerplate'), 'error'); }
   };
 
@@ -316,7 +310,7 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
           {tab === 'preview'
             ? (mobile
                 ? <div className="mx-auto w-[375px] overflow-hidden rounded-2xl border-4 border-[var(--color-border)] bg-white"><iframe title={t('معاينة الجوال', 'Mobile preview')} sandbox="" referrerPolicy="no-referrer" srcDoc={draft.html || '<p></p>'} className="h-[600px] w-full" /></div>
-                : <RichPreview previewRef={previewRef} canEdit={canEdit} onCommit={html => setDraft(previous => ({ ...previous, html }))} onSelect={saveSelection} />)
+                : <EmailDocumentEditor html={draft.html} frameRef={previewRef} canEdit={canEdit} onCommit={html => setDraft(previous => ({ ...previous, html }))} onSelect={saveSelection} title={t('محرر البريد', 'Email editor')} />)
             : <textarea ref={codeRef} dir="ltr" disabled={!canEdit} className={`${input} h-full font-mono text-xs`} value={draft.html} onChange={event => setDraft({ ...draft, html: event.target.value })} />}
         </div>
       </div>
@@ -374,22 +368,6 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
     </div>
   </div>;
 }
-
-// React's own reconciler can crash (TypeError: Cannot read properties of null (reading
-// 'innerHTML')) when it tries to diff a contentEditable node whose children were just mutated
-// imperatively (e.g. replacing a text selection via Range.deleteContents()/insertNode()) --
-// confirmed live: it only happened when inserting a variable over a selection, never into a
-// collapsed cursor. Freezing this node behind an always-equal memo stops React from ever
-// touching its children again after the first mount, which removes the conflict entirely.
-// canEdit/onCommit/onSelect are effectively captured only at mount; onCommit/onSelect are safe
-// because they only use refs and functional state updates, never a stale closure value.
-const RichPreview = memo(function RichPreview({ previewRef, canEdit, onCommit, onSelect }: {
-  previewRef: React.RefObject<HTMLDivElement | null>; canEdit: boolean; onCommit: (html: string) => void; onSelect: () => void;
-}) {
-  return <div ref={previewRef} contentEditable={canEdit} suppressContentEditableWarning
-    onBlur={event => onCommit(event.currentTarget.innerHTML)} onMouseUp={onSelect} onKeyUp={onSelect}
-    className="min-h-full rounded-xl border border-[var(--color-border)] bg-white p-4 text-black" dir="ltr" />;
-}, () => true);
 
 function FixedAttachmentForm({ isAr, busy, onSubmit }: { isAr: boolean; busy: boolean; onSubmit: (file: File, title: string) => void }) {
   const t = (ar: string, en: string) => isAr ? ar : en;
