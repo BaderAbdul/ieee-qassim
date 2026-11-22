@@ -58,10 +58,10 @@ export default function CertificatesManagementPage() {
   const handleCompleteEventAndEnableCertificates = async () => {
     setProcessing(true);
     try {
+      await httpsCallable(null, 'saveEvent')({ eventId, hasCertificate: true });
       if (event?.state !== 'Completed') {
         await httpsCallable(null, 'changeEventState')({ eventId, state: 'Completed' });
       }
-      await httpsCallable(null, 'saveEvent')({ eventId, hasCertificate: true });
       setEvent(prev => prev ? { ...prev, state: 'Completed', hasCertificate: true } : null);
       setReloadKey(k => k + 1);
     } catch (err) {

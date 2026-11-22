@@ -5,9 +5,9 @@ import { useLocale } from 'next-intl';
 import { apiGet, apiSend } from '@/lib/backend';
 import { useToast } from '@/context/ToastContext';
 
-const roles = ['student', 'organizer', 'speaker', 'interviewer'] as const;
+const roles = ['student', 'studentCertificate', 'organizer', 'speaker', 'interviewer', 'sponsor'] as const;
 type Mappings = Record<`${typeof roles[number]}EmailTemplateId`, string | null>;
-const names = { student: ['الطلاب — تذكير الفعالية', 'Students — event reminders'], organizer: ['المنظمون', 'Organizers'], speaker: ['المتحدثون', 'Speakers'], interviewer: ['المحاور', 'Interviewer'] };
+const names = { student: ['تذكير الطلاب', 'Student reminders'], studentCertificate: ['شهادات الحضور للطلاب', 'Student attendance certificates'], organizer: ['المنظمون', 'Organizers'], speaker: ['شهادات المتحدثين', 'Speaker certificates'], interviewer: ['شهادات المحاور', 'Interviewer certificates'], sponsor: ['شهادات الرعاة', 'Sponsor certificates'] };
 
 export default function EventCommunicationSettings() {
   const isAr = useLocale() === 'ar';
@@ -33,12 +33,12 @@ export default function EventCommunicationSettings() {
   };
   return <section className="space-y-5 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
     <h2 className="text-xl font-bold">{isAr ? 'ربط رسائل الفعالية بالمستلمين' : 'Event email routing'}</h2>
-    <p className="text-sm leading-7 text-[var(--color-text-secondary)]">{isAr ? 'اختر قالبًا معتمدًا لكل فئة. بريد الطلاب يستخدم للتذكير اليدوي والتلقائي. رسائل المنظمين والمتحدثين والمحاور تُرسل يدويًا من تبويب المحاور، مرة واحدة لكل مستلم ودور. ربط قالب المنظمين يُضمّنهم في زر الإرسال. لا يؤدي الحفظ إلى إرسال البريد.' : 'Choose an approved template for each audience. Student templates apply to manual and scheduled reminders. Organizer, speaker and interviewer emails are sent manually from the interviewer tab, once per recipient and role. Mapping an organizer template includes organizers in that send action. Saving does not send mail.'}</p>
-    <p className="text-xs text-[var(--color-text-muted)]">{isAr ? 'بلا قالب طلاب: تُستخدم رسالة تذكير جاهزة. بلا قالب محاور أو متحدث: يستخدم قالب الفعالية ثم الافتراضي. المنظمون لا يُرسَل لهم دون ربط قالب. استخدم متغير اسم المستلم بالعربية أو الإنجليزية لتحية كل شخص باسمه.' : 'Without a student template, reminders use built-in text. Interviewer/speaker emails fall back to event/default templates. Organizers are only emailed when mapped. Use recipient name variables for personalized greetings.'}</p>
+    <p className="text-sm leading-7 text-[var(--color-text-secondary)]">{isAr ? 'تذكير الطلاب مستقل عن شهادات الحضور. عند إنهاء فعالية مفعّل فيها إصدار الشهادات، تُجهّز شهادات الطلاب الذين سُجّل حضورهم، والمتحدثين والمحاور والرعاة تلقائيًا وترسل بالبريد. اختيار قالب المنظمين يضمّنهم أيضًا. لا يؤدي حفظ الربط إلى إرسال البريد.' : 'Student reminders are separate from attendance certificates. Completing a certificate-enabled event automatically prepares and emails certificates to verified attendees, speakers, the interviewer and sponsors. Mapping organizers includes them too. Saving mappings does not send email.'}</p>
+    <p className="text-xs text-[var(--color-text-muted)]">{isAr ? 'أرفق تصميم الشهادة المناسب داخل قالب البريد لكل فئة؛ وإلا يُستخدم تصميم شهادة الفعالية ثم الافتراضي. قالب تذكير الطلاب لا يقبل مرفقات شهادات. بلا قالب بريد لشهادات الطلاب تُرسل رسالة شهادة جاهزة. لا تُكرر شهادة سبق إصدارها أو إرسالها.' : 'Attach the appropriate certificate design to each audience’s email template; otherwise the event/default certificate design is used. Reminder templates cannot attach certificates. Without a student certificate email template, a built-in certificate message is used. Previously issued or sent certificates are not duplicated.'}</p>
     {error && <p role="alert" className="text-[var(--color-danger)]">{error}</p>}
     {data && roles.map(role => <label key={role} className="block space-y-2"><span className="text-sm font-bold">{names[role][isAr ? 0 : 1]}</span>
       <select disabled={busy} value={data[`${role}EmailTemplateId`] || ''} onChange={e => setData({ ...data, [`${role}EmailTemplateId`]: e.target.value || null })} className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3">
-        <option value="">{role === 'student' ? (isAr ? 'رسالة تذكير جاهزة' : 'Built-in reminder') : role === 'organizer' ? (isAr ? 'لا ترسل للمنظمين' : 'Do not email organizers') : (isAr ? 'استخدام قالب الفعالية / الافتراضي' : 'Use event / default template')}</option>
+        <option value="">{role === 'student' ? (isAr ? 'رسالة تذكير جاهزة' : 'Built-in reminder') : role === 'studentCertificate' ? (isAr ? 'رسالة شهادة جاهزة' : 'Built-in certificate message') : role === 'organizer' ? (isAr ? 'لا ترسل للمنظمين' : 'Do not email organizers') : (isAr ? 'استخدام قالب الفعالية / الافتراضي' : 'Use event / default template')}</option>
         {templates.map(template => <option key={template.id} value={template.id}>{template.name}</option>)}
       </select></label>)}
     <button type="button" disabled={!data || busy} onClick={() => void save()} className="rounded-xl bg-[var(--color-accent)] px-5 py-3 font-bold text-[var(--color-accent-contrast)] disabled:opacity-50">{isAr ? 'حفظ الربط' : 'Save mappings'}</button>
