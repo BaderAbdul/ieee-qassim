@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import EmailDocumentEditor from './EmailDocumentEditor';
+import EmailLanguageSelect from '../EmailLanguageSelect';
 import { replaceEmailBody } from '@/lib/emailDocument';
 import { useLocale } from 'next-intl';
 import { ArrowRight, Check, Code2, Eye, Image as ImageIcon, Paperclip, Send, ShieldCheck, Smartphone, Trash2 } from 'lucide-react';
@@ -22,8 +23,8 @@ const primary = `${button} bg-[var(--color-accent)] text-[var(--color-accent-con
 const panel = 'rounded-2xl border border-[var(--color-border)]/50 bg-[var(--color-surface)]/60 backdrop-blur-md shadow-sm';
 
 interface ApiErrorLike { code?: string; message?: string }
-type Draft = Pick<EmailTemplate, 'id' | 'name' | 'subject' | 'html' | 'allowAttachments' | 'revision' | 'status'> & { boilerplateId: string | null };
-const emptyDraft: Draft = { id: '', name: '', subject: '', html: '', allowAttachments: false, boilerplateId: null, revision: 0, status: 'draft' };
+type Draft = Pick<EmailTemplate, 'id' | 'name' | 'subject' | 'html' | 'language' | 'allowAttachments' | 'revision' | 'status'> & { boilerplateId: string | null };
+const emptyDraft: Draft = { id: '', name: '', subject: '', language: 'ar', html: '', allowAttachments: false, boilerplateId: null, revision: 0, status: 'draft' };
 
 // Available height below the sticky admin topbar, down to the bottom margin, so the page itself
 // never scrolls on desktop -- only the editor's own content scrolls inside that fixed box.
@@ -101,7 +102,7 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
     setLoading(true);
     apiGet<EmailTemplate>(`/api/admin/mail/templates/${templateId}`)
       .then(result => {
-        setDraft({ id: result.id, name: result.name, subject: result.subject, html: result.html, allowAttachments: result.allowAttachments, boilerplateId: result.boilerplateId, revision: result.revision, status: result.status });
+        setDraft({ id: result.id, name: result.name, subject: result.subject, language: result.language || 'bilingual', html: result.html, allowAttachments: result.allowAttachments, boilerplateId: result.boilerplateId, revision: result.revision, status: result.status });
         setAttachments(result.attachments); setCreatedBy(result.createdBy); setCanManage(!!result.canManage);
       })
       .catch(() => setNotFound(true))
@@ -118,9 +119,9 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
   const save = useCallback(async (payload: Draft) => {
     setSaveState('saving');
     try {
-      const body = { name: payload.name, subject: payload.subject, html: payload.html, allowAttachments: payload.allowAttachments, boilerplateId: payload.boilerplateId, revision: payload.revision };
+      const body = { name: payload.name, subject: payload.subject, language: payload.language, html: payload.html, allowAttachments: payload.allowAttachments, boilerplateId: payload.boilerplateId, revision: payload.revision };
       const result = await apiSend<{ id: string; revision: number; status: 'draft' | 'approved' }>(payload.id ? 'PUT' : 'POST', payload.id ? `/api/admin/mail/templates/${payload.id}` : '/api/admin/mail/templates', body);
-      setDraft(current => current.html === payload.html && current.name === payload.name && current.subject === payload.subject
+      setDraft(current => current.html === payload.html && current.name === payload.name && current.subject === payload.subject && current.language === payload.language
         ? { ...current, id: result.id, revision: result.revision, status: result.status } : current);
       if (!payload.id) router.replace(`/admin/mail/templates/${result.id}`);
       setSaveState('saved');
@@ -138,7 +139,7 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
     saveTimer.current = setTimeout(() => { void save(draft); }, 900);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft.name, draft.subject, draft.html, draft.allowAttachments]);
+  }, [draft.name, draft.subject, draft.html, draft.allowAttachments, draft.language]);
 
   const loadCertOptions = async () => {
     if (certOptions) return;
@@ -324,9 +325,10 @@ export default function EmailTemplateFullPage({ templateId }: { templateId?: str
           </select>
         </label>}
         <fieldset disabled={!canEdit} className="space-y-4">
+          <EmailLanguageSelect isAr={isAr} value={draft.language} bilingual onChange={language => setDraft({ ...draft, language })} title={t('لغة هذا البريد', 'Email language')} />
           <label className="block space-y-2"><span>{t('اسم القالب', 'Template name')}</span><input className={input} maxLength={120} value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} /></label>
           <div className="space-y-2">
-            <label className="block space-y-2"><span>{t('عنوان البريد', 'Email subject')}</span><input ref={subjectRef} className={input} maxLength={200} value={draft.subject} onChange={event => setDraft({ ...draft, subject: event.target.value })} /></label>
+            <label className="block space-y-2"><span>{t('عنوان البريد', 'Email subject')}</span><input ref={subjectRef} dir={draft.language === 'en' ? 'ltr' : draft.language === 'ar' ? 'rtl' : 'auto'} className={input} maxLength={200} value={draft.subject} onChange={event => setDraft({ ...draft, subject: event.target.value })} /></label>
             <div className="flex flex-wrap gap-1.5">{EMAIL_VARIABLE_GROUPS.map(group => <select key={group.id} className={smallSelect} value="" onChange={event => { if (event.target.value) insertVariableInSubject(event.target.value); event.target.value = ''; }}>
               <option value="">{t(group.ar, group.en)}</option>
               {group.variables.map(variable => <option key={variable.source} value={variable.source}>{t(variable.ar, variable.en)}</option>)}

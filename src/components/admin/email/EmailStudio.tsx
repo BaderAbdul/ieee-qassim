@@ -10,6 +10,7 @@ import { apiGet, apiSend } from '@/lib/backend';
 import { EMAIL_VARIABLE_GROUPS, MAX_TEMPLATE_ATTACHMENTS, insertAtCursor, variableToken } from '@/lib/emailTemplates';
 import { builderSamples, builderSubject, defaultBuilderState, generateEmail, normalizeBuilderState, type BuilderState } from '@/lib/emailBuilder';
 import EmailBuilder from '@/components/admin/email/EmailBuilder';
+import EmailLanguageSelect from '@/components/admin/EmailLanguageSelect';
 import {
   type Candidate, type StudioSamples, countOccurrences, detectCandidates, escapeHtml, fileToBase64, highlightVariables,
   addGreeting, replaceLiteral, scanHardcoded, unknownVariables, usedVariables,
@@ -56,6 +57,7 @@ export default function EmailStudio() {
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [html, setHtml] = useState('');
+  const [language, setLanguage] = useState<'ar' | 'en' | 'bilingual'>('ar');
   const [subject, setSubject] = useState('');
   const [samples, setSamples] = useState<StudioSamples | null>(null);
   const [history, setHistory] = useState<Snapshot[]>([]);
@@ -167,7 +169,7 @@ export default function EmailStudio() {
     setSaving(true);
     try {
       const created = await apiSend<{ id: string; revision: number; status: 'draft' | 'approved' }>('POST', '/api/admin/mail/templates', {
-        name: name.trim(), subject: subject.trim(), html, allowAttachments: attachments.length > 0, boilerplateId: null,
+        name: name.trim(), subject: subject.trim(), html, language, allowAttachments: attachments.length > 0, boilerplateId: null,
       });
       const failed: string[] = [];
       for (const item of attachments) {
@@ -360,10 +362,11 @@ export default function EmailStudio() {
       {step === 4 && (
         <section className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <div className={`${panel} space-y-4 p-6`}>
+            <EmailLanguageSelect isAr={isAr} value={language} onChange={setLanguage} bilingual title={t('لغة هذا البريد', 'Email language')} />
             <label className="block space-y-1"><span className="text-xs font-bold">{t('اسم القالب', 'Template name')}</span>
               <input className={field} value={name} maxLength={120} onChange={event => setName(event.target.value)} /></label>
             <label className="block space-y-1"><span className="text-xs font-bold">{t('عنوان الرسالة (Subject) — يقبل المتغيرات', 'Email subject — variables allowed')}</span>
-              <input ref={subjectRef} className={field} value={subject} maxLength={200} onChange={event => setSubject(event.target.value)} dir="auto" /></label>
+              <input ref={subjectRef} className={field} value={subject} maxLength={200} onChange={event => setSubject(event.target.value)} dir={language === 'en' ? 'ltr' : language === 'ar' ? 'rtl' : 'auto'} /></label>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-[var(--color-text-muted)]">{t('إدراج متغير:', 'Insert variable:')}</span>
               <select className={small} value="" onChange={event => { if (event.target.value) insertAtCursor(subjectRef.current, subject, setSubject, variableToken(event.target.value)); }}>

@@ -58,13 +58,14 @@ export interface SecurityFields {
 export interface OrganizerAccount { id: string; name: string; nameEn?: string | null; role?: string; photoURL?: string | null; universityId?: string | null; emailHint?: string | null }
 
 /** A speaker: Arabic and English name and the e-mail the event's mail and certificate are sent to. */
-export interface SpeakerRow { name: string; nameEn: string; email: string }
+export interface SpeakerRow { name: string; nameEn: string; email: string; emailLanguage?: 'ar' | 'en' }
 
 export interface InterviewerFields {
   organizers: OrganizerAccount[];
   interviewer: string;
   interviewerEn: string;
   interviewerEmail: string;
+  interviewerEmailLanguage?: 'ar' | 'en';
   speakers: SpeakerRow[];
 }
 
@@ -86,6 +87,8 @@ export const SOCIAL_PLATFORMS: { id: SocialLink['platform']; labelAr: string; la
 ];
 
 export interface SettingsFields {
+  studentEmailLanguage?: 'ar' | 'en';
+  organizerEmailLanguage?: 'ar' | 'en';
   requiresRegistration: boolean;
   registrationMode: RegistrationMode;
   vtoolsUuid: string;

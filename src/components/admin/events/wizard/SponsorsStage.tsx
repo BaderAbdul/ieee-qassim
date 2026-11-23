@@ -1,5 +1,6 @@
 'use client';
 
+import EmailLanguageSelect from '../../EmailLanguageSelect';
 import { Plus, Save, Trash2 } from 'lucide-react';
 import { button, input, label, primaryButton, type SponsorsFields } from './wizardTypes';
 
@@ -26,6 +27,7 @@ export default function SponsorsStage({ isAr, value, onChange, onSave, saving }:
             <button type="button" className={button} aria-label={isAr ? 'حذف الراعي' : 'Remove sponsor'} disabled={value.sponsors.length === 1} onClick={() => onChange({ ...value, sponsors: value.sponsors.filter(s => s.id !== sponsor.id) })}><Trash2 size={16} /></button></div>
           <label className={label}><span>{isAr ? 'اسم الراعي' : 'Sponsor name'}</span><input required maxLength={200} className={input} value={sponsor.name} onChange={e => onChange({ ...value, sponsors: value.sponsors.map(s => s.id === sponsor.id ? { ...s, name: e.target.value } : s) })} /></label>
           <label className={label}><span>{isAr ? 'البريد الإلكتروني لاستلام الشهادة' : 'Email for certificate delivery'}</span><input required type="email" maxLength={254} dir="ltr" className={input} value={sponsor.email} onChange={e => onChange({ ...value, sponsors: value.sponsors.map(s => s.id === sponsor.id ? { ...s, email: e.target.value } : s) })} /></label>
+          <EmailLanguageSelect isAr={isAr} value={sponsor.emailLanguage || 'ar'} onChange={language => onChange({ ...value, sponsors: value.sponsors.map(s => s.id === sponsor.id ? { ...s, emailLanguage: language as 'ar' | 'en' } : s) })} />
         </section>)}
         <button type="button" className={button} disabled={value.sponsors.length >= 50} onClick={() => onChange({ ...value, sponsors: [...value.sponsors, { id: crypto.randomUUID(), name: '', email: '' }] })}><Plus size={16} />{isAr ? 'إضافة راعٍ' : 'Add sponsor'}</button>
       </div>}

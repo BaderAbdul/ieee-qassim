@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import EmailLanguageSelect from '../../EmailLanguageSelect';
 import { Paperclip, Save, Trash2 } from 'lucide-react';
 import { apiGet, apiSend } from '@/lib/backend';
 import { useToast } from '@/context/ToastContext';
@@ -74,6 +75,7 @@ export default function SettingsStage({ isAr, value, onChange, onSave, saving, e
     registrationMode: value.registrationMode,
     vtoolsUuid: value.vtoolsUuid.trim(),
     hasCertificate: value.hasCertificate,
+    emailPreferences: { students: value.studentEmailLanguage || 'ar', organizers: value.organizerEmailLanguage || 'ar' },
     };
   };
   const save = async () => { const fields = collect(); if (fields) await onSave(fields); };
@@ -81,6 +83,10 @@ export default function SettingsStage({ isAr, value, onChange, onSave, saving, e
 
   return (
     <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <EmailLanguageSelect isAr={isAr} value={value.studentEmailLanguage || 'ar'} title={t('لغة بريد الطلاب وشهاداتهم (للجميع)', 'Student email and certificate language (all students)')} onChange={language => set('studentEmailLanguage', language as 'ar' | 'en')} />
+        <EmailLanguageSelect isAr={isAr} value={value.organizerEmailLanguage || 'ar'} title={t('لغة بريد المنظمين وشهاداتهم (للجميع)', 'Organizer email and certificate language (all organizers)')} onChange={language => set('organizerEmailLanguage', language as 'ar' | 'en')} />
+      </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {!value.requiresRegistration && (
           <p className="rounded-xl bg-[var(--color-surface-2)] p-3 text-xs text-[var(--color-text-muted)] sm:col-span-2">

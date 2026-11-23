@@ -22,6 +22,7 @@ export interface UserData {
   isSuperAdmin?: boolean;
   canReviewTemplates?: boolean;
   canManageEmail?: boolean;
+  isTechnician?: boolean;
   privileges?: string[];
   teams?: UserTeam[];
   totalPoints: number;

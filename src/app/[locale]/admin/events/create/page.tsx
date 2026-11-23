@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocale } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
 import { ArrowRight, Trash2 } from 'lucide-react';
@@ -58,7 +59,7 @@ export default function CreateEventPage() {
   const router = useRouter();
   const locale = useLocale();
   const isAr = locale === 'ar';
-  const { userData } = useAuth();
+  const { userData, loading: authLoading } = useAuth();
   const { showToast } = useToast();
   const searchParams = useSearchParams();
   // Accept older delivered push links too; never open a blank event for an existing-event alert.
@@ -70,6 +71,7 @@ export default function CreateEventPage() {
   const stageParam = STAGES.some(stage => stage.id === normalizedStageParam) ? (normalizedStageParam as StageId) : null;
   const highlightField = searchParams.get('field') || undefined;
 
+  const [testChoice, setTestChoice] = useState<boolean | null>(null);
   const [eventId, setEventId] = useState<number | null>(null);
   const [loadingDraft, setLoadingDraft] = useState(!!resumeId);
   const [loadError, setLoadError] = useState(() =>
@@ -99,6 +101,7 @@ export default function CreateEventPage() {
       try {
         const event = await apiGet<PlatformEvent>(`/api/admin/events/${resumeId}`);
         setEventId(resumeId);
+        setTestChoice(event.isTestEvent === true);
         setMainData({
           title: event.title, titleEn: event.titleEn, description: event.description, descriptionEn: event.descriptionEn,
           type: event.type, gains: (event.gains || []).join('\n'), gainsEn: (event.gainsEn || []).join('\n'),
@@ -113,9 +116,9 @@ export default function CreateEventPage() {
         setInterviewerData({
           organizers: event.organizers || [],
           interviewer: event.interviewer || '', interviewerEn: event.interviewerEn || '',
-          interviewerEmail: event.interviewerEmail || '',
+          interviewerEmail: event.interviewerEmail || '', interviewerEmailLanguage: event.emailPreferences?.interviewer || 'ar',
           speakers: Array.from({ length: Math.max((event.speakers || []).length, (event.speakersEn || []).length, (event.speakerEmails || []).length) }, (_, index) => ({
-            name: event.speakers?.[index] || '', nameEn: event.speakersEn?.[index] || '', email: event.speakerEmails?.[index] || '',
+            name: event.speakers?.[index] || '', nameEn: event.speakersEn?.[index] || '', email: event.speakerEmails?.[index] || '', emailLanguage: event.emailPreferences?.speakers?.[index] || 'ar',
           })),
         });
         setSponsorsData({ hasSponsors: event.hasSponsors ?? null, sponsors: event.sponsors || [] });
@@ -125,7 +128,7 @@ export default function CreateEventPage() {
           requiresRegistration: event.requiresRegistration !== false, registrationMode: event.registrationMode || 'Auto',
           vtoolsUuid: event.vtoolsUuid || '', hasCertificate: !!event.hasCertificate,
           certificateTemplateId: event.certificateTemplateId || '', emailTemplateId: event.emailTemplateId || '',
-          points: String(event.points ?? 0),
+          points: String(event.points ?? 0), studentEmailLanguage: event.emailPreferences?.students || 'ar', organizerEmailLanguage: event.emailPreferences?.organizers || 'ar',
         });
         setReviewData({ feedbackQuestions: normalizeFeedbackQuestions(event.feedbackQuestions || []) });
         setAttendance(event.manualAttendanceCount === null || event.manualAttendanceCount === undefined ? '' : String(event.manualAttendanceCount));
@@ -148,9 +151,10 @@ export default function CreateEventPage() {
   }, [resumeParam]);
 
   const saveStage = async (stage: StageId, fields: Record<string, unknown>) => {
+    if (!eventId && userData?.isTechnician && testChoice === null) return false;
     setSaving(true);
     try {
-      const payload = eventId ? { eventId, ...fields } : fields;
+      const payload = eventId ? { eventId, ...fields } : { ...fields, isTestEvent: userData?.isTechnician ? testChoice === true : false };
       const result = await httpsCallable<typeof payload, { eventId: number }>(null, 'saveEvent')(payload);
       if (!eventId) setEventId(result.data.eventId);
       setCompletedStages(prev => new Set(prev).add(stage));
@@ -167,7 +171,18 @@ export default function CreateEventPage() {
     }
   };
 
-  if (loadingDraft) {
+  if (!resumeId && !eventId && userData?.isTechnician && testChoice === null) {
+    return createPortal(<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="test-event-title">
+      <div className="w-full max-w-md space-y-5 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-2xl">
+        <h2 id="test-event-title" className="text-xl font-bold">{isAr ? 'هل هذه فعالية تجريبية؟' : 'Is this a test event?'}</h2>
+        <p className="text-sm text-[var(--color-text-secondary)]">{isAr ? 'الفعالية التجريبية ترسل إشعاراتها إليك فقط. الفعالية العادية تُشعر الفرق والمشرفين كالمعتاد.' : 'Test event notifications go only to you. Normal events notify their teams and observers as usual.'}</p>
+        <div className="flex flex-wrap gap-3"><button autoFocus className="rounded-xl bg-[var(--color-accent)] px-4 py-3 font-bold text-[var(--color-accent-contrast)]" onClick={() => setTestChoice(true)}>{isAr ? 'نعم، فعالية تجريبية' : 'Yes, test event'}</button><button className="rounded-xl border border-[var(--color-border)] px-4 py-3 font-bold" onClick={() => setTestChoice(false)}>{isAr ? 'لا، فعالية عادية' : 'No, normal event'}</button></div>
+        <Link href="/admin/events" className="block text-sm">{isAr ? 'إلغاء' : 'Cancel'}</Link>
+      </div>
+    </div>, document.body);
+  }
+
+  if (loadingDraft || authLoading) {
     return <div className="max-w-4xl mx-auto py-12 text-center text-[var(--color-text-muted)]">{isAr ? 'جارٍ التحميل...' : 'Loading...'}</div>;
   }
 
@@ -182,6 +197,7 @@ export default function CreateEventPage() {
         </h1>
       </div>
 
+      {testChoice === true && <p className="mb-4 rounded-xl bg-[var(--color-accent-soft)] p-3 text-sm">{isAr ? 'فعالية تجريبية — إشعارات الإدارة تصل إلى منشئها فقط.' : 'Test event — staff notifications go only to its creator.'}</p>}
       {loadError && <p role="alert" className="mb-4 rounded-xl p-4 text-sm" style={{ backgroundColor: 'var(--color-danger-soft)', color: 'var(--color-danger)' }}>{loadError}</p>}
 
       <div className="rounded-2xl border border-[var(--color-border)] bg-white p-5 sm:p-8 space-y-6">

@@ -6,11 +6,11 @@ export interface EmailTemplateAttachment {
   filename?: string; contentType?: string; certificateTemplateId?: string;
 }
 export interface EmailTemplateSummary {
-  id: string; name: string; subject: string; allowAttachments: boolean; createdBy: string; revision: number;
+  id: string; name: string; subject: string; language: 'ar' | 'en' | 'bilingual'; allowAttachments: boolean; createdBy: string; revision: number;
   updatedAt: string; status: 'draft' | 'approved';
 }
 export interface EmailTemplate {
-  id: string; name: string; subject: string; html: string; boilerplateId: string | null;
+  id: string; name: string; subject: string; language: 'ar' | 'en' | 'bilingual'; html: string; boilerplateId: string | null;
   allowAttachments: boolean; createdBy: string; revision: number; attachments: EmailTemplateAttachment[];
   status: 'draft' | 'approved'; approvedBy: string | null; approvedAt: string | null; canManage?: boolean;
 }

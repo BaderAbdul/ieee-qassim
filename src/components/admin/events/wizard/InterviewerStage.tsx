@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowDown, ArrowUp, Loader2, Mail, Plus, Save, Search, UserPlus, X } from 'lucide-react';
 import { apiGet, httpsCallable } from '@/lib/backend';
+import EmailLanguageSelect from '../../EmailLanguageSelect';
 import { useToast } from '@/context/ToastContext';
 import { input, label, primaryButton, type InterviewerFields, type OrganizerAccount, type SpeakerRow, type StageEmbedProps } from './wizardTypes';
 
@@ -39,6 +40,7 @@ export default function InterviewerStage({ isAr, value, eventId, inPerson = true
       speakers: rows.map(row => row.name.trim()), speakersEn: rows.map(row => row.nameEn.trim()),
       speakerEmails: rows.map(row => row.email.trim()),
       organizerIds: value.organizers.map(account => account.id),
+      emailPreferences: { interviewer: value.interviewerEmailLanguage || 'ar', speakers: rows.map(row => row.emailLanguage || 'ar') },
     };
   };
   const save = async () => { const fields = collect(); if (fields) await onSave(fields); };
@@ -95,6 +97,7 @@ export default function InterviewerStage({ isAr, value, eventId, inPerson = true
       </p>
       <div className="space-y-3 rounded-2xl border border-[var(--color-border)] p-4">
         <h3 className="font-bold">{isAr ? 'المحاور' : 'Interviewer'}</h3>
+        <EmailLanguageSelect isAr={isAr} value={value.interviewerEmailLanguage || 'ar'} onChange={language => set('interviewerEmailLanguage', language as 'ar' | 'en')} />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <label className={label}><span>{isAr ? 'الاسم (عربي)' : 'Name (Arabic)'}</span>
             <input className={input} dir="rtl" value={value.interviewer} onChange={e => set('interviewer', e.target.value)} /></label>
@@ -114,13 +117,14 @@ export default function InterviewerStage({ isAr, value, eventId, inPerson = true
         </div>
         {value.speakers.length === 0 && <p className="text-xs text-[var(--color-text-muted)]">{isAr ? 'لم يُضف متحدثون بعد.' : 'No speakers yet.'}</p>}
         {value.speakers.map((row, index) => (
-          <div key={index} className="grid grid-cols-1 gap-2 rounded-xl bg-[var(--color-surface-2)] p-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
+          <div key={index} className="grid grid-cols-1 gap-2 rounded-xl bg-[var(--color-surface-2)] p-3 sm:grid-cols-2 sm:items-end">
             <label className={label}><span>{isAr ? 'الاسم (عربي)' : 'Name (Arabic)'}</span>
               <input className={input} dir="rtl" value={row.name} onChange={e => setSpeaker(index, { name: e.target.value })} /></label>
             <label className={label}><span>Name (English)</span>
               <input className={input} dir="ltr" value={row.nameEn} onChange={e => setSpeaker(index, { nameEn: e.target.value })} /></label>
             <label className={label}><span>{isAr ? 'البريد الإلكتروني' : 'E-mail'}</span>
               <input className={input} dir="ltr" type="email" inputMode="email" value={row.email} onChange={e => setSpeaker(index, { email: e.target.value })} placeholder="name@example.com" /></label>
+            <EmailLanguageSelect isAr={isAr} value={row.emailLanguage || 'ar'} onChange={language => setSpeaker(index, { emailLanguage: language as 'ar' | 'en' })} />
             <button type="button" aria-label={isAr ? 'إزالة المتحدث' : 'Remove speaker'} onClick={() => removeSpeaker(index)} className="rounded-lg p-2 text-red-500 hover:bg-red-50"><X size={16} /></button>
           </div>
         ))}

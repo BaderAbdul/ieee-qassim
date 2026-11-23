@@ -27,7 +27,7 @@ export interface CustomQuestion {
   required: boolean;
 }
 
-export interface EventSponsor { id: string; name: string; email: string }
+export interface EventSponsor { id: string; name: string; email: string; emailLanguage?: 'ar' | 'en' }
 export type SocialPlatform = 'linkedin' | 'x' | 'tiktok' | 'snapchat' | 'instagram' | 'telegram' | 'discord';
 export interface SocialLink { platform: SocialPlatform; url: string }
 export interface EventReport { fileName: string; uploadedAt: string; size: number }
@@ -75,6 +75,8 @@ export interface PlatformEvent {
   /** Admin-only: the interviewer's address and one per speaker (same order as `speakers`). */
   interviewerEmail?: string;
   speakerEmails?: string[];
+  emailPreferences?: { students?: 'ar' | 'en'; organizers?: 'ar' | 'en'; interviewer?: 'ar' | 'en'; speakers?: ('ar' | 'en')[] };
+  isTestEvent?: boolean;
   hasSponsors?: boolean | null;
   sponsors?: EventSponsor[];
   report?: EventReport | null;
